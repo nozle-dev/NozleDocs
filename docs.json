@@ -1,0 +1,599 @@
+{
+  "theme": "mint",
+  "name": "Nozle",
+  "description": "AI billing & margin intelligence platform",
+  "colors": {
+    "primary": "#6366F1"
+  },
+  "logo": {
+    "light": "/images/nozle-logo.svg",
+    "dark": "/images/nozle-logo.svg"
+  },
+  "favicon": "/images/nozle-logo.svg",
+  "api": {
+    "mdx": {
+      "server": "https://api.nozle.app/api/v1",
+      "auth": {
+        "method": "bearer"
+      }
+    },
+    "playground": {
+      "display": "interactive"
+    },
+    "examples": {
+      "languages": ["curl", "python", "javascript", "go", "ruby", "php", "java"]
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "guides/getting-started/introduction",
+              "guides/getting-started/quickstart",
+              "guides/getting-started/concepts",
+              "guides/getting-started/architecture"
+            ]
+          },
+          {
+            "group": "Billing",
+            "pages": [
+              "guides/billing/event-pipeline",
+              "guides/billing/plans",
+              "guides/billing/checkout",
+              "guides/billing/subscriptions",
+              "guides/billing/invoices",
+              "guides/billing/payments"
+            ]
+          },
+          {
+            "group": "Margin Intelligence",
+            "pages": [
+              "guides/margin/overview",
+              "guides/margin/cost-models",
+              "guides/margin/dashboard",
+              "guides/margin/alerts"
+            ]
+          },
+          {
+            "group": "Entitlements",
+            "pages": [
+              "guides/entitlements/overview",
+              "guides/entitlements/can-endpoint",
+              "guides/entitlements/real-time"
+            ]
+          },
+          {
+            "group": "Self-Hosting",
+            "pages": [
+              "guides/self-hosting/docker",
+              "guides/self-hosting/environment",
+              "guides/self-hosting/production"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/authentication",
+              "api/errors",
+              "api/webhooks",
+              "api/mcp"
+            ]
+          },
+          {
+            "group": "Nozle Intelligence",
+            "pages": [
+              {
+                "group": "Entitlements",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "api/check-entitlement",
+                  "api/centrifugo-token",
+                  "POST /features",
+                  "GET /features",
+                  "PUT /features/{code}",
+                  "DELETE /features/{code}",
+                  "GET /features/{code}",
+                  "DELETE /features/{code}/privileges/{privilege_code}",
+                  "POST /plans/{code}/entitlements",
+                  "GET /plans/{code}/entitlements",
+                  "PATCH /plans/{code}/entitlements",
+                  "GET /plans/{code}/entitlements/{feature_code}",
+                  "DELETE /plans/{code}/entitlements/{feature_code}",
+                  "DELETE /plans/{code}/entitlements/{feature_code}/privileges/{privilege_code}",
+                  "GET /subscriptions/{external_id}/entitlements",
+                  "PATCH /subscriptions/{external_id}/entitlements",
+                  "DELETE /subscriptions/{external_id}/entitlements/{feature_code}",
+                  "DELETE /subscriptions/{external_id}/entitlements/{feature_code}/privileges/{privilege_code}"
+                ]
+              },
+              {
+                "group": "Checkout & Credits",
+                "expanded": false,
+                "pages": [
+                  "api/create-checkout",
+                  "api/check-and-deduct",
+                  "api/credit-balance"
+                ]
+              },
+              {
+                "group": "Margin Intelligence",
+                "expanded": false,
+                "pages": [
+                  "api/margin-summary",
+                  "api/margin-customers",
+                  "api/margin-trend",
+                  "api/margin-simulate",
+                  "api/create-cost-model",
+                  "api/list-cost-models",
+                  "api/delete-cost-model"
+                ]
+              },
+              {
+                "group": "LLM Proxy",
+                "expanded": false,
+                "pages": [
+                  "api/llm-proxy"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Billing",
+            "pages": [
+              {
+                "group": "Customers",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "POST /customers",
+                  "GET /customers",
+                  "GET /customers/{external_customer_id}",
+                  "DELETE /customers/{external_customer_id}",
+                  "GET /customers/{external_customer_id}/applied_coupons",
+                  "DELETE /customers/{external_customer_id}/applied_coupons/{applied_coupon_id}",
+                  "GET /customers/{external_customer_id}/credit_notes",
+                  "GET /customers/{external_customer_id}/invoices",
+                  "GET /customers/{external_customer_id}/payments",
+                  "GET /customers/{external_customer_id}/payment_requests",
+                  "GET /customers/{external_customer_id}/portal_url",
+                  "GET /customers/{external_customer_id}/subscriptions",
+                  "GET /customers/{external_customer_id}/current_usage",
+                  "GET /customers/{external_customer_id}/projected_usage",
+                  "GET /customers/{external_customer_id}/past_usage",
+                  "POST /customers/{external_customer_id}/checkout_url"
+                ]
+              },
+              {
+                "group": "Events",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "POST /events",
+                  "GET /events",
+                  "POST /events/batch",
+                  "POST /events/estimate_fees",
+                  "POST /events/estimate_instant_fees",
+                  "POST /events/batch_estimate_instant_fees",
+                  "GET /events/{transaction_id}"
+                ]
+              },
+              {
+                "group": "Subscriptions",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /customers/{external_customer_id}/subscriptions",
+                  "POST /subscriptions",
+                  "GET /subscriptions",
+                  "GET /subscriptions/{external_id}",
+                  "PUT /subscriptions/{external_id}",
+                  "DELETE /subscriptions/{external_id}",
+                  "GET /subscriptions/{external_id}/lifetime_usage",
+                  "PUT /subscriptions/{external_id}/lifetime_usage",
+                  "GET /subscriptions/{external_id}/alerts",
+                  "POST /subscriptions/{external_id}/alerts",
+                  "DELETE /subscriptions/{external_id}/alerts",
+                  "GET /subscriptions/{external_id}/alerts/{code}",
+                  "PUT /subscriptions/{external_id}/alerts/{code}",
+                  "DELETE /subscriptions/{external_id}/alerts/{code}",
+                  "GET /subscriptions/{external_id}/fixed_charges",
+                  "GET /subscriptions/{external_id}/charges",
+                  "GET /subscriptions/{external_id}/charges/{charge_code}",
+                  "PUT /subscriptions/{external_id}/charges/{charge_code}",
+                  "POST /subscriptions/{external_id}/charges/{charge_code}/filters",
+                  "GET /subscriptions/{external_id}/charges/{charge_code}/filters",
+                  "GET /subscriptions/{external_id}/charges/{charge_code}/filters/{filter_id}",
+                  "PUT /subscriptions/{external_id}/charges/{charge_code}/filters/{filter_id}",
+                  "DELETE /subscriptions/{external_id}/charges/{charge_code}/filters/{filter_id}",
+                  "GET /subscriptions/{external_id}/fixed_charges/{fixed_charge_code}",
+                  "PUT /subscriptions/{external_id}/fixed_charges/{fixed_charge_code}"
+                ]
+              },
+              {
+                "group": "Plans",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "POST /plans",
+                  "GET /plans",
+                  "PUT /plans/{code}",
+                  "GET /plans/{code}",
+                  "DELETE /plans/{code}",
+                  "POST /plans/{code}/metadata",
+                  "PATCH /plans/{code}/metadata",
+                  "DELETE /plans/{code}/metadata",
+                  "DELETE /plans/{code}/metadata/{key}",
+                  "POST /plans/{code}/charges",
+                  "GET /plans/{code}/charges",
+                  "GET /plans/{code}/charges/{charge_code}",
+                  "PUT /plans/{code}/charges/{charge_code}",
+                  "DELETE /plans/{code}/charges/{charge_code}",
+                  "POST /plans/{code}/charges/{charge_code}/filters",
+                  "GET /plans/{code}/charges/{charge_code}/filters",
+                  "GET /plans/{code}/charges/{charge_code}/filters/{filter_id}",
+                  "PUT /plans/{code}/charges/{charge_code}/filters/{filter_id}",
+                  "DELETE /plans/{code}/charges/{charge_code}/filters/{filter_id}",
+                  "POST /plans/{code}/fixed_charges",
+                  "GET /plans/{code}/fixed_charges",
+                  "GET /plans/{code}/fixed_charges/{fixed_charge_code}",
+                  "PUT /plans/{code}/fixed_charges/{fixed_charge_code}",
+                  "DELETE /plans/{code}/fixed_charges/{fixed_charge_code}"
+                ]
+              },
+              {
+                "group": "Billable Metrics",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "POST /billable_metrics",
+                  "GET /billable_metrics",
+                  "POST /billable_metrics/evaluate_expression",
+                  "PUT /billable_metrics/{code}",
+                  "DELETE /billable_metrics/{code}",
+                  "GET /billable_metrics/{code}"
+                ]
+              },
+              {
+                "group": "Invoices",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /customers/{external_customer_id}/invoices",
+                  "POST /invoices",
+                  "GET /invoices",
+                  "PUT /invoices/{lago_id}",
+                  "GET /invoices/{lago_id}",
+                  "POST /invoices/{lago_id}/download",
+                  "PUT /invoices/{lago_id}/finalize",
+                  "POST /invoices/{lago_id}/lose_dispute",
+                  "PUT /invoices/{lago_id}/refresh",
+                  "POST /invoices/{lago_id}/retry",
+                  "POST /invoices/{lago_id}/payment_url",
+                  "POST /invoices/preview",
+                  "POST /invoices/{lago_id}/retry_payment",
+                  "POST /invoices/{lago_id}/void"
+                ]
+              },
+              {
+                "group": "Fees",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /fees",
+                  "GET /fees/{lago_id}",
+                  "PUT /fees/{lago_id}",
+                  "DELETE /fees/{lago_id}"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Payments & Credits",
+            "pages": [
+              {
+                "group": "Wallets",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "POST /customers/{external_customer_id}/wallets",
+                  "GET /customers/{external_customer_id}/wallets",
+                  "PUT /customers/{external_customer_id}/wallets/{code}",
+                  "GET /customers/{external_customer_id}/wallets/{code}",
+                  "DELETE /customers/{external_customer_id}/wallets/{code}",
+                  "POST /customers/{external_customer_id}/wallets/{wallet_code}/metadata",
+                  "PATCH /customers/{external_customer_id}/wallets/{wallet_code}/metadata",
+                  "DELETE /customers/{external_customer_id}/wallets/{wallet_code}/metadata",
+                  "DELETE /customers/{external_customer_id}/wallets/{wallet_code}/metadata/{key}",
+                  "GET /customers/{external_customer_id}/wallets/{wallet_code}/alerts",
+                  "POST /customers/{external_customer_id}/wallets/{wallet_code}/alerts",
+                  "DELETE /customers/{external_customer_id}/wallets/{wallet_code}/alerts",
+                  "GET /customers/{external_customer_id}/wallets/{wallet_code}/alerts/{code}",
+                  "PUT /customers/{external_customer_id}/wallets/{wallet_code}/alerts/{code}",
+                  "DELETE /customers/{external_customer_id}/wallets/{wallet_code}/alerts/{code}",
+                  "POST /wallets",
+                  "GET /wallets",
+                  "PUT /wallets/{lago_id}",
+                  "GET /wallets/{lago_id}",
+                  "DELETE /wallets/{lago_id}",
+                  "POST /wallets/{lago_id}/metadata",
+                  "PATCH /wallets/{lago_id}/metadata",
+                  "DELETE /wallets/{lago_id}/metadata",
+                  "DELETE /wallets/{lago_id}/metadata/{key}",
+                  "POST /wallet_transactions",
+                  "GET /wallet_transactions/{lago_id}",
+                  "POST /wallet_transactions/{lago_id}/payment_url",
+                  "GET /wallet_transactions/{lago_id}/consumptions",
+                  "GET /wallet_transactions/{lago_id}/fundings",
+                  "GET /wallets/{lago_id}/wallet_transactions"
+                ]
+              },
+              {
+                "group": "Coupons",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "POST /applied_coupons",
+                  "GET /applied_coupons",
+                  "POST /coupons",
+                  "GET /coupons",
+                  "PUT /coupons/{code}",
+                  "GET /coupons/{code}",
+                  "DELETE /coupons/{code}",
+                  "GET /customers/{external_customer_id}/applied_coupons",
+                  "DELETE /customers/{external_customer_id}/applied_coupons/{applied_coupon_id}"
+                ]
+              },
+              {
+                "group": "Add-ons",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "POST /add_ons",
+                  "GET /add_ons",
+                  "PUT /add_ons/{code}",
+                  "GET /add_ons/{code}",
+                  "DELETE /add_ons/{code}"
+                ]
+              },
+              {
+                "group": "Credit Notes",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "POST /credit_notes",
+                  "GET /credit_notes",
+                  "PUT /credit_notes/{lago_id}",
+                  "GET /credit_notes/{lago_id}",
+                  "POST /credit_notes/{lago_id}/download",
+                  "POST /credit_notes/estimate",
+                  "PUT /credit_notes/{lago_id}/void",
+                  "POST /credit_notes/{lago_id}/metadata",
+                  "PATCH /credit_notes/{lago_id}/metadata",
+                  "DELETE /credit_notes/{lago_id}/metadata",
+                  "DELETE /credit_notes/{lago_id}/metadata/{key}",
+                  "GET /customers/{external_customer_id}/credit_notes"
+                ]
+              },
+              {
+                "group": "Taxes",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "POST /taxes",
+                  "GET /taxes",
+                  "PUT /taxes/{code}",
+                  "GET /taxes/{code}",
+                  "DELETE /taxes/{code}"
+                ]
+              },
+              {
+                "group": "Payments",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /customers/{external_customer_id}/payments",
+                  "POST /payments",
+                  "GET /payments",
+                  "GET /payments/{lago_id}"
+                ]
+              },
+              {
+                "group": "Payment Methods",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /customers/{external_customer_id}/payment_methods",
+                  "PUT /customers/{external_customer_id}/payment_methods/{lago_id}/set_as_default",
+                  "DELETE /customers/{external_customer_id}/payment_methods/{lago_id}"
+                ]
+              },
+              {
+                "group": "Payment Receipts",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /payment_receipts",
+                  "GET /payment_receipts/{lago_id}"
+                ]
+              },
+              {
+                "group": "Payment Requests",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /customers/{external_customer_id}/payment_requests",
+                  "POST /payment_requests",
+                  "GET /payment_requests",
+                  "GET /payment_requests/{lago_id}"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "System",
+            "pages": [
+              {
+                "group": "Webhook Endpoints",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "POST /webhook_endpoints",
+                  "GET /webhook_endpoints",
+                  "PUT /webhook_endpoints/{lago_id}",
+                  "GET /webhook_endpoints/{lago_id}",
+                  "DELETE /webhook_endpoints/{lago_id}"
+                ]
+              },
+              {
+                "group": "Webhooks Key",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /webhooks/public_key"
+                ]
+              },
+              {
+                "group": "Billing Entities",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /billing_entities",
+                  "POST /billing_entities",
+                  "GET /billing_entities/{code}",
+                  "PUT /billing_entities/{code}"
+                ]
+              },
+              {
+                "group": "Organizations",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "PUT /organizations"
+                ]
+              },
+              {
+                "group": "Analytics",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /analytics/gross_revenue",
+                  "GET /analytics/invoice_collection",
+                  "GET /analytics/invoiced_usage",
+                  "GET /analytics/mrr",
+                  "GET /analytics/overdue_balance",
+                  "GET /analytics/usage"
+                ]
+              },
+              {
+                "group": "Activity Logs",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /activity_logs",
+                  "GET /activity_logs/{activity_id}"
+                ]
+              },
+              {
+                "group": "API Logs",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /api_logs",
+                  "GET /api_logs/{request_id}"
+                ]
+              },
+              {
+                "group": "Customer Usage",
+                "openapi": "lago-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /customers/{external_customer_id}/current_usage",
+                  "GET /customers/{external_customer_id}/projected_usage",
+                  "GET /customers/{external_customer_id}/past_usage"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "SDKs",
+        "groups": [
+          {
+            "group": "React SDK",
+            "pages": [
+              "sdks/react/installation",
+              "sdks/react/components",
+              "sdks/react/hooks",
+              "sdks/react/gates"
+            ]
+          },
+          {
+            "group": "Node.js SDK",
+            "pages": [
+              "sdks/node/installation",
+              "sdks/node/tracking-events",
+              "sdks/node/entitlements",
+              "sdks/node/margin-queries",
+              "sdks/node/llm-auto-capture"
+            ]
+          },
+          {
+            "group": "Python SDK",
+            "pages": [
+              "sdks/python/installation",
+              "sdks/python/tracking-events",
+              "sdks/python/entitlements",
+              "sdks/python/llm-auto-capture"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Integrations",
+        "groups": [
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/stripe"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Changelog",
+        "groups": [
+          {
+            "group": "Changelog",
+            "pages": [
+              "changelog/index"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Dashboard",
+        "href": "https://app.nozle.app"
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/nozle-dev"
+    }
+  }
+}

@@ -1,0 +1,56 @@
+---
+title: Introduction
+description: What is Nozle and who is it for
+---
+
+Nozle is an AI billing and margin intelligence platform. It gives AI companies usage-based billing, real-time entitlements, and per-customer margin visibility in a single integrated stack.
+
+## Who is Nozle for?
+
+Nozle is built for AI companies that:
+
+- Bill customers based on API calls, tokens, compute time, or other usage metrics
+- Need real-time visibility into per-customer and per-model costs
+- Want feature gating and usage limits without building entitlement logic from scratch
+- Use Stripe for payments and need managed checkout flows
+
+## Key capabilities
+
+| Capability | What it does |
+|---|---|
+| **Usage-based billing** | Meter any event, aggregate in real time, and invoice automatically |
+| **Real-time entitlements** | Feature gates and usage limits evaluated at the edge with sub-100ms latency |
+| **Margin intelligence** | Per-customer, per-model cost tracking so you know your true margins |
+| **Stripe checkout** | Embedded checkout and subscription management with no custom Stripe code |
+
+## Architecture
+
+Nozle is built around two layers:
+
+1. **Nozle API** -- The backend that handles Stripe checkout, margin analytics, entitlement evaluation, and usage event ingestion. Runs at `api.nozle.app`.
+
+2. **SDKs** -- Client and server libraries that connect your application to Nozle.
+
+<Info>
+You interact with Nozle through the SDKs or REST API -- all the complexity of billing, entitlements, and margin lives behind a single API surface.
+</Info>
+
+## SDKs
+
+Nozle ships three SDKs:
+
+- **`@nozle-js/react`** -- 25+ billing components and hooks for React apps. Checkout buttons, usage meters, plan selectors, and a full billing portal out of the box.
+- **`@nozle-js/node`** -- Server-side billing operations and event tracking for Node.js. Report usage events, check entitlements, manage customers.
+- **`nozle-sdk`** (Python) -- Server-side billing for Python backends. Same capabilities as the Node SDK.
+
+## Production URLs
+
+| Service | URL |
+|---|---|
+| Dashboard | [app.nozle.app](https://app.nozle.app) |
+| API | [api.nozle.app](https://api.nozle.app) |
+| Docs | [docs.nozle.app](https://docs.nozle.app) |
+
+## Next steps
+
+Head to the [Quickstart](/guides/getting-started/quickstart) to integrate Nozle into your app in under 10 minutes, or read [Architecture](/guides/getting-started/architecture) for a deeper look at how the system fits together.

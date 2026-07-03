@@ -1,0 +1,39 @@
+---
+title: Entitlements
+description: Check feature access with nozle.can()
+---
+
+```python
+result = nozle.can("customer_123", "api_calls")
+```
+
+Returns a dict matching the Node SDK's CanResult:
+```python
+{
+    "allowed": True,
+    "used": 1500,
+    "limit": 10000,
+    "remaining": 8500,
+    "cost_per_use_cents": 2,
+    "revenue_per_use_cents": 5,
+    "margin_per_use_cents": 3,
+}
+```
+
+**Example — Guard an endpoint:**
+```python
+from fastapi import FastAPI, HTTPException
+from nozle import Nozle
+
+app = FastAPI()
+nozle = Nozle(api_key="sk_...", base_url="https://api.nozle.app", events_url="https://api.nozle.app")
+
+@app.post("/generate")
+async def generate(customer_id: str, prompt: str):
+    check = nozle.can(customer_id, "api_calls")
+    if not check["allowed"]:
+        raise HTTPException(429, detail=f"Limit reached: {check['used']}/{check['limit']}")
+    # ... proceed with generation
+```
+
+The margin fields (cost_per_use_cents, revenue_per_use_cents, margin_per_use_cents) let you make real-time decisions based on profitability.

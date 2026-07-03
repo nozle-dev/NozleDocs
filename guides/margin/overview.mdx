@@ -1,0 +1,28 @@
+---
+title: Margin Intelligence
+description: Real-time cost vs. revenue visibility for AI companies
+---
+
+Margin intelligence is unique to Nozle — no other billing platform offers it.
+
+**The problem:** AI companies bill customers per API call, per token, or per model use. But the cost to serve varies dramatically by model (GPT-4 vs GPT-3.5), by usage pattern, and by customer. Without margin visibility, you're flying blind.
+
+**What Nozle provides:**
+- Per-customer margin: how much you earn vs. spend on each customer
+- Per-model margin: which LLM models are profitable vs. loss-leaders
+- Per-metric margin: margin breakdown by billable metric
+- Per-plan margin: which pricing tiers are profitable
+- Trend analysis: margin over time with configurable granularity
+- Margin simulation: what-if analysis for pricing changes
+
+**How it works:**
+1. You define cost models (what each unit costs you)
+2. Nozle tracks usage events (what you charge customers)
+3. Nozle computes margin = revenue - cost per event, per customer, per model
+4. Data is stored for fast analytical queries
+5. Query via SDK (nozle.margin.*) or API (GET /api/v1/margin/*)
+
+**Access:**
+All margin endpoints require a secret key (sk_). Margin data is server-side only — it should not be exposed to customers.
+
+The can() endpoint returns margin fields (cost_per_use_cents, revenue_per_use_cents, margin_per_use_cents) so you can make real-time decisions based on profitability.

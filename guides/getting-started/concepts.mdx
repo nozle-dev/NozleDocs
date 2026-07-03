@@ -1,0 +1,110 @@
+---
+title: Core Concepts
+description: Plans, subscriptions, events, entitlements, and margin
+---
+
+The building blocks of Nozle. Each concept maps to a specific part of the platform -- understand these and the rest of the docs will click.
+
+## Plans
+
+A plan is a pricing tier -- Starter, Growth, Scale, Enterprise, or whatever you define. Each plan bundles three things:
+
+- **Base price** -- a flat recurring charge (monthly or annual)
+- **Usage-based charges** -- metered fees tied to event codes (e.g., \$0.002 per API call)
+- **Feature entitlements** -- what the plan unlocks (analytics access, SSO, custom models)
+
+Plans are configured in the Nozle dashboard and served to your app through the API.
+
+<CardGroup cols={2}>
+  <Card title="Plans" href="/guides/billing/plans" />
+</CardGroup>
+
+## Subscriptions
+
+A subscription assigns a customer to a plan. When a customer checks out, Nozle creates a subscription that controls what they can access and how they are billed.
+
+Subscriptions support:
+
+- **Upgrades** -- move to a higher plan mid-cycle with prorated charges
+- **Downgrades** -- move to a lower plan, effective at the next billing period
+- **Cancellation** -- end the subscription with prorated credits
+
+<CardGroup cols={2}>
+  <Card title="Subscriptions" href="/guides/billing/subscriptions" />
+  <Card title="Checkout" href="/guides/billing/checkout" />
+</CardGroup>
+
+## Events
+
+Events are usage data points sent from your application via the SDK's `track()` method. Each event contains:
+
+| Field | Description |
+|-------|-------------|
+| `customer_id` | Who generated the usage |
+| `event_code` | What was used (maps to a billable metric) |
+| `properties` | Metadata -- model name, token count, region, etc. |
+
+The event pipeline flows: **SDK** → **Nozle API** → **aggregation and billing**.
+
+Events drive both usage-based charges and entitlement consumption (counting toward limits).
+
+<CardGroup cols={2}>
+  <Card title="Event Pipeline" href="/guides/billing/event-pipeline" />
+  <Card title="Node SDK" href="/sdks/node/installation" />
+</CardGroup>
+
+## Entitlements
+
+Entitlements define what a customer can do based on their plan. There are two types:
+
+**Feature gates** -- boolean access checks. Either the plan includes a feature or it does not.
+
+```
+can("analytics")       // → true or false
+can("custom-models")   // → true or false
+```
+
+**Usage limits** -- numeric caps that reset each billing period.
+
+```
+can("api-calls")       // → { allowed: true, remaining: 8420 }
+can("team-members")    // → { allowed: false, remaining: 0 }
+```
+
+Entitlements are checked via the [`can()` endpoint](/guides/entitlements/can-endpoint) (REST) or the `useCan()` hook (React SDK). Updates propagate in real-time over WebSocket -- no polling required.
+
+<CardGroup cols={2}>
+  <Card title="Entitlements Overview" href="/guides/entitlements/overview" />
+  <Card title="Real-time Updates" href="/guides/entitlements/real-time" />
+</CardGroup>
+
+## Margin
+
+Margin intelligence is what separates Nozle from a billing system. Nozle tracks the **cost** of each usage unit -- per LLM model, per token type, per provider -- and compares it against what you **charge**.
+
+This gives you:
+
+- **Per-customer margin** -- who is profitable, who is not
+- **Per-model cost tracking** -- which models eat into margin
+- **Alerts** -- get notified when margin drops below a threshold
+
+Margin data is computed by the Nozle API and returned alongside billing data.
+
+<CardGroup cols={2}>
+  <Card title="Margin Overview" href="/guides/margin/overview" />
+  <Card title="Cost Models" href="/guides/margin/cost-models" />
+</CardGroup>
+
+## API Keys
+
+Nozle uses two types of API keys to separate client-safe and server-only operations:
+
+| Key prefix | Name | Use case |
+|------------|------|----------|
+| `pk_` | Publishable | Safe for client-side code. Used by the React SDK for entitlement checks, checkout, and plan display. |
+| `sk_` | Secret | Server-only. Used for sending events, managing subscriptions, configuring cost models, and reading margin data. Never expose in a browser. |
+
+<CardGroup cols={2}>
+  <Card title="Node SDK (secret key)" href="/sdks/node/installation" />
+  <Card title="React SDK (publishable key)" href="/sdks/react/installation" />
+</CardGroup>

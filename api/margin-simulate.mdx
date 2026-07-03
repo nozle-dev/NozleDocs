@@ -1,0 +1,24 @@
+---
+title: "Simulate Margin"
+api: "POST /margin/simulate"
+---
+
+Simulate margin impact of pricing or cost changes before applying them.
+
+**Auth:** `sk_` only
+
+<Warning>
+All margin endpoints require a secret key (`sk_`). These endpoints expose cost data that should never be visible to your end users.
+</Warning>
+
+<ParamField body="plan_code" type="string" required>
+  Plan code to simulate changes for
+</ParamField>
+
+<ParamField body="new_price_cents" type="number">
+  New price in cents to simulate
+</ParamField>
+
+<ParamField body="cost_change_percent" type="number">
+  Percentage change in cost to simulate
+</ParamField>

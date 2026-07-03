@@ -1,0 +1,52 @@
+---
+title: Tracking Events
+description: Send usage events with nozle.track()
+---
+
+```python
+nozle.track(
+    customer_id="customer_123",
+    event="api_call",
+    metadata={"model": "gpt-4", "tokens": 1500},
+    subscription_id="sub_abc",      # optional
+    transaction_id="tx_unique",     # optional, for idempotency
+    timestamp="2024-01-15T10:30:00Z",  # optional
+)
+```
+
+## Parameters
+
+- **customer_id** (`str`): External customer ID
+- **event** (`str`): Event code matching a billable metric in your workspace
+- **metadata** (`dict`, optional): Properties for aggregation
+- **subscription_id** (`str`, optional): Target specific subscription
+- **transaction_id** (`str`, optional): Idempotency key (auto-generated if omitted)
+- **timestamp** (`str`, optional): ISO 8601 timestamp
+
+This calls `POST /api/v1/events` on the Nozle API with the same payload format as the Node SDK.
+
+## Example — Track LLM usage in a FastAPI app
+
+```python
+from fastapi import FastAPI
+from nozle import Nozle
+import openai
+
+app = FastAPI()
+nozle = Nozle(api_key="sk_...", base_url="https://api.nozle.app", events_url="https://api.nozle.app")
+
+@app.post("/chat")
+async def chat(customer_id: str, message: str):
+    response = openai.chat.completions.create(
+        model="gpt-4", messages=[{"role": "user", "content": message}]
+    )
+    nozle.track(
+        customer_id=customer_id,
+        event="llm_tokens",
+        metadata={
+            "model": response.model,
+            "tokens": response.usage.total_tokens,
+        },
+    )
+    return {"reply": response.choices[0].message.content}
+```

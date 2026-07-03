@@ -1,0 +1,32 @@
+---
+title: "Check & Deduct Credits"
+api: "POST /check-and-deduct"
+---
+
+Atomically check if a customer has sufficient credit balance and deduct in a single database transaction. Uses row-level locking to prevent race conditions under concurrent requests.
+
+**Auth:** `sk_` only
+
+<ParamField body="customer_id" type="string" required>
+  External customer ID
+</ParamField>
+
+<ParamField body="feature" type="string" required>
+  Feature being consumed
+</ParamField>
+
+<ParamField body="credits" type="number" required>
+  Number of credits to deduct (must be positive)
+</ParamField>
+
+<ResponseField name="allowed" type="boolean" required>
+  Whether sufficient balance existed to fulfill the deduction
+</ResponseField>
+
+<ResponseField name="remaining" type="number" required>
+  Credit balance after deduction (or unchanged balance if denied)
+</ResponseField>
+
+<Note>
+When `allowed` is `false`, no credits are deducted. The `remaining` field returns the current balance as-is.
+</Note>

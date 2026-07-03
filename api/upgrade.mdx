@@ -1,0 +1,24 @@
+---
+title: "Upgrade Plan"
+api: "POST /billing/upgrade"
+---
+
+Upgrade a customer's current plan. Proration is handled automatically -- the customer is credited for the unused portion of their current plan and charged the prorated amount for the new plan.
+
+**Auth:** `pk_` (publishable key) or `sk_` (secret key).
+
+<ParamField body="customer_id" type="string" required>
+  External customer ID.
+</ParamField>
+
+<ParamField body="plan_code" type="string" required>
+  The plan code to upgrade the customer to.
+</ParamField>
+
+### Response
+
+Returns the updated subscription details.
+
+<Note>
+  Also available as `POST /subscriptions/change` (alias). Use `POST /subscriptions/preview` to preview upgrade costs before committing.
+</Note>

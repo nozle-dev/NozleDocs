@@ -1,0 +1,32 @@
+---
+title: "List Plans"
+api: "GET /plans"
+---
+
+List all available plans. Useful for building pricing tables and plan selectors in your frontend.
+
+**Auth:** `pk_` (publishable key) or `sk_` (secret key).
+
+### Response
+
+Returns an array of plan objects.
+
+<ResponseField name="code" type="string" required>
+  Unique plan identifier (e.g. `starter`, `pro`, `enterprise`).
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Human-readable plan name.
+</ResponseField>
+
+<ResponseField name="amount_cents" type="number" required>
+  Plan price in cents (e.g. `2999` for $29.99).
+</ResponseField>
+
+<ResponseField name="amount_currency" type="string" required>
+  ISO 4217 currency code (e.g. `USD`).
+</ResponseField>
+
+<ResponseField name="interval" type="string" required>
+  Billing interval: `monthly` or `yearly`.
+</ResponseField>

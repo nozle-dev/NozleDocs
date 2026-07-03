@@ -1,0 +1,481 @@
+---
+title: Hooks
+description: React hooks for billing data, entitlements, and checkout
+---
+
+All hooks must be used inside a [`<BillingProvider>`](/sdks/react/installation). They handle loading states, errors, and cleanup automatically.
+
+```tsx
+import {
+  useCan,
+  useUsage,
+  useCredits,
+  usePlan,
+  usePlans,
+  useCheckout,
+  useSubscribe,
+  useNozleClient,
+  useBillingContext,
+} from '@nozle-js/react';
+```
+
+---
+
+## useCan
+
+Check whether a customer is entitled to use a feature. Fetches the initial state via the API, then subscribes to a WebSocket channel for live updates -- no polling.
+
+### Signature
+
+```ts
+function useCan(customerId: string, featureKey: string): CanState
+```
+
+### Return type
+
+```ts
+interface CanState {
+  allowed: boolean;
+  remaining: number | null;
+  limit: number | null;
+  loading: boolean;
+  error: string | null;
+}
+```
+
+### How it works
+
+1. Calls `client.can(customerId, featureKey)` on mount to get the initial entitlement state.
+2. Opens a WebSocket subscription on `workspace:\{workspaceId\}:entitlements`.
+3. When a publication arrives for the matching customer and feature, state updates instantly.
+
+<Info>
+Real-time updates require `workspaceId` and `centrifugoUrl` (WebSocket URL) to be set on `BillingProvider`. Without them, the hook still works but only returns the initial API result.
+</Info>
+
+### Example
+
+```tsx title="components/ApiCallButton.tsx"
+import { useCan } from '@nozle-js/react';
+
+function ApiCallButton({ customerId }: { customerId: string }) {
+  const { allowed, remaining, limit, loading, error } = useCan(
+    customerId,
+    'api_calls'
+  );
+
+  if (loading) return <p>Checking access...</p>;
+  if (error) return <p>Error: {error}</p>;
+
+  return (
+    <div>
+      <button disabled={!allowed}>Make API Call</button>
+      {remaining !== null && (
+        <p>
+          {remaining} / {limit} calls remaining
+        </p>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## useUsage
+
+Fetch the current usage value for a specific metric.
+
+### Signature
+
+```ts
+function useUsage(customerId: string, metricKey: string): UsageState
+```
+
+### Return type
+
+```ts
+interface UsageState {
+  value: number | null;
+  loading: boolean;
+  error: string | null;
+}
+```
+
+### How it works
+
+Calls `GET /api/v1/usage/:customerId/:metricKey` on mount. The request includes a timeout (default 5s) and Authorization header from the provider's API key.
+
+### Example
+
+```tsx title="components/TokenCounter.tsx"
+import { useUsage } from '@nozle-js/react';
+
+function TokenCounter({ customerId }: { customerId: string }) {
+  const { value, loading, error } = useUsage(customerId, 'tokens_used');
+
+  if (loading) return <span>Loading usage...</span>;
+  if (error) return <span>Failed to load usage</span>;
+
+  return (
+    <div>
+      <strong>{value?.toLocaleString()}</strong> tokens used this period
+    </div>
+  );
+}
+```
+
+---
+
+## useCredits
+
+Fetch the current credit balance for a customer.
+
+### Signature
+
+```ts
+function useCredits(customerId: string): CreditsState
+```
+
+### Return type
+
+```ts
+interface CreditsState {
+  balance: number | null;
+  loading: boolean;
+  error: string | null;
+}
+```
+
+### How it works
+
+Calls `GET /api/v1/credits/:customerId/balance` on mount. Returns the customer's prepaid credit balance.
+
+### Example
+
+```tsx title="components/CreditDisplay.tsx"
+import { useCredits } from '@nozle-js/react';
+
+function CreditDisplay({ customerId }: { customerId: string }) {
+  const { balance, loading, error } = useCredits(customerId);
+
+  if (loading) return <p>Loading balance...</p>;
+  if (error) return <p>Could not load credits</p>;
+
+  return (
+    <p>
+      Credit balance: <strong>${(balance ?? 0).toFixed(2)}</strong>
+    </p>
+  );
+}
+```
+
+---
+
+## usePlan
+
+Return the current plan and subscription status from the entitlements store. This hook uses `useSyncExternalStore` for tear-free reads.
+
+### Signature
+
+```ts
+function usePlan(): UsePlanResult
+```
+
+### Return type
+
+```ts
+interface UsePlanResult {
+  data: {
+    plan_slug: string;
+    subscription_status: string;
+  } | null;
+  isLoading: boolean;
+  error: Error | null;
+}
+```
+
+### How it works
+
+Reads from the `BillingStore` snapshot. The store is populated when any entitlement check (`useCan`, `fetchUsage`) runs, so `usePlan` reflects the most recent entitlement data without an extra network call.
+
+### Example
+
+```tsx title="components/PlanIndicator.tsx"
+import { usePlan } from '@nozle-js/react';
+
+function PlanIndicator() {
+  const { data, isLoading, error } = usePlan();
+
+  if (isLoading) return <span>Loading plan...</span>;
+  if (error) return <span>Error loading plan</span>;
+  if (!data) return <span>No active plan</span>;
+
+  return (
+    <span>
+      Plan: <strong>{data.plan_slug}</strong> ({data.subscription_status})
+    </span>
+  );
+}
+```
+
+---
+
+## usePlans
+
+Fetch all available plans from the API.
+
+### Signature
+
+```ts
+function usePlans(): { plans: Plan[]; isLoading: boolean }
+```
+
+### Return type
+
+```ts
+interface Plan {
+  code: string;
+  name: string;
+  amount_cents: number;
+  amount_currency: string;
+  interval: string;
+}
+```
+
+### How it works
+
+Calls `GET /v1/plans` via the store on mount. Returns the full list of plans configured in your Nozle workspace.
+
+### Example
+
+```tsx title="components/PlanSelector.tsx"
+import { usePlans } from '@nozle-js/react';
+
+function PlanSelector() {
+  const { plans, isLoading } = usePlans();
+
+  if (isLoading) return <p>Loading plans...</p>;
+
+  return (
+    <ul>
+      {plans.map((plan) => (
+        <li key={plan.code}>
+          {plan.name} --{' '}
+          {(plan.amount_cents / 100).toFixed(2)} {plan.amount_currency}/
+          {plan.interval}
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+---
+
+## useCheckout
+
+Access Stripe payment confirmation from inside a [`<Checkout>`](/sdks/react/components) component.
+
+<Warning>
+`useCheckout` must be called inside a `<Checkout>` component. It relies on Stripe Elements context that `<Checkout>` provides.
+</Warning>
+
+### Signature
+
+```ts
+function useCheckout(): UseCheckoutResult
+```
+
+### Return type
+
+```ts
+interface UseCheckoutResult {
+  /** Trigger Stripe payment confirmation programmatically */
+  confirmPayment: () => Promise<void>;
+  /** True while a payment confirmation is in-flight */
+  isProcessing: boolean;
+  /** Last payment error, or null */
+  error: Error | null;
+}
+```
+
+### How it works
+
+The `<Checkout>` component wraps Stripe Elements and exposes a context. `useCheckout` reads that context to let you build custom payment UIs or trigger confirmation from outside the default button.
+
+### Example
+
+```tsx title="components/CustomCheckout.tsx"
+import { Checkout, useCheckout } from '@nozle-js/react';
+
+function PayButton() {
+  const { confirmPayment, isProcessing, error } = useCheckout();
+
+  return (
+    <div>
+      <button onClick={confirmPayment} disabled={isProcessing}>
+        {isProcessing ? 'Processing...' : 'Confirm Payment'}
+      </button>
+      {error && <p style={{ color: 'red' }}>{error.message}</p>}
+    </div>
+  );
+}
+
+function CheckoutPage({ clientSecret }: { clientSecret: string }) {
+  return (
+    <Checkout
+      clientSecret={clientSecret}
+      publishableKey="pk_live_..."
+      onSuccess={(id) => console.log('Paid!', id)}
+    >
+      <PayButton />
+    </Checkout>
+  );
+}
+```
+
+---
+
+## useSubscribe
+
+Create a subscription server-side. Calls `POST /v1/subscribe` with the plan code and customer ID from the store.
+
+<Warning>
+This hook posts to a server endpoint. If your API key is a publishable key (`pk_`), the server must handle authorization. For full server-side subscription creation, use a secret key (`sk_`) in a backend route instead.
+</Warning>
+
+### Signature
+
+```ts
+function useSubscribe(): UseSubscribeResult
+```
+
+### Return type
+
+```ts
+interface UseSubscribeResult {
+  subscribe: (planCode: string) => Promise<any>;
+  isLoading: boolean;
+  error: Error | null;
+}
+```
+
+### Example
+
+```tsx title="components/SubscribeButton.tsx"
+import { useSubscribe } from '@nozle-js/react';
+
+function SubscribeButton({ planCode }: { planCode: string }) {
+  const { subscribe, isLoading, error } = useSubscribe();
+
+  async function handleClick() {
+    try {
+      await subscribe(planCode);
+      alert('Subscribed successfully!');
+    } catch {
+      // error state is set automatically
+    }
+  }
+
+  return (
+    <div>
+      <button onClick={handleClick} disabled={isLoading}>
+        {isLoading ? 'Subscribing...' : `Subscribe to ${planCode}`}
+      </button>
+      {error && <p style={{ color: 'red' }}>{error.message}</p>}
+    </div>
+  );
+}
+```
+
+---
+
+## useNozleClient
+
+Access the raw `NozleClient` instance for making custom API calls.
+
+### Signature
+
+```ts
+function useNozleClient(): NozleClient
+```
+
+### Return type
+
+```ts
+interface NozleClient {
+  apiKey: string;
+  baseUrl: string;
+  fetch(path: string, init?: RequestInit): Promise<Response>;
+  can(customerId: string, feature: string): Promise<CanResult>;
+}
+```
+
+The `fetch` method automatically injects the `Authorization` header and base URL, so you only need to pass the path.
+
+<Warning>
+Throws an error if called outside of `<BillingProvider>`.
+</Warning>
+
+### Example
+
+```tsx title="components/CustomApiCall.tsx"
+import { useNozleClient } from '@nozle-js/react';
+
+function InvoiceDownloader({ invoiceId }: { invoiceId: string }) {
+  const client = useNozleClient();
+
+  async function download() {
+    const res = await client.fetch(`/api/v1/invoices/${invoiceId}/pdf`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url);
+  }
+
+  return <button onClick={download}>Download Invoice</button>;
+}
+```
+
+---
+
+## useBillingContext
+
+Access the full billing context, including the client, workspace ID, and WebSocket connection details.
+
+### Signature
+
+```ts
+function useBillingContext(): BillingContextValue
+```
+
+### Return type
+
+```ts
+interface BillingContextValue {
+  client: NozleClient | null;
+  workspaceId: string;
+  centrifugoUrl: string;
+  centrifugoToken: string | null;
+}
+```
+
+### Example
+
+```tsx title="components/ConnectionStatus.tsx"
+import { useBillingContext } from '@nozle-js/react';
+
+function ConnectionStatus() {
+  const { centrifugoToken, workspaceId } = useBillingContext();
+
+  return (
+    <div>
+      <p>Workspace: {workspaceId || 'Not set'}</p>
+      <p>
+        Real-time:{' '}
+        {centrifugoToken ? 'Connected' : 'Not connected'}
+      </p>
+    </div>
+  );
+}
+```

@@ -1,0 +1,36 @@
+---
+title: Webhooks
+description: Stripe webhook events and signature verification
+---
+
+Nozle processes Stripe webhooks at `POST /webhooks/stripe`.
+
+**How it works:**
+1. Stripe sends webhook events to your Nozle API's /webhooks/stripe endpoint
+2. Nozle verifies the Stripe signature header
+3. Based on the event type, Nozle updates subscription state, activates features, etc.
+
+**Key events processed:**
+
+| Event | What Nozle Does |
+|-------|----------------|
+| checkout.session.completed | Activates subscription, provisions plan entitlements |
+| customer.subscription.updated | Updates subscription state (upgrades, downgrades) |
+| customer.subscription.deleted | Deactivates subscription |
+| invoice.paid | Marks invoice as paid |
+| invoice.payment_failed | Triggers dunning/retry flow |
+
+**Plan features provisioned on subscription:**
+
+Starter plan: base features only
+Growth plan: revenue_analytics, remove_branding_watermark, auto_dunning, progressive_billing, lifetime_usage
+Scale plan: everything in Growth PLUS netsuite, xero, hubspot, salesforce, okta, avalara, api_permissions, custom_roles, forecasted_usage, security_logs, from_email, issue_receipts, manual_payments, multi_entities_pro
+
+**Setup:**
+Configure your Stripe webhook endpoint in the Stripe Dashboard pointing to:
+```
+https://api.nozle.app/webhooks/stripe
+```
+
+Configure the webhook signing secret in the Nozle dashboard under **Settings > Stripe**.
+

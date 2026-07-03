@@ -1,0 +1,75 @@
+---
+title: The can() Endpoint
+description: Deep-dive into GET /api/v1/can
+---
+
+The `can()` endpoint is the core of Nozle's entitlement system.
+
+## Request
+
+```
+GET /api/v1/can?customer_id=cust_123&feature=api_calls
+Authorization: Bearer pk_live_... (or sk_live_...)
+```
+
+## Response
+
+```json
+{
+  "allowed": true,
+  "used": 1500,
+  "limit": 10000,
+  "remaining": 8500,
+  "cost_per_use_cents": 2,
+  "revenue_per_use_cents": 5,
+  "margin_per_use_cents": 3,
+  "min_margin_percent": 20
+}
+```
+
+## Field reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `allowed` | `boolean` | Whether the customer can use this feature |
+| `reason` | `string?` | Why access was denied (if `!allowed`) |
+| `used` | `number` | Current usage count this billing period |
+| `limit` | `number` | Usage cap for this feature |
+| `remaining` | `number` | `limit - used` |
+| `cost_per_use_cents` | `number` | Your cost per unit (from cost model) |
+| `revenue_per_use_cents` | `number` | What you charge per unit (from plan pricing) |
+| `margin_per_use_cents` | `number` | `revenue - cost` per unit |
+| `min_margin_percent` | `number?` | Minimum margin threshold if configured |
+
+## Performance
+
+- **Cached**: ~5ms p99 response time
+- Cache is invalidated when subscription changes or usage counters update
+- Automatic fallback if cache is unavailable
+
+## Denial reasons
+
+- No active subscription
+- Feature not included in plan
+- Usage limit exceeded
+- Subscription expired/cancelled
+
+## SDK wrappers
+
+**Node:**
+
+```ts
+nozle.can('cust_123', 'api_calls')
+```
+
+**Python:**
+
+```python
+nozle.can('cust_123', 'api_calls')
+```
+
+**React:**
+
+```tsx
+useCan('cust_123', 'api_calls') // with real-time WebSocket updates
+```

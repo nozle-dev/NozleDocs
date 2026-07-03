@@ -1,0 +1,20 @@
+---
+title: "Cancel Subscription"
+api: "DELETE /subscriptions/{id}"
+---
+
+Cancel a subscription. The cancellation takes effect at the end of the current billing period -- the customer retains access until then.
+
+**Auth:** `pk_` (publishable key) or `sk_` (secret key).
+
+<ParamField path="id" type="string" required>
+  The subscription ID to cancel.
+</ParamField>
+
+<ParamField body="reason" type="string">
+  Optional cancellation reason for your records.
+</ParamField>
+
+### Response
+
+Returns the updated subscription with a `canceled` status and the `ends_at` timestamp indicating when access expires.

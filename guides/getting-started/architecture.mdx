@@ -1,0 +1,84 @@
+---
+title: Architecture
+description: How Nozle's platform components connect
+---
+
+Nozle is a unified platform: a single API that handles billing, entitlements, margin intelligence, and payment processing via Stripe.
+
+## Overview
+
+```
+Your App
+  │
+  ├──► React SDK ──► Nozle API (api.nozle.app)
+  │                      │
+  │                      ├──► Billing ──► Invoices, Subscriptions
+  │                      │
+  │                      ├──► Stripe ──► Payments
+  │                      │
+  │                      └──► WebSocket ──► Real-time updates to React SDK
+  │
+  └──► Node/Python SDK ──► Nozle API
+```
+
+## Nozle API
+
+The primary API surface at `api.nozle.app`. Every request from your application hits this layer.
+
+**What it handles:**
+
+- **Authentication** — API key validation with publishable (`pk_`) and secret (`sk_`) scoping
+- **Entitlements** — `can()` endpoint with low-latency caching for sub-millisecond feature checks
+- **Checkout** — creates Stripe Checkout sessions and processes webhooks for subscription activation
+- **Margin intelligence** — cost-vs-revenue analytics by customer, model, metric, and plan
+- **Cost models** — define what each usage unit costs you
+- **Billing** — usage-based invoicing, subscription management, and plan configuration
+- **Subscription management** — orchestrates subscriptions with proration, upgrades, and cancellation
+
+Your application never talks to internal billing services directly. All access goes through the Nozle API.
+
+## Stripe
+
+Stripe handles payments. Nozle uses Stripe for:
+
+- **Checkout sessions** — customers enter payment details via Stripe's hosted UI
+- **Webhook processing** — successful payments and subscription changes trigger backend updates
+- **Subscription activation** — when Stripe confirms a checkout, the Nozle API activates the subscription and provisions entitlements
+
+## Real-Time Updates
+
+When billing state changes — a plan upgrade, usage limit reached, or feature toggled — the update pushes to connected React SDK clients via WebSocket. No polling required.
+
+This means your UI reacts to billing changes instantly. A customer completes checkout, and their feature gates unlock without a page refresh.
+
+## Request Flow Examples
+
+### Checking an entitlement
+
+```
+Your App → SDK calls can("feature-x")
+  → Nozle API checks cache
+    → Cache hit: returns allow/deny in < 1ms
+    → Cache miss: queries billing data, caches result, returns
+```
+
+### Reporting usage
+
+```
+Your Server → SDK calls nozle.track(...)
+  → Nozle API validates API key
+    → Event is ingested and aggregated against billable metric
+      → Reflected in next invoice
+```
+
+### Customer checkout
+
+```
+Your App → SDK opens checkout
+  → Nozle API creates Stripe Checkout Session
+    → Customer enters payment details on Stripe
+      → Stripe webhook hits Nozle API
+        → Subscription activated, entitlements provisioned
+          → WebSocket pushes update to React SDK
+            → UI unlocks features instantly
+```

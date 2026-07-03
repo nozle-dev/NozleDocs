@@ -1,0 +1,221 @@
+---
+title: Quickstart
+description: Go from zero to tracking your first billable event in 5 minutes
+---
+
+<Steps>
+
+<Step>
+## Create your Nozle account
+
+Sign up at [app.nozle.app](https://app.nozle.app) and create your first workspace.
+</Step>
+
+<Step>
+## Get your API keys
+
+From the dashboard, navigate to **Settings > API Keys**. You will see two keys:
+
+| Key prefix | Purpose | Use in |
+|------------|---------|--------|
+| `pk_` | Publishable key | Client-side (React, browser) |
+| `sk_` | Secret key | Server-side only (Node.js, Python) |
+
+<Warning>
+Never expose your `sk_` secret key in client-side code. Use the `pk_` publishable key for React components.
+</Warning>
+</Step>
+
+<Step>
+## Install the SDK
+
+<Tabs items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+```bash
+npm install @nozle-js/node
+```
+</Tab>
+<Tab value="Python">
+```bash
+pip install nozle-sdk
+```
+</Tab>
+</Tabs>
+</Step>
+
+<Step>
+## Initialize the client
+
+Create a Nozle client instance with your secret key.
+
+<Tabs items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+```ts title="nozle.ts"
+import { Nozle } from '@nozle-js/node';
+
+const nozle = new Nozle({
+  apiKey: 'sk_...',
+  baseUrl: 'https://api.nozle.app',
+  eventsUrl: 'https://api.nozle.app',
+});
+```
+</Tab>
+<Tab value="Python">
+```python title="nozle_client.py"
+from nozle import Nozle
+
+nozle = Nozle(
+    api_key="sk_...",
+    base_url="https://api.nozle.app",
+    events_url="https://api.nozle.app",
+)
+```
+</Tab>
+</Tabs>
+</Step>
+
+<Step>
+## Track your first event
+
+Send a billable event with metadata. Nozle automatically resolves the customer's active subscription.
+
+<Tabs items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+```ts
+await nozle.track('customer_123', 'api_call', {
+  model: 'gpt-4',
+  tokens: 1500,
+});
+```
+</Tab>
+<Tab value="Python">
+```python
+nozle.track("customer_123", "api_call", {
+    "model": "gpt-4",
+    "tokens": 1500,
+})
+```
+</Tab>
+</Tabs>
+
+Events are matched against your billable metric definitions in the dashboard. The `tokens` property can drive usage-based charges, while the event name (`api_call`) increments count-based meters.
+</Step>
+
+<Step>
+## Check entitlements
+
+Before executing an expensive operation, check whether the customer still has capacity on their plan.
+
+<Tabs items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+```ts
+const result = await nozle.can('customer_123', 'api_calls');
+// {
+//   allowed: true,
+//   remaining: 8500,
+//   limit: 10000,
+//   used: 1500
+// }
+
+if (!result.allowed) {
+  throw new Error('Usage limit reached — upgrade your plan');
+}
+```
+</Tab>
+<Tab value="Python">
+```python
+result = nozle.can("customer_123", "api_calls")
+# {
+#   "allowed": True,
+#   "remaining": 8500,
+#   "limit": 10000,
+#   "used": 1500
+# }
+
+if not result["allowed"]:
+    raise Exception("Usage limit reached — upgrade your plan")
+```
+</Tab>
+</Tabs>
+
+The response includes `remaining`, `limit`, and `used` fields so you can show usage progress in your UI.
+</Step>
+
+<Step>
+## Add React billing components
+
+Install the React SDK to get pre-built billing UI components.
+
+```bash
+npm install @nozle-js/react
+```
+
+Wrap your app with `BillingProvider` using your **publishable** key:
+
+```tsx title="app/providers.tsx"
+import { BillingProvider } from '@nozle-js/react';
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <BillingProvider apiKey="pk_...">
+      {children}
+    </BillingProvider>
+  );
+}
+```
+</Step>
+
+<Step>
+## Show a pricing table and checkout
+
+Drop in a `PricingTable` to display your plans, and use `CheckoutButton` to let customers subscribe.
+
+```tsx title="app/pricing/page.tsx"
+import { PricingTable, CheckoutButton } from '@nozle-js/react';
+
+export default function PricingPage() {
+  return (
+    <div>
+      <h1>Choose your plan</h1>
+      <PricingTable
+        customerId="customer_123"
+        renderAction={(plan) => (
+          <CheckoutButton
+            customerId="customer_123"
+            planCode={plan.code}
+            successUrl="/dashboard"
+          >
+            Get started
+          </CheckoutButton>
+        )}
+      />
+    </div>
+  );
+}
+```
+
+You can also gate features in your UI with the `useCan` hook:
+
+```tsx
+import { useCan } from '@nozle-js/react';
+
+function AiFeature({ customerId }: { customerId: string }) {
+  const { allowed, remaining } = useCan(customerId, 'api_calls');
+
+  if (!allowed) {
+    return <p>You have used all your API calls. Upgrade to continue.</p>;
+  }
+
+  return <p>You have {remaining} API calls remaining.</p>;
+}
+```
+</Step>
+
+</Steps>
+
+## What's next
+
+- [SDK Reference](/sdks/react/installation) -- full API docs for Node.js, Python, and React
+- [Billing Concepts](/guides/getting-started/concepts) -- plans, metrics, and subscriptions
+- [Entitlements](/guides/entitlements/overview) -- advanced gating with margin-aware rules
+- [Self-Hosting](/guides/self-hosting/docker) -- deploy Nozle in your own infrastructure

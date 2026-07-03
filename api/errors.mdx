@@ -1,0 +1,36 @@
+---
+title: Errors
+description: Error codes and rate limits
+---
+
+**HTTP Status Codes:**
+
+| Status | Meaning |
+|--------|---------|
+| 200 | Success |
+| 400 | Bad request — missing or invalid parameters |
+| 401 | Unauthorized — missing or invalid API key |
+| 403 | Forbidden — key doesn't have permission (e.g., pk_ key on sk_-only endpoint) |
+| 404 | Not found — resource doesn't exist |
+| 429 | Rate limited — too many requests |
+| 500 | Internal server error |
+
+**Error Response Format:**
+```json
+{
+  "error": "description of what went wrong"
+}
+```
+
+**Rate Limits:**
+- Default: 10 requests/second per API key
+- Events endpoint (track): higher limit for batch ingestion
+- Rate limit headers are not currently returned (planned)
+
+**Common errors and fixes:**
+
+"invalid api key" → Check your key prefix (pk_ vs sk_) and that it hasn't been revoked
+"customer not found" → The external_customer_id doesn't match any customer in your workspace
+"feature not found" → The feature key doesn't match any entitlement on the customer's plan
+"subscription not active" → Customer doesn't have an active subscription
+"insufficient credits" → Credit balance too low for the operation

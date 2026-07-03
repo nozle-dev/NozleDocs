@@ -1,0 +1,41 @@
+---
+title: Events
+description: Track usage events from your application
+---
+
+
+Base URL: `https://api.nozle.app/api/v1`
+
+Events are tracked via the SDKs (`nozle.track()`) rather than a direct REST endpoint. The SDKs batch and send events to the engine automatically.
+
+<Info>
+See the [Node.js Event Tracking](/sdks/node/tracking-events) or [Python Event Tracking](/sdks/python/tracking-events) guides for SDK-based event ingestion.
+</Info>
+
+## How it works
+
+1. Your application calls `nozle.track()` with a metric code, customer ID, and optional properties
+2. The SDK batches events and sends them to `POST /api/v1/events` internally
+3. The engine processes events for billing aggregation and margin calculation
+
+## Event structure
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `customer_id` | string | Yes | External customer ID |
+| `metric_code` | string | Yes | Billable metric code (e.g. `api_calls`, `llm_tokens`) |
+| `value` | number | No | Usage quantity (default: 1) |
+| `properties` | object | No | Additional metadata (e.g. `model`, `region`) |
+| `timestamp` | string | No | ISO 8601 timestamp (default: now) |
+
+```bash title="cURL (direct, for testing)"
+curl -X POST https://api.nozle.app/api/v1/events \
+  -H "Authorization: Bearer sk_live_your_secret_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "cust_123",
+    "metric_code": "api_calls",
+    "value": 1,
+    "properties": {"endpoint": "/v1/chat"}
+  }'
+```

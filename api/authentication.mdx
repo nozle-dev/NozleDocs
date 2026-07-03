@@ -1,0 +1,53 @@
+---
+title: Authentication
+description: API key types, base URLs, and how to authenticate requests
+---
+
+## Base URLs
+
+The Nozle API has two base URLs depending on the type of endpoint:
+
+| Base URL | Endpoints | Description |
+|----------|-----------|-------------|
+| `https://api.nozle.app/api/v1` | Entitlements, Checkout, Margin, Cost Models, Credits, LLM Proxy | Nozle intelligence layer — features built on top of the billing engine |
+| `https://core.nozle.app/api/v1` | Customers, Events, Plans, Subscriptions, Invoices, Wallets, and all other billing resources | Full billing engine API |
+
+<Info>
+Each endpoint page shows the correct base URL in the code examples on the right. You don't need to memorize which URL to use — just copy the snippet.
+</Info>
+
+## API Keys
+
+**Two key types:**
+
+| Key Type | Prefix | Use | Example |
+|----------|--------|-----|---------|
+| Publishable | `pk_` | Client-side (React SDK, browsers) | `pk_live_abc123...` |
+| Secret | `sk_` | Server-side only (Node/Python SDKs, cURL) | `sk_live_xyz789...` |
+
+All authenticated endpoints require a Bearer token in the Authorization header:
+
+```
+Authorization: Bearer sk_live_your_secret_key
+```
+
+## Key Scoping
+
+- **Publishable keys** (`pk_`) can access: `can`, plans, checkout, billing status, subscriptions, invoices, credits, ws-token
+- **Secret keys** (`sk_`) can access everything above PLUS: subscribe, cost-models, admin/reload, margin/*, and all billing engine endpoints
+
+## Public Endpoints
+
+These do not require an API key:
+
+- `POST /api/v1/auth/send-otp`
+- `POST /api/v1/auth/verify-otp`
+- `POST /api/v1/auth/signup`
+
+## Getting Your Keys
+
+Sign in at [app.nozle.app](https://app.nozle.app) → Settings → API Keys.
+
+<Warning>
+Never expose secret keys in client-side code. Use publishable keys for the React SDK and secret keys only on your server.
+</Warning>

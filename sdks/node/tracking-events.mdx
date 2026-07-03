@@ -1,0 +1,46 @@
+---
+title: Tracking Events
+description: Send usage events with nozle.track()
+---
+
+```typescript
+await nozle.track(
+  'customer_123',        // customer ID
+  'api_call',            // event code (matches your billable metric)
+  { model: 'gpt-4', tokens: 1500 },  // properties (metadata)
+  {
+    subscriptionId: 'sub_abc',  // optional: specific subscription
+    transactionId: 'tx_unique', // optional: idempotency key
+    timestamp: '2024-01-15T10:30:00Z'  // optional: event timestamp
+  }
+);
+```
+
+**Parameters:**
+- customerId (string): The external customer ID
+- event (string): Event code matching a billable metric in your workspace
+- metadata (`Record<string, unknown>`, optional): Properties attached to the event
+- options.subscriptionId (string, optional): Target a specific subscription
+- options.transactionId (string, optional): Unique ID for idempotency (auto-generated if omitted)
+- options.timestamp (string, optional): ISO 8601 timestamp (defaults to now)
+
+**How it works:**
+The SDK sends a `POST /api/v1/events` request to Nozle:
+```json
+{
+  "event": {
+    "transaction_id": "tx_unique",
+    "external_customer_id": "customer_123",
+    "code": "api_call",
+    "properties": { "model": "gpt-4", "tokens": 1500 },
+    "external_subscription_id": "sub_abc",
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+**Best practices:**
+- Always set a transactionId for idempotency in production
+- Match event codes exactly to your billable metric codes
+- Properties are used for aggregation (e.g., SUM on "tokens" property)
+- For high-volume tracking, batch events or use a queue

@@ -1,0 +1,40 @@
+---
+title: Invoices
+description: Invoice generation and delivery
+---
+
+Invoices are generated automatically and accessible through Nozle's API and React SDK.
+
+## Viewing invoices
+
+### React: InvoiceList component
+
+```tsx
+<InvoiceList customerId="cust_123" />
+```
+
+Shows: invoice number, date, amount, currency, status, PDF download link.
+
+### API: GET /api/v1/invoices?customer_id=\{id\}
+
+Returns array of invoices with statuses: `draft`, `open`, `paid`, `void`, `uncollectible`.
+
+## Invoice lifecycle
+
+1. Invoice generated at billing period end (or on subscription change)
+2. Invoice starts as "draft" or "open"
+3. Payment is collected via Stripe
+4. Stripe webhook updates status to "paid"
+5. PDF is generated and available for download
+6. Email with invoice sent via Loops SMTP (no-reply@nozle.app)
+
+## Email delivery
+
+Invoices are emailed automatically via Loops (smtp.loops.so:587). The from address is no-reply@nozle.app.
+
+## Further reading
+
+For deeper invoice configuration (grace periods, numbering, net payment terms, taxes), see:
+
+- Credit Notes
+- Taxes

@@ -1,0 +1,75 @@
+---
+title: LLM Proxy
+description: Reverse proxy for OpenAI and Anthropic with automatic token tracking
+---
+
+
+Base URL: `https://api.nozle.app/api/v1`
+
+Reverse proxy routes that forward LLM requests to OpenAI or Anthropic and automatically track token usage. The proxy reads the response to extract `{ model, input_tokens, output_tokens, latency_ms }` and fires an internal `nozle.track()` event — no SDK wrapper needed on your side.
+
+<Warning>
+LLM proxy routes use `X-Nozle-Key` for Nozle authentication, **not** the `Authorization` header. The `Authorization` header is reserved for the customer's own LLM provider API key, which the proxy forwards untouched to the provider.
+</Warning>
+
+---
+
+## /api/v1/proxy/openai/v1/*
+
+Proxies all requests to `https://api.openai.com/v1/*`. Any OpenAI-compatible endpoint works (chat completions, embeddings, etc.).
+
+**Auth:** `X-Nozle-Key` header (`sk_` only)
+
+**Required headers:**
+
+| Header | Description |
+|--------|-------------|
+| `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`) |
+| `X-Nozle-Customer` | External customer ID to bill for this usage |
+| `Authorization` | Customer's OpenAI API key (`Bearer sk-...`) |
+
+```bash title="cURL"
+curl -X POST https://api.nozle.app/api/v1/proxy/openai/v1/chat/completions \
+  -H "X-Nozle-Key: sk_live_your_nozle_key" \
+  -H "X-Nozle-Customer: cust_123" \
+  -H "Authorization: Bearer sk-customer-openai-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+---
+
+## /api/v1/proxy/anthropic/v1/*
+
+Proxies all requests to `https://api.anthropic.com/v1/*`.
+
+**Auth:** `X-Nozle-Key` header (`sk_` only)
+
+**Required headers:**
+
+| Header | Description |
+|--------|-------------|
+| `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`) |
+| `X-Nozle-Customer` | External customer ID to bill for this usage |
+| `Authorization` | Customer's Anthropic API key |
+
+```bash title="cURL"
+curl -X POST https://api.nozle.app/api/v1/proxy/anthropic/v1/messages \
+  -H "X-Nozle-Key: sk_live_your_nozle_key" \
+  -H "X-Nozle-Customer: cust_123" \
+  -H "x-api-key: customer-anthropic-key" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1024,
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+<Info>
+The proxy returns the provider's response unchanged. Your customer's API key is forwarded but never stored. Token usage is extracted from the response and tracked automatically as a billing event on the `llm_tokens` metric.
+</Info>

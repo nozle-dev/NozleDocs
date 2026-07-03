@@ -1,0 +1,37 @@
+---
+title: Plans
+description: Creating and managing pricing plans
+---
+
+Plans are configured in the Nozle dashboard and served through the `GET /api/v1/plans` endpoint.
+
+**Default plan tiers:**
+
+| Plan | Monthly Price | Event Limit | MRR Limit |
+|------|--------------|-------------|-----------|
+| Starter | $50/mo | 50,000 | $5,000 |
+| Growth | $100/mo | 10,000,000 | $100,000 |
+| Scale | $500/mo | 100,000,000 | $1,000,000 |
+| Enterprise | Custom | Custom | Custom |
+
+**Plan features by tier:**
+- Starter: core billing + entitlements
+- Growth: + revenue_analytics, remove_branding_watermark, auto_dunning, progressive_billing, lifetime_usage
+- Scale: + all integrations (netsuite, xero, hubspot, salesforce, okta, avalara), api_permissions, custom_roles, forecasted_usage, security_logs, from_email, issue_receipts, manual_payments, multi_entities_pro
+
+**Fetching plans in your app:**
+
+React: usePlans() hook
+```tsx
+const { plans, isLoading } = usePlans();
+```
+
+Node:
+```typescript
+const plans = await nozle.plans();
+```
+
+Python:
+```python
+plans = nozle.plans()
+```

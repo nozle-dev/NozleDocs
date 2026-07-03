@@ -1,0 +1,56 @@
+---
+title: "Check Entitlement"
+api: "GET /can"
+---
+
+Check whether a customer is entitled to use a feature under their current plan. This is the primary gating endpoint -- call it before executing any metered or limited operation.
+
+**Auth:** `pk_` or `sk_`
+
+<ParamField query="customer_id" type="string" required>
+  External customer ID
+</ParamField>
+
+<ParamField query="feature" type="string" required>
+  Feature key to check (matches a billable metric code)
+</ParamField>
+
+<ResponseField name="allowed" type="boolean" required>
+  Whether the customer can use this feature
+</ResponseField>
+
+<ResponseField name="reason" type="string" required>
+  Why the request was allowed or denied (e.g. `within_limit`, `limit_exceeded`, `no_subscription`)
+</ResponseField>
+
+<ResponseField name="used" type="number">
+  Units consumed in the current billing period
+</ResponseField>
+
+<ResponseField name="limit" type="number">
+  Maximum units allowed by the plan
+</ResponseField>
+
+<ResponseField name="remaining" type="number">
+  Units still available
+</ResponseField>
+
+<ResponseField name="cost_per_use_cents" type="number">
+  Your cost per unit (from cost models)
+</ResponseField>
+
+<ResponseField name="revenue_per_use_cents" type="number">
+  What you charge per unit
+</ResponseField>
+
+<ResponseField name="margin_per_use_cents" type="number">
+  Profit per unit
+</ResponseField>
+
+<ResponseField name="min_margin_percent" type="number">
+  Minimum margin threshold configured for this feature, if any
+</ResponseField>
+
+<Info>
+When `allowed` is `false`, the `reason` field tells you why -- use it to show contextual upgrade prompts in your UI.
+</Info>

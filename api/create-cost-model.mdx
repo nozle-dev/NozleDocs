@@ -1,0 +1,28 @@
+---
+title: "Create Cost Model"
+api: "POST /cost-models"
+---
+
+Create a new cost model for margin calculations.
+
+**Auth:** `sk_` only
+
+<Warning>
+All cost model endpoints require a secret key (`sk_`). Publishable keys will receive a 403 Forbidden response.
+</Warning>
+
+<ParamField body="name" type="string" required>
+  Human-readable name for the cost model (e.g. "GPT-4 API Cost")
+</ParamField>
+
+<ParamField body="metric_code" type="string" required>
+  Billable metric code this cost model applies to
+</ParamField>
+
+<ParamField body="cost_per_unit_cents" type="number" required>
+  Cost per unit in cents
+</ParamField>
+
+<ParamField body="model" type="string">
+  AI model identifier (e.g. `gpt-4`, `claude-sonnet-4-20250514`)
+</ParamField>

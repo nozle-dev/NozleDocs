@@ -1,0 +1,49 @@
+---
+title: Subscriptions
+description: Upgrade, downgrade, and cancel subscription flows
+---
+
+**View current subscription:**
+
+React: CurrentPlan component or GET /api/v1/subscriptions/current
+```tsx
+<CurrentPlan customerId="cust_123" onChangePlan={() => router.push('/plans')} />
+```
+
+**Upgrade/Downgrade:**
+
+The UpgradeButton component handles the full flow:
+1. Shows proration preview (calls POST /api/v1/subscriptions/preview)
+2. Displays credit (unused time on current plan), debit (new plan cost), net amount, next billing date
+3. On confirm, calls POST /api/v1/subscriptions/change
+4. Subscription changes immediately
+
+```tsx
+<UpgradeButton targetPlanId="scale" label="Upgrade to Scale" onUpgraded={() => toast('Upgraded!')} />
+```
+
+Or via SDK:
+```typescript
+// Preview proration first
+const preview = await fetch('/api/v1/subscriptions/preview', {
+  method: 'POST',
+  headers: { Authorization: 'Bearer pk_...', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ target_plan_id: 'scale' })
+});
+
+// Confirm change
+const change = await fetch('/api/v1/subscriptions/change', {
+  method: 'POST',
+  headers: { Authorization: 'Bearer pk_...', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ target_plan_id: 'scale' })
+});
+```
+
+**Cancel subscription:**
+
+```tsx
+<CancelSubscriptionButton subscriptionId="sub_123" onCancelled={() => router.push('/')} />
+```
+
+Two-step flow: confirm → select reason (Too expensive, Missing features, Switching to competitor, Not using it enough, Other).
+Calls `DELETE /api/v1/subscriptions/{id}` with the selected reason.

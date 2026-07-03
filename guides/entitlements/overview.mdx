@@ -1,0 +1,36 @@
+---
+title: Entitlements Overview
+description: Feature gating and usage limits
+---
+
+Entitlements control what customers can do based on their subscription plan.
+
+**Two types:**
+1. **Feature gates** — boolean access (can this customer use analytics? yes/no)
+2. **Usage limits** — numeric caps (this customer can make 10,000 API calls/month)
+
+**How it works:**
+1. Define features and assign them to plans (in the dashboard or via API)
+2. Check access at runtime using can() — in your API (Node/Python SDK) or UI (React useCan hook)
+3. Get real-time updates via WebSocket (React SDK auto-subscribes)
+
+**Server-side check:**
+```typescript
+const { allowed, remaining, limit, used } = await nozle.can('cust_123', 'api_calls');
+if (!allowed) return res.status(403).json({ error: 'Upgrade required' });
+```
+
+**Client-side check:**
+```tsx
+const { allowed, loading } = useCan('cust_123', 'api_calls');
+// Or use declarative gates:
+<FeatureGate customerId="cust_123" feature="analytics" fallback={<UpgradePrompt />}>
+  <Dashboard />
+</FeatureGate>
+```
+
+**What makes Nozle's entitlements powerful:**
+- Real-time WebSocket updates — no polling
+- Low-latency cached counters for sub-millisecond checks
+- Margin-aware responses (cost/revenue/margin per use)
+- React SDK components (FeatureGate, UsageGate, PlanGate, LockedOverlay)

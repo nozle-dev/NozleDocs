@@ -1,0 +1,63 @@
+---
+title: Dashboard
+description: Query margin data by customer, metric, plan, and model
+---
+
+All margin queries are available via the Node SDK (`nozle.margin.*`) and REST API (`GET /api/v1/margin/*`). Secret key required.
+
+**Summary** — overall margin overview:
+
+```typescript
+const summary = await nozle.margin.summary({
+  from: '2024-01-01',
+  to: '2024-01-31'
+});
+```
+
+**By Customer** — identify your most and least profitable customers:
+
+```typescript
+const byCustomer = await nozle.margin.byCustomer({
+  from: '2024-01-01',
+  to: '2024-01-31'
+});
+```
+
+**By Metric** — which usage types are profitable:
+
+```typescript
+const byMetric = await nozle.margin.byMetric();
+```
+
+**By Plan** — which pricing tiers work:
+
+```typescript
+const byPlan = await nozle.margin.byPlan();
+```
+
+**By Model** — which LLM models are profitable:
+
+```typescript
+const byModel = await nozle.margin.byModel();
+```
+
+**Trend** — margin over time:
+
+```typescript
+const trend = await nozle.margin.trend({
+  from: '2024-01-01',
+  to: '2024-03-31',
+  granularity: 'week', // 'hour' | 'day' | 'week' | 'month'
+});
+```
+
+**Simulate** — what-if pricing analysis:
+
+```bash
+curl -X POST https://api.nozle.app/api/v1/margin/simulate \
+  -H "Authorization: Bearer sk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "plan_code": "growth", "price_change_percent": 10 }'
+```
+
+All endpoints accept optional `from`/`to` date range parameters (ISO 8601 format).

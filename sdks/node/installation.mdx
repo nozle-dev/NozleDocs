@@ -1,0 +1,60 @@
+---
+title: Installation
+description: Install and configure @nozle-js/node
+---
+
+```bash
+npm install @nozle-js/node
+```
+
+Initialize the client:
+
+```typescript
+import { Nozle } from '@nozle-js/node';
+
+const nozle = new Nozle({
+  apiKey: 'sk_live_...',
+  baseUrl: 'https://api.nozle.app',
+  eventsUrl: 'https://api.nozle.app',
+  timeout: 10_000,
+});
+```
+
+## NozleConfig props
+
+- **apiKey** (`string`, required) -- Your secret key (`sk_`)
+- **baseUrl** (`string`, default: `'http://localhost:8080'`) -- Nozle API URL
+- **eventsUrl** (`string`, default: `'http://localhost:3000'`) -- Events ingestion URL (Lago)
+- **timeout** (`number`, default: `10000`) -- Request timeout in ms
+
+## Available methods
+
+### Core
+
+- `nozle.track()` -- send usage events
+- `nozle.can()` -- check entitlements
+- `nozle.ping()` -- health check
+
+### Billing
+
+- `nozle.plans()` -- list available plans
+- `nozle.checkout()` -- create Stripe checkout session
+- `nozle.subscribe()` -- create a subscription
+
+### Customers & Credits
+
+- `nozle.customers.upsert()` -- create or update a customer
+- `nozle.checkAndDeduct()` -- atomically check and deduct wallet credits
+
+### LLM Auto-Capture
+
+- `wrapOpenAI()` -- wrap OpenAI client for automatic token tracking
+- `wrapAnthropic()` -- wrap Anthropic client for automatic token tracking
+
+### Margin Intelligence
+
+- `nozle.margin.summary()` / `byCustomer()` / `byMetric()` / `byPlan()` / `byModel()` / `trend()`
+
+<Warning>
+Use `sk_` (secret) keys only. This SDK is for server-side use.
+</Warning>

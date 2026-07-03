@@ -1,0 +1,41 @@
+---
+title: Margin Alerts
+description: Margin floor alerts and cost spike detection
+---
+
+Margin alerts help you detect when profitability drops below acceptable thresholds.
+
+**Margin floor:**
+The can() endpoint can include a min_margin_percent field. When a customer's margin drops below this threshold, you can take action — warn them, throttle usage, or adjust pricing.
+
+```typescript
+const check = await nozle.can('cust_123', 'api_calls');
+if (check.margin_per_use_cents < 0) {
+  // This customer is costing you money
+  logger.alert('Negative margin detected', {
+    customer: 'cust_123',
+    margin: check.margin_per_use_cents,
+    cost: check.cost_per_use_cents,
+    revenue: check.revenue_per_use_cents,
+  });
+}
+```
+
+**Using trend data for spike detection:**
+```typescript
+const trend = await nozle.margin.trend({ granularity: 'hour' });
+// Check for sudden margin drops in the last 24 hours
+```
+
+**React-side usage alerts:**
+The UsageAlert component shows warnings when usage approaches limits:
+```tsx
+<UsageAlert
+  features={[
+    { key: 'api_calls', label: 'API Calls', percentage: 92 },
+    { key: 'tokens', label: 'Token Usage', percentage: 85 },
+  ]}
+  threshold={80}
+  upgradeHref="/plans"
+/>
+```

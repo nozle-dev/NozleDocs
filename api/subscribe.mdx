@@ -1,0 +1,26 @@
+---
+title: "Create Subscription"
+api: "POST /subscribe"
+---
+
+Create a subscription directly without going through a checkout flow. Use this for server-side subscription creation where you handle payment collection separately.
+
+**Auth:** `sk_` (secret key) only.
+
+<ParamField body="customer_id" type="string" required>
+  External customer ID. The customer must already exist.
+</ParamField>
+
+<ParamField body="plan_code" type="string" required>
+  The plan code to subscribe the customer to (e.g. `pro`).
+</ParamField>
+
+### Response
+
+<ResponseField name="subscription_id" type="string" required>
+  The newly created subscription's ID.
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Subscription status (e.g. `active`).
+</ResponseField>

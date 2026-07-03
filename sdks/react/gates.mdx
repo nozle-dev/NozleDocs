@@ -1,0 +1,272 @@
+---
+title: Feature Gates
+description: Conditionally render UI based on entitlements, usage, and plans
+---
+
+Gate components let you declaratively show or hide UI based on a customer's entitlements, usage, or plan tier. They pair with the [hooks](/sdks/react/hooks) to cover most access-control patterns without writing conditional logic by hand.
+
+## FeatureGate
+
+Renders children only when the customer is entitled to a feature. Uses `useCan()` internally and subscribes to real-time entitlement updates via WebSocket.
+
+Returns `null` while the entitlement check is loading to avoid layout shift.
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `customerId` | `string` | *required* | Customer ID to check entitlement for |
+| `feature` | `string` | *required* | Feature key to check |
+| `fallback` | `ReactNode` | `null` | Rendered when the customer does not have access |
+| `children` | `ReactNode` | *required* | Content to show when the customer has access |
+
+### Example
+
+```tsx
+import { FeatureGate, UpgradePrompt } from '@nozle-js/react';
+
+<FeatureGate customerId="cust_123" feature="analytics" fallback={<UpgradePrompt />}>
+  <AnalyticsDashboard />
+</FeatureGate>
+```
+
+<Info>
+`FeatureGate` subscribes to the `workspace:\{id\}:entitlements` WebSocket channel. When entitlements change server-side, the gate updates automatically without polling.
+</Info>
+
+## UsageGate
+
+Renders children only when the customer's current usage is below their limit. This is a pure render component -- the caller provides the `usage` and `limit` values (typically from the `useCan()` or `useUsage()` hooks).
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `usage` | `number` | *required* | Current usage value |
+| `limit` | `number` | *required* | Usage limit |
+| `fallback` | `ReactNode` | `null` | Rendered when usage is at or above the limit |
+| `children` | `ReactNode` | *required* | Content to show when usage is below the limit |
+
+### Example
+
+```tsx
+import { UsageGate } from '@nozle-js/react';
+
+<UsageGate usage={currentCalls} limit={10000} fallback={<span>Limit reached</span>}>
+  <ApiCallForm />
+</UsageGate>
+```
+
+## PlanGate
+
+Renders children only when the customer's plan is in the allowed list. Like `UsageGate`, this is a pure render component -- the caller provides the current plan and allowed plan list.
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `currentPlan` | `string` | *required* | The customer's current plan identifier |
+| `allowedPlans` | `string[]` | *required* | Plan identifiers that grant access |
+| `fallback` | `ReactNode` | `null` | Rendered when the customer is not on an allowed plan |
+| `children` | `ReactNode` | *required* | Content to show when the customer is on an allowed plan |
+
+### Example
+
+```tsx
+import { PlanGate, UpgradePrompt } from '@nozle-js/react';
+
+<PlanGate
+  currentPlan={plan}
+  allowedPlans={['growth', 'scale']}
+  fallback={<UpgradePrompt planName="Growth" />}
+>
+  <AdvancedSettings />
+</PlanGate>
+```
+
+## UpgradePrompt
+
+A reusable upgrade call-to-action. Renders a centered message and an "Upgrade" button. When no `onUpgrade` handler is provided, clicking the button navigates to `/upgrade`.
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `text` | `string` | `"Upgrade to access this feature"` | Message to display |
+| `planName` | `string` | `undefined` | When set, overrides `text` with "Upgrade to [planName] to access this feature" |
+| `onUpgrade` | `() => void` | `undefined` | Called when the upgrade button is clicked. Falls back to `window.location.href = "/upgrade"` |
+
+### Example
+
+```tsx
+import { UpgradePrompt } from '@nozle-js/react';
+
+// Default text
+<UpgradePrompt />
+
+// With plan name
+<UpgradePrompt planName="Growth" />
+
+// With custom handler
+<UpgradePrompt
+  planName="Scale"
+  onUpgrade={() => router.push('/billing?upgrade=scale')}
+/>
+```
+
+<Info>
+`UpgradePrompt` uses CSS variables from the `--nozle-*` namespace for theming. Set `--nozle-primary`, `--nozle-primary-foreground`, and `--nozle-radius` to match your design system.
+</Info>
+
+## LockedOverlay
+
+Wraps children with a blur filter and an upgrade prompt overlay when locked. When `locked` is `false`, children render normally with no wrapper.
+
+When `locked` is `true`:
+- Children receive `filter: blur(4px)` and `pointer-events: none`
+- An `UpgradePrompt` overlay is positioned on top with `aria-label="Feature locked -- upgrade required"`
+- Content is marked `aria-hidden="true"` so screen readers skip the blurred preview
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `locked` | `boolean` | *required* | Whether to apply the blur and overlay |
+| `upgradeText` | `string` | `undefined` | Passed as `text` to the inner `UpgradePrompt` |
+| `upgradePlanName` | `string` | `undefined` | Passed as `planName` to the inner `UpgradePrompt` |
+| `onUpgrade` | `() => void` | `undefined` | Passed as `onUpgrade` to the inner `UpgradePrompt` |
+| `children` | `ReactNode` | *required* | Content to blur when locked |
+
+### Example
+
+```tsx
+import { LockedOverlay } from '@nozle-js/react';
+
+<LockedOverlay
+  locked={!canUseAnalytics}
+  upgradeText="Upgrade to Growth"
+  onUpgrade={handleUpgrade}
+>
+  <AnalyticsPreview />
+</LockedOverlay>
+```
+
+## Composition Patterns
+
+Gates are most powerful when combined with hooks. The following patterns cover common real-world scenarios.
+
+### Feature gate with usage progress
+
+Use `useCan()` to drive both a `FeatureGate` and a progress indicator:
+
+```tsx
+import { FeatureGate, UpgradePrompt, useCan } from '@nozle-js/react';
+
+function ApiSection({ customerId }: { customerId: string }) {
+  const { allowed, remaining, limit, loading } = useCan(customerId, 'api_calls');
+
+  if (loading) return null;
+
+  if (!allowed) return <UpgradePrompt planName="Growth" />;
+
+  return (
+    <div>
+      <p>{remaining?.toLocaleString()} / {limit?.toLocaleString()} calls remaining</p>
+      <ApiCallForm />
+    </div>
+  );
+}
+```
+
+### Plan-gated feature with live usage
+
+Combine `usePlan()` for plan checks with `useCan()` for entitlement data, then compose the gate components:
+
+```tsx
+import {
+  PlanGate,
+  UsageGate,
+  LockedOverlay,
+  UpgradePrompt,
+  usePlan,
+  useCan,
+} from '@nozle-js/react';
+
+function AdvancedAnalytics({ customerId }: { customerId: string }) {
+  const { data: planData } = usePlan();
+  const { allowed, remaining, limit } = useCan(customerId, 'analytics_queries');
+
+  const currentPlan = planData?.plan_slug ?? '';
+  const usage = limit && remaining != null ? limit - remaining : 0;
+
+  return (
+    <PlanGate
+      currentPlan={currentPlan}
+      allowedPlans={['growth', 'scale', 'enterprise']}
+      fallback={<UpgradePrompt planName="Growth" />}
+    >
+      <UsageGate
+        usage={usage}
+        limit={limit ?? Infinity}
+        fallback={<span>Query limit reached. Resets at the end of your billing period.</span>}
+      >
+        <AnalyticsQueryBuilder />
+      </UsageGate>
+    </PlanGate>
+  );
+}
+```
+
+### Locked preview with dynamic data
+
+Use `LockedOverlay` to show a blurred preview of a feature while fetching entitlement data, then unlock when the check completes:
+
+```tsx
+import { LockedOverlay, useCan } from '@nozle-js/react';
+
+function MarginInsights({ customerId }: { customerId: string }) {
+  const { allowed, loading } = useCan(customerId, 'margin_insights');
+
+  return (
+    <LockedOverlay
+      locked={!allowed && !loading}
+      upgradePlanName="Scale"
+      onUpgrade={() => window.location.href = '/billing?upgrade=scale'}
+    >
+      <MarginDashboard customerId={customerId} />
+    </LockedOverlay>
+  );
+}
+```
+
+### Nested gates for tiered access
+
+Stack multiple gates to create granular access tiers where the base feature and advanced sub-features have different requirements:
+
+```tsx
+import { FeatureGate, PlanGate, UpgradePrompt, usePlan } from '@nozle-js/react';
+
+function ReportingSection({ customerId }: { customerId: string }) {
+  const { data: planData } = usePlan();
+  const currentPlan = planData?.plan_slug ?? '';
+
+  return (
+    <FeatureGate
+      customerId={customerId}
+      feature="reporting"
+      fallback={<UpgradePrompt planName="Growth" />}
+    >
+      <BasicReports />
+
+      <PlanGate
+        currentPlan={currentPlan}
+        allowedPlans={['scale', 'enterprise']}
+        fallback={<UpgradePrompt planName="Scale" />}
+      >
+        <CustomReportBuilder />
+        <ScheduledExports />
+      </PlanGate>
+    </FeatureGate>
+  );
+}
+```

@@ -1,0 +1,56 @@
+---
+title: Checkout
+description: Stripe embedded checkout flow
+---
+
+Nozle uses Stripe's embedded checkout for payment collection. The flow:
+
+1. Customer selects a plan (PricingTable or CheckoutButton component)
+2. React SDK calls POST /api/v1/checkout with `{ customer_id, plan_code, success_url }`
+3. Nozle API creates a Stripe Checkout Session in "setup" mode
+4. Returns `{ client_secret, invoice_id, amount_cents, currency }`
+5. The Checkout component renders Stripe Elements using the client_secret
+6. Customer enters payment details
+7. On success, Stripe sends checkout.session.completed webhook to /webhooks/stripe
+8. Nozle API processes the webhook: creates subscription, provisions entitlements
+
+## React implementation
+
+### Option A -- CheckoutButton (simplest)
+
+```tsx
+<CheckoutButton planId="growth" label="Subscribe to Growth" />
+```
+
+### Option B -- Custom flow with useCheckout
+
+```tsx
+const { fetchClientSecret, isLoading } = useCheckout();
+
+const handleCheckout = async () => {
+  const clientSecret = await fetchClientSecret('growth', '/success');
+  // Use clientSecret with Stripe Elements
+};
+```
+
+### Option C -- Full Stripe Elements
+
+```tsx
+<Checkout
+  clientSecret={secret}
+  publishableKey="pk_live_..."
+  submitLabel="Subscribe"
+  onSuccess={(paymentIntentId) => router.push('/welcome')}
+/>
+```
+
+## Server-side (bypass checkout UI)
+
+For B2B scenarios where payment is already on file:
+
+```typescript
+const result = await nozle.subscribe('customer_123', 'growth');
+// { subscription_id: 'sub_...', status: 'active' }
+```
+
+Note: `subscribe()` requires a secret key (`sk_`).

@@ -1,0 +1,53 @@
+---
+title: Entitlements
+description: Check feature access with nozle.can()
+---
+
+```typescript
+const result = await nozle.can('customer_123', 'api_calls');
+```
+
+**Returns CanResult:**
+```typescript
+{
+  allowed: boolean;      // Whether the feature is accessible
+  reason?: string;       // Why access was denied (if applicable)
+  used: number;          // Current usage count
+  limit: number;         // Usage limit for this feature
+  remaining: number;     // Remaining usage (limit - used)
+  cost_per_use_cents: number;    // Cost per unit (from cost model)
+  revenue_per_use_cents: number; // Revenue per unit (from plan pricing)
+  margin_per_use_cents: number;  // Margin per unit
+  min_margin_percent?: number;   // Minimum margin threshold if configured
+}
+```
+
+**How it works:**
+Calls `GET /api/v1/can?customer_id={id}&feature={feature}` on the Nozle API. It checks:
+1. Customer's active subscription and plan
+2. Plan entitlements (feature gates + usage limits)
+3. Current usage counters (cached for low latency)
+4. Cost model data for margin fields
+
+**Examples:**
+
+Feature gate check:
+```typescript
+const { allowed } = await nozle.can('cust_123', 'analytics');
+if (!allowed) return res.status(403).json({ error: 'Upgrade required' });
+```
+
+Usage limit check with margin awareness:
+```typescript
+const check = await nozle.can('cust_123', 'api_calls');
+if (!check.allowed) {
+  return res.status(429).json({
+    error: 'Usage limit reached',
+    used: check.used,
+    limit: check.limit,
+  });
+}
+if (check.margin_per_use_cents < 0) {
+  logger.warn('Negative margin for customer', { margin: check.margin_per_use_cents });
+}
+```

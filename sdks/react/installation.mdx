@@ -1,0 +1,92 @@
+---
+title: Installation
+description: Install and configure @nozle-js/react
+---
+
+<Steps>
+
+<Step>
+## Install the package
+
+```bash
+npm install @nozle-js/react
+```
+</Step>
+
+<Step>
+## Wrap your app with BillingProvider
+
+`BillingProvider` initializes the Nozle client and makes billing data available to all child components and hooks.
+
+```tsx title="app/providers.tsx"
+import { BillingProvider } from '@nozle-js/react';
+
+function App() {
+  return (
+    <BillingProvider
+      apiKey="pk_live_..."
+      baseUrl="https://api.nozle.app"
+      workspaceId="ws_abc123"
+      centrifugoUrl="wss://rt.nozle.app/connection/websocket"
+    >
+      {children}
+    </BillingProvider>
+  );
+}
+```
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `apiKey` | `string` | **required** | Your publishable key (`pk_`) |
+| `baseUrl` | `string` | `'https://api.nozle.app'` | API endpoint |
+| `workspaceId` | `string` | `''` | Your workspace ID |
+| `centrifugoUrl` | `string` | `undefined` | WebSocket URL for real-time entitlement updates |
+| `children` | `ReactNode` | **required** | Your app content |
+
+<Warning>
+The `apiKey` must be a publishable key (prefixed with `pk_`), not a secret key. Publishable keys are safe for client-side use and can only read billing data scoped to the authenticated customer. Never expose your `sk_` secret key in browser code.
+</Warning>
+</Step>
+
+<Step>
+## Configure Tailwind CSS
+
+Nozle components ship with a Tailwind preset that provides consistent theming out of the box. Add it to your Tailwind config:
+
+```js title="tailwind.config.js"
+import { nozlePreset } from '@nozle-js/react/styles/preset';
+
+export default {
+  presets: [nozlePreset],
+};
+```
+
+The preset registers the following CSS custom properties that you can override to match your brand:
+
+| Variable | Purpose |
+|----------|---------|
+| `--nozle-primary` | Primary accent color |
+| `--nozle-primary-foreground` | Text color on primary backgrounds |
+| `--nozle-background` | Page background |
+| `--nozle-foreground` | Default text color |
+| `--nozle-card` | Card background color |
+| `--nozle-border` | Border color |
+| `--nozle-muted` | Muted background (toggles, disabled states) |
+| `--nozle-muted-foreground` | Muted text color |
+| `--nozle-destructive` | Error / danger actions |
+| `--nozle-success` | Success indicators |
+| `--nozle-warning` | Warning indicators |
+| `--nozle-radius` | Border radius for components |
+
+Some components also accept component-specific CSS variables for finer control. For example, `PricingTable` supports `--nozle-pricing-bg`, `--nozle-pricing-card-bg`, `--nozle-pricing-highlight`, `--nozle-pricing-border`, and `--nozle-pricing-radius` -- all falling back to their global equivalents.
+</Step>
+
+</Steps>
+
+## Next steps
+
+- [Components](/sdks/react/components) -- pre-built billing UI components
+- [Hooks](/sdks/react/hooks) -- `useCan`, `useUsage`, and more
+- [Gates](/sdks/react/gates) -- feature gating with React components
