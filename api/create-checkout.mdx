@@ -25,13 +25,9 @@ Use this when a customer is selecting a plan.
   The plan code to subscribe the customer to (e.g. `pro`).
 </ParamField>
 
-Plan checkout is payment-gated. Nozle creates an incomplete subscription and activates it only after Stripe confirms payment through the webhook.
+Plan checkout is payment-gated. Free-to-paid checkout uses an incomplete subscription. Paid-to-paid upgrades keep the old subscription active in a durable pending intent and apply the Lago upgrade only after Stripe confirms payment.
 
-If no payment is due immediately, Nozle returns `checkout_not_required`. This includes free plans, trials with no pay-in-advance fixed charge, and downgrades that should take effect through the subscription API rather than checkout.
-
-<Warning>
-Paid-to-paid upgrade checkout is not enabled until the proration invoice flow is payment-gated end-to-end. Use server-side subscription changes for now, or create an explicit invoice and collect it with invoice checkout.
-</Warning>
+If prepaid credits fully cover a paid plan change, Nozle applies it without Stripe and returns `type: "completed"`. Free plans, trials with no pay-in-advance fixed charge, and Lago-classified downgrades should use subscription flows instead of checkout.
 
 ### Existing invoice checkout
 
@@ -99,6 +95,23 @@ Invoice checkout:
 <ResponseField name="currency" type="string">
   Invoice currency.
 </ResponseField>
+
+### Credit-funded response
+
+When no external payment remains due:
+
+```json
+{
+  "type": "completed",
+  "status": "succeeded",
+  "payment_source": "credits",
+  "subscription_id": "subscription_uuid",
+  "plan_code": "pro",
+  "invoice_id": "invoice_uuid",
+  "amount_cents": 0,
+  "currency": "USD"
+}
+```
 
 ## Webhook requirement
 

@@ -3,7 +3,7 @@ title: "Upgrade Plan"
 api: "POST /billing/upgrade"
 ---
 
-Upgrade a customer's current plan. Proration is handled automatically -- the customer is credited for the unused portion of their current plan and charged the prorated amount for the new plan.
+Change a customer's current plan through Lago's native no-checkout path. This endpoint is intended for downgrades and other changes that do not require collecting an immediate payment.
 
 **Auth:** `pk_` (publishable key) or `sk_` (secret key).
 
@@ -17,8 +17,19 @@ Upgrade a customer's current plan. Proration is handled automatically -- the cus
 
 ### Response
 
-Returns the updated subscription details.
+Returns the updated subscription details for an allowed no-payment change.
+
+Paid upgrades return:
+
+```json
+{
+  "error": "payment_checkout_required",
+  "code": "payment_checkout_required"
+}
+```
+
+Use `POST /checkout` for free-to-paid and paid-to-paid upgrades. Checkout previews the exact prorated invoice and preserves the current paid plan until payment succeeds.
 
 <Note>
-  Also available as `POST /subscriptions/change` (alias). Use `POST /subscriptions/preview` to preview upgrade costs before committing.
+  Also available as `POST /subscriptions/change` (alias). Use `POST /subscriptions/preview` to preview costs, then `POST /checkout` when payment is required.
 </Note>

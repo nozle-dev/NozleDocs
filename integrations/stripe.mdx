@@ -12,7 +12,7 @@ Connect Stripe from the Nozle dashboard or API using your Stripe secret key. Noz
 You do not expose the Stripe secret key in your frontend. Browser checkout uses:
 
 - your Nozle publishable key (`pk_nozle_...`) to call Nozle
-- your Stripe publishable key (`pk_test_...` / `pk_live_...`) to mount Stripe Elements
+- your Stripe publishable key (`pk_test_...` / `pk_live_...`) to mount Stripe Embedded Checkout
 
 ## What Nozle handles
 
@@ -44,10 +44,12 @@ Your Nozle public API URL must be reachable by Stripe. If the webhook is missing
 ## Checkout flow
 
 1. Customer selects a plan in your app (via React SDK or API)
-2. Nozle creates an incomplete subscription and open invoice
-3. Nozle creates a Stripe embedded Checkout Session for that invoice
+2. Nozle computes the exact invoice/proration while preserving the current paid plan
+3. Nozle creates a Stripe embedded Checkout Session when an external payment remains due
 4. Customer enters payment details in the embedded checkout
 5. Stripe sends a payment intent webhook to Nozle
-6. Nozle marks the invoice paid and activates the subscription
+6. Nozle marks the invoice paid and applies the subscription change
+
+If prepaid credits fully cover the invoice, Nozle returns a completed checkout response and Stripe is not called.
 
 For credit top-ups, add-ons, and other one-off purchases, create the invoice first and then call checkout with `invoice_id`. Those flows do not use subscription activation rules.

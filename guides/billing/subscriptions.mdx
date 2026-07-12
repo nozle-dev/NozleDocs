@@ -15,11 +15,18 @@ React: CurrentPlan component or GET /api/v1/subscriptions/current
 The UpgradeButton component handles the full flow:
 1. Shows proration preview (calls POST /api/v1/subscriptions/preview)
 2. Displays credit (unused time on current plan), debit (new plan cost), net amount, next billing date
-3. On confirm, calls POST /api/v1/subscriptions/change
-4. Subscription changes immediately
+3. On confirm, calls `POST /api/v1/checkout`
+4. If payment is due, the current plan stays active while Stripe Checkout is shown
+5. The upgrade applies after the Stripe success webhook; a fully credit-funded change completes immediately
+6. A lower annualized plan, including some discounted monthly-to-annual switches, is scheduled at Lago's next billing boundary
 
 ```tsx
-<UpgradeButton targetPlanId="scale" label="Upgrade to Scale" onUpgraded={() => toast('Upgraded!')} />
+<UpgradeButton
+  targetPlanId="scale"
+  label="Upgrade to Scale"
+  onStripeClientSecret={(secret) => setClientSecret(secret)}
+  onUpgraded={() => toast('Upgraded with prepaid credits')}
+/>
 ```
 
 Or via SDK:
@@ -31,11 +38,11 @@ const preview = await fetch('/api/v1/subscriptions/preview', {
   body: JSON.stringify({ target_plan_id: 'scale' })
 });
 
-// Confirm change
-const change = await fetch('/api/v1/subscriptions/change', {
+// Start payment-first checkout
+const checkout = await fetch('/api/v1/checkout', {
   method: 'POST',
   headers: { Authorization: 'Bearer pk_...', 'Content-Type': 'application/json' },
-  body: JSON.stringify({ target_plan_id: 'scale' })
+  body: JSON.stringify({ customer_id: 'cust_123', plan_code: 'scale' })
 });
 ```
 

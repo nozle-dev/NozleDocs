@@ -275,10 +275,10 @@ function PlanSelector() {
 
 ## useCheckout
 
-Access Stripe payment confirmation from inside a [`<Checkout>`](/sdks/react/components) component.
+Access PaymentElement confirmation when `<Checkout>` is explicitly given a PaymentIntent secret. Nozle's standard checkout returns a Checkout Session secret (`cs_...`) and uses Stripe Embedded Checkout, which owns its submit flow.
 
 <Warning>
-`useCheckout` must be called inside a `<Checkout>` component. It relies on Stripe Elements context that `<Checkout>` provides.
+`useCheckout` must be called inside the PaymentIntent branch of `<Checkout>`. Do not use it for standard Nozle `cs_...` checkout sessions.
 </Warning>
 
 ### Signature
@@ -302,7 +302,7 @@ interface UseCheckoutResult {
 
 ### How it works
 
-The `<Checkout>` component wraps Stripe Elements and exposes a context. `useCheckout` reads that context to let you build custom payment UIs or trigger confirmation from outside the default button.
+For a PaymentIntent secret, `<Checkout>` wraps Stripe Elements and exposes a context. Standard Checkout Session secrets render Stripe Embedded Checkout instead.
 
 ### Example
 

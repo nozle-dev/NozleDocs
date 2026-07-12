@@ -7,16 +7,16 @@ Nozle uses Stripe's embedded checkout for payment collection. The flow:
 
 1. Customer selects a plan (PricingTable or CheckoutButton component)
 2. React SDK calls `POST /api/v1/checkout` with `{ customer_id, plan_code, return_url }`
-3. Nozle creates an incomplete subscription and an open invoice
-4. Nozle creates a Stripe embedded Checkout Session for that invoice
+3. Nozle keeps the current plan active and computes the exact invoice/proration
+4. If money remains due, Nozle creates a Stripe embedded Checkout Session
 5. Returns `{ type: "stripe", client_secret }`
-6. The Checkout component renders Stripe Elements using the client secret
+6. The Checkout component renders Stripe Embedded Checkout using the `cs_...` secret
 7. Customer enters payment details
 8. Stripe sends `payment_intent.succeeded` or `payment_intent.payment_failed` to Nozle
-9. Nozle marks the invoice paid/failed and activates or cancels the incomplete subscription
+9. Nozle marks the invoice paid/failed and applies the paid plan change only after success
 
 <Info>
-Plan checkout is payment-gated: a paid subscription is not activated until Stripe confirms payment through the webhook. Add-ons, credit top-ups, and other one-off payments should create an invoice first, then call checkout with that invoice.
+Plan checkout is payment-gated: a paid plan change is not applied until Stripe confirms payment through the webhook. If prepaid credits reduce the exact amount due to zero, Nozle applies the change transactionally and returns `type: "completed"` without creating a Stripe session.
 </Info>
 
 ## Required Stripe webhook setup
@@ -49,7 +49,9 @@ Plan checkout:
 }
 ```
 
-If no immediate payment is due, Nozle returns `checkout_not_required` instead of creating a Stripe session. Free plans, trials without an upfront fixed charge, and downgrades should be handled through subscription flows rather than checkout.
+Free plans, trials without an upfront fixed charge, and Lago-classified downgrades do not create checkout. A paid upgrade fully funded by prepaid credits returns a completed response instead.
+
+Discounted annual plans can have a lower annualized amount than twelve monthly payments. Lago treats that monthly-to-annual move as a scheduled downgrade; `UpgradeModal` detects `checkout_not_required_for_downgrade` and delegates it to `/subscriptions/change` for the next billing boundary.
 
 Existing invoice checkout:
 
@@ -77,6 +79,19 @@ Plan checkout uses subscription activation rules internally. Invoice checkout do
 
 The browser must use your Nozle publishable key (`pk_nozle_...`) for the SDK. If you mount embedded Stripe checkout yourself, your app also needs the Stripe publishable key for the same Stripe account connected in Nozle.
 
+Credit-funded completion response:
+
+```json
+{
+  "type": "completed",
+  "status": "succeeded",
+  "payment_source": "credits",
+  "plan_code": "growth",
+  "amount_cents": 0,
+  "currency": "USD"
+}
+```
+
 ## React implementation
 
 ### Option A -- CheckoutButton (simplest)
@@ -92,18 +107,17 @@ const { fetchClientSecret, isLoading } = useCheckout();
 
 const handleCheckout = async () => {
   const clientSecret = await fetchClientSecret('growth', '/success');
-  // Use clientSecret with Stripe Elements
+  // Pass the cs_... secret to <Checkout>
 };
 ```
 
-### Option C -- Full Stripe Elements
+### Option C -- Embedded Stripe Checkout
 
 ```tsx
 <Checkout
   clientSecret={secret}
   publishableKey={import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY}
-  submitLabel="Subscribe"
-  onSuccess={(paymentIntentId) => router.push('/welcome')}
+  onComplete={() => router.refresh()}
 />
 ```
 

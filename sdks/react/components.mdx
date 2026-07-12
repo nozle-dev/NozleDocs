@@ -181,7 +181,7 @@ import { PlanBadge } from '@nozle-js/react';
 
 ### CheckoutButton
 
-Initiates a checkout session and routes to the appropriate payment processor. Supports Stripe (hosted redirect and embedded Elements) and Razorpay.
+Initiates checkout and routes to hosted Stripe, embedded Stripe Checkout, Razorpay, or a credit-funded completion response.
 
 Must be used inside a `BillingPortalProvider`.
 
@@ -201,6 +201,12 @@ import { CheckoutButton } from '@nozle-js/react';
   onStripeClientSecret={(secret) => setClientSecret(secret)}
 />
 
+// No external payment was needed because prepaid credits covered the invoice
+<CheckoutButton
+  planId="pro_monthly"
+  onComplete={() => router.refresh()}
+/>
+
 // Razorpay checkout
 <CheckoutButton
   planId="pro_monthly"
@@ -218,14 +224,15 @@ import { CheckoutButton } from '@nozle-js/react';
 | `style` | `React.CSSProperties` | -- | Inline styles |
 | `onError` | `(error: Error) => void` | -- | Called on checkout failure |
 | `razorpayKeyId` | `string` | -- | Razorpay key_id (required for Razorpay path) |
-| `onStripeClientSecret` | `(clientSecret: string) => void` | -- | Called with the Stripe client secret for embedded Elements |
+| `onStripeClientSecret` | `(clientSecret: string) => void` | -- | Called with a Stripe Checkout Session secret (`cs_...`) |
 | `onSuccess` | `(paymentId: string) => void` | -- | Called with Razorpay payment ID on success |
+| `onComplete` | `(result: CompletedCheckoutResult) => void` | -- | Called when credits fully settle the plan change without external payment |
 
 ---
 
 ### Checkout
 
-Stripe Elements drop-in checkout form. Mount this after receiving a `clientSecret` from `CheckoutButton` or your own backend.
+Stripe checkout drop-in. For Nozle's normal `cs_...` response it mounts Stripe Embedded Checkout. It also retains PaymentElement support when explicitly given a PaymentIntent secret (`pi_..._secret_...`).
 
 Requires `@stripe/react-stripe-js` and `@stripe/stripe-js` as peer dependencies.
 
@@ -233,28 +240,27 @@ Requires `@stripe/react-stripe-js` and `@stripe/stripe-js` as peer dependencies.
 import { Checkout } from '@nozle-js/react';
 
 <Checkout
-  clientSecret="pi_xxx_secret_xxx"
+  clientSecret={clientSecret}
   publishableKey="pk_live_xxx"
-  submitLabel="Pay now"
-  onSuccess={(paymentIntentId) => router.push('/success')}
+  onComplete={() => router.refresh()}
   onError={(err) => toast.error(err.message)}
-  onReady={() => setLoading(false)}
 />
 ```
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `clientSecret` | `string` | -- | Stripe PaymentIntent client secret |
+| `clientSecret` | `string` | -- | Stripe Checkout Session (`cs_...`) or PaymentIntent client secret |
 | `publishableKey` | `string` | -- | Stripe publishable key |
 | `stripeAccount` | `string` | -- | Stripe Connect account ID |
 | `submitLabel` | `string` | `'Pay now'` | Text on the submit button |
 | `onSuccess` | `(paymentIntentId: string) => void` | -- | Called when payment succeeds without redirect |
+| `onComplete` | `() => void` | -- | Called when embedded Checkout completes without redirect |
 | `onError` | `(error: Error) => void` | -- | Called on payment failure |
 | `onReady` | `() => void` | -- | Called when the PaymentElement becomes interactive |
 | `className` | `string` | -- | CSS class for the outer wrapper |
 | `style` | `React.CSSProperties` | -- | Inline styles for the outer wrapper |
 
-The `useCheckout` hook is available inside the `Checkout` tree for programmatic control:
+The `useCheckout` hook is only for the advanced PaymentIntent/PaymentElement branch. Stripe Embedded Checkout owns its own submit UI.
 
 ```tsx
 import { useCheckout } from '@nozle-js/react';
@@ -277,6 +283,7 @@ import { UpgradeButton } from '@nozle-js/react';
 <UpgradeButton
   targetPlanId="pro_monthly"
   label="Upgrade to Pro"
+  onStripeClientSecret={(secret) => setClientSecret(secret)}
   onUpgraded={() => router.refresh()}
 />
 ```
@@ -288,13 +295,16 @@ import { UpgradeButton } from '@nozle-js/react';
 | `apiBaseUrl` | `string` | `'https://api.nozle.app'` | API base URL |
 | `className` | `string` | -- | CSS class for the button |
 | `style` | `React.CSSProperties` | -- | Inline styles |
-| `onUpgraded` | `() => void` | -- | Called after the upgrade is confirmed |
+| `onStripeClientSecret` | `(clientSecret: string) => void` | -- | Receives the Checkout Session secret when payment is required |
+| `onCheckoutStarted` | `() => void` | -- | Called after a Stripe checkout is created |
+| `onUpgraded` | `() => void` | -- | Called only when credits complete the upgrade without Stripe |
+| `onDowngradeScheduled` | `() => void` | -- | Called when Lago schedules a lower annualized plan for the next billing boundary |
 
 ---
 
 ### UpgradeModal
 
-Modal dialog showing a proration preview before confirming a plan change. Fetches preview from `POST /api/v1/subscriptions/preview` and confirms via `POST /api/v1/subscriptions/change`.
+Modal dialog showing a proration preview before starting payment-first checkout. It fetches preview from `POST /api/v1/subscriptions/preview` and confirms through `POST /api/v1/checkout`.
 
 Displays: credit from current plan, new plan charge, net amount due today, and next billing date.
 
@@ -307,6 +317,8 @@ import { UpgradeModal } from '@nozle-js/react';
   customerId="cus_xxx"
   apiBaseUrl="https://api.nozle.app"
   apiKey="pk_xxx"
+  onStripeClientSecret={(secret) => setClientSecret(secret)}
+  onCompleted={() => router.refresh()}
   onConfirm={() => setShowModal(false)}
   onCancel={() => setShowModal(false)}
 />
@@ -319,7 +331,11 @@ import { UpgradeModal } from '@nozle-js/react';
 | `customerId` | `string` | -- | Customer identifier |
 | `apiBaseUrl` | `string` | `'https://api.nozle.app'` | API base URL |
 | `apiKey` | `string` | `''` | API key for authorization |
-| `onConfirm` | `() => void` | -- | Called after successful upgrade |
+| `onStripeClientSecret` | `(clientSecret: string) => void` | -- | Receives the Stripe Checkout Session secret |
+| `onCheckoutStarted` | `() => void` | -- | Called after Stripe checkout is created |
+| `onCompleted` | `() => void` | -- | Called when prepaid credits complete the change immediately |
+| `onScheduled` | `() => void` | -- | Called when checkout delegates a Lago-classified downgrade to the scheduled change endpoint |
+| `onConfirm` | `() => void` | -- | Backward-compatible callback after checkout creation, credit-funded completion, or scheduling |
 | `onCancel` | `() => void` | -- | Called when the user dismisses the modal |
 
 #### ProrationPreview type
