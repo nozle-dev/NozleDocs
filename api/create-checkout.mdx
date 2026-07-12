@@ -5,7 +5,7 @@ api: "POST /checkout"
 
 Create a Stripe Checkout session for a customer to subscribe to a plan. Returns a `client_secret` that you pass to Stripe's embedded checkout component.
 
-**Auth:** `pk_` (publishable key) or `sk_` (secret key).
+**Auth:** `pk_nozle_...` (publishable key) or `sk_nozle_...` (secret key).
 
 <ParamField body="customer_id" type="string" required>
   External customer ID. The customer must already exist.
@@ -15,24 +15,24 @@ Create a Stripe Checkout session for a customer to subscribe to a plan. Returns 
   The plan code to subscribe the customer to (e.g. `pro`).
 </ParamField>
 
+<ParamField body="return_url" type="string">
+  URL Stripe should return to after embedded checkout completes. If omitted, Nozle uses the configured dashboard return URL.
+</ParamField>
+
 <ParamField body="success_url" type="string">
-  URL to redirect the customer to after successful checkout. Defaults to your configured redirect URL.
+  Backward-compatible alias for `return_url`.
 </ParamField>
 
 ### Response
+
+<ResponseField name="type" type="string" required>
+  Payment processor type. Currently `stripe`.
+</ResponseField>
 
 <ResponseField name="client_secret" type="string" required>
   Stripe Checkout Session client secret. Pass this to `stripe.initEmbeddedCheckout()`.
 </ResponseField>
 
-<ResponseField name="invoice_id" type="string">
-  The Lago invoice ID associated with this checkout.
-</ResponseField>
-
-<ResponseField name="amount_cents" type="number">
-  Total amount in cents.
-</ResponseField>
-
-<ResponseField name="currency" type="string">
-  ISO 4217 currency code.
+<ResponseField name="clientSecret" type="string">
+  Camel-case alias for `client_secret`.
 </ResponseField>

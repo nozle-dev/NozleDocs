@@ -6,13 +6,17 @@ description: Stripe embedded checkout flow
 Nozle uses Stripe's embedded checkout for payment collection. The flow:
 
 1. Customer selects a plan (PricingTable or CheckoutButton component)
-2. React SDK calls POST /api/v1/checkout with `{ customer_id, plan_code, success_url }`
-3. Nozle API creates a Stripe Checkout Session in "setup" mode
-4. Returns `{ client_secret, invoice_id, amount_cents, currency }`
+2. React SDK calls `POST /api/v1/checkout` with `{ customer_id, plan_code, return_url }`
+3. Nozle API creates a Stripe Checkout Session
+4. Returns `{ type: "stripe", client_secret }`
 5. The Checkout component renders Stripe Elements using the client_secret
 6. Customer enters payment details
 7. On success, Stripe sends checkout.session.completed webhook to /webhooks/stripe
 8. Nozle API processes the webhook: creates subscription, provisions entitlements
+
+<Info>
+The browser must use your Nozle publishable key (`pk_nozle_...`) for the SDK. If you mount embedded Stripe checkout yourself, your app also needs a Stripe publishable key such as `VITE_STRIPE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
+</Info>
 
 ## React implementation
 
@@ -38,7 +42,7 @@ const handleCheckout = async () => {
 ```tsx
 <Checkout
   clientSecret={secret}
-  publishableKey="pk_live_..."
+  publishableKey={import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY}
   submitLabel="Subscribe"
   onSuccess={(paymentIntentId) => router.push('/welcome')}
 />

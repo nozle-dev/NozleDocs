@@ -14,18 +14,43 @@ npm install @nozle-js/react
 </Step>
 
 <Step>
+## Add client-side environment variables
+
+Use a Nozle publishable key in browser code. Keep your Nozle secret key server-side only.
+
+For Vite:
+
+```bash title=".env"
+VITE_NOZLE_PUBLISHABLE_KEY=pk_nozle_...
+VITE_NOZLE_API_URL=https://api.nozle.app
+VITE_STRIPE_PUBLISHABLE_KEY=pk_live_...
+```
+
+For Next.js:
+
+```bash title=".env.local"
+NEXT_PUBLIC_NOZLE_PUBLISHABLE_KEY=pk_nozle_...
+NEXT_PUBLIC_NOZLE_API_URL=https://api.nozle.app
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
+```
+
+`VITE_STRIPE_PUBLISHABLE_KEY` / `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is only needed if your app mounts embedded Stripe checkout. If you only redirect to a hosted checkout URL, you do not need to mount Stripe Elements in your app.
+</Step>
+
+<Step>
 ## Wrap your app with BillingProvider
 
 `BillingProvider` initializes the Nozle client and makes billing data available to all child components and hooks.
 
-```tsx title="app/providers.tsx"
+```tsx title="src/App.tsx"
 import { BillingProvider } from '@nozle-js/react';
 
-function App() {
+function App({ children, currentCustomerId }) {
   return (
     <BillingProvider
-      apiKey="pk_live_..."
-      baseUrl="https://api.nozle.app"
+      publishableKey={import.meta.env.VITE_NOZLE_PUBLISHABLE_KEY}
+      baseUrl={import.meta.env.VITE_NOZLE_API_URL ?? 'https://api.nozle.app'}
+      customerId={currentCustomerId}
       workspaceId="ws_abc123"
       centrifugoUrl="wss://rt.nozle.app/connection/websocket"
     >
@@ -35,18 +60,22 @@ function App() {
 }
 ```
 
+In Next.js, use `process.env.NEXT_PUBLIC_NOZLE_PUBLISHABLE_KEY` and `process.env.NEXT_PUBLIC_NOZLE_API_URL` instead of `import.meta.env.*`.
+
 ### Props
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `apiKey` | `string` | **required** | Your publishable key (`pk_`) |
+| `publishableKey` | `string` | **required** | Your Nozle publishable key (`pk_nozle_...`) |
+| `apiKey` | `string` | -- | Backward-compatible alias for `publishableKey` |
+| `customerId` | `string` | `''` | Your external customer ID. Required by customer-scoped hooks and billing components. |
 | `baseUrl` | `string` | `'https://api.nozle.app'` | API endpoint |
 | `workspaceId` | `string` | `''` | Your workspace ID |
 | `centrifugoUrl` | `string` | `undefined` | WebSocket URL for real-time entitlement updates |
 | `children` | `ReactNode` | **required** | Your app content |
 
 <Warning>
-The `apiKey` must be a publishable key (prefixed with `pk_`), not a secret key. Publishable keys are safe for client-side use and can only read billing data scoped to the authenticated customer. Never expose your `sk_` secret key in browser code.
+The key passed to `BillingProvider` must be a publishable key (`pk_nozle_...`), not a secret key. Publishable keys are safe for client-side billing UI. Never expose your `sk_nozle_...` secret key in browser code.
 </Warning>
 </Step>
 
