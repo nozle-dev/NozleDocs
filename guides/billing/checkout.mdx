@@ -7,16 +7,75 @@ Nozle uses Stripe's embedded checkout for payment collection. The flow:
 
 1. Customer selects a plan (PricingTable or CheckoutButton component)
 2. React SDK calls `POST /api/v1/checkout` with `{ customer_id, plan_code, return_url }`
-3. Nozle API creates a Stripe Checkout Session
-4. Returns `{ type: "stripe", client_secret }`
-5. The Checkout component renders Stripe Elements using the client_secret
-6. Customer enters payment details
-7. On success, Stripe sends checkout.session.completed webhook to /webhooks/stripe
-8. Nozle API processes the webhook: creates subscription, provisions entitlements
+3. Nozle creates an incomplete subscription and an open invoice
+4. Nozle creates a Stripe embedded Checkout Session for that invoice
+5. Returns `{ type: "stripe", client_secret }`
+6. The Checkout component renders Stripe Elements using the client secret
+7. Customer enters payment details
+8. Stripe sends `payment_intent.succeeded` or `payment_intent.payment_failed` to Nozle
+9. Nozle marks the invoice paid/failed and activates or cancels the incomplete subscription
 
 <Info>
-The browser must use your Nozle publishable key (`pk_nozle_...`) for the SDK. If you mount embedded Stripe checkout yourself, your app also needs a Stripe publishable key such as `VITE_STRIPE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
+Plan checkout is payment-gated: a paid subscription is not activated until Stripe confirms payment through the webhook. Add-ons, credit top-ups, and other one-off payments should create an invoice first, then call checkout with that invoice.
 </Info>
+
+## Required Stripe webhook setup
+
+When you connect a Stripe account, Nozle registers a Stripe webhook endpoint for that account and stores Stripe's webhook signing secret. Your Stripe account must allow webhook endpoint creation.
+
+The webhook target is derived from your public Nozle API URL:
+
+```text
+{NOZLE_PUBLIC_API_URL}/webhooks/stripe/{organization_id}?code={stripe_provider_code}
+```
+
+Stripe events used by checkout:
+
+- `payment_intent.succeeded`
+- `payment_intent.payment_failed`
+- `payment_intent.canceled`
+
+Without this webhook, Stripe may collect payment but Nozle will not reliably update invoice or subscription state.
+
+## API shape
+
+Plan checkout:
+
+```json
+{
+  "customer_id": "customer_123",
+  "plan_code": "growth",
+  "return_url": "https://app.example.com/settings/billing"
+}
+```
+
+If no immediate payment is due, Nozle returns `checkout_not_required` instead of creating a Stripe session. Free plans, trials without an upfront fixed charge, and downgrades should be handled through subscription flows rather than checkout.
+
+Existing invoice checkout:
+
+```json
+{
+  "invoice_id": "invoice_uuid",
+  "return_url": "https://app.example.com/settings/billing"
+}
+```
+
+Plan checkout uses subscription activation rules internally. Invoice checkout does not create or mutate subscription activation rules.
+
+## Response
+
+```json
+{
+  "type": "stripe",
+  "client_secret": "cs_...",
+  "clientSecret": "cs_...",
+  "invoice_id": "invoice_uuid",
+  "amount_cents": 19900,
+  "currency": "USD"
+}
+```
+
+The browser must use your Nozle publishable key (`pk_nozle_...`) for the SDK. If you mount embedded Stripe checkout yourself, your app also needs the Stripe publishable key for the same Stripe account connected in Nozle.
 
 ## React implementation
 
@@ -48,13 +107,13 @@ const handleCheckout = async () => {
 />
 ```
 
-## Server-side (bypass checkout UI)
+## Server-side plan changes
 
-For B2B scenarios where payment is already on file:
+For B2B scenarios where payment is already handled outside embedded checkout:
 
 ```typescript
 const result = await nozle.subscribe('customer_123', 'growth');
 // { subscription_id: 'sub_...', status: 'active' }
 ```
 
-Note: `subscribe()` requires a secret key (`sk_`).
+`subscribe()` requires a secret key (`sk_`). Embedded checkout should be used when Nozle needs to collect payment before activating a paid plan.

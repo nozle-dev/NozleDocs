@@ -3,9 +3,19 @@ title: "Create Checkout Session"
 api: "POST /checkout"
 ---
 
-Create a Stripe Checkout session for a customer to subscribe to a plan. Returns a `client_secret` that you pass to Stripe's embedded checkout component.
+Create a Stripe embedded Checkout Session. The endpoint can be used from the browser with a Nozle publishable key.
 
-**Auth:** `pk_nozle_...` (publishable key) or `sk_nozle_...` (secret key).
+**Auth:** `pk_nozle_...` publishable key or `sk_nozle_...` secret key.
+
+<Info>
+With a publishable key, checkout is scoped to the organization and customer context allowed by that key. Nozle never returns your Stripe secret key to the browser. The response only includes a Stripe Checkout `client_secret`.
+</Info>
+
+## Modes
+
+### Plan checkout
+
+Use this when a customer is selecting a plan.
 
 <ParamField body="customer_id" type="string" required>
   External customer ID. The customer must already exist.
@@ -15,6 +25,26 @@ Create a Stripe Checkout session for a customer to subscribe to a plan. Returns 
   The plan code to subscribe the customer to (e.g. `pro`).
 </ParamField>
 
+Plan checkout is payment-gated. Nozle creates an incomplete subscription and activates it only after Stripe confirms payment through the webhook.
+
+If no payment is due immediately, Nozle returns `checkout_not_required`. This includes free plans, trials with no pay-in-advance fixed charge, and downgrades that should take effect through the subscription API rather than checkout.
+
+<Warning>
+Paid-to-paid upgrade checkout is not enabled until the proration invoice flow is payment-gated end-to-end. Use server-side subscription changes for now, or create an explicit invoice and collect it with invoice checkout.
+</Warning>
+
+### Existing invoice checkout
+
+Use this for one-off payments such as add-ons, credit top-ups, or manually generated invoices.
+
+<ParamField body="invoice_id" type="string">
+  Existing Nozle invoice ID to collect payment for. When `invoice_id` is provided, `customer_id` and `plan_code` are not required.
+</ParamField>
+
+Invoice checkout does not create subscription activation rules. It only collects payment for the existing invoice.
+
+## Return URL
+
 <ParamField body="return_url" type="string">
   URL Stripe should return to after embedded checkout completes. If omitted, Nozle uses the configured dashboard return URL.
 </ParamField>
@@ -23,7 +53,28 @@ Create a Stripe Checkout session for a customer to subscribe to a plan. Returns 
   Backward-compatible alias for `return_url`.
 </ParamField>
 
-### Response
+## Request examples
+
+Plan checkout:
+
+```json
+{
+  "customer_id": "customer_123",
+  "plan_code": "growth",
+  "return_url": "https://app.example.com/settings/billing"
+}
+```
+
+Invoice checkout:
+
+```json
+{
+  "invoice_id": "invoice_uuid",
+  "return_url": "https://app.example.com/settings/billing"
+}
+```
+
+## Response
 
 <ResponseField name="type" type="string" required>
   Payment processor type. Currently `stripe`.
@@ -36,3 +87,29 @@ Create a Stripe Checkout session for a customer to subscribe to a plan. Returns 
 <ResponseField name="clientSecret" type="string">
   Camel-case alias for `client_secret`.
 </ResponseField>
+
+<ResponseField name="invoice_id" type="string">
+  Nozle invoice ID being paid.
+</ResponseField>
+
+<ResponseField name="amount_cents" type="integer">
+  Amount due for the checkout session, in the invoice currency's smallest unit.
+</ResponseField>
+
+<ResponseField name="currency" type="string">
+  Invoice currency.
+</ResponseField>
+
+## Webhook requirement
+
+Stripe must be able to reach your Nozle public API URL. When a Stripe provider is connected, Nozle registers the Stripe webhook endpoint for that tenant's Stripe account:
+
+```text
+{NOZLE_PUBLIC_API_URL}/webhooks/stripe/{organization_id}?code={stripe_provider_code}
+```
+
+Checkout relies on these Stripe events:
+
+- `payment_intent.succeeded`
+- `payment_intent.payment_failed`
+- `payment_intent.canceled`

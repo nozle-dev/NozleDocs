@@ -3,22 +3,26 @@ title: Webhooks
 description: Stripe webhook events and signature verification
 ---
 
-Nozle processes Stripe webhooks at `POST /webhooks/stripe`.
+Nozle processes Stripe payment webhooks for each connected Stripe account.
 
 **How it works:**
-1. Stripe sends webhook events to your Nozle API's /webhooks/stripe endpoint
-2. Nozle verifies the Stripe signature header
-3. Based on the event type, Nozle updates subscription state, activates features, etc.
+
+1. You connect a Stripe account to a Nozle organization.
+2. Nozle registers a Stripe webhook endpoint for that Stripe account.
+3. Stripe sends payment events to your public Nozle API URL.
+4. Nozle verifies the `Stripe-Signature` header using the webhook secret returned by Stripe.
+5. Nozle updates invoice payment status and resolves any payment-gated subscription activation.
 
 **Key events processed:**
 
 | Event | What Nozle Does |
 |-------|----------------|
-| checkout.session.completed | Activates subscription, provisions plan entitlements |
-| customer.subscription.updated | Updates subscription state (upgrades, downgrades) |
-| customer.subscription.deleted | Deactivates subscription |
-| invoice.paid | Marks invoice as paid |
-| invoice.payment_failed | Triggers dunning/retry flow |
+| payment_intent.succeeded | Marks the invoice paid; activates payment-gated subscriptions |
+| payment_intent.payment_failed | Marks payment failed; cancels payment-gated subscriptions |
+| payment_intent.canceled | Treats the payment attempt as failed |
+| setup_intent.succeeded | Stores successful setup intent/payment method data |
+| customer.updated | Syncs customer payment details |
+| charge.dispute.closed | Updates disputed payment state |
 
 **Plan features provisioned on subscription:**
 
@@ -27,10 +31,11 @@ Growth plan: revenue_analytics, remove_branding_watermark, auto_dunning, progres
 Scale plan: everything in Growth PLUS netsuite, xero, hubspot, salesforce, okta, avalara, api_permissions, custom_roles, forecasted_usage, security_logs, from_email, issue_receipts, manual_payments, multi_entities_pro
 
 **Setup:**
-Configure your Stripe webhook endpoint in the Stripe Dashboard pointing to:
-```
-https://api.nozle.app/webhooks/stripe
+
+Nozle registers the Stripe webhook automatically when you connect Stripe. The target is:
+
+```text
+{NOZLE_PUBLIC_API_URL}/webhooks/stripe/{organization_id}?code={stripe_provider_code}
 ```
 
-Configure the webhook signing secret in the Nozle dashboard under **Settings > Stripe**.
-
+Your Stripe account must allow webhook endpoint creation, and your public Nozle API URL must be reachable by Stripe.

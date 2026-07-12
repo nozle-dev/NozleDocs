@@ -6,13 +6,17 @@ description: Payment processing, retries, and dunning
 Nozle uses Stripe as the payment processor. Payments are initiated during checkout and processed automatically for recurring subscriptions.
 
 **Payment flow:**
+
 1. Customer enters payment details during Stripe checkout
 2. Stripe processes the payment
-3. Webhook (checkout.session.completed or invoice.paid) notifies Nozle API
-4. Nozle API updates subscription status
+3. Stripe sends `payment_intent.succeeded`, `payment_intent.payment_failed`, or `payment_intent.canceled` to Nozle
+4. Nozle updates invoice payment status
+5. If the invoice belongs to a payment-gated plan checkout, Nozle activates or cancels the incomplete subscription
 
 **Payment methods:**
+
 The PaymentMethodDisplay component shows the customer's saved card:
+
 ```tsx
 <PaymentMethodDisplay
   paymentMethod={{ last4: '4242', brand: 'visa', expMonth: 12, expYear: 2025 }}
@@ -21,12 +25,16 @@ The PaymentMethodDisplay component shows the customer's saved card:
 ```
 
 **Failed payments and retries:**
-When a payment fails (invoice.payment_failed webhook), the system can retry automatically based on the dunning configuration:
+
+When a payment fails, Nozle records the failed payment status. Dunning and retries can be configured for recurring invoices:
+
 - Automatic dunning: configurable retry schedule
 - Manual dunning: manually trigger retry
 
 **Credits:**
-Customers can prepay via credits:
+
+Customers can prepay via credits. Credit purchases should create a credit invoice first, then use checkout with `invoice_id`:
+
 ```tsx
 <CreditBalance customerId="cust_123" />
 <CreditTopUpButton onSuccess={(amount) => toast('Added ' + amount + ' credits')} />
