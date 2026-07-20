@@ -1,0 +1,27 @@
+---
+title: Credit Systems and Rates
+description: Create a credit catalog and exact metric conversion rates
+---
+
+Create Credit Systems and rates in the Nozle dashboard. Rails owns this configuration, organization scoping, auditing, and version history.
+
+## Rate formula
+
+```text
+credits required = metric units × credit_amount / metric_amount
+```
+
+All amounts are exact decimals. API requests and responses use strings, such as `"2.500000000000"`, to avoid binary floating-point loss.
+
+## Mapping rules
+
+- the metric and Credit System must belong to the same organization;
+- only `consumable=true` metrics are eligible;
+- Phase 1 accepts `count_agg` and direct-field `sum_agg` metrics;
+- amounts must be finite and positive;
+- a rate edit closes the previous effective version and creates a new one;
+- historical operations retain the exact rate snapshot they used.
+
+A metric with any rate history is configuration-locked: its code and metering definition cannot be changed or soft-deleted, and `consumable` must remain true.
+
+If one metric has multiple active mappings, integrations must select a Credit System explicitly unless configuration provides one deterministic mapping. Nozle does not silently fall back between pools based on current balance.

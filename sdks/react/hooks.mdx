@@ -9,7 +9,9 @@ All hooks must be used inside a [`<BillingProvider>`](/sdks/react/installation).
 import {
   useCan,
   useUsage,
-  useCredits,
+  useCreditBalance,
+  useCreditBalances,
+  useCreditOperations,
   usePlan,
   usePlans,
   useCheckout,
@@ -127,48 +129,83 @@ function TokenCounter({ customerId }: { customerId: string }) {
 
 ---
 
-## useCredits
+## useCreditBalance
 
-Fetch the current credit balance for a customer.
+Fetch one product Credit System balance, including source provenance. Amounts remain exact decimal strings.
 
 ### Signature
 
 ```ts
-function useCredits(customerId: string): CreditsState
+function useCreditBalance(
+  creditSystemCode: string,
+  options?: { customerId?: string; enabled?: boolean }
+): CreditBalanceState
 ```
 
 ### Return type
 
 ```ts
-interface CreditsState {
-  balance: number | null;
-  loading: boolean;
-  error: string | null;
+interface CreditBalanceState {
+  data: CreditBalanceData | null;
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => void;
 }
 ```
 
 ### How it works
 
-Calls `GET /api/v1/credits/:customerId/balance` on mount. Returns the customer's prepaid credit balance.
+Calls `GET /api/v1/customers/:customerId/credit-systems/:code/balance`. The provider should use a customer session token bound to the same customer.
+
+This and the other product-credit hooks use HTTP only. They do not subscribe to Centrifugo, and the customer session is not used for realtime entitlement channels.
 
 ### Example
 
 ```tsx title="components/CreditDisplay.tsx"
-import { useCredits } from '@nozle-js/react';
+import { useCreditBalance } from '@nozle-js/react';
 
-function CreditDisplay({ customerId }: { customerId: string }) {
-  const { balance, loading, error } = useCredits(customerId);
+function CreditDisplay() {
+  const { data, isLoading, error } = useCreditBalance('ai_credits');
 
-  if (loading) return <p>Loading balance...</p>;
+  if (isLoading) return <p>Loading balance...</p>;
   if (error) return <p>Could not load credits</p>;
 
   return (
     <p>
-      Credit balance: <strong>${(balance ?? 0).toFixed(2)}</strong>
+      Credit balance: <strong>{data?.available ?? '0'} {data?.unit_name}</strong>
     </p>
   );
 }
 ```
+
+## useCreditBalances
+
+Returns every Credit System balance for the provider customer:
+
+```tsx
+const { data, isLoading, error, refetch } = useCreditBalances();
+```
+
+## useCreditOperations
+
+Paginates immutable grants, consumes, denials, and adjustments. `loadMore` is concurrency-guarded and deduplicates operation IDs.
+
+```tsx
+const {
+  operations,
+  isLoading,
+  isLoadingMore,
+  hasMore,
+  loadMore,
+} = useCreditOperations({
+  creditSystemCode: 'ai_credits',
+  pageSize: 25,
+});
+```
+
+<Info>
+The older `useCredits(customerId)` export reads the legacy Lago wallet adapter. Use the hooks above for product Credit Systems.
+</Info>
 
 ---
 

@@ -1,0 +1,34 @@
+---
+title: Check and Track Usage
+description: Advisory checks and atomic idempotent consumption
+---
+
+Use `/usage/check` for an advisory decision and `/usage/track` for the authoritative mutation. Both require a server-side secret key.
+
+```ts
+const check = await nozle.usage.check({
+  customerId: "customer_123",
+  billableMetricCode: "agent_execution",
+  creditSystemCode: "ai_credits",
+});
+
+const result = await nozle.usage.track(
+  {
+    customerId: "customer_123",
+    billableMetricCode: "agent_execution",
+    creditSystemCode: "ai_credits",
+    timestamp: new Date().toISOString(),
+  },
+  { idempotencyKey: "execution_0183f" },
+);
+```
+
+## Idempotency
+
+Every track request requires an `Idempotency-Key`. Retrying the same key and payload returns the committed result. Reusing the key with a different payload returns a conflict. A denied request is also idempotent; use a new action key after adding credits.
+
+## Outcomes
+
+Insufficient credits return a product decision with `allowed=false`; they are not a server failure. Database unavailability or lock timeout returns retryable HTTP `503` with `Retry-After`. Retry those failures with the same idempotency key.
+
+Nozle locks eligible sources in deterministic expiry order, rechecks validity using PostgreSQL time, writes allocations, and inserts the Lago event outbox row in one transaction. A successful debit cannot be lost merely because Lago is temporarily unavailable.

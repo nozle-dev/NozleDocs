@@ -1,0 +1,33 @@
+---
+title: Credit Reliability and Reconciliation
+description: Understand ledger invariants, event delivery, and operational safety
+---
+
+PostgreSQL balance sources plus immutable allocations are the credit source of truth. Redis is never authoritative for consumption.
+
+## Core guarantees
+
+- balances cannot cross below zero;
+- one idempotency key creates at most one logical operation;
+- successful consume allocations sum exactly to the operation amount;
+- denied operations have no allocations and no usage outbox event;
+- every successful consume has one durable outbox row;
+- paid payments and subscription periods materialize one deterministic source;
+- exact rate arithmetic is enforced in Rails, Go, and PostgreSQL.
+
+## Lago publication
+
+Usage publication is at-least-once. The credit operation ID becomes the Lago transaction ID, so retrying after a timeout cannot create a second usage effect. Workers claim rows in bounded waves, use leases longer than the maximum POST and reconciliation duration, and truncate stored errors without breaking UTF-8.
+
+## Reconciliation
+
+Continuous jobs detect:
+
+- source remaining amount that disagrees with immutable allocations;
+- successful consumes missing allocations or an outbox row;
+- denied consumes with side effects;
+- missing Lago events;
+- missing subscription grants;
+- successful top-up payments without a credit source.
+
+Repairs use idempotent materialization or explicit compensating operations. They never rewrite historical ledger rows.

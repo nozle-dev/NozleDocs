@@ -1,0 +1,38 @@
+---
+title: Create Customer Session
+api: "POST /customer-sessions"
+description: Mint a short-lived customer-bound token for browser credit reads
+---
+
+**Auth:** secret key (`sk_nozle_...`) only. Call this endpoint from your backend.
+
+```json
+{
+  "customer_id": "customer_123",
+  "expires_in_seconds": 900
+}
+```
+
+`expires_in_seconds` is optional, defaults to 900 seconds, and must be between 60 and 3600.
+
+```json
+{
+  "customer_session": {
+    "token": "csess_...",
+    "customer_id": "customer_123",
+    "expires_at": "2026-07-20T12:15:00Z",
+    "scope": ["credits:read"]
+  }
+}
+```
+
+The customer must exist in the authenticated organization. The token is accepted only by the customer balance, single-system balance, and credit-operation HTTP reads. It cannot mint a Centrifugo token, subscribe to customer-credit realtime channels, track usage, create purchases, modify billing, or read another customer.
+
+Issue it after authenticating the user in your own application, keep it in memory where possible, and refresh it from your backend after expiry. Do not place a Nozle secret key in the browser or persist the session in long-lived local storage.
+
+```ts
+const session = await nozle.customerSessions.create({
+  customerId: "customer_123",
+  expiresInSeconds: 900,
+});
+```

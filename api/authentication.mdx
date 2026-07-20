@@ -18,12 +18,13 @@ Each endpoint page shows the correct base URL in the code examples on the right.
 
 ## API Keys
 
-**Two key types:**
+**Three credential types:**
 
 | Key Type | Prefix | Use | Example |
 |----------|--------|-----|---------|
 | Publishable | `pk_nozle_` | Client-side (React SDK, browsers) | `pk_nozle_abc123...` |
 | Secret | `sk_nozle_` | Server-side only (Node/Python SDKs, cURL) | `sk_nozle_xyz789...` |
+| Customer session | `csess_` | Short-lived browser reads for one customer | `csess_eyJ...` |
 
 All authenticated endpoints require a Bearer token in the Authorization header:
 
@@ -33,8 +34,11 @@ Authorization: Bearer sk_nozle_your_secret_key
 
 ## Key Scoping
 
-- **Publishable keys** (`pk_nozle_...`) can access: `can`, plans, checkout, billing status, subscriptions, invoices, credits, ws-token
-- **Secret keys** (`sk_nozle_...`) can access everything above PLUS: subscribe, cost-models, admin/reload, margin/*, and all billing engine endpoints
+- **Publishable keys** (`pk_nozle_...`) support public catalog and browser checkout flows. They cannot read the product-credit ledger or mutate usage.
+- **Secret keys** (`sk_nozle_...`) are server-side credentials for configuration, usage mutation, customer-session creation, and privileged reads.
+- **Customer sessions** (`csess_...`) carry only `credits:read`, are bound to one organization and external customer ID, and expire after at most one hour. They are accepted only by the three product-credit HTTP read routes and are rejected by `/auth/centrifugo-token` and all legacy billing routes.
+
+Create customer sessions from your backend with `POST /api/v1/customer-sessions`, then pass the returned token alongside the React provider's existing publishable key. Only the product-credit hooks and components select it.
 
 ## Public Endpoints
 
@@ -49,5 +53,5 @@ These do not require an API key:
 Sign in at [app.nozle.app](https://app.nozle.app) → Settings → API Keys.
 
 <Warning>
-Never expose secret keys in client-side code. Use publishable keys for the React SDK and secret keys only on your server.
+Never expose secret keys in client-side code. Use publishable keys for public checkout/catalog UI and a short-lived customer session for balance, source, or operation history components.
 </Warning>

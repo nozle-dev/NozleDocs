@@ -1,0 +1,59 @@
+---
+title: Product Credits
+description: Read balances, mint customer sessions, and track credit-backed usage
+---
+
+## Read balances and history
+
+```ts
+const balance = await nozle.credits.getBalance('customer_123', 'ai_credits');
+console.log(balance.available); // exact decimal string
+
+const allBalances = await nozle.credits.listBalances('customer_123');
+
+const firstPage = await nozle.credits.listOperations('customer_123', {
+  creditSystemCode: 'ai_credits',
+  limit: 25,
+});
+
+const nextPage = firstPage.next_cursor
+  ? await nozle.credits.listOperations('customer_123', {
+      creditSystemCode: 'ai_credits',
+      limit: 25,
+      cursor: firstPage.next_cursor,
+    })
+  : null;
+```
+
+## Mint a React read session
+
+```ts
+const session = await nozle.customerSessions.create({
+  customerId: 'customer_123',
+  expiresInSeconds: 900,
+});
+```
+
+Call this only from an authenticated backend route. Send `session.token` to `BillingProvider`; never send your `sk_` key to the browser.
+
+## Check and consume
+
+```ts
+const check = await nozle.usage.check({
+  customerId: 'customer_123',
+  billableMetricCode: 'agent_execution',
+  creditSystemCode: 'ai_credits',
+});
+
+const result = await nozle.usage.track(
+  {
+    customerId: 'customer_123',
+    billableMetricCode: 'agent_execution',
+    creditSystemCode: 'ai_credits',
+    timestamp: new Date().toISOString(),
+  },
+  { idempotencyKey: 'execution_0183f' },
+);
+```
+
+`usage.check` is advisory. Only `usage.track` atomically reserves and deducts value.
