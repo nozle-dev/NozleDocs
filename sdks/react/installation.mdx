@@ -14,9 +14,9 @@ npm install @nozle-js/react
 </Step>
 
 <Step>
-## Add client-side environment variables
+## Configure browser and server authentication
 
-Use a Nozle publishable key in browser code. Keep your Nozle secret key server-side only.
+Keep your Nozle secret key server-side only. A publishable key can power public pricing and checkout UI, but product-credit balances and ledger history require a short-lived customer session.
 
 For Vite:
 
@@ -35,6 +35,17 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
 ```
 
 `VITE_STRIPE_PUBLISHABLE_KEY` / `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is only needed if your app mounts embedded Stripe checkout. If you only redirect to a hosted checkout URL, you do not need to mount Stripe Elements in your app.
+
+Mint the read session in your authenticated backend route:
+
+```ts title="app/api/nozle-session/route.ts"
+const session = await nozle.customerSessions.create({
+  customerId: currentCustomerId,
+  expiresInSeconds: 900,
+});
+
+return Response.json(session);
+```
 </Step>
 
 <Step>
@@ -45,10 +56,11 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
 ```tsx title="src/App.tsx"
 import { BillingProvider } from '@nozle-js/react';
 
-function App({ children, currentCustomerId }) {
+function App({ children, currentCustomerId, customerSessionToken }) {
   return (
     <BillingProvider
       publishableKey={import.meta.env.VITE_NOZLE_PUBLISHABLE_KEY}
+      customerSessionToken={customerSessionToken}
       baseUrl={import.meta.env.VITE_NOZLE_API_URL ?? 'https://api.nozle.app'}
       customerId={currentCustomerId}
       workspaceId="ws_abc123"
@@ -66,16 +78,19 @@ In Next.js, use `process.env.NEXT_PUBLIC_NOZLE_PUBLISHABLE_KEY` and `process.env
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `publishableKey` | `string` | **required** | Your Nozle publishable key (`pk_nozle_...`) |
-| `apiKey` | `string` | -- | Backward-compatible alias for `publishableKey` |
+| `customerSessionToken` | `string` | -- | Recommended for customer balance/history UI. Short-lived `csess_...` token minted by your backend. |
+| `publishableKey` | `string` | -- | Client-safe key for public catalog, entitlement, and checkout UI. Cannot read product-credit balances. |
+| `apiKey` | `string` | -- | Backward-compatible auth-token alias. Never pass a secret key in browser code. |
 | `customerId` | `string` | `''` | Your external customer ID. Required by customer-scoped hooks and billing components. |
 | `baseUrl` | `string` | `'https://api.nozle.app'` | API endpoint |
 | `workspaceId` | `string` | `''` | Your workspace ID |
 | `centrifugoUrl` | `string` | `undefined` | WebSocket URL for real-time entitlement updates |
 | `children` | `ReactNode` | **required** | Your app content |
 
+Provide at least one authentication prop. For a full billing portal, pass both `publishableKey` and `customerSessionToken`: general billing calls keep using the publishable key, while credit-ledger hooks select the customer session only for their bounded read routes.
+
 <Warning>
-The key passed to `BillingProvider` must be a publishable key (`pk_nozle_...`), not a secret key. Publishable keys are safe for client-side billing UI. Never expose your `sk_nozle_...` secret key in browser code.
+Never expose your `sk_nozle_...` secret key in browser code. Use `customerSessionToken` for credit reads and a publishable key for public checkout/catalog components. A customer session is bound to one customer and cannot mutate usage or billing.
 </Warning>
 </Step>
 

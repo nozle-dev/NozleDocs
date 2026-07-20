@@ -1,0 +1,20 @@
+---
+title: Paid Credit Top-ups
+description: Sell fixed packages and grant credits only after confirmed payment
+---
+
+Paid top-ups use fixed catalog packages. A package snapshots its Credit System, credit amount, money amount, currency, and optional expiry.
+
+```text
+Create purchase -> checkout/invoice -> payment succeeds -> idempotent credit source
+```
+
+Checkout creation never grants credits. Core durably records the successful payment signal and Engine materializes exactly one source and one originating grant operation. A reconciliation sweep repairs missed delivery without duplicating credits.
+
+The React `CreditTopUpButton` submits `creditSystemCode` and `topUpPackageCode`, reuses its idempotency key after network failure, and uses same-page hosted-checkout navigation.
+
+<Warning>
+The package's money-to-credit exchange is different from a metric rate. `$10 -> 250 AI credits` defines a product package; `1 agent execution -> 2 AI credits` defines usage cost.
+</Warning>
+
+Refunds after credits were spent require an explicit operator policy. Nozle never forces a source below zero silently.

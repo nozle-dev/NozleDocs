@@ -1,0 +1,40 @@
+---
+title: Product Credits Overview
+description: Customer-level credit systems, balances, sources, and ledger behavior
+---
+
+Nozle product credits are customer-level units used to authorize metered actions. They are separate from Lago wallet credits, which apply monetary value to invoices.
+
+```text
+Billable metric -> exact conversion rate -> credit system -> customer sources
+```
+
+For example, one `agent_execution` event can cost `2` AI credits while one `voice_call_minute` costs `4` AI credits.
+
+## Core objects
+
+- **Billable metric:** measures the product action.
+- **Credit system:** names the shared pool, such as AI Credits.
+- **Metric rate:** stores the exact metric-to-credit ratio and its effective history.
+- **Plan grant rule:** defines included credits and cadence.
+- **Balance source:** keeps each plan grant, paid top-up, or adjustment separate.
+- **Operation and allocation ledger:** explains every accepted, denied, granted, or adjusted amount.
+
+<Warning>
+Product credits are not Lago wallet credits. Do not use wallet endpoints or the legacy `/check-and-deduct` adapter for new credit-system integrations.
+</Warning>
+
+## Customer-level Phase 1
+
+Phase 1 balances belong to a customer. Per-user or per-project balances are introduced later as Entities. A successful usage request atomically deducts the customer pool and writes an immutable operation before its Lago event is published through the durable outbox.
+
+## Read access
+
+Server code can read balances with a secret key. Browser components use a short-lived customer session carrying only `credits:read`; a publishable key alone cannot read the ledger.
+
+<CardGroup cols={2}>
+  <Card title="Configure credit systems" href="/guides/credits/configuration" />
+  <Card title="Track credit-backed usage" href="/guides/credits/usage-tracking" />
+  <Card title="React credit components" href="/sdks/react/components" />
+  <Card title="Reliability and reconciliation" href="/guides/credits/reliability" />
+</CardGroup>

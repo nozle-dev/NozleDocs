@@ -1,0 +1,27 @@
+---
+title: Consumable Metrics
+description: Model usage behavior independently from aggregation lifecycle
+---
+
+Every new Billable Metric explicitly chooses two independent concepts.
+
+## Usage behavior
+
+- **Consumable:** each measured unit may spend an allowance or credit balance.
+- **Continuous:** represents a current allocation such as seats or storage.
+
+## Aggregation lifecycle
+
+- **Periodic (`recurring=false`):** the aggregate starts over for the next billing period.
+- **Persistent (`recurring=true`):** Lago carries the calculated metric state across periods.
+
+`consumable` is never inferred from `recurring`. A lifetime token pool can be consumable and persistent; a seat count is continuous and normally persistent.
+
+Only metrics with `consumable=true` can join a Phase 1 Credit System. Existing metrics with `consumable=null` continue ordinary Lago pricing and invoicing, but cannot spend product credits until classified.
+
+Phase 1 credit deduction supports deterministic per-event deltas:
+
+- `count_agg`: one event equals one metric unit;
+- `sum_agg`: units come from the configured numeric field.
+
+Stateful or whole-period aggregations remain available for normal Lago billing but are not eligible for credit mappings yet.

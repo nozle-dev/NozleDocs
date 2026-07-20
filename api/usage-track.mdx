@@ -1,0 +1,28 @@
+---
+title: Track and Consume Credits
+api: "POST /usage/track"
+description: Atomically consume credits and queue the matching Lago event
+---
+
+**Auth:** secret key only. The organization must be enabled for credit usage tracking.
+
+```http
+POST /usage/track
+Authorization: Bearer sk_nozle_...
+Idempotency-Key: execution_0183f
+Content-Type: application/json
+```
+
+```json
+{
+  "customer_id": "customer_123",
+  "billable_metric_code": "agent_execution",
+  "credit_system_code": "ai_credits",
+  "properties": {},
+  "timestamp": "2026-07-20T12:00:00.750Z"
+}
+```
+
+A successful response includes the operation ID, exact credits consumed, remaining total, and source deductions. Insufficient credits return `allowed=false` without allocations or a Lago event.
+
+Retry HTTP `503` with the same idempotency key. Reusing a key with a different payload returns `409`.

@@ -1,0 +1,20 @@
+---
+title: Included Plan Credits
+description: Configure recurring customer grants and lifecycle behavior
+---
+
+Plan credit grant rules attach an amount and cadence to one Credit System. Cadence can be monthly, yearly, multi-period, or lifetime and is independent from invoice frequency.
+
+For each entitlement period, Nozle creates a distinct balance source with a deterministic reference. It never resets one shared mutable balance row.
+
+## Lifecycle policy
+
+- **Activation:** grant the configured target.
+- **Immediate upgrade:** grant `max(target - cumulative amount already granted for the same period and subscription lineage, 0)` per Credit System.
+- **Downgrade:** do not claw back; the lower target applies next period.
+- **Cycle-end transition:** create no immediate difference grant.
+- **Cancellation:** subscription sources expire at their own period boundary; lifetime sources retain their configured lifetime behavior.
+
+Cadence cannot change unsafely across a subscription lineage. Removing and later reintroducing a rule does not bypass historical cadence validation.
+
+Paid top-ups remain separate sources and are not reduced by plan changes.

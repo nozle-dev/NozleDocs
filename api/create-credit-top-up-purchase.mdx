@@ -1,0 +1,21 @@
+---
+title: Create Credit Top-up Purchase
+api: "POST /credit-top-up-purchases"
+description: Start checkout for a fixed product-credit package
+---
+
+**Auth:** publishable or secret key. `Idempotency-Key` is required.
+
+```json
+{
+  "customer_id": "customer_123",
+  "credit_system_code": "ai_credits",
+  "top_up_package_code": "starter_pack"
+}
+```
+
+The response returns the pending purchase snapshot and hosted `payment_url`. Navigate the same page to that URL.
+
+<Warning>
+Creating checkout does not grant credits. Credits are materialized only after Core records a confirmed successful payment and Engine validates the payment snapshot.
+</Warning>

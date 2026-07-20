@@ -27,4 +27,12 @@ Regardless of deployment model, you'll need Nozle API keys to use the SDKs:
 | Publishable | `pk_` | Client-side (React SDK) |
 | Secret | `sk_` | Server-side (Node/Python SDKs) |
 
+## Credit engine sessions
+
+| Variable | Description |
+|----------|-------------|
+| `NOZLE_CUSTOMER_SESSION_SECRET` | Separate high-entropy HMAC secret of at least 32 bytes, used to sign short-lived `credits:read` customer sessions. Required before deploying WP9 browser credit reads. |
+
+Rotate this value deliberately: replacing it immediately invalidates every outstanding customer session. Never expose it through frontend build variables.
+
 Get your keys from the Nozle dashboard at [app.nozle.app](https://app.nozle.app).

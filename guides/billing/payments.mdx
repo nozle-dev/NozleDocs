@@ -31,16 +31,16 @@ When a payment fails, Nozle records the failed payment status. Dunning and retri
 - Automatic dunning: configurable retry schedule
 - Manual dunning: manually trigger retry
 
-**Credits:**
+**Product credit top-ups:**
 
-Customers can prepay via credits. Credit purchases should create a credit invoice first, then use checkout with `invoice_id`:
+Configure fixed top-up packages for a Credit System. Checkout creation produces an invoice/payment flow; credits are granted only after confirmed payment:
 
 ```tsx
-<CreditBalance customerId="cust_123" />
-<CreditTopUpButton onSuccess={(amount) => toast('Added ' + amount + ' credits')} />
-<CreditHistory customerId="cust_123" />
+<CreditBalance creditSystemCode="ai_credits" />
+<CreditTopUpButton creditSystemCode="ai_credits" topUpPackageCode="starter_pack" />
+<CreditUsageHistory creditSystemCode="ai_credits" />
 ```
 
-Credit transaction types: grant, deduct, purchase, application.
+Product credits are separate from Lago wallet credits. See [Paid Credit Top-ups](/guides/credits/top-ups).
 
 For detailed payment configuration, see:

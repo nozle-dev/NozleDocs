@@ -1,0 +1,19 @@
+---
+title: Check Credit Usage
+api: "POST /usage/check"
+description: Calculate an advisory credit decision without mutation
+---
+
+**Auth:** secret key only.
+
+```json
+{
+  "customer_id": "customer_123",
+  "billable_metric_code": "agent_execution",
+  "credit_system_code": "ai_credits",
+  "properties": {},
+  "occurred_at": "2026-07-20T12:00:00.750Z"
+}
+```
+
+The response includes `advisory: true`, exact `metric_amount`, `credits_required`, and the available balance. Another request can spend credits before a later track call, so this endpoint is not authorization to perform irreversible work.

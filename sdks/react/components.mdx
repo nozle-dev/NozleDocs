@@ -6,7 +6,7 @@ description: Drop-in billing UI components for React
 All components are exported from `@nozle-js/react` and use `--nozle-*` CSS custom properties for theming. They work with any design system -- just set the CSS variables on a parent element or `:root`.
 
 <Info>
-Components that make API calls (`CheckoutButton`, `UpgradeButton`, `CreditTopUpButton`) must be wrapped in a `BillingPortalProvider`. Components that read subscription data (`CurrentPlan`, `CreditBalance`, `CreditHistory`, `InvoiceList`) require a `BillingProvider` ancestor.
+Checkout components use `BillingPortalProvider` with a publishable key. Product-credit read components use `BillingProvider` with a short-lived `customerSessionToken`; a bare publishable key cannot read balances or ledger operations.
 </Info>
 
 ---
@@ -351,7 +351,7 @@ import { UpgradeModal } from '@nozle-js/react';
 
 ### CreditTopUpButton
 
-Opens a dialog for purchasing credits. Displays preset amounts ($10, $25, $50, $100, $250) with an optional custom amount input.
+Opens a confirmation dialog for one fixed top-up package configured in the Credit System catalog.
 
 Must be used inside a `BillingPortalProvider`.
 
@@ -359,8 +359,11 @@ Must be used inside a `BillingPortalProvider`.
 import { CreditTopUpButton } from '@nozle-js/react';
 
 <CreditTopUpButton
-  label="Add Credits"
-  onSuccess={(amount) => toast.success(`Added $${amount} in credits`)}
+  creditSystemCode="ai_credits"
+  topUpPackageCode="starter_pack"
+  packageName="Starter pack"
+  creditAmount="250"
+  priceLabel="$10.00"
   onError={(err) => toast.error(err.message)}
 />
 ```
@@ -368,11 +371,18 @@ import { CreditTopUpButton } from '@nozle-js/react';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `label` | `string` | `'Add Credits'` | Button text |
+| `creditSystemCode` | `string` | **required** | Credit System catalog code |
+| `topUpPackageCode` | `string` | **required** | Fixed package code |
+| `packageName` | `string` | Package code | Customer-facing package name |
+| `creditAmount` | `string` | -- | Optional display amount |
+| `priceLabel` | `string` | -- | Optional display price |
 | `apiBaseUrl` | `string` | `'https://api.nozle.app'` | API base URL |
 | `className` | `string` | -- | CSS class for the button |
 | `style` | `React.CSSProperties` | -- | Inline styles |
-| `onSuccess` | `(amount: number) => void` | -- | Called with the purchased amount |
+| `onCheckoutCreated` | `(purchase) => void` | -- | Called after pending checkout creation, not after payment success |
 | `onError` | `(error: Error) => void` | -- | Called on purchase failure |
+
+The component requires an idempotency key internally and navigates the current page to hosted checkout. Credits are granted only after confirmed payment.
 
 ---
 
@@ -443,6 +453,7 @@ import { BillingPortal } from '@nozle-js/react';
 
 <BillingPortal
   customerId="cus_xxx"
+  creditSystemCode="ai_credits"
   usageFeatures={[
     { key: 'api_calls', label: 'API Calls', used: 8200, limit: 10000 },
     { key: 'storage', label: 'Storage (GB)', used: 3, limit: 10 },
@@ -454,6 +465,7 @@ import { BillingPortal } from '@nozle-js/react';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `customerId` | `string` | -- | Customer identifier |
+| `creditSystemCode` | `string` | -- | Adds the product-credit balance section when provided |
 | `usageFeatures` | `UsageDashboardFeature[]` | -- | Usage data passed to the embedded UsageDashboard |
 | `usageLoading` | `boolean` | `false` | Shows skeleton placeholders for the usage section |
 | `onChangePlan` | `() => void` | -- | Called when the "Change Plan" button is clicked |
@@ -496,48 +508,60 @@ import { CurrentPlan } from '@nozle-js/react';
 
 ### CreditBalance
 
-Displays the customer's current credit balance. Uses the `useCredits` hook internally.
+Displays one product Credit System balance without converting the exact decimal through JavaScript `number`.
 
 ```tsx
 import { CreditBalance } from '@nozle-js/react';
 
-<CreditBalance customerId="cus_xxx" currency="USD" />
+<CreditBalance creditSystemCode="ai_credits" />
 ```
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `customerId` | `string` | -- | Customer identifier |
-| `currency` | `string` | `'USD'` | Currency code for formatting (e.g., `'EUR'`, `'GBP'`) |
+| `creditSystemCode` | `string` | **required** | Credit System code |
+| `customerId` | `string` | Provider customer | Optional override; the customer session must match |
+| `maximumFractionDigits` | `number` | `12` | Display precision without floating-point coercion |
 
 ---
 
-### CreditHistory
+### CreditBreakdown
 
-Renders a table of credit transactions sorted newest-first. Shows up to 20 rows with a "View all" link when there are more.
+Shows each subscription grant, paid top-up, manual grant, or adjustment separately, including remaining amount, original amount, expiry, and availability.
 
 ```tsx
-import { CreditHistory } from '@nozle-js/react';
+import { CreditBreakdown } from '@nozle-js/react';
 
-<CreditHistory
-  customerId="cus_xxx"
-  viewAllHref="/billing/credits"
-/>
+<CreditBreakdown creditSystemCode="ai_credits" showUnavailable />
 ```
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `customerId` | `string` | -- | Customer identifier |
-| `viewAllHref` | `string` | `'/billing/credits'` | Link target for "View all" when there are more than 20 transactions |
+| `creditSystemCode` | `string` | **required** | Credit System code |
+| `showUnavailable` | `boolean` | `true` | Include scheduled, expired, or exhausted source history |
 
-#### CreditTransaction type
+---
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | Transaction ID |
-| `amount` | `number` | Credit amount |
-| `type` | `string` | One of `'grant'`, `'deduct'`, `'purchase'`, `'application'` |
-| `description` | `string` | Human-readable description |
-| `createdAt` | `string` | ISO timestamp |
+### CreditUsageHistory
+
+Paginates immutable operations and shows status, metric, rate snapshot, exact credit amount, and occurrence time. The load-more guard prevents concurrent requests from appending one page twice.
+
+```tsx
+<CreditUsageHistory creditSystemCode="ai_credits" pageSize={20} />
+```
+
+---
+
+### LowCreditWarning
+
+Renders only when the exact available amount is less than or equal to the configured decimal threshold.
+
+```tsx
+<LowCreditWarning creditSystemCode="ai_credits" threshold="100" />
+```
+
+<Info>
+The older `CreditHistory` and `useCredits` exports read the legacy Lago wallet adapter. Use `CreditUsageHistory` and the `useCredit*` hooks for product Credit Systems.
+</Info>
 
 ---
 
