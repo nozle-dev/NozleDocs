@@ -32,9 +32,12 @@ Regardless of deployment model, you'll need Nozle API keys to use the SDKs:
 | Variable | Description |
 |----------|-------------|
 | `NOZLE_CUSTOMER_SESSION_SECRET` | Separate high-entropy HMAC secret of at least 32 bytes, used to sign short-lived `credits:read` customer sessions. Required before deploying WP9 browser credit reads. |
+| `CORS_ORIGIN` | Transitional single-origin setting retained for old Engine replicas during a rolling deployment. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated browser-origin allowlist, for example `https://app.example.com,https://portal.example.com`. |
 | `CHECKOUT_RETURN_URL` | Independent absolute URL used when checkout requests omit a return URL. Do not reuse this as the CORS allowlist. |
 
 Rotate this value deliberately: replacing it immediately invalidates every outstanding customer session. Never expose it through frontend build variables.
+
+During the environment rename, set all three CORS/checkout variables. New Engine versions prefer `CORS_ALLOWED_ORIGINS` and `CHECKOUT_RETURN_URL`; old versions continue reading `CORS_ORIGIN`. Remove `CORS_ORIGIN` only after all old Engine versions have been retired.
 
 Get your keys from the Nozle dashboard at [app.nozle.app](https://app.nozle.app).
