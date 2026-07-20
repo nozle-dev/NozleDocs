@@ -26,7 +26,7 @@ description: Mint a short-lived customer-bound token for browser credit reads
 }
 ```
 
-The customer must exist in the authenticated organization. The token cannot track usage, create purchases, modify billing, or read another customer.
+The customer must exist in the authenticated organization. The token is accepted only by the customer balance, single-system balance, and credit-operation HTTP reads. It cannot mint a Centrifugo token, subscribe to customer-credit realtime channels, track usage, create purchases, modify billing, or read another customer.
 
 Issue it after authenticating the user in your own application, keep it in memory where possible, and refresh it from your backend after expiry. Do not place a Nozle secret key in the browser or persist the session in long-lived local storage.
 

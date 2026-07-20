@@ -78,7 +78,7 @@ In Next.js, use `process.env.NEXT_PUBLIC_NOZLE_PUBLISHABLE_KEY` and `process.env
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `customerSessionToken` | `string` | -- | Recommended for customer balance/history UI. Short-lived `csess_...` token minted by your backend. |
+| `customerSessionToken` | `string` | -- | Optional credential used only by the new product-credit read hooks and components. Short-lived `csess_...` token minted by your backend. |
 | `publishableKey` | `string` | -- | Client-safe key for public catalog, entitlement, and checkout UI. Cannot read product-credit balances. |
 | `apiKey` | `string` | -- | Backward-compatible auth-token alias. Never pass a secret key in browser code. |
 | `customerId` | `string` | `''` | Your external customer ID. Required by customer-scoped hooks and billing components. |
@@ -87,10 +87,12 @@ In Next.js, use `process.env.NEXT_PUBLIC_NOZLE_PUBLISHABLE_KEY` and `process.env
 | `centrifugoUrl` | `string` | `undefined` | WebSocket URL for real-time entitlement updates |
 | `children` | `ReactNode` | **required** | Your app content |
 
-Provide at least one authentication prop. For a full billing portal, pass both `publishableKey` and `customerSessionToken`: general billing calls keep using the publishable key, while credit-ledger hooks select the customer session only for their bounded read routes.
+Provide `publishableKey` (or the backward-compatible `apiKey` alias) for the provider's existing billing and entitlement APIs. Add `customerSessionToken` only when rendering the new product-credit read hooks or components; those bounded HTTP calls select the customer session while all legacy `BillingPortal` calls continue using the publishable key.
+
+Product-credit reads are HTTP-only in WP9. `centrifugoUrl` remains available for existing entitlement updates, but customer sessions cannot mint Centrifugo tokens and carry no realtime customer-credit claims.
 
 <Warning>
-Never expose your `sk_nozle_...` secret key in browser code. Use `customerSessionToken` for credit reads and a publishable key for public checkout/catalog components. A customer session is bound to one customer and cannot mutate usage or billing.
+Never expose your `sk_nozle_...` secret key in browser code. Use `customerSessionToken` only for product-credit reads and a publishable key for the provider's existing checkout, catalog, entitlement, and legacy billing components. A customer session is bound to one customer and cannot mutate usage or billing.
 </Warning>
 </Step>
 

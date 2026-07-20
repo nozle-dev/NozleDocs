@@ -6,7 +6,7 @@ description: Read exact customer balances and source breakdowns
 
 **Auth:** secret key or a customer session bound to `{customer_id}`. Bare publishable keys are rejected.
 
-List every Credit System with historical sources:
+List customer Credit System balances and their active or scheduled sources:
 
 ```http
 GET /customers/customer_123/credit-systems
@@ -47,4 +47,4 @@ Authorization: Bearer csess_...
 }
 ```
 
-Decimal amounts are strings. `available` includes only currently active, valid sources; the source list may also include scheduled or exhausted history.
+Decimal amounts are strings. `available` includes only currently active, valid sources. The source list can also include scheduled sources whose `valid_from` is in the future; expired and exhausted sources are omitted.

@@ -6,7 +6,7 @@ description: Drop-in billing UI components for React
 All components are exported from `@nozle-js/react` and use `--nozle-*` CSS custom properties for theming. They work with any design system -- just set the CSS variables on a parent element or `:root`.
 
 <Info>
-Checkout components use `BillingPortalProvider` with a publishable key. Product-credit read components use `BillingProvider` with a short-lived `customerSessionToken`; a bare publishable key cannot read balances or ledger operations.
+Checkout components use `BillingPortalProvider` with a publishable key. Product-credit read components use `BillingProvider` with a short-lived `customerSessionToken`; a bare publishable key cannot read product-credit balances or ledger operations. Customer sessions do not authenticate the legacy `BillingPortal` as a whole.
 </Info>
 
 ---
@@ -446,14 +446,13 @@ const { customerId, apiKey } = useBillingPortal();
 
 ### BillingPortal
 
-Aggregated portal view that composes `CurrentPlan`, `UsageDashboard`, `InvoiceList`, and `CreditBalance` into a single vertical layout.
+Aggregated legacy portal view that composes `CurrentPlan`, `UsageDashboard`, `InvoiceList`, and the existing Lago wallet `CreditBalance` into a single vertical layout. WP9 does not replace or extend this component with product-credit reads.
 
 ```tsx
 import { BillingPortal } from '@nozle-js/react';
 
 <BillingPortal
   customerId="cus_xxx"
-  creditSystemCode="ai_credits"
   usageFeatures={[
     { key: 'api_calls', label: 'API Calls', used: 8200, limit: 10000 },
     { key: 'storage', label: 'Storage (GB)', used: 3, limit: 10 },
@@ -465,7 +464,6 @@ import { BillingPortal } from '@nozle-js/react';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `customerId` | `string` | -- | Customer identifier |
-| `creditSystemCode` | `string` | -- | Adds the product-credit balance section when provided |
 | `usageFeatures` | `UsageDashboardFeature[]` | -- | Usage data passed to the embedded UsageDashboard |
 | `usageLoading` | `boolean` | `false` | Shows skeleton placeholders for the usage section |
 | `onChangePlan` | `() => void` | -- | Called when the "Change Plan" button is clicked |
@@ -508,12 +506,30 @@ import { CurrentPlan } from '@nozle-js/react';
 
 ### CreditBalance
 
-Displays one product Credit System balance without converting the exact decimal through JavaScript `number`.
+Preserved legacy Lago wallet balance component used by `BillingPortal`.
 
 ```tsx
 import { CreditBalance } from '@nozle-js/react';
 
-<CreditBalance creditSystemCode="ai_credits" />
+<CreditBalance customerId="cus_xxx" unit="credits" />
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `customerId` | `string` | **required** | Customer identifier |
+| `currency` | `string` | `'USD'` | Currency used when `unit="currency"` |
+| `unit` | `'credits' \| 'currency'` | `'credits'` | Legacy wallet display mode |
+
+---
+
+### ProductCreditBalance
+
+Displays one product Credit System balance without converting the exact decimal through JavaScript `number`.
+
+```tsx
+import { ProductCreditBalance } from '@nozle-js/react';
+
+<ProductCreditBalance creditSystemCode="ai_credits" />
 ```
 
 | Prop | Type | Default | Description |
@@ -537,7 +553,7 @@ import { CreditBreakdown } from '@nozle-js/react';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `creditSystemCode` | `string` | **required** | Credit System code |
-| `showUnavailable` | `boolean` | `true` | Include scheduled, expired, or exhausted source history |
+| `showUnavailable` | `boolean` | `true` | Include scheduled sources whose `valid_from` is in the future. Expired and exhausted sources are not returned by the balance endpoint. |
 
 ---
 
@@ -560,7 +576,7 @@ Renders only when the exact available amount is less than or equal to the config
 ```
 
 <Info>
-The older `CreditHistory` and `useCredits` exports read the legacy Lago wallet adapter. Use `CreditUsageHistory` and the `useCredit*` hooks for product Credit Systems.
+`CreditBalance`, `CreditHistory`, `BillingPortal`, and `useCredits` retain the legacy Lago wallet behavior. Use `ProductCreditBalance`, `CreditUsageHistory`, and the `useCredit*` hooks for product Credit Systems.
 </Info>
 
 ---

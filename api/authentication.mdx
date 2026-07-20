@@ -36,9 +36,9 @@ Authorization: Bearer sk_nozle_your_secret_key
 
 - **Publishable keys** (`pk_nozle_...`) support public catalog and browser checkout flows. They cannot read the product-credit ledger or mutate usage.
 - **Secret keys** (`sk_nozle_...`) are server-side credentials for configuration, usage mutation, customer-session creation, and privileged reads.
-- **Customer sessions** (`csess_...`) carry only `credits:read`, are bound to one organization and external customer ID, and expire after at most one hour.
+- **Customer sessions** (`csess_...`) carry only `credits:read`, are bound to one organization and external customer ID, and expire after at most one hour. They are accepted only by the three product-credit HTTP read routes and are rejected by `/auth/centrifugo-token` and all legacy billing routes.
 
-Create customer sessions from your backend with `POST /api/v1/customer-sessions`, then pass only the returned token to React credit components.
+Create customer sessions from your backend with `POST /api/v1/customer-sessions`, then pass the returned token alongside the React provider's existing publishable key. Only the product-credit hooks and components select it.
 
 ## Public Endpoints
 
