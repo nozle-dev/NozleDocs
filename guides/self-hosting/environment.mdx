@@ -35,6 +35,8 @@ Regardless of deployment model, you'll need Nozle API keys to use the SDKs:
 | `CORS_ORIGIN` | Transitional single-origin setting retained for old Engine replicas during a rolling deployment. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated browser-origin allowlist, for example `https://app.example.com,https://portal.example.com`. |
 | `CHECKOUT_RETURN_URL` | Independent absolute URL used when checkout requests omit a return URL. Do not reuse this as the CORS allowlist. |
+| `NOZLE_CREDIT_USAGE_TRACK_TARGETS` | Preferred comma-separated exact mutation targets in `organization_uuid:metric_code` or `organization_uuid:metric_code:credit_system_code` form. Any configured exact target list takes precedence over the legacy organization allowlist. Leave empty by default. |
+| `NOZLE_CREDIT_USAGE_TRACK_ORGANIZATION_IDS` | Legacy comma-separated organization-wide mutation allowlist. Leave empty when using exact targets. |
 
 Rotate this value deliberately: replacing it immediately invalidates every outstanding customer session. Never expose it through frontend build variables.
 
