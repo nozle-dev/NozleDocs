@@ -4,7 +4,9 @@ api: "POST /usage/track"
 description: Atomically consume credits and queue the matching Lago event
 ---
 
-**Auth:** secret key only. The organization must be enabled for credit usage tracking.
+**Auth:** secret key only. The organization and BillableMetric must match the
+reviewed mutation gate. A gate may also require an explicit matching Credit
+System.
 
 ```http
 POST /usage/track
@@ -23,6 +25,12 @@ Content-Type: application/json
 }
 ```
 
-A successful response includes the operation ID, exact credits consumed, remaining total, and source deductions. Insufficient credits return `allowed=false` without allocations or a Lago event.
+A successful response includes the operation ID, exact credits consumed,
+remaining total, and source deductions with their balance-source IDs.
+Insufficient credits return `allowed=false` without allocations or a
+Core event.
 
 Retry HTTP `503` with the same idempotency key. Reusing a key with a different payload returns `409`.
+
+For rollout configuration and exact target syntax, see [Credit Rollout and
+Acceptance](/guides/credits/rollout).

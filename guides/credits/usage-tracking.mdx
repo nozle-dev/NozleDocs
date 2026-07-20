@@ -32,3 +32,12 @@ Every track request requires an `Idempotency-Key`. Retrying the same key and pay
 Insufficient credits return a product decision with `allowed=false`; they are not a server failure. Database unavailability or lock timeout returns retryable HTTP `503` with `Retry-After`. Retry those failures with the same idempotency key.
 
 Nozle locks eligible sources in deterministic expiry order, rechecks validity using PostgreSQL time, writes allocations, and inserts the Lago event outbox row in one transaction. A successful debit cannot be lost merely because Lago is temporarily unavailable.
+
+## Shadow and canary
+
+Advisory responses include `projected_remaining` and ordered
+`projected_deductions` without mutation. Use those fields to compare
+reviewed fixtures before enabling one exact organization/metric target.
+
+Do not enable an organization-wide mutation switch for a metric canary. Follow
+the [rollout and acceptance runbook](/guides/credits/rollout).

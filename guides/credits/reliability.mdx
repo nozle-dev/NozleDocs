@@ -31,3 +31,14 @@ Continuous jobs detect:
 - successful top-up payments without a credit source.
 
 Repairs use idempotent materialization or explicit compensating operations. They never rewrite historical ledger rows.
+
+## Acceptance audit
+
+The Engine image includes a read-only `credit-rollout audit` command.
+It checks source balances against allocations, allocation chains, operation
+totals, rate arithmetic, source/operation pairs, outbox envelopes, tenant
+ownership, publication, and initial reconciliation. It exits nonzero on drift
+and never repairs data.
+
+Run it after the canary settle window and retain the JSON report. See [Credit
+Rollout and Acceptance](/guides/credits/rollout).

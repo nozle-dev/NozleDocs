@@ -45,6 +45,9 @@ const check = await nozle.usage.check({
   creditSystemCode: 'ai_credits',
 });
 
+console.log(check.projected_remaining); // exact decimal string
+console.log(check.projected_deductions); // ordered, no mutation
+
 const result = await nozle.usage.track(
   {
     customerId: 'customer_123',
@@ -56,4 +59,6 @@ const result = await nozle.usage.track(
 );
 ```
 
-`usage.check` is advisory. Only `usage.track` atomically reserves and deducts value.
+`usage.check` is advisory. Its projected source plan is useful for shadow
+fixtures, but another request can spend credits before a later mutation. Only
+`usage.track` atomically reserves and deducts value.

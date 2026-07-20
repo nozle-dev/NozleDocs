@@ -1,0 +1,145 @@
+---
+title: Credit Rollout and Acceptance
+description: Shadow, load, canary, audit, and rollback for customer-level credits
+---
+
+Phase 1 uses an expand → shadow → canary → enforce → contract rollout. It
+authorizes customer-level shared pools only. Per-user or per-project balances
+remain Phase 2 Entity work.
+
+<Warning>
+Keep both mutation gates empty until a specific canary is reviewed. Deploying
+the Engine, migrations, or this documentation does not require enabling
+`/usage/track`.
+</Warning>
+
+## Mutation gates
+
+The preferred gate is an exact organization and metric target:
+
+```
+NOZLE_CREDIT_USAGE_TRACK_TARGETS=organization_uuid:billable_metric_code
+NOZLE_CREDIT_USAGE_TRACK_TARGETS=organization_uuid:billable_metric_code:credit_system_code
+```
+
+Multiple targets are comma-separated. A two-part target allows any effective
+Credit System for that organization and metric. A three-part target also
+requires the request's explicit `credit_system_code` to match.
+
+When at least one exact target is configured, it takes precedence over the
+legacy organization-wide
+`NOZLE_CREDIT_USAGE_TRACK_ORGANIZATION_IDS` setting. Invalid exact
+targets fail closed. Empty settings disable mutation globally.
+
+## 1. Verify the expanded system
+
+Before shadow traffic:
+
+- apply the reviewed Core and Engine migrations;
+- deploy code with mutation gates empty;
+- confirm the outbox has no failed or dead-lettered rows;
+- confirm each canary organization has an active secret key that can create and
+  read Core events;
+- verify the BillableMetric is `consumable=true` and has one effective
+  rate for the intended Credit System;
+- verify subscription grants or paid top-ups created separate balance sources.
+
+## 2. Run Pullse shadow calculations
+
+Build the Engine repository's `credit-rollout` command or use the
+binary included in the Engine image. Keep the organization mutation gate off.
+
+```
+export NOZLE_ENGINE_URL=https://api.nozle.app
+export NOZLE_API_KEY=sk_...
+
+credit-rollout shadow \
+  --fixture cmd/credit-rollout/testdata/shadow.example.json
+```
+
+The fixture calls only `POST /usage/check`. It compares exact decimal
+metric and credit amounts, the selected Credit System, total availability, and
+the ordered projected source deductions. Review every mismatch; do not round or
+infer expected values from recurring billing behavior.
+
+## 3. Run sandbox mutation and load tests
+
+Enable one exact Pullse Testing target in a non-production environment. Use a
+fixed event timestamp and stable idempotency prefix so rerunning the command
+replays the same logical operations.
+
+```
+credit-rollout load \
+  --mode track \
+  --customer pullse_test_customer \
+  --metric agent_execution \
+  --credit-system ai_credits \
+  --event-time 2026-07-20T12:00:00.750Z \
+  --idempotency-prefix pullse-canary-20260720 \
+  --requests 100 \
+  --concurrency 10 \
+  --max-p99 300ms
+```
+
+Confirm:
+
+- concurrent requests cannot overdraw a source;
+- same-key retries return one operation;
+- different payloads using the same key return conflict;
+- insufficient credits create a denied operation without allocations or outbox;
+- successful consumes publish one Core event and later reconcile;
+- plan changes, cancellations, paid top-ups, and source expiry retain their
+  existing deterministic behavior.
+
+## 4. Run the Wrrk shared-pool canary
+
+Configure Wrrk BillableMetrics and AI Credits, then enable only selected
+non-production organization/metric targets. Wrrk backend code calls the secret
+`/usage/track` endpoint.
+
+This Phase 1 canary spends one customer-level pool shared by the Wrrk company.
+It does not provide or claim per-user credit isolation.
+
+## 5. Audit acceptance
+
+After publication and initial reconciliation have had time to settle, run the
+read-only database audit:
+
+```
+credit-rollout audit \
+  --organization-id 00000000-0000-0000-0000-000000000000 \
+  --metric agent_execution \
+  --credit-system ai_credits \
+  --since 2h \
+  --settle-grace 2m
+```
+
+The command exits nonzero for:
+
+- source balances that disagree with immutable allocations;
+- broken allocation chains or consume totals;
+- inexact rate snapshots;
+- source ↔ originating-operation drift;
+- successful consume ↔ outbox drift;
+- malformed Core event envelopes;
+- organization ownership drift;
+- failed, dead-lettered, overdue unpublished, or overdue unreconciled events.
+
+The audit is read-only and never repairs records. Store its JSON output with the
+canary evidence.
+
+## 6. Production canary
+
+Enable one reviewed exact target at a time. Monitor denial rate, p99 latency,
+outbox age, publication failures, dead letters, and reconciliation. Expand only
+after the acceptance audit reports `"passed": true` for the complete
+canary period.
+
+## Rollback
+
+Remove the exact target and redeploy. This stops new mutation but does not
+delete balances, operations, allocations, or outbox rows. Drain or pause the
+outbox deliberately. A retry of an already committed idempotency key still
+returns its stored result; a new key is rejected by the disabled gate. If a
+mutation committed, repair it with a compensating operation; never delete or
+rewrite ledger history.

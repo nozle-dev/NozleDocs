@@ -16,4 +16,31 @@ description: Calculate an advisory credit decision without mutation
 }
 ```
 
-The response includes `advisory: true`, exact `metric_amount`, `credits_required`, and the available balance. Another request can spend credits before a later track call, so this endpoint is not authorization to perform irreversible work.
+The response includes `advisory: true`, exact `metric_amount`,
+`credits_required`, the available balance, and the projected source
+selection:
+
+```json
+{
+  "advisory": true,
+  "allowed": true,
+  "metric_amount": "1",
+  "credit_system": "ai_credits",
+  "credits_required": "2",
+  "available": "625",
+  "projected_remaining": "623",
+  "projected_deductions": [
+    {
+      "balance_source_id": "0f89...",
+      "source_type": "subscription_grant",
+      "amount": "2",
+      "remaining": "373"
+    }
+  ]
+}
+```
+
+Projected deductions follow the same deterministic expiry, priority, creation
+time, and ID ordering as an authoritative consume, but no source or ledger row
+is changed. Another request can spend credits before a later track call, so
+this endpoint is not authorization to perform irreversible work.
