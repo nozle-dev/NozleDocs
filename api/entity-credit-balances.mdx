@@ -1,0 +1,57 @@
+---
+title: Entity Credit Balances
+api: "GET /customers/{customer_id}/entities/{entity_id}/credit-systems"
+description: Read Entity, shared, and effective exact-decimal balances
+---
+
+**Auth:** secret key or a customer session bound to `{customer_id}`. When API permissions are enabled, secret keys require `entity:read`. Bare publishable keys are rejected.
+
+List all relevant Credit Systems:
+
+```http
+GET /customers/workspace_123/entities/user_42/credit-systems
+Authorization: Bearer csess_...
+```
+
+Read one system:
+
+```http
+GET /customers/workspace_123/entities/user_42/credit-systems/ai_credits/balance
+Authorization: Bearer csess_...
+```
+
+```json
+{
+  "customer_id": "workspace_123",
+  "entity_id": "user_42",
+  "entity_status": "active",
+  "credit_system": "ai_credits",
+  "credit_system_name": "AI Credits",
+  "unit_name": "credit",
+  "entity_available": "480.000000000001",
+  "shared_available": "250",
+  "effective_available": "730.000000000001",
+  "consumed": "42",
+  "pool_policy": "entity_then_customer",
+  "as_of": "2026-07-22T12:00:00.750Z",
+  "sources": [
+    {
+      "id": "allocated-source-1",
+      "entity_id": "user_42",
+      "parent_source_id": "paid-top-up-source-1",
+      "scope": "entity",
+      "transferable": false,
+      "returnable": true,
+      "type": "allocated_top_up",
+      "initial": "100",
+      "remaining": "100",
+      "expires_at": null,
+      "available": true
+    }
+  ]
+}
+```
+
+All amounts are strings. `entity_available` and `shared_available` expose separate source pools. `effective_available` applies the current plan policy and becomes zero when the Entity is inactive or no unambiguous policy exists.
+
+The source list contains active or scheduled, non-exhausted sources. Expired and exhausted sources remain in immutable history but are not returned by this balance endpoint.

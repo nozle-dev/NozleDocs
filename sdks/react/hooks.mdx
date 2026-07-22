@@ -12,6 +12,8 @@ import {
   useCreditBalance,
   useCreditBalances,
   useCreditOperations,
+  useEntityCreditBalance,
+  useEntityCreditOperations,
   usePlan,
   usePlans,
   useCheckout,
@@ -202,6 +204,41 @@ const {
   pageSize: 25,
 });
 ```
+
+## useEntityCreditBalance
+
+Reads one Entity/Credit System pair through the customer-bound HTTP session:
+
+```tsx
+const { data, isLoading, error, refetch } = useEntityCreditBalance(
+  'user_42',
+  'ai_credits',
+);
+
+console.log(data?.entity_available);
+console.log(data?.shared_available);
+console.log(data?.effective_available);
+```
+
+Pass `{ customerId }` only when overriding the provider customer. The session token must still be bound to that same customer.
+
+## useEntityCreditOperations
+
+```tsx
+const {
+  operations,
+  isLoading,
+  isLoadingMore,
+  hasMore,
+  loadMore,
+  refetch,
+} = useEntityCreditOperations('user_42', {
+  creditSystemCode: 'ai_credits',
+  pageSize: 25,
+});
+```
+
+The hook deduplicates operation IDs and permits only one in-flight `loadMore` request. Entity credit hooks are read-only and do not subscribe to customer-credit realtime channels.
 
 <Info>
 The older `useCredits(customerId)` export reads the legacy Lago wallet adapter. Use the hooks above for product Credit Systems.

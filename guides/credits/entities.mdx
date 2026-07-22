@@ -1,0 +1,86 @@
+---
+title: Entity-scoped Credits
+description: Model per-user credit pools, shared fallback, lifecycle, and exact transfers
+---
+
+Entities are stable customer-owned subjects such as users, seats, agents, or projects. They add a scoped credit pool without replacing the customer pool.
+
+```text
+Customer  = workspace or company
+Entity    = one stable subject inside that customer
+```
+
+An Entity belongs to exactly one customer and organization. Its external ID can be reused only through the Engine's tombstoned incarnation rules; financial history remains bound to the durable Entity UUID.
+
+## Pool policies
+
+Each active plan can select one policy per Credit System:
+
+- `entity_only` spends only Entity-owned sources;
+- `entity_then_customer` spends Entity sources first, then the shared customer pool;
+- `customer_only` records Entity attribution while spending only shared customer sources.
+
+The balance API returns all three exact-decimal views:
+
+```json
+{
+  "entity_available": "480.000000000001",
+  "shared_available": "250",
+  "effective_available": "730.000000000001",
+  "pool_policy": "entity_then_customer"
+}
+```
+
+`effective_available` is zero for an inactive Entity or when no unambiguous active plan policy exists. The API never infers a fallback policy from available sources.
+
+## Sources and transfers
+
+Entity plan grants and allocated paid top-ups remain separate sources. Allocation moves value from a customer paid-top-up source into an `allocated_top_up` child while preserving its parent source, payment provenance, priority, and expiry.
+
+Only unused allocated top-up value can be returned. Subscription grants are never presented as transferable company value.
+
+<Warning>
+Allocation and deallocation are backend-only mutations. They require a secret/internal credential, an idempotency key, and an exact organization plus Credit System rollout target. The transfer gate is default-off.
+</Warning>
+
+Keep amounts as decimal strings throughout your application. Do not convert them to JavaScript numbers or binary floating-point values.
+
+## Lifecycle
+
+Entities can be `active`, `suspended`, or `deleted`.
+
+- Active Entities can read and spend according to their pool policy.
+- Suspension or deletion blocks new usage, expires unused Entity subscription grants, and returns unused allocated top-ups to their original parents.
+- Operations, allocations, source provenance, and status history remain immutable.
+- Reactivation does not reuse an older incarnation's idempotency results or mint duplicate period grants.
+
+Entity status is not proof that a billing seat event has been published. Seat-event delivery and reconciliation are a separate rollout capability; until configured, use the Entity status as operational state only.
+
+## Dashboard
+
+The customer **Entities** tab provides:
+
+- active, suspended, and deleted Entity filters;
+- create/edit, bulk upsert, activation, and suspension flows;
+- plan, allocated top-up, shared, consumed, and effective balances;
+- source provenance and expiry;
+- immutable Entity operation history;
+- allocation/deallocation previews and confirmations.
+
+All mutation retries preserve their idempotency key until the result is known. Changing the payload starts a new key.
+
+## Integration sequence
+
+1. Create or bulk-upsert stable Entity IDs from your backend.
+2. Configure per-Entity grant rules and one pool policy per plan/Credit System.
+3. Read Entity balances before enabling mutation traffic.
+4. Enable the exact transfer target only for a sandbox organization and Credit System.
+5. Track usage with both `customer_id` and `entity_id` after the usage gate is enabled.
+6. Run the acceptance audit before enabling shared fallback or broader traffic.
+
+<CardGroup cols={2}>
+  <Card title="Entity API" href="/api/customer-entities" />
+  <Card title="Entity balances" href="/api/entity-credit-balances" />
+  <Card title="Node SDK" href="/sdks/node/credits" />
+  <Card title="React components" href="/sdks/react/components" />
+</CardGroup>

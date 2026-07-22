@@ -36,6 +36,61 @@ const session = await nozle.customerSessions.create({
 
 Call this only from an authenticated backend route. Send `session.token` to `BillingProvider`; never send your `sk_` key to the browser.
 
+## Manage Entities
+
+Entity mutations require a secret key and a caller-supplied idempotency key:
+
+```ts
+await nozle.entities.upsert(
+  'workspace_123',
+  'user_42',
+  { name: 'Asha', status: 'active', metadata: { role: 'agent' } },
+  { idempotencyKey: 'entity-user-42-v1' },
+);
+
+const page = await nozle.entities.list('workspace_123', {
+  status: 'active',
+  limit: 50,
+});
+
+await nozle.entities.suspend('workspace_123', 'user_42', {
+  idempotencyKey: 'suspend-user-42',
+});
+```
+
+`suspend` and `activate` first read the Entity and preserve its current name and metadata. Retry an uncertain mutation with the same idempotency key.
+
+## Read and transfer Entity credits
+
+```ts
+const balance = await nozle.credits.getEntityBalance(
+  'workspace_123',
+  'user_42',
+  'ai_credits',
+);
+
+console.log(balance.entity_available);
+console.log(balance.shared_available);
+console.log(balance.effective_available);
+
+const history = await nozle.credits.listEntityOperations(
+  'workspace_123',
+  'user_42',
+  { creditSystemCode: 'ai_credits', limit: 25 },
+);
+```
+
+Allocation/deallocation is backend-only, exact-decimal, and subject to the Engine's default-off exact transfer gate:
+
+```ts
+await nozle.credits.allocate(
+  'workspace_123',
+  'user_42',
+  { creditSystemCode: 'ai_credits', amount: '100.000000000001' },
+  { idempotencyKey: 'allocate-user-42-100' },
+);
+```
+
 ## Check and consume
 
 ```ts
@@ -51,6 +106,7 @@ console.log(check.projected_deductions); // ordered, no mutation
 const result = await nozle.usage.track(
   {
     customerId: 'customer_123',
+    entityId: 'user_42', // optional; enables Entity attribution and pool policy
     billableMetricCode: 'agent_execution',
     creditSystemCode: 'ai_credits',
     timestamp: new Date().toISOString(),

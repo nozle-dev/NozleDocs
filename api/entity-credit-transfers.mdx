@@ -1,0 +1,43 @@
+---
+title: Entity Credit Transfers
+api: "POST /customers/{customer_id}/entities/{entity_id}/credit-allocations"
+description: Allocate and return provenance-preserving paid top-up credits
+---
+
+**Auth:** secret/internal credential with `entity:write` when API permissions are enabled. Customer sessions and publishable keys are rejected.
+
+<Warning>
+New external transfers are default-off. The exact `organization_id:credit_system_code` pair must be enabled in `NOZLE_ENTITY_CREDIT_TRANSFER_TARGETS` before a new allocation or deallocation can commit. Completed idempotent replays remain available after disabling the target.
+</Warning>
+
+Allocate paid customer top-up value:
+
+```http
+POST /customers/workspace_123/entities/user_42/credit-allocations
+Authorization: Bearer sk_...
+Idempotency-Key: allocate-user-42-100
+Content-Type: application/json
+
+{
+  "credit_system": "ai_credits",
+  "amount": "100.000000000001"
+}
+```
+
+Return unused allocated value:
+
+```http
+POST /customers/workspace_123/entities/user_42/credit-deallocations
+Authorization: Bearer sk_...
+Idempotency-Key: deallocate-user-42-25
+Content-Type: application/json
+
+{
+  "credit_system": "ai_credits",
+  "amount": "25"
+}
+```
+
+Amounts must be positive decimal strings with at most 12 fractional digits. Allocation can draw only from active paid customer top-ups. Deallocation returns unused value to each exact parent source; expiry, priority, payment provenance, and conservation remain enforced by PostgreSQL.
+
+Retry an uncertain response with the same idempotency key and identical payload. Reusing a key with a different customer, Entity, Credit System, direction, or amount returns a conflict.

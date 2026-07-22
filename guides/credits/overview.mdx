@@ -24,9 +24,9 @@ For example, one `agent_execution` event can cost `2` AI credits while one `voic
 Product credits are not Lago wallet credits. Do not use wallet endpoints or the legacy `/check-and-deduct` adapter for new credit-system integrations.
 </Warning>
 
-## Customer-level Phase 1
+## Customer and Entity pools
 
-Phase 1 balances belong to a customer. Per-user or per-project balances are introduced later as Entities. A successful usage request atomically deducts the customer pool and writes an immutable operation before its Lago event is published through the durable outbox.
+Customer balances remain the shared pool. Entities add stable per-user or per-project attribution, per-Entity grants, and optional shared fallback without replacing that pool. A successful usage request atomically deducts the configured source order and writes an immutable operation before its Lago event is published through the durable outbox.
 
 ## Read access
 
@@ -34,6 +34,7 @@ Server code can read balances with a secret key. Browser product-credit componen
 
 <CardGroup cols={2}>
   <Card title="Configure credit systems" href="/guides/credits/configuration" />
+  <Card title="Entity-scoped credits" href="/guides/credits/entities" />
   <Card title="Track credit-backed usage" href="/guides/credits/usage-tracking" />
   <Card title="React credit components" href="/sdks/react/components" />
   <Card title="Reliability and reconciliation" href="/guides/credits/reliability" />

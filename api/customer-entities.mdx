@@ -1,0 +1,64 @@
+---
+title: Customer Entities
+api: "GET /customers/{customer_id}/entities"
+description: Create, list, update, suspend, reactivate, and delete customer Entities
+---
+
+**Auth:** secret/internal credential. When API permissions are enabled, reads require `entity:read` and mutations require `entity:write`. Customer sessions cannot read the Entity directory.
+
+List Entities with an optional `status`, `limit` from 1 to 100, and opaque `cursor`:
+
+```http
+GET /customers/workspace_123/entities?status=active&limit=50
+Authorization: Bearer sk_...
+```
+
+Read one Entity:
+
+```http
+GET /customers/workspace_123/entities/user_42
+Authorization: Bearer sk_...
+```
+
+Create or replace its display fields and status:
+
+```http
+PUT /customers/workspace_123/entities/user_42
+Authorization: Bearer sk_...
+Idempotency-Key: entity-user-42-v1
+Content-Type: application/json
+
+{
+  "name": "Asha",
+  "status": "active",
+  "metadata": { "role": "agent" }
+}
+```
+
+The upsert payload is a complete snapshot. When changing only status, send the current `name` and `metadata` so they are not cleared.
+
+Bulk upsert accepts 1 to 500 unique external IDs:
+
+```http
+POST /customers/workspace_123/entities/bulk-upsert
+Authorization: Bearer sk_...
+Idempotency-Key: entity-import-2026-07-22
+Content-Type: application/json
+
+{
+  "entities": [
+    { "external_id": "user_42", "name": "Asha", "status": "active", "metadata": {} },
+    { "external_id": "user_43", "name": "Ben", "status": "suspended", "metadata": {} }
+  ]
+}
+```
+
+Delete through the lifecycle endpoint:
+
+```http
+DELETE /customers/workspace_123/entities/user_42
+Authorization: Bearer sk_...
+Idempotency-Key: delete-user-42
+```
+
+Deletion is not a financial cascade. It preserves all source, allocation, operation, and audit rows. Retry an uncertain mutation with the same idempotency key and identical payload.
