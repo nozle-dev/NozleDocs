@@ -567,6 +567,40 @@ Paginates immutable operations and shows status, metric, rate snapshot, exact cr
 
 ---
 
+### EntityProductCreditBalance
+
+Displays one Entity's separate Entity, shared-customer, and policy-effective totals.
+
+```tsx
+import { EntityProductCreditBalance } from '@nozle-js/react';
+
+<EntityProductCreditBalance entityId="user_42" creditSystemCode="ai_credits" />
+```
+
+### EntityCreditBreakdown
+
+Shows Entity and shared sources, including allocated top-up parent provenance and expiry.
+
+```tsx
+<EntityCreditBreakdown entityId="user_42" creditSystemCode="ai_credits" />
+```
+
+### EntityCreditUsageHistory
+
+Paginates immutable operations attributed to the Entity and prevents duplicate concurrent page requests.
+
+```tsx
+<EntityCreditUsageHistory
+  entityId="user_42"
+  creditSystemCode="ai_credits"
+  pageSize={20}
+/>
+```
+
+These components are read-only and use the customer-bound session token. Allocation, Entity lifecycle changes, and Entity-aware usage tracking remain backend actions; never expose a secret key in React.
+
+---
+
 ### LowCreditWarning
 
 Renders only when the exact available amount is less than or equal to the configured decimal threshold.
@@ -576,7 +610,7 @@ Renders only when the exact available amount is less than or equal to the config
 ```
 
 <Info>
-`CreditBalance`, `CreditHistory`, `BillingPortal`, and `useCredits` retain the legacy Lago wallet behavior. Use `ProductCreditBalance`, `CreditUsageHistory`, and the `useCredit*` hooks for product Credit Systems.
+`CreditBalance`, `CreditHistory`, `BillingPortal`, and `useCredits` retain the legacy Lago wallet behavior. Use the explicitly named `ProductCredit*` and `Entity*Credit*` components for product Credit Systems.
 </Info>
 
 ---
