@@ -128,6 +128,31 @@ The command exits nonzero for:
 The audit is read-only and never repairs records. Store its JSON output with the
 canary evidence.
 
+### Require Entity seat reconciliation
+
+For a WP7 seat canary, name the exact persistent unique-count metric and make seat coverage mandatory. Disable the unrelated consume-activity requirement when the canary is seat-only:
+
+```
+credit-rollout audit \
+  --organization-id 00000000-0000-0000-0000-000000000000 \
+  --seat-metric seats \
+  --require-seat-reconciliation \
+  --require-success=false \
+  --since 2h \
+  --settle-grace 2m
+```
+
+Required-seat acceptance exits nonzero when:
+
+- the metric is absent, ambiguous, archived, consumable, non-recurring, not `unique_count_agg`, or lacks a dedicated field;
+- no active customer reconciliation subjects are covered;
+- an active customer has zero or multiple active subscriptions;
+- an applicable subscription has zero or multiple matching seat charges;
+- a covered subject still lacks reconciliation state after the settle grace;
+- publication or reconciliation is failed, dead-lettered, overdue, drifting, or otherwise inconsistent.
+
+Malformed UUID selectors, malformed `organization_uuid:metric_code` entries, and conflicting metrics in `NOZLE_ENTITY_SEAT_TARGETS` are configuration errors and fail closed. An empty value remains valid and keeps seat publication disabled.
+
 ## 6. Production canary
 
 Enable one reviewed exact target at a time. Monitor denial rate, p99 latency,

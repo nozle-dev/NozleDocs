@@ -62,7 +62,7 @@ When seat billing applies, Entity responses include nullable synchronization sta
 }
 ```
 
-`seat_sync` is `null` when no configured seat metric currently applies. `pending`, `processing`, `failed`, and `dead_lettered` describe durable event delivery; aggregate reconciliation separately reports `pending`, `in_sync`, `drift`, `repairing`, or `failed`.
+`seat_sync` is `null` when no seat-event synchronization projection or history exists for this Entity yet. It does not prove that the organization currently has no configured seat metric. `pending`, `processing`, `failed`, and `dead_lettered` describe durable event delivery; aggregate reconciliation separately reports `pending`, `in_sync`, `drift`, `repairing`, or `failed`.
 
 Bulk upsert accepts 1 to 500 unique external IDs:
 

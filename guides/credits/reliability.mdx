@@ -21,6 +21,19 @@ Usage publication is at-least-once. The credit operation ID becomes the Lago tra
 
 Entity seat publication uses a separate durable outbox and never enters the credit ledger transaction path. Lifecycle add/remove events have deterministic transaction IDs and payload reconciliation. Aggregate reconciliation compares the current Lago unique-count value with the active Entity count, records expected and observed values, and queues deterministic repairs for missing known Entity effects.
 
+### Recover a dead-lettered seat event
+
+Investigate and correct the underlying Core, credential, or configuration failure first. Then requeue the existing immutable event with an operator reason:
+
+```sql
+SELECT nozle.retry_dead_lettered_customer_entity_seat_event(
+  '00000000-0000-0000-0000-000000000000',
+  'Core credential repaired and payload ownership verified'
+);
+```
+
+The function requires a non-empty reason and returns `true` only when the row was dead-lettered. It clears delivery and reconciliation leases, resets retry state, increments `republish_count`, and republishes the same payload and transaction ID. It never creates a replacement event. A repeated call returns `false`; directly clearing `dead_lettered_at` is rejected by PostgreSQL.
+
 ## Reconciliation
 
 Continuous jobs detect:
