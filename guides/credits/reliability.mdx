@@ -19,6 +19,8 @@ PostgreSQL balance sources plus immutable allocations are the credit source of t
 
 Usage publication is at-least-once. The credit operation ID becomes the Lago transaction ID, so retrying after a timeout cannot create a second usage effect. Workers claim rows in bounded waves, use leases longer than the maximum POST and reconciliation duration, and truncate stored errors without breaking UTF-8.
 
+Entity seat publication uses a separate durable outbox and never enters the credit ledger transaction path. Lifecycle add/remove events have deterministic transaction IDs and payload reconciliation. Aggregate reconciliation compares the current Lago unique-count value with the active Entity count, records expected and observed values, and queues deterministic repairs for missing known Entity effects.
+
 ## Reconciliation
 
 Continuous jobs detect:

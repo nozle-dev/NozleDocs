@@ -54,7 +54,26 @@ Entities can be `active`, `suspended`, or `deleted`.
 - Operations, allocations, source provenance, and status history remain immutable.
 - Reactivation does not reuse an older incarnation's idempotency results or mint duplicate period grants.
 
-Entity status is not proof that a billing seat event has been published. Seat-event delivery and reconciliation are a separate rollout capability; until configured, use the Entity status as operational state only.
+## Seat billing synchronization
+
+Entity status is the source of truth for active-seat quantity. Configure one persistent unique-count Billable Metric per enabled organization:
+
+```text
+consumable=false
+recurring=true
+aggregation=unique_count_agg
+field_name=entity_id
+```
+
+An effective inactive-to-active transition publishes `operation_type=add` with the stable Entity external ID. Active-to-suspended or active-to-deleted publishes `operation_type=remove`. Display-only updates and status no-ops publish nothing.
+
+The status audit event and durable seat outbox row commit atomically. Delivery retries reuse a deterministic transaction ID, and a separate reconciliation job compares Lago current usage with the active Entity count. Missing known add/remove effects are repaired with deterministic reconciliation events; unexplained drift remains visible for investigation.
+
+This path does not grant, consume, transfer, or otherwise mutate product credits.
+
+<Warning>
+Seat publication is default-off. Enable only exact `organization_uuid:metric_code` targets in `NOZLE_ENTITY_SEAT_TARGETS` after Engine migration 011 and the WP7 worker are deployed. The configured metric must have exactly one active charge on each applicable subscription.
+</Warning>
 
 ## Dashboard
 
@@ -66,6 +85,7 @@ The customer **Entities** tab provides:
 - source provenance and expiry;
 - immutable Entity operation history;
 - allocation/deallocation previews and confirmations.
+- seat-count effect, publication status, last synchronization, and expected-versus-observed active-seat count.
 
 All mutation retries preserve their idempotency key until the result is known. Changing the payload starts a new key.
 
@@ -76,7 +96,8 @@ All mutation retries preserve their idempotency key until the result is known. C
 3. Read Entity balances before enabling mutation traffic.
 4. Enable the exact transfer target only for a sandbox organization and Credit System.
 5. Track usage with both `customer_id` and `entity_id` after the usage gate is enabled.
-6. Run the acceptance audit before enabling shared fallback or broader traffic.
+6. Enable one sandbox seat target and verify active Entity count reconciliation.
+7. Run the acceptance audit before enabling shared fallback or broader traffic.
 
 <CardGroup cols={2}>
   <Card title="Entity API" href="/api/customer-entities" />
