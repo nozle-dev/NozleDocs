@@ -52,4 +52,4 @@ Core signs its internal Engine webhook body with RS256. Engine verifies all of t
 
 Missing, forged, expired, malformed, or conflicting replays fail closed. A processing lease allows safe retry after a worker crash; a completed receipt returns the idempotent result without enqueueing duplicate work.
 
-Core and Engine use the dedicated `NOZLE_INTERNAL_SECRET` for authenticated service calls. This secret is not an organization API key and must not be sent to browsers.
+Webhook verification uses the public key derived from Core's configured RSA signer; deployment validation rejects a mismatched key pair. Authenticated service calls use separate `NOZLE_CORE_TO_ENGINE_SECRET` and `NOZLE_ENGINE_TO_CORE_SECRET` values with route/method allowlists and tenant context. Neither value is an organization API key or browser credential.

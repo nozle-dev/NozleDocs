@@ -31,7 +31,10 @@ Regardless of deployment model, you'll need Nozle API keys to use the SDKs:
 
 | Variable | Description |
 |----------|-------------|
-| `NOZLE_INTERNAL_SECRET` | Dedicated Core–Engine service credential of at least 32 bytes. Never reuse an organization API key. |
+| `NOZLE_CORE_TO_ENGINE_SECRET` | Dedicated Core identity for strict, allowlisted calls to Engine. At least 32 bytes. |
+| `NOZLE_ENGINE_TO_CORE_SECRET` | Different Engine identity for strict, allowlisted calls to Core. At least 32 bytes. |
+| `NOZLE_INTERNAL_SECRET` | Transitional shared credential accepted only while staged enforcement is disabled. Remove after all old pods are retired. |
+| `NOZLE_SECURITY_ENFORCEMENT_ENABLED` | Defaults to `false` for the compatibility rollout. Set `true` after dashboard/SDK migration and all old Core/Engine versions are retired. |
 | `NOZLE_CUSTOMER_SESSION_SECRET` | Separate high-entropy HMAC secret of at least 32 bytes, used to sign scoped, short-lived customer sessions. |
 | `NOZLE_METRICS_SECRET` | Separate secret required by Core and Engine operational metrics endpoints. |
 | `NOZLE_CORE_WEBHOOK_PUBLIC_KEY` | Base64-encoded PEM RSA public key used by Engine to verify Core webhook signatures. |
@@ -46,6 +49,8 @@ Regardless of deployment model, you'll need Nozle API keys to use the SDKs:
 | `NOZLE_ENTITY_CREDIT_TRANSFER_TARGETS` | Comma-separated exact `organization_uuid:credit_system_code` external transfer targets. Leave empty by default. |
 
 Rotate `NOZLE_CUSTOMER_SESSION_SECRET` deliberately: replacing it immediately invalidates every outstanding customer session. Never expose it through frontend build variables.
+
+The directional service credentials must be different. New directional variables take precedence over `NOZLE_INTERNAL_SECRET`; strict mode ignores the legacy value.
 
 During the environment rename, set all three CORS/checkout variables. New Engine versions prefer `CORS_ALLOWED_ORIGINS` and `CHECKOUT_RETURN_URL`; old versions continue reading `CORS_ORIGIN`. Remove `CORS_ORIGIN` only after all old Engine versions have been retired.
 

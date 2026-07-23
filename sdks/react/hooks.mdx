@@ -17,7 +17,7 @@ import {
   usePlan,
   usePlans,
   useCheckout,
-  useSubscribe,
+  useCheckoutSession,
   useNozleClient,
   useBillingContext,
 } from '@nozle-js/react';
@@ -413,55 +413,13 @@ function CheckoutPage({ clientSecret }: { clientSecret: string }) {
 
 ## useSubscribe
 
-Create a subscription for the authenticated customer session. Calls `POST /v1/subscribe` with the plan code and the provider customer ID.
+`useSubscribe` is a deprecated compatibility export. It now starts `POST /api/v1/checkout`; it never calls the secret-key-only direct subscription endpoint.
 
 <Warning>
-This hook requires a customer session with `subscriptions:write`. A publishable key is never used for the request. Trusted backend code may instead call the endpoint with a secret key.
+Migrate to `useCheckoutSession`, `CheckoutButton`, or `UpgradeModal`. Paid activation happens only after the verified checkout flow. Trusted backend code may call `POST /subscribe` with an `sk_` key that has `subscription:write`.
 </Warning>
 
-### Signature
-
-```ts
-function useSubscribe(): UseSubscribeResult
-```
-
-### Return type
-
-```ts
-interface UseSubscribeResult {
-  subscribe: (planCode: string) => Promise<any>;
-  isLoading: boolean;
-  error: Error | null;
-}
-```
-
-### Example
-
-```tsx title="components/SubscribeButton.tsx"
-import { useSubscribe } from '@nozle-js/react';
-
-function SubscribeButton({ planCode }: { planCode: string }) {
-  const { subscribe, isLoading, error } = useSubscribe();
-
-  async function handleClick() {
-    try {
-      await subscribe(planCode);
-      alert('Subscribed successfully!');
-    } catch {
-      // error state is set automatically
-    }
-  }
-
-  return (
-    <div>
-      <button onClick={handleClick} disabled={isLoading}>
-        {isLoading ? 'Subscribing...' : `Subscribe to ${planCode}`}
-      </button>
-      {error && <p style={{ color: 'red' }}>{error.message}</p>}
-    </div>
-  );
-}
-```
+See [Checkout](/guides/billing/checkout) for the supported browser flow.
 
 ---
 

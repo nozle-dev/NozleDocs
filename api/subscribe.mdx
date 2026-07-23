@@ -3,11 +3,11 @@ title: "Create Subscription"
 api: "POST /subscribe"
 ---
 
-Create a subscription directly without going through a checkout flow. Browser calls require a customer session with `subscriptions:write`; server calls may use a secret key.
-
-For customer sessions, every customer identifier must match the session subject.
+Create a subscription directly from a trusted backend without going through the browser checkout flow. This endpoint never accepts a publishable key or customer session, including during the staged compatibility window. Browser paid-plan changes must use `POST /checkout`.
 
 **Auth:** `sk_` (secret key) only.
+
+The secret key requires `subscription:write`, and the customer must belong to the authenticated organization.
 
 <ParamField body="customer_id" type="string" required>
   External customer ID. The customer must already exist.

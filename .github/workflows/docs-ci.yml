@@ -5,12 +5,16 @@ on:
     branches: [main]
     paths:
       - "**/*.mdx"
+      - "examples/**"
+      - tsconfig.examples.json
       - docs.json
       - .github/workflows/docs-ci.yml
   push:
     branches: [main]
     paths:
       - "**/*.mdx"
+      - "examples/**"
+      - tsconfig.examples.json
       - docs.json
       - .github/workflows/docs-ci.yml
   workflow_dispatch:
@@ -33,3 +37,8 @@ jobs:
 
       - name: Check internal links
         run: npx --yes mintlify@4.2.715 broken-links
+
+      - name: Compile security documentation examples
+        run: |
+          npm ci --ignore-scripts
+          npm run typecheck:examples

@@ -36,7 +36,7 @@ Authorization: Bearer sk_nozle_your_secret_key
 
 - **Publishable keys** (`pk_nozle_...`) can only read the explicit public plan catalog. This restriction is unconditional. A publishable key cannot checkout, read customer data, receive write permissions, or become broader through rotation.
 - **Secret keys** (`sk_nozle_...`) are server-side credentials for customer-session creation, configuration, usage mutation, and privileged reads. Never send one to a browser.
-- **Customer sessions** (`csess_...`) are bound to one organization and external customer ID, expire after at most one hour, and contain explicit scopes. They support customer billing reads, entitlements, checkout, plan changes, cancellation, top-ups, and product-credit reads only when the corresponding scope is present.
+- **Customer sessions** (`csess_...`) are bound to one organization and external customer ID, expire after at most one hour, and contain explicit scopes no broader than the minting secret key. They support customer billing reads, entitlements, checkout, plan changes, cancellation, top-ups, and product-credit reads only when the corresponding scope is present.
 
 Create customer sessions from your backend with `POST /api/v1/customer-sessions`. Pass the session to customer-facing React components and keep a publishable key only for the plan catalog. Every customer identifier in the request path, query, or body must equal the session subject.
 
@@ -48,7 +48,7 @@ Create customer sessions from your backend with `POST /api/v1/customer-sessions`
 | `billing:read` | Billing status, current subscription, invoices, and subscription preview |
 | `entitlements:read` | Customer entitlement checks without internal cost or margin data |
 | `checkout:create` | Customer-scoped checkout creation |
-| `subscriptions:write` | Customer-scoped subscribe, plan change, and cancellation |
+| `subscriptions:write` | Customer-scoped plan change and cancellation. Direct subscribe remains server-only. |
 | `topups:create` | Customer-scoped fixed-package credit top-up checkout |
 
 Customer sessions cannot mint other sessions or gRPC/realtime tokens, configure resources, submit usage, call the LLM proxy, or access cost and margin data.

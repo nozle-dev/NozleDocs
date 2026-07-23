@@ -13,8 +13,11 @@ Browser
 Trusted backend
   `-- Secret key -> creates scoped customer sessions and performs server operations
 
+Core -> Engine
+  `-- NOZLE_CORE_TO_ENGINE_SECRET + authenticated organization/customer context
+
 Engine -> Core
-  `-- NOZLE_INTERNAL_SECRET + authenticated organization/customer context
+  `-- NOZLE_ENGINE_TO_CORE_SECRET + authenticated organization/customer context
 ```
 
 These boundaries are enforced independently of plan tier and premium-feature state.
@@ -42,9 +45,10 @@ The security boundary assumes browser code, browser storage, request parameters,
 | `GET /can` | Deny | `entitlements:read`, exact subject, browser-safe response | Allow, includes server-only margin fields | Allow |
 | Billing status, current subscription, invoices, preview | Deny | `billing:read`, exact subject | Allow | Allow |
 | Checkout | Deny | `checkout:create`, exact subject | Allow | Allow |
-| Subscribe, plan change, cancellation | Deny | `subscriptions:write`, exact subject | Allow | Allow |
+| Direct `POST /subscribe` | Deny | Deny | `subscription:write` only | Deny |
+| Plan change and cancellation | Deny | `subscriptions:write`, exact subject | `subscription:write` | Deny |
 | Credit top-up checkout | Deny | `topups:create`, exact subject | Allow | Allow |
-| Customer-session creation | Deny | Deny | Allow | Allow for trusted service workflows |
+| Customer-session creation | Deny | Deny | Allow only for scopes contained by the SK permissions | Core dashboard only on its internal mint route |
 | Customers, events, usage, configuration, Entity mutation | Deny | Deny | Allow subject to API permissions | Allow where explicitly wired |
 | Cost models, margin, analytics | Deny | Deny | Allow | Allow where explicitly wired |
 | LLM proxy | Deny | Deny | Allow through `X-Nozle-Key`; customer ownership required | Deny |
@@ -56,7 +60,7 @@ The Core global boundary also rejects publishable keys on GraphQL, onboarding, a
 
 ## Customer-session contract
 
-A trusted backend creates a session only after authenticating its own user. The session is bound to one organization and external customer ID, has a unique token ID, and expires in 60 to 3600 seconds.
+A trusted backend creates a session only after authenticating its own user. The session is bound to one organization and external customer ID, has a unique token ID, and expires in 60 to 3600 seconds. Requested scopes must be a subset of the minting secret key's resource permissions; a restricted key cannot delegate authority it does not hold.
 
 Available scopes are:
 
@@ -67,21 +71,21 @@ Available scopes are:
 - `subscriptions:write`
 - `topups:create`
 
-Every `customer_id` or `external_customer_id` found in a request path, query string, or nested JSON body must equal the session subject. Handlers use the authenticated subject when the identifier is omitted. Cancellation additionally checks that the subscription belongs to both that customer and organization.
+Every `customer_id` or `external_customer_id` found in a request path, query string, or nested JSON body must equal the session subject. Handlers use the authenticated subject when the identifier is omitted. Cancellation additionally checks that the subscription belongs to both that customer and organization. Paid browser plan changes always create checkout; direct subscription creation is server-only.
 
 Customer-session entitlement responses intentionally omit cost, revenue, margin, and minimum-margin fields. Those fields remain available only to trusted secret-key callers.
 
 ## Service authentication
 
-Engine never forwards the caller's publishable key, customer session, or secret key to Core. It authenticates with `NOZLE_INTERNAL_SECRET` and sends `X-Nozle-Org-Id`; customer-specific calls also send `X-Nozle-Customer-Id`. Core resolves the organization from that context and rejects mismatching customer parameters.
+Engine never forwards the caller's publishable key, customer session, or secret key to Core. Engine authenticates to Core with `NOZLE_ENGINE_TO_CORE_SECRET`; Core authenticates to Engine with a different `NOZLE_CORE_TO_ENGINE_SECRET`. Both directions send `X-Nozle-Org-Id`, and customer-specific calls also send `X-Nozle-Customer-Id`.
 
-`NOZLE_INTERNAL_SECRET`, `NOZLE_CUSTOMER_SESSION_SECRET`, and `NOZLE_METRICS_SECRET` are distinct mandatory secrets of at least 32 bytes. They must not reuse `NOZLE_MASTER_API_KEY` or any organization API key.
+Each service identity has a strict route/method allowlist, and every tenant selector must match the authenticated headers. `NOZLE_INTERNAL_SECRET` is only a transitional rolling-deployment fallback while `NOZLE_SECURITY_ENFORCEMENT_ENABLED=false`; it is ignored after enforcement is enabled. All service, customer-session, and metrics secrets are distinct values of at least 32 bytes and must not reuse `NOZLE_MASTER_API_KEY` or an organization API key.
 
 ## Webhook and token controls
 
 Core-to-Engine webhooks use expiring RS256 signatures with issuer, audience, issued-at, expiration, and unique token ID claims. Engine requires an exact signed-body match and stores a durable replay receipt. Missing, forged, expired, altered, in-progress, and conflicting replay cases fail closed or return an explicitly retryable response.
 
-gRPC tokens can be created only with an active secret key. They include audience, issued-at, expiration, and token ID claims. Legacy tokens without an expiration are rejected.
+gRPC tokens can be created only with an active secret key. Issuance is verified through the same RSA verifier used by consumers before the token is returned. Tokens include audience, issued-at, expiration, and token ID claims; legacy tokens without an expiration are rejected.
 
 ## Browser boundary controls
 
@@ -95,7 +99,7 @@ gRPC tokens can be created only with an active secret key. They include audience
 
 - Publishable keys no longer authenticate checkout, entitlements, billing reads, plan changes, cancellation, top-ups, realtime token creation, or any write route.
 - React applications must mint customer sessions on a trusted backend and pass them to customer-facing components.
-- Engine-to-Core deployments must configure `NOZLE_INTERNAL_SECRET`; the old master API key is not a fallback.
+- Core and Engine deployments must configure different directional service secrets. `NOZLE_INTERNAL_SECRET` is temporary compatibility only; the old master API key is not a fallback.
 - Existing gRPC tokens without `exp` stop working.
 - Production now requires explicit Core/Engine CORS allowlists, checkout-return origins, metrics authentication, and webhook verification keys.
 
