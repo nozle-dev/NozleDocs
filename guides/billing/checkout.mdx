@@ -6,10 +6,10 @@ description: Stripe embedded checkout flow
 Nozle uses Stripe's embedded checkout for payment collection. The flow:
 
 1. Customer selects a plan (PricingTable or CheckoutButton component)
-2. React SDK calls `POST /api/v1/checkout` with `{ customer_id, plan_code, return_url }`
+2. React SDK calls `POST /api/v1/checkout` with a customer session carrying `checkout:create`
 3. Nozle keeps the current plan active and computes the exact invoice/proration
 4. If money remains due, Nozle creates a Stripe embedded Checkout Session
-5. Returns `{ type: "stripe", client_secret }`
+5. Returns a `stripe`, `completed`, or `scheduled` checkout result
 6. The Checkout component renders Stripe Embedded Checkout using the `cs_...` secret
 7. Customer enters payment details
 8. Stripe sends `payment_intent.succeeded` or `payment_intent.payment_failed` to Nozle
@@ -49,9 +49,9 @@ Plan checkout:
 }
 ```
 
-Free plans, trials without an upfront fixed charge, and Lago-classified downgrades do not create checkout. A paid upgrade fully funded by prepaid credits returns a completed response instead.
+Free plans and trials without an upfront fixed charge do not create payment checkout. A paid change fully funded by prepaid credits returns a completed response instead.
 
-Discounted annual plans can have a lower annualized amount than twelve monthly payments. Lago treats that monthly-to-annual move as a scheduled downgrade; `UpgradeModal` detects `checkout_not_required_for_downgrade` and delegates it to `/subscriptions/change` for the next billing boundary.
+Paid downgrades, including discounted monthly-to-annual transitions, still enter through `/checkout`. Core schedules the Lago transition for the next billing boundary and returns `type: "scheduled"`; the browser never falls back to `/subscriptions/change` for a paid target.
 
 Existing invoice checkout:
 
@@ -77,7 +77,9 @@ Plan checkout uses subscription activation rules internally. Invoice checkout do
 }
 ```
 
-The browser must use your Nozle publishable key (`pk_nozle_...`) for the SDK. If you mount embedded Stripe checkout yourself, your app also needs the Stripe publishable key for the same Stripe account connected in Nozle.
+The browser must use a Nozle customer session (`csess_...`) for checkout. The `customer_id` must equal the session subject. A Nozle publishable key can only fetch the plan catalog. If you mount embedded Stripe checkout yourself, your app also needs the Stripe publishable key for the same Stripe account connected in Nozle.
+
+Checkout return URLs must use HTTPS and an exact configured origin. Nozle rejects wildcard, userinfo, and unapproved return URLs.
 
 Credit-funded completion response:
 
@@ -92,6 +94,17 @@ Credit-funded completion response:
 }
 ```
 
+Scheduled paid-downgrade response:
+
+```json
+{
+  "type": "scheduled",
+  "status": "pending",
+  "subscription_id": "subscription_uuid",
+  "plan_code": "growth"
+}
+```
+
 ## React implementation
 
 ### Option A -- CheckoutButton (simplest)
@@ -100,14 +113,20 @@ Credit-funded completion response:
 <CheckoutButton planId="growth" label="Subscribe to Growth" />
 ```
 
-### Option B -- Custom flow with useCheckout
+### Option B -- Custom flow with useCheckoutSession
 
 ```tsx
-const { fetchClientSecret, isLoading } = useCheckout();
+import { useCheckoutSession } from '@nozle-js/react';
+
+const { fetchClientSecret, checkout, isLoading } = useCheckoutSession();
 
 const handleCheckout = async () => {
   const clientSecret = await fetchClientSecret('growth', '/success');
-  // Pass the cs_... secret to <Checkout>
+  if (clientSecret) {
+    // Pass the cs_... secret to <Checkout>.
+  } else if (checkout?.type === 'scheduled') {
+    // Refresh billing state; the paid downgrade is scheduled.
+  }
 };
 ```
 

@@ -1,46 +1,14 @@
 ---
-title: Real-Time Updates
-description: WebSocket for live entitlement changes
+title: Realtime security boundary
+description: Why customer billing remains HTTP-only and how trusted realtime token creation is protected
 ---
 
-Nozle uses WebSocket for real-time entitlement updates in the browser.
+Customer sessions cannot create Centrifugo tokens or subscribe to customer-credit channels. The React SDK uses authenticated HTTP for customer billing, entitlement, and product-credit reads.
 
-**How it works:**
-1. BillingProvider connects to WebSocket on mount
-2. Subscribes to channel: workspace:\{workspaceId\}:entitlements
-3. When entitlements change (plan upgrade, usage limit hit, feature toggled), Nozle publishes to the channel
-4. React hooks (useCan, usePlan) update automatically — no polling
+This boundary prevents a browser session from expanding its exact customer scopes into a broader workspace channel. A publishable key is also rejected by the realtime-token route.
 
-**Setup:**
-Provide the WebSocket URL in BillingProvider:
-```tsx
-<BillingProvider
-  apiKey="pk_live_..."
-  workspaceId="ws_abc123"
-  centrifugoUrl="wss://rt.nozle.app/connection/websocket"
->
-  {children}
-</BillingProvider>
-```
+Refresh or remount the relevant browser query after checkout, a plan mutation, cancellation, or top-up completion. The current React provider deliberately supplies no customer-session Centrifugo token.
 
-The SDK automatically:
-1. Requests a WebSocket auth token from `GET /api/v1/auth/ws-token`
-2. Connects to the WebSocket
-3. Subscribes to the entitlements channel
-4. Updates the billing store on incoming messages
+If a trusted server integration needs a realtime token, it must call `GET /api/v1/auth/centrifugo-token` with a secret key and keep that key out of the browser. Publishable keys and customer sessions receive `403 Forbidden`.
 
-**Connection states:**
-The BillingState tracks connection:
-```typescript
-const { connectionState } = useBillingContext();
-// 'connecting' | 'connected' | 'disconnected'
-```
-
-**When updates are pushed:**
-- Customer upgrades/downgrades plan
-- Usage counter crosses a limit threshold
-- Admin toggles a feature
-- Subscription is cancelled or expired
-
-**Without WebSocket:**
-If `centrifugoUrl` is not provided, the React SDK falls back to REST-only mode. Hooks will fetch data on mount but won't receive live updates. For most apps, this is fine for non-critical UI. For real-time gates (e.g., locking a feature the moment a limit is hit), WebSocket mode is recommended.
+Do not proxy the secret-key token route directly to an untrusted browser. Define an application-specific, least-privilege channel contract before exposing any realtime capability.

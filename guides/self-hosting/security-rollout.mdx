@@ -1,0 +1,86 @@
+---
+title: Security rollout and rollback
+description: Coordinated migration, secret provisioning, rollout order, compatibility, and audit checklist
+---
+
+The security remediation is a coordinated Core, Engine, React SDK, deployment, and documentation release. Do not expose the new browser contract until the database migrations and mandatory secrets are ready.
+
+## Required configuration
+
+Provision distinct values for:
+
+- `NOZLE_CORE_TO_ENGINE_SECRET` — Core's identity when calling Engine, at least 32 bytes;
+- `NOZLE_ENGINE_TO_CORE_SECRET` — Engine's different identity when calling Core, at least 32 bytes;
+- `NOZLE_INTERNAL_SECRET` — transitional shared fallback for mixed old/new pods only;
+- `NOZLE_SECURITY_ENFORCEMENT_ENABLED=false` — default-off compatibility gate for the first rollout;
+- `NOZLE_CUSTOMER_SESSION_SECRET` — Engine session signing, at least 32 bytes;
+- `NOZLE_METRICS_SECRET` — Core and Engine metrics authentication, at least 32 bytes;
+- `NOZLE_CORE_WEBHOOK_PUBLIC_KEY` — base64-encoded PEM RSA public key that must match Core's `LAGO_RSA_PRIVATE_KEY` webhook signer;
+- `NOZLE_CORE_WEBHOOK_ISSUER` — exact Core API origin;
+- `NOZLE_CORS_ALLOWED_ORIGINS` and `CORS_ALLOWED_ORIGINS` — explicit Core and Engine browser origins;
+- `NOZLE_CHECKOUT_RETURN_URL_ALLOWED_ORIGINS` and `CHECKOUT_RETURN_URL_ALLOWED_ORIGINS` — explicit HTTPS return origins.
+
+Keep all usage and Entity mutation selectors default off until their separate canaries are approved.
+
+## Deployment order
+
+1. Generate and store both directional service secrets, the temporary legacy secret, and the other mandatory secrets. Do not reuse an organization key or `NOZLE_MASTER_API_KEY`.
+2. Confirm the configured webhook public key matches the public key derived from Core's RSA private signer.
+3. Deploy the Core additive API-key permission migration. Verify rollback/reapply in a disposable database. The Core migration job must receive the same RSA and Nozle service environment as the API boot path.
+4. Run Engine migration 012 before rolling Engine pods. The Helm pre-install/pre-upgrade job performs this step and records the configured baseline for an existing database.
+5. Deploy Core and Engine with both directional credentials, the temporary legacy credential, and `NOZLE_SECURITY_ENFORCEMENT_ENABLED=false`. New variables take precedence; the legacy credential permits mixed old/new pods.
+6. Verify both directional identities, their route/method allowlists, tenant ownership checks, restricted secret-key behavior, and webhook key matching.
+7. Release the React SDK change and migrate browser billing components. The Nozle dashboard obtains its customer session through its authenticated Core backend; it does not ship a secret key.
+8. Enable `NOZLE_SECURITY_ENFORCEMENT_ENABLED=true` only after all old Core, Engine, dashboard, and client versions are retired. Verify publishable keys are catalog-only and browser paid plan changes use checkout.
+9. Remove `NOZLE_INTERNAL_SECRET` in a later cleanup release after the strict rollout has remained healthy.
+
+## Database migrations
+
+Core adds a constraint and trigger that force publishable keys to the exact plan-read permission set. Existing publishable keys are normalized during migration, and their prior permission JSON is stored in a migration-owned backup table so rollback can restore the data it changed.
+
+Engine migration 012 creates durable Core webhook replay receipts, immutable identity protection, claim leases, completion state, and supporting indexes. Migration execution is transactional.
+
+## Rollback order
+
+1. Stop new browser rollout and return the application to the previously compatible SDK.
+2. Set `NOZLE_SECURITY_ENFORCEMENT_ENABLED=false` before rolling back application pods so mixed versions can use the transitional credential.
+3. Roll back Engine application pods before attempting schema rollback.
+4. Engine migration 012 rollback intentionally aborts while webhook replay receipts exist. Preserve receipts for audit or archive them through an explicitly reviewed operational procedure before schema rollback.
+5. Roll back Core application code.
+6. Roll back the Core permission migration only if the old application must be restored. The down migration removes the trigger/constraint and restores permissions saved before normalization; keys created after the migration retain their current permission JSON.
+7. Keep mandatory secrets stored during rollback; deleting them prematurely can break mixed-version pods and invalidates active customer sessions.
+
+Never downgrade by restoring `NOZLE_MASTER_API_KEY` as Engine-to-Core authentication.
+
+## Compatibility notes
+
+- Existing secret keys remain server-side credentials and preserve their configured permissions through rotation.
+- While enforcement is false, old Engine clients can temporarily continue their pre-remediation publishable-key customer flow. Once enforcement is true, publishable keys are catalog-only everywhere.
+- Customer sessions default to `credits:read` when scopes are omitted, preserving the earlier credit-read contract. New clients should request explicit least-privilege scopes.
+- Customer-session scopes cannot exceed the minting secret key's permissions.
+- `POST /subscribe` is always secret-key-only. Browser paid plan changes use checkout even during the compatibility window.
+- Replacing `NOZLE_CUSTOMER_SESSION_SECRET` immediately invalidates all outstanding customer sessions.
+- The Engine migration baseline is `11` for installations that already contain migrations 001 through 011.
+
+## Security audit checklist
+
+- [ ] Publishable keys receive 403 from every route except explicit plan catalog reads.
+- [ ] Publishable-key creation and rotation retain only plan-read permission.
+- [ ] Cross-customer and cross-organization session requests fail.
+- [ ] Each customer-session scope is denied when absent and succeeds when present.
+- [ ] A restricted secret key cannot mint broader session scopes or invoke a mutation without the matching resource permission.
+- [ ] Cancellation rejects a subscription owned by another customer or organization.
+- [ ] Core-to-Engine and Engine-to-Core use different credentials, strict route/method allowlists, and matching tenant context; neither direction accepts the opposite credential.
+- [ ] `/customers` and LLM proxy traffic use the authenticated organization; LLM customers are ownership-checked.
+- [ ] Missing, forged, expired, altered, concurrent, and replayed Core webhooks are covered.
+- [ ] Cost-model reads/deletes are organization-scoped and secret-only.
+- [ ] Browser entitlement responses contain no cost, revenue, or margin fields.
+- [ ] Legacy no-expiry gRPC tokens are rejected.
+- [ ] The Core migration container boots in production mode with the same required security/RSA environment as the API.
+- [ ] Core and Engine reject wildcard production CORS configuration.
+- [ ] Checkout rejects non-HTTPS, userinfo, and unapproved return origins.
+- [ ] Core and Engine metrics reject missing or incorrect metrics secrets.
+- [ ] PostgreSQL migration up/down/reapply passes on supported versions.
+- [ ] Core, Engine, SDK, Helm, Docker Compose, and documentation CI are green before coordinated release.
+
+Production changes require a separate approval. The code PRs do not run migrations against or modify production.

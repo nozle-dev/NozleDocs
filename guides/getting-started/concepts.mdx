@@ -71,11 +71,11 @@ can("api-calls")       // → { allowed: true, remaining: 8420 }
 can("team-members")    // → { allowed: false, remaining: 0 }
 ```
 
-Entitlements are checked via the [`can()` endpoint](/guides/entitlements/can-endpoint) (REST) or the `useCan()` hook (React SDK). Updates propagate in real-time over WebSocket -- no polling required.
+Entitlements are checked via the [`can()` endpoint](/guides/entitlements/can-endpoint) (REST) or the `useCan()` hook (React SDK). Browser checks use a customer session and ordinary authenticated HTTP.
 
 <CardGroup cols={2}>
   <Card title="Entitlements Overview" href="/guides/entitlements/overview" />
-  <Card title="Real-time Updates" href="/guides/entitlements/real-time" />
+  <Card title="Realtime security boundary" href="/guides/entitlements/real-time" />
 </CardGroup>
 
 ## Margin
@@ -97,13 +97,13 @@ Margin data is computed by the Nozle API and returned alongside billing data.
 
 ## API Keys
 
-Nozle uses two types of API keys to separate client-safe and server-only operations:
+Nozle uses three credential types to separate public, customer-bound, and server-only operations:
 
 | Key prefix | Name | Use case |
 |------------|------|----------|
-| `pk_` | Publishable | Safe for public client-side catalog, entitlement, and checkout flows. It cannot read the credit ledger. |
+| `pk_` | Publishable | Safe only for public client-side plan catalog reads. It cannot access customer data or write routes. |
 | `sk_` | Secret | Server-only. Used for sending events, managing subscriptions, configuring cost models, and reading margin data. Never expose in a browser. |
-| `csess_` | Customer session | Short-lived browser credential bound to one customer and `credits:read`. Mint it from your backend. |
+| `csess_` | Customer session | Short-lived browser credential bound to one customer and explicit billing scopes. Mint it from your backend. |
 
 <CardGroup cols={2}>
   <Card title="Node SDK (secret key)" href="/sdks/node/installation" />

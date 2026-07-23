@@ -24,7 +24,7 @@ Each endpoint page shows the correct base URL in the code examples on the right.
 |----------|--------|-----|---------|
 | Publishable | `pk_nozle_` | Client-side (React SDK, browsers) | `pk_nozle_abc123...` |
 | Secret | `sk_nozle_` | Server-side only (Node/Python SDKs, cURL) | `sk_nozle_xyz789...` |
-| Customer session | `csess_` | Short-lived browser reads for one customer | `csess_eyJ...` |
+| Customer session | `csess_` | Short-lived browser billing access for one customer | `csess_eyJ...` |
 
 All authenticated endpoints require a Bearer token in the Authorization header:
 
@@ -34,11 +34,24 @@ Authorization: Bearer sk_nozle_your_secret_key
 
 ## Key Scoping
 
-- **Publishable keys** (`pk_nozle_...`) support public catalog and browser checkout flows. They cannot read the product-credit ledger or mutate usage.
-- **Secret keys** (`sk_nozle_...`) are server-side credentials for configuration, usage mutation, customer-session creation, and privileged reads.
-- **Customer sessions** (`csess_...`) carry only `credits:read`, are bound to one organization and external customer ID, and expire after at most one hour. They are accepted by the customer and Entity Credit System list, single-balance, and operation-history HTTP routes. They cannot list the customer's Entity directory and are rejected by `/auth/centrifugo-token` and all legacy billing routes.
+- **Publishable keys** (`pk_nozle_...`) can only read the explicit public plan catalog. This restriction is unconditional. A publishable key cannot checkout, read customer data, receive write permissions, or become broader through rotation.
+- **Secret keys** (`sk_nozle_...`) are server-side credentials for customer-session creation, configuration, usage mutation, and privileged reads. Never send one to a browser.
+- **Customer sessions** (`csess_...`) are bound to one organization and external customer ID, expire after at most one hour, and contain explicit scopes no broader than the minting secret key. They support customer billing reads, entitlements, checkout, plan changes, cancellation, top-ups, and product-credit reads only when the corresponding scope is present.
 
-Create customer sessions from your backend with `POST /api/v1/customer-sessions`, then pass the returned token alongside the React provider's existing publishable key. Only the product-credit hooks and components select it.
+Create customer sessions from your backend with `POST /api/v1/customer-sessions`. Pass the session to customer-facing React components and keep a publishable key only for the plan catalog. Every customer identifier in the request path, query, or body must equal the session subject.
+
+## Customer-session scopes
+
+| Scope | Browser capability |
+|-------|--------------------|
+| `credits:read` | Customer and owned-Entity credit balances and operation history |
+| `billing:read` | Billing status, current subscription, invoices, and subscription preview |
+| `entitlements:read` | Customer entitlement checks without internal cost or margin data |
+| `checkout:create` | Customer-scoped checkout creation |
+| `subscriptions:write` | Customer-scoped plan change and cancellation. Direct subscribe remains server-only. |
+| `topups:create` | Customer-scoped fixed-package credit top-up checkout |
+
+Customer sessions cannot mint other sessions or gRPC/realtime tokens, configure resources, submit usage, call the LLM proxy, or access cost and margin data.
 
 ## Public Endpoints
 
@@ -53,5 +66,7 @@ These do not require an API key:
 Sign in at [app.nozle.app](https://app.nozle.app) → Settings → API Keys.
 
 <Warning>
-Never expose secret keys in client-side code. Use publishable keys for public checkout/catalog UI and a short-lived customer session for customer or Entity balance, source, or operation-history components.
+Never expose secret keys in client-side code. Use publishable keys only for the public plan catalog and a short-lived customer session for every customer-bound read or mutation.
 </Warning>
+
+See [Security model and route matrix](/guides/getting-started/security-model) for the complete authorization contract.

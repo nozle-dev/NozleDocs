@@ -10,15 +10,16 @@ Nozle is a unified platform: a single API that handles billing, entitlements, ma
 ```
 Your App
   │
-  ├──► React SDK ──► Nozle API (api.nozle.app)
+│ ├──► Browser: publishable key ──► public plan catalog
+│ ├──► Browser: customer session ──► exact customer billing APIs
   │                      │
   │                      ├──► Billing ──► Invoices, Subscriptions
   │                      │
   │                      ├──► Stripe ──► Payments
   │                      │
-  │                      └──► WebSocket ──► Real-time updates to React SDK
+  │                      └──► Authenticated HTTP ──► Browser billing state
   │
-  └──► Node/Python SDK ──► Nozle API
+  └──► Trusted backend: secret key ──► Nozle API
 ```
 
 ## Nozle API
@@ -27,7 +28,7 @@ The primary API surface at `api.nozle.app`. Every request from your application 
 
 **What it handles:**
 
-- **Authentication** — API key validation with publishable (`pk_`) and secret (`sk_`) scoping
+- **Authentication** — catalog-only publishable keys, customer-bound sessions, server-only secret keys, and dedicated internal service authentication
 - **Entitlements** — `can()` endpoint with low-latency caching for sub-millisecond feature checks
 - **Checkout** — creates Stripe Checkout sessions and processes webhooks for subscription activation
 - **Margin intelligence** — cost-vs-revenue analytics by customer, model, metric, and plan
@@ -47,9 +48,7 @@ Stripe handles payments. Nozle uses Stripe for:
 
 ## Real-Time Updates
 
-When billing state changes — a plan upgrade, usage limit reached, or feature toggled — the update pushes to connected React SDK clients via WebSocket. No polling required.
-
-This means your UI reacts to billing changes instantly. A customer completes checkout, and their feature gates unlock without a page refresh.
+Customer billing and product-credit components use authenticated HTTP requests. Customer sessions cannot mint realtime tokens. Refresh customer data after a mutation or on your application's own invalidation signal.
 
 ## Request Flow Examples
 
@@ -74,11 +73,13 @@ Your Server → SDK calls nozle.track(...)
 ### Customer checkout
 
 ```
-Your App → SDK opens checkout
+Your App → backend mints a checkout-scoped customer session
+  → SDK opens checkout
   → Nozle API creates Stripe Checkout Session
     → Customer enters payment details on Stripe
       → Stripe webhook hits Nozle API
         → Subscription activated, entitlements provisioned
-          → WebSocket pushes update to React SDK
-            → UI unlocks features instantly
+          → UI refreshes authenticated billing and entitlement reads
 ```
+
+See [Security model and route matrix](/guides/getting-started/security-model).

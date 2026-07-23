@@ -18,11 +18,11 @@ From the dashboard, navigate to **Settings > API Keys**. You will see two keys:
 
 | Key prefix | Purpose | Use in |
 |------------|---------|--------|
-| `pk_` | Publishable key | Client-side (React, browser) |
+| `pk_` | Publishable key | Browser plan catalog only |
 | `sk_` | Secret key | Server-side only (Node.js, Python) |
 
 <Warning>
-Never expose your `sk_` secret key in client-side code. Use the `pk_` publishable key for React components.
+Never expose your `sk_` secret key in client-side code. Use `pk_` only for public plan catalog components and mint a scoped `csess_` customer session for customer-facing billing components.
 </Warning>
 </Step>
 
@@ -150,7 +150,7 @@ Install the React SDK to get pre-built billing UI components.
 npm install @nozle-js/react
 ```
 
-For public pricing, checkout, and the existing `BillingPortal`, a publishable key is used. For the new product-credit balances and operation history, mint a customer session in your backend and pass it alongside that publishable key to `BillingProvider`:
+Use a publishable key only for public pricing. Mint a scoped customer session in your backend for checkout, billing, entitlements, top-ups, and product-credit operations, then pass both credentials to `BillingProvider`:
 
 ```tsx title="app/providers.tsx"
 import { BillingProvider, ProductCreditBalance } from '@nozle-js/react';
@@ -165,7 +165,7 @@ export function Providers({ children, sessionToken }: { children: React.ReactNod
 }
 ```
 
-The product-credit components use HTTP only. The session does not authenticate the full legacy portal or Centrifugo.
+Customer operations use HTTP only. The session does not authenticate Centrifugo and cannot access another customer.
 </Step>
 
 <Step>

@@ -5,7 +5,7 @@ api: "GET /can"
 
 Check whether a customer is entitled to use a feature under their current plan. This is the primary gating endpoint -- call it before executing any metered or limited operation.
 
-**Auth:** `pk_` or `sk_`
+**Auth:** customer session with `entitlements:read`, or a server-side secret key. Publishable keys are rejected.
 
 <ParamField query="customer_id" type="string" required>
   External customer ID
@@ -36,20 +36,22 @@ Check whether a customer is entitled to use a feature under their current plan. 
 </ResponseField>
 
 <ResponseField name="cost_per_use_cents" type="number">
-  Your cost per unit (from cost models)
+  Your cost per unit (from cost models). Returned only to secret-key callers.
 </ResponseField>
 
 <ResponseField name="revenue_per_use_cents" type="number">
-  What you charge per unit
+  What you charge per unit. Returned only to secret-key callers.
 </ResponseField>
 
 <ResponseField name="margin_per_use_cents" type="number">
-  Profit per unit
+  Profit per unit. Returned only to secret-key callers.
 </ResponseField>
 
 <ResponseField name="min_margin_percent" type="number">
-  Minimum margin threshold configured for this feature, if any
+  Minimum margin threshold configured for this feature, if any. Returned only to secret-key callers.
 </ResponseField>
+
+Customer-session responses omit all cost, revenue, margin, and margin-threshold fields.
 
 <Info>
 When `allowed` is `false`, the `reason` field tells you why -- use it to show contextual upgrade prompts in your UI.

@@ -5,7 +5,7 @@ api: "DELETE /subscriptions/{id}"
 
 Cancel a subscription. The cancellation takes effect at the end of the current billing period -- the customer retains access until then.
 
-**Auth:** `pk_` (publishable key) or `sk_` (secret key).
+**Auth:** customer session with `subscriptions:write`, or a server-side secret key.
 
 <ParamField path="id" type="string" required>
   The subscription ID to cancel.
@@ -14,6 +14,12 @@ Cancel a subscription. The cancellation takes effect at the end of the current b
 <ParamField body="reason" type="string">
   Optional cancellation reason for your records.
 </ParamField>
+
+<ParamField body="customer_id" type="string" required>
+  External customer ID. For a customer session this must match the session subject.
+</ParamField>
+
+Nozle verifies both the customer and subscription ownership in the authenticated organization before cancellation. A subscription ID from another customer or organization is rejected.
 
 ### Response
 

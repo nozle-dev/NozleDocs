@@ -6,7 +6,7 @@ description: Drop-in billing UI components for React
 All components are exported from `@nozle-js/react` and use `--nozle-*` CSS custom properties for theming. They work with any design system -- just set the CSS variables on a parent element or `:root`.
 
 <Info>
-Checkout components use `BillingPortalProvider` with a publishable key. Product-credit read components use `BillingProvider` with a short-lived `customerSessionToken`; a bare publishable key cannot read product-credit balances or ledger operations. Customer sessions do not authenticate the legacy `BillingPortal` as a whole.
+`PricingTable` uses a publishable key for the public plan catalog. Every customer-facing billing component uses a short-lived `customerSessionToken`; publishable and secret keys are rejected as browser billing credentials.
 </Info>
 
 ---
@@ -316,7 +316,7 @@ import { UpgradeModal } from '@nozle-js/react';
   targetPlanId="pro_monthly"
   customerId="cus_xxx"
   apiBaseUrl="https://api.nozle.app"
-  apiKey="pk_xxx"
+  customerSessionToken="csess_xxx"
   onStripeClientSecret={(secret) => setClientSecret(secret)}
   onCompleted={() => router.refresh()}
   onConfirm={() => setShowModal(false)}
@@ -330,7 +330,8 @@ import { UpgradeModal } from '@nozle-js/react';
 | `targetPlanId` | `string` | -- | Plan the customer is upgrading to |
 | `customerId` | `string` | -- | Customer identifier |
 | `apiBaseUrl` | `string` | `'https://api.nozle.app'` | API base URL |
-| `apiKey` | `string` | `''` | API key for authorization |
+| `customerSessionToken` | `string` | `''` | Scoped customer session for preview and checkout |
+| `apiKey` | `string` | `''` | Deprecated alias accepted only for a `csess_...` token |
 | `onStripeClientSecret` | `(clientSecret: string) => void` | -- | Receives the Stripe Checkout Session secret |
 | `onCheckoutStarted` | `() => void` | -- | Called after Stripe checkout is created |
 | `onCompleted` | `() => void` | -- | Called when prepaid credits complete the change immediately |
@@ -417,12 +418,12 @@ import { CANCEL_REASONS } from '@nozle-js/react';
 
 ### BillingPortalProvider
 
-Context wrapper that provides `{ customerId, apiKey }` to all nested SDK components. Required by `CheckoutButton`, `UpgradeButton`, and `CreditTopUpButton`.
+Context wrapper that provides `{ customerId, customerSessionToken }` to all nested SDK components. Required by `CheckoutButton`, `UpgradeButton`, and `CreditTopUpButton`.
 
 ```tsx
 import { BillingPortalProvider } from '@nozle-js/react';
 
-<BillingPortalProvider customerId="cus_xxx" apiKey="pk_xxx">
+<BillingPortalProvider customerId="cus_xxx" customerSessionToken="csess_xxx">
   <PricingTable plans={plans} />
   <CheckoutButton planId="pro" />
 </BillingPortalProvider>
@@ -431,7 +432,8 @@ import { BillingPortalProvider } from '@nozle-js/react';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `customerId` | `string` | -- | Customer identifier passed to all child components |
-| `apiKey` | `string` | -- | Publishable API key (`pk_` prefix) |
+| `customerSessionToken` | `string` | -- | Scoped customer session (`csess_` prefix) |
+| `apiKey` | `string` | -- | Deprecated alias accepted only for a `csess_...` token |
 | `children` | `ReactNode` | -- | Child components |
 
 Access the context directly with the `useBillingPortal` hook:
@@ -439,14 +441,14 @@ Access the context directly with the `useBillingPortal` hook:
 ```ts
 import { useBillingPortal } from '@nozle-js/react';
 
-const { customerId, apiKey } = useBillingPortal();
+const { customerId, customerSessionToken } = useBillingPortal();
 ```
 
 ---
 
 ### BillingPortal
 
-Aggregated legacy portal view that composes `CurrentPlan`, `UsageDashboard`, `InvoiceList`, and the existing Lago wallet `CreditBalance` into a single vertical layout. WP9 does not replace or extend this component with product-credit reads.
+Aggregated portal view that composes `CurrentPlan`, `UsageDashboard`, `InvoiceList`, and the existing Lago wallet `CreditBalance`. It requires the matching customer session through `BillingPortalProvider`.
 
 ```tsx
 import { BillingPortal } from '@nozle-js/react';

@@ -20,18 +20,20 @@ Proxies all requests to `https://api.openai.com/v1/*`. Any OpenAI-compatible end
 
 **Auth:** `X-Nozle-Key` header (`sk_` only)
 
+The secret key's organization must own the `X-Nozle-Customer-Id` customer. Publishable keys, customer sessions, internal service credentials, and customers from another organization are rejected.
+
 **Required headers:**
 
 | Header | Description |
 |--------|-------------|
 | `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`) |
-| `X-Nozle-Customer` | External customer ID to bill for this usage |
+| `X-Nozle-Customer-Id` | External customer ID to bill for this usage |
 | `Authorization` | Customer's OpenAI API key (`Bearer sk-...`) |
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/api/v1/proxy/openai/v1/chat/completions \
   -H "X-Nozle-Key: sk_live_your_nozle_key" \
-  -H "X-Nozle-Customer: cust_123" \
+  -H "X-Nozle-Customer-Id: cust_123" \
   -H "Authorization: Bearer sk-customer-openai-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -53,13 +55,13 @@ Proxies all requests to `https://api.anthropic.com/v1/*`.
 | Header | Description |
 |--------|-------------|
 | `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`) |
-| `X-Nozle-Customer` | External customer ID to bill for this usage |
+| `X-Nozle-Customer-Id` | External customer ID to bill for this usage |
 | `Authorization` | Customer's Anthropic API key |
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/api/v1/proxy/anthropic/v1/messages \
   -H "X-Nozle-Key: sk_live_your_nozle_key" \
-  -H "X-Nozle-Customer: cust_123" \
+  -H "X-Nozle-Customer-Id: cust_123" \
   -H "x-api-key: customer-anthropic-key" \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \

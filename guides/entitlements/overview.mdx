@@ -12,7 +12,7 @@ Entitlements control what customers can do based on their subscription plan.
 **How it works:**
 1. Define features and assign them to plans (in the dashboard or via API)
 2. Check access at runtime using can() — in your API (Node/Python SDK) or UI (React useCan hook)
-3. Get real-time updates via WebSocket (React SDK auto-subscribes)
+3. Refresh browser state after customer mutations; customer sessions use authenticated HTTP and cannot mint realtime tokens
 
 **Server-side check:**
 ```typescript
@@ -30,7 +30,6 @@ const { allowed, loading } = useCan('cust_123', 'api_calls');
 ```
 
 **What makes Nozle's entitlements powerful:**
-- Real-time WebSocket updates — no polling
 - Low-latency cached counters for sub-millisecond checks
-- Margin-aware responses (cost/revenue/margin per use)
+- Margin-aware responses for trusted secret-key callers; browser responses omit internal economics
 - React SDK components (FeatureGate, UsageGate, PlanGate, LockedOverlay)

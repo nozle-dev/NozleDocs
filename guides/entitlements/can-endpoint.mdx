@@ -9,7 +9,7 @@ The `can()` endpoint is the core of Nozle's entitlement system.
 
 ```
 GET /api/v1/can?customer_id=cust_123&feature=api_calls
-Authorization: Bearer pk_live_... (or sk_live_...)
+Authorization: Bearer csess_...
 ```
 
 ## Response
@@ -19,11 +19,7 @@ Authorization: Bearer pk_live_... (or sk_live_...)
   "allowed": true,
   "used": 1500,
   "limit": 10000,
-  "remaining": 8500,
-  "cost_per_use_cents": 2,
-  "revenue_per_use_cents": 5,
-  "margin_per_use_cents": 3,
-  "min_margin_percent": 20
+  "remaining": 8500
 }
 ```
 
@@ -36,10 +32,8 @@ Authorization: Bearer pk_live_... (or sk_live_...)
 | `used` | `number` | Current usage count this billing period |
 | `limit` | `number` | Usage cap for this feature |
 | `remaining` | `number` | `limit - used` |
-| `cost_per_use_cents` | `number` | Your cost per unit (from cost model) |
-| `revenue_per_use_cents` | `number` | What you charge per unit (from plan pricing) |
-| `margin_per_use_cents` | `number` | `revenue - cost` per unit |
-| `min_margin_percent` | `number?` | Minimum margin threshold if configured |
+
+Browser calls require a customer session with `entitlements:read`, and the customer ID must match its subject. Cost, revenue, margin, and margin-threshold fields are omitted from browser responses. Secret-key callers can receive those server-only fields.
 
 ## Performance
 
@@ -71,5 +65,5 @@ nozle.can('cust_123', 'api_calls')
 **React:**
 
 ```tsx
-useCan('cust_123', 'api_calls') // with real-time WebSocket updates
+useCan('cust_123', 'api_calls') // authenticated HTTP with a customer session
 ```

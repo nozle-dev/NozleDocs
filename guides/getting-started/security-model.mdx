@@ -1,0 +1,106 @@
+---
+title: Security model and route matrix
+description: Credential boundaries, threat model, and the final browser-to-service authorization contract
+---
+
+Nozle uses separate credentials for public catalog discovery, customer-bound browser operations, trusted server operations, and internal service calls.
+
+```text
+Browser
+  |-- Publishable key -> public plan catalog only
+  `-- Customer session -> exact customer billing reads and mutations
+
+Trusted backend
+  `-- Secret key -> creates scoped customer sessions and performs server operations
+
+Core -> Engine
+  `-- NOZLE_CORE_TO_ENGINE_SECRET + authenticated organization/customer context
+
+Engine -> Core
+  `-- NOZLE_ENGINE_TO_CORE_SECRET + authenticated organization/customer context
+```
+
+These boundaries are enforced independently of plan tier and premium-feature state.
+
+## Threat-model summary
+
+The security boundary assumes browser code, browser storage, request parameters, redirects, webhook delivery, and customer-supplied identifiers may be hostile. It specifically protects against:
+
+- a leaked publishable key being used for customer reads, checkout, writes, cost data, token creation, or administrative APIs;
+- a valid customer session crossing to another customer, subscription, Entity, or organization;
+- a browser credential being forwarded by Engine to Core;
+- a master-organization fallback attributing customer or LLM traffic to the wrong tenant;
+- forged, expired, altered, or replayed Core webhook deliveries;
+- cross-organization cost-model reads or deletes;
+- unbounded CORS origins, open checkout redirects, and unauthenticated operational metrics;
+- API-key rotation broadening a publishable key;
+- legacy gRPC tokens remaining valid without an expiration.
+
+## Route authorization matrix
+
+| Route family | Publishable key | Customer session | Secret key | Internal service |
+|--------------|-----------------|------------------|------------|------------------|
+| `GET /plans`, `GET /plans/{code}` | Allow | Deny | Allow | Allow |
+| Customer credit and Entity-credit reads | Deny | `credits:read`, exact subject | Allow | Allow |
+| `GET /can` | Deny | `entitlements:read`, exact subject, browser-safe response | Allow, includes server-only margin fields | Allow |
+| Billing status, current subscription, invoices, preview | Deny | `billing:read`, exact subject | Allow | Allow |
+| Checkout | Deny | `checkout:create`, exact subject | Allow | Allow |
+| Direct `POST /subscribe` | Deny | Deny | `subscription:write` only | Deny |
+| Plan change and cancellation | Deny | `subscriptions:write`, exact subject | `subscription:write` | Deny |
+| Credit top-up checkout | Deny | `topups:create`, exact subject | Allow | Allow |
+| Customer-session creation | Deny | Deny | Allow only for scopes contained by the SK permissions | Core dashboard only on its internal mint route |
+| Customers, events, usage, configuration, Entity mutation | Deny | Deny | Allow subject to API permissions | Allow where explicitly wired |
+| Cost models, margin, analytics | Deny | Deny | Allow | Allow where explicitly wired |
+| LLM proxy | Deny | Deny | Allow through `X-Nozle-Key`; customer ownership required | Deny |
+| Realtime or gRPC token creation | Deny | Deny | Allow | Allow only for explicit trusted workflows |
+| Internal payment-success signal | Deny | Deny | Deny | Allow |
+| Operational metrics | Deny | Deny | Deny | Dedicated metrics secret only |
+
+The Core global boundary also rejects publishable keys on GraphQL, onboarding, and any controller not explicitly identified as a public plan-catalog read.
+
+## Customer-session contract
+
+A trusted backend creates a session only after authenticating its own user. The session is bound to one organization and external customer ID, has a unique token ID, and expires in 60 to 3600 seconds. Requested scopes must be a subset of the minting secret key's resource permissions; a restricted key cannot delegate authority it does not hold.
+
+Available scopes are:
+
+- `credits:read`
+- `billing:read`
+- `entitlements:read`
+- `checkout:create`
+- `subscriptions:write`
+- `topups:create`
+
+Every `customer_id` or `external_customer_id` found in a request path, query string, or nested JSON body must equal the session subject. Handlers use the authenticated subject when the identifier is omitted. Cancellation additionally checks that the subscription belongs to both that customer and organization. Paid browser plan changes always create checkout; direct subscription creation is server-only.
+
+Customer-session entitlement responses intentionally omit cost, revenue, margin, and minimum-margin fields. Those fields remain available only to trusted secret-key callers.
+
+## Service authentication
+
+Engine never forwards the caller's publishable key, customer session, or secret key to Core. Engine authenticates to Core with `NOZLE_ENGINE_TO_CORE_SECRET`; Core authenticates to Engine with a different `NOZLE_CORE_TO_ENGINE_SECRET`. Both directions send `X-Nozle-Org-Id`, and customer-specific calls also send `X-Nozle-Customer-Id`.
+
+Each service identity has a strict route/method allowlist, and every tenant selector must match the authenticated headers. `NOZLE_INTERNAL_SECRET` is only a transitional rolling-deployment fallback while `NOZLE_SECURITY_ENFORCEMENT_ENABLED=false`; it is ignored after enforcement is enabled. All service, customer-session, and metrics secrets are distinct values of at least 32 bytes and must not reuse `NOZLE_MASTER_API_KEY` or an organization API key.
+
+## Webhook and token controls
+
+Core-to-Engine webhooks use expiring RS256 signatures with issuer, audience, issued-at, expiration, and unique token ID claims. Engine requires an exact signed-body match and stores a durable replay receipt. Missing, forged, expired, altered, in-progress, and conflicting replay cases fail closed or return an explicitly retryable response.
+
+gRPC tokens can be created only with an active secret key. Issuance is verified through the same RSA verifier used by consumers before the token is returned. Tokens include audience, issued-at, expiration, and token ID claims; legacy tokens without an expiration are rejected.
+
+## Browser boundary controls
+
+- Core and Engine use explicit CORS origin allowlists; wildcard production origins are rejected.
+- Checkout return URLs require HTTPS and an exact configured origin. Userinfo and cross-origin redirects are rejected.
+- Cost-model and margin routes are secret-only and organization-scoped.
+- Operational metrics require `NOZLE_METRICS_SECRET`.
+- Publishable keys always retain the exact catalog-read permission set after creation or rotation.
+
+## Breaking changes
+
+- Publishable keys no longer authenticate checkout, entitlements, billing reads, plan changes, cancellation, top-ups, realtime token creation, or any write route.
+- React applications must mint customer sessions on a trusted backend and pass them to customer-facing components.
+- Core and Engine deployments must configure different directional service secrets. `NOZLE_INTERNAL_SECRET` is temporary compatibility only; the old master API key is not a fallback.
+- Existing gRPC tokens without `exp` stop working.
+- Production now requires explicit Core/Engine CORS allowlists, checkout-return origins, metrics authentication, and webhook verification keys.
+
+See [Security rollout and rollback](/guides/self-hosting/security-rollout) before upgrading a self-hosted deployment.

@@ -12,6 +12,8 @@ React: CurrentPlan component or GET /api/v1/subscriptions/current
 
 **Upgrade/Downgrade:**
 
+Browser paid-plan changes always use checkout. `POST /api/v1/subscribe` is reserved for trusted backends with a secret key and is not called by the React SDK.
+
 The UpgradeButton component handles the full flow:
 1. Shows proration preview (calls POST /api/v1/subscriptions/preview)
 2. Displays credit (unused time on current plan), debit (new plan cost), net amount, next billing date
@@ -34,14 +36,14 @@ Or via SDK:
 // Preview proration first
 const preview = await fetch('/api/v1/subscriptions/preview', {
   method: 'POST',
-  headers: { Authorization: 'Bearer pk_...', 'Content-Type': 'application/json' },
+  headers: { Authorization: 'Bearer csess_...', 'Content-Type': 'application/json' },
   body: JSON.stringify({ target_plan_id: 'scale' })
 });
 
 // Start payment-first checkout
 const checkout = await fetch('/api/v1/checkout', {
   method: 'POST',
-  headers: { Authorization: 'Bearer pk_...', 'Content-Type': 'application/json' },
+  headers: { Authorization: 'Bearer csess_...', 'Content-Type': 'application/json' },
   body: JSON.stringify({ customer_id: 'cust_123', plan_code: 'scale' })
 });
 ```
@@ -53,4 +55,4 @@ const checkout = await fetch('/api/v1/checkout', {
 ```
 
 Two-step flow: confirm → select reason (Too expensive, Missing features, Switching to competitor, Not using it enough, Other).
-Calls `DELETE /api/v1/subscriptions/{id}` with the selected reason.
+Calls `DELETE /api/v1/subscriptions/{id}` with the selected reason and customer ID. The session requires `subscriptions:write`; Nozle verifies the subscription belongs to the session customer and organization.

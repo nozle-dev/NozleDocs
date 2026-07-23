@@ -3,12 +3,12 @@ title: "Create Checkout Session"
 api: "POST /checkout"
 ---
 
-Create a Stripe embedded Checkout Session. The endpoint can be used from the browser with a Nozle publishable key.
+Create a Stripe embedded Checkout Session for the authenticated customer session.
 
-**Auth:** `pk_nozle_...` publishable key or `sk_nozle_...` secret key.
+**Auth:** customer session with `checkout:create`, or a server-side secret key.
 
 <Info>
-With a publishable key, checkout is scoped to the organization and customer context allowed by that key. Nozle never returns your Stripe secret key to the browser. The response only includes a Stripe Checkout `client_secret`.
+With a customer session, `customer_id` must match the session subject. Nozle never returns your Stripe secret key to the browser. The response only includes a Stripe Checkout `client_secret`.
 </Info>
 
 ## Modes
@@ -27,7 +27,7 @@ Use this when a customer is selecting a plan.
 
 Plan checkout is payment-gated. Free-to-paid checkout uses an incomplete subscription. Paid-to-paid upgrades keep the old subscription active in a durable pending intent and apply the Lago upgrade only after Stripe confirms payment.
 
-If prepaid credits fully cover a paid plan change, Nozle applies it without Stripe and returns `type: "completed"`. Free plans, trials with no pay-in-advance fixed charge, and Lago-classified downgrades should use subscription flows instead of checkout.
+If prepaid credits fully cover a paid plan change, Nozle applies it without Stripe and returns `type: "completed"`. Paid downgrades also use this endpoint; Core schedules the Lago transition and returns `type: "scheduled"` without asking the browser to call the direct plan-change route.
 
 ### Existing invoice checkout
 
@@ -44,6 +44,8 @@ Invoice checkout does not create subscription activation rules. It only collects
 <ParamField body="return_url" type="string">
   URL Stripe should return to after embedded checkout completes. If omitted, Nozle uses the configured dashboard return URL.
 </ParamField>
+
+The return URL must be HTTPS and its origin must exactly match the configured checkout-return allowlist. Userinfo, wildcard origins, and unapproved origins are rejected.
 
 <ParamField body="success_url" type="string">
   Backward-compatible alias for `return_url`.
@@ -73,11 +75,11 @@ Invoice checkout:
 ## Response
 
 <ResponseField name="type" type="string" required>
-  Payment processor type. Currently `stripe`.
+  Result type: `stripe`, `completed`, or `scheduled`.
 </ResponseField>
 
-<ResponseField name="client_secret" type="string" required>
-  Stripe Checkout Session client secret. Pass this to `stripe.initEmbeddedCheckout()`.
+<ResponseField name="client_secret" type="string">
+  Stripe Checkout Session client secret when `type` is `stripe`. Pass this to `stripe.initEmbeddedCheckout()`.
 </ResponseField>
 
 <ResponseField name="clientSecret" type="string">
@@ -110,6 +112,17 @@ When no external payment remains due:
   "invoice_id": "invoice_uuid",
   "amount_cents": 0,
   "currency": "USD"
+}
+```
+
+### Scheduled paid-downgrade response
+
+```json
+{
+  "type": "scheduled",
+  "status": "pending",
+  "subscription_id": "subscription_uuid",
+  "plan_code": "pro"
 }
 ```
 

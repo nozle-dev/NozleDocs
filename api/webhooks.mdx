@@ -1,6 +1,6 @@
 ---
 title: Webhooks
-description: Stripe webhook events and signature verification
+description: Stripe verification and the authenticated Core-to-Engine delivery contract
 ---
 
 Nozle processes Stripe payment webhooks for each connected Stripe account.
@@ -39,3 +39,17 @@ Nozle registers the Stripe webhook automatically when you connect Stripe. The ta
 ```
 
 Your Stripe account must allow webhook endpoint creation, and your public Nozle API URL must be reachable by Stripe.
+
+## Core-to-Engine webhook security
+
+Core signs its internal Engine webhook body with RS256. Engine verifies all of the following before accepting work:
+
+- the configured Core public key and expected issuer;
+- audience `nozle-engine-webhook`;
+- required `iat`, `exp`, and `jti` claims within the bounded lifetime;
+- exact semantic equality between the signed payload and request body;
+- a durable replay receipt keyed by `jti` and immutable payload digest.
+
+Missing, forged, expired, malformed, or conflicting replays fail closed. A processing lease allows safe retry after a worker crash; a completed receipt returns the idempotent result without enqueueing duplicate work.
+
+Webhook verification uses the public key derived from Core's configured RSA signer; deployment validation rejects a mismatched key pair. Authenticated service calls use separate `NOZLE_CORE_TO_ENGINE_SECRET` and `NOZLE_ENGINE_TO_CORE_SECRET` values with route/method allowlists and tenant context. Neither value is an organization API key or browser credential.
