@@ -34,14 +34,14 @@ Or via SDK:
 // Preview proration first
 const preview = await fetch('/api/v1/subscriptions/preview', {
   method: 'POST',
-  headers: { Authorization: 'Bearer pk_...', 'Content-Type': 'application/json' },
+  headers: { Authorization: 'Bearer csess_...', 'Content-Type': 'application/json' },
   body: JSON.stringify({ target_plan_id: 'scale' })
 });
 
 // Start payment-first checkout
 const checkout = await fetch('/api/v1/checkout', {
   method: 'POST',
-  headers: { Authorization: 'Bearer pk_...', 'Content-Type': 'application/json' },
+  headers: { Authorization: 'Bearer csess_...', 'Content-Type': 'application/json' },
   body: JSON.stringify({ customer_id: 'cust_123', plan_code: 'scale' })
 });
 ```
@@ -53,4 +53,4 @@ const checkout = await fetch('/api/v1/checkout', {
 ```
 
 Two-step flow: confirm → select reason (Too expensive, Missing features, Switching to competitor, Not using it enough, Other).
-Calls `DELETE /api/v1/subscriptions/{id}` with the selected reason.
+Calls `DELETE /api/v1/subscriptions/{id}` with the selected reason and customer ID. The session requires `subscriptions:write`; Nozle verifies the subscription belongs to the session customer and organization.

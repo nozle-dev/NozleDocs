@@ -1,7 +1,7 @@
 ---
 title: Create Customer Session
 api: "POST /customer-sessions"
-description: Mint a short-lived customer-bound token for browser credit reads
+description: Mint a short-lived customer-bound token for browser billing access
 ---
 
 **Auth:** secret key (`sk_nozle_...`) only. Call this endpoint from your backend.
@@ -9,7 +9,15 @@ description: Mint a short-lived customer-bound token for browser credit reads
 ```json
 {
   "customer_id": "customer_123",
-  "expires_in_seconds": 900
+  "expires_in_seconds": 900,
+  "scopes": [
+    "credits:read",
+    "billing:read",
+    "entitlements:read",
+    "checkout:create",
+    "subscriptions:write",
+    "topups:create"
+  ]
 }
 ```
 
@@ -21,17 +29,31 @@ description: Mint a short-lived customer-bound token for browser credit reads
     "token": "csess_...",
     "customer_id": "customer_123",
     "expires_at": "2026-07-20T12:15:00Z",
-    "scope": ["credits:read"]
+    "scope": [
+      "credits:read",
+      "billing:read",
+      "entitlements:read",
+      "checkout:create",
+      "subscriptions:write",
+      "topups:create"
+    ]
   }
 }
 ```
 
-The customer must exist in the authenticated organization. The token is accepted by these bounded HTTP reads for that customer:
+The customer must exist in the authenticated secret key's organization. Omitted `scopes` preserve the compatibility default of `credits:read`; new integrations should request only the scopes their UI needs.
 
-- customer Credit System list, single-system balance, and operation history;
-- Entity Credit System list, single-system balance, and operation history for an Entity owned by that customer.
+The token can be accepted for these customer-bound operations when scoped:
 
-It cannot list the customer's Entity directory, mint a Centrifugo token, subscribe to customer-credit realtime channels, track usage, create purchases, modify billing, or read another customer.
+- credit and Entity-credit reads;
+- billing status, current subscription, invoices, and preview;
+- entitlement checks with browser-safe responses;
+- checkout and top-up creation;
+- subscribe, plan change, and cancellation.
+
+Every `customer_id` or `external_customer_id` in a path, query, or nested body must match the token subject. Cancellation additionally validates that the subscription belongs to that customer and organization.
+
+It cannot mint a Centrifugo or gRPC token, subscribe to customer-credit realtime channels, track usage, access cost/margin data, invoke the LLM proxy, configure resources, or read another customer.
 
 Issue it after authenticating the user in your own application, keep it in memory where possible, and refresh it from your backend after expiry. Do not place a Nozle secret key in the browser or persist the session in long-lived local storage.
 
@@ -39,5 +61,6 @@ Issue it after authenticating the user in your own application, keep it in memor
 const session = await nozle.customerSessions.create({
   customerId: "customer_123",
   expiresInSeconds: 900,
+  scopes: ["billing:read", "checkout:create", "subscriptions:write"],
 });
 ```

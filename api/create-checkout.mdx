@@ -3,12 +3,12 @@ title: "Create Checkout Session"
 api: "POST /checkout"
 ---
 
-Create a Stripe embedded Checkout Session. The endpoint can be used from the browser with a Nozle publishable key.
+Create a Stripe embedded Checkout Session for the authenticated customer session.
 
-**Auth:** `pk_nozle_...` publishable key or `sk_nozle_...` secret key.
+**Auth:** customer session with `checkout:create`, or a server-side secret key.
 
 <Info>
-With a publishable key, checkout is scoped to the organization and customer context allowed by that key. Nozle never returns your Stripe secret key to the browser. The response only includes a Stripe Checkout `client_secret`.
+With a customer session, `customer_id` must match the session subject. Nozle never returns your Stripe secret key to the browser. The response only includes a Stripe Checkout `client_secret`.
 </Info>
 
 ## Modes
@@ -44,6 +44,8 @@ Invoice checkout does not create subscription activation rules. It only collects
 <ParamField body="return_url" type="string">
   URL Stripe should return to after embedded checkout completes. If omitted, Nozle uses the configured dashboard return URL.
 </ParamField>
+
+The return URL must be HTTPS and its origin must exactly match the configured checkout-return allowlist. Userinfo, wildcard origins, and unapproved origins are rejected.
 
 <ParamField body="success_url" type="string">
   Backward-compatible alias for `return_url`.

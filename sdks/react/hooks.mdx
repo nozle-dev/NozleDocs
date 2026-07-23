@@ -27,7 +27,7 @@ import {
 
 ## useCan
 
-Check whether a customer is entitled to use a feature. Fetches the initial state via the API, then subscribes to a WebSocket channel for live updates -- no polling.
+Check whether a customer is entitled to use a feature through authenticated HTTP. The provider must carry a matching customer session with `entitlements:read`.
 
 ### Signature
 
@@ -49,12 +49,12 @@ interface CanState {
 
 ### How it works
 
-1. Calls `client.can(customerId, featureKey)` on mount to get the initial entitlement state.
-2. Opens a WebSocket subscription on `workspace:\{workspaceId\}:entitlements`.
-3. When a publication arrives for the matching customer and feature, state updates instantly.
+1. Calls `client.can(customerId, featureKey)` on mount.
+2. Sends the provider's customer session, never its publishable key.
+3. Returns a browser-safe response without cost, revenue, or margin fields.
 
 <Info>
-Real-time updates require `workspaceId` and `centrifugoUrl` (WebSocket URL) to be set on `BillingProvider`. Without them, the hook still works but only returns the initial API result.
+Refresh the hook after a billing mutation or on your application's own invalidation signal. Customer sessions cannot mint Centrifugo tokens.
 </Info>
 
 ### Example
@@ -413,10 +413,10 @@ function CheckoutPage({ clientSecret }: { clientSecret: string }) {
 
 ## useSubscribe
 
-Create a subscription server-side. Calls `POST /v1/subscribe` with the plan code and customer ID from the store.
+Create a subscription for the authenticated customer session. Calls `POST /v1/subscribe` with the plan code and the provider customer ID.
 
 <Warning>
-This hook posts to a server endpoint. If your API key is a publishable key (`pk_`), the server must handle authorization. For full server-side subscription creation, use a secret key (`sk_`) in a backend route instead.
+This hook requires a customer session with `subscriptions:write`. A publishable key is never used for the request. Trusted backend code may instead call the endpoint with a secret key.
 </Warning>
 
 ### Signature
@@ -515,7 +515,7 @@ function InvoiceDownloader({ invoiceId }: { invoiceId: string }) {
 
 ## useBillingContext
 
-Access the full billing context, including the client, workspace ID, and WebSocket connection details.
+Access the full billing context, including the split catalog/customer client and compatibility connection fields. Customer-session realtime tokens remain `null`.
 
 ### Signature
 
@@ -528,6 +528,7 @@ function useBillingContext(): BillingContextValue
 ```ts
 interface BillingContextValue {
   client: NozleClient | null;
+  customerId: string;
   workspaceId: string;
   centrifugoUrl: string;
   centrifugoToken: string | null;

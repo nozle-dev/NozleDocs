@@ -6,7 +6,7 @@ description: Margin floor alerts and cost spike detection
 Margin alerts help you detect when profitability drops below acceptable thresholds.
 
 **Margin floor:**
-The can() endpoint can include a min_margin_percent field. When a customer's margin drops below this threshold, you can take action — warn them, throttle usage, or adjust pricing.
+Secret-key calls to `can()` can include a `min_margin_percent` field. Use it only in trusted backend policy; customer-session responses do not expose cost or margin data.
 
 ```typescript
 const check = await nozle.can('cust_123', 'api_calls');

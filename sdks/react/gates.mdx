@@ -7,7 +7,7 @@ Gate components let you declaratively show or hide UI based on a customer's enti
 
 ## FeatureGate
 
-Renders children only when the customer is entitled to a feature. Uses `useCan()` internally and subscribes to real-time entitlement updates via WebSocket.
+Renders children only when the customer is entitled to a feature. Uses `useCan()` internally with the provider's `entitlements:read` customer session.
 
 Returns `null` while the entitlement check is loading to avoid layout shift.
 
@@ -31,7 +31,7 @@ import { FeatureGate, UpgradePrompt } from '@nozle-js/react';
 ```
 
 <Info>
-`FeatureGate` subscribes to the `workspace:\{id\}:entitlements` WebSocket channel. When entitlements change server-side, the gate updates automatically without polling.
+Customer-session entitlement checks use HTTP and omit cost, revenue, and margin fields. Refresh the query after billing mutations or on your application's own invalidation signal.
 </Info>
 
 ## UsageGate

@@ -4,7 +4,9 @@ api: "POST /credit-top-up-purchases"
 description: Start checkout for a fixed product-credit package
 ---
 
-**Auth:** publishable or secret key. `Idempotency-Key` is required.
+**Auth:** customer session with `topups:create`, or a server-side secret key. `Idempotency-Key` is required.
+
+For a customer session, every customer identifier must match the session subject.
 
 ```json
 {

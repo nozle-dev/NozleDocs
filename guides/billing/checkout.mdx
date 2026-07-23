@@ -6,7 +6,7 @@ description: Stripe embedded checkout flow
 Nozle uses Stripe's embedded checkout for payment collection. The flow:
 
 1. Customer selects a plan (PricingTable or CheckoutButton component)
-2. React SDK calls `POST /api/v1/checkout` with `{ customer_id, plan_code, return_url }`
+2. React SDK calls `POST /api/v1/checkout` with a customer session carrying `checkout:create`
 3. Nozle keeps the current plan active and computes the exact invoice/proration
 4. If money remains due, Nozle creates a Stripe embedded Checkout Session
 5. Returns `{ type: "stripe", client_secret }`
@@ -77,7 +77,9 @@ Plan checkout uses subscription activation rules internally. Invoice checkout do
 }
 ```
 
-The browser must use your Nozle publishable key (`pk_nozle_...`) for the SDK. If you mount embedded Stripe checkout yourself, your app also needs the Stripe publishable key for the same Stripe account connected in Nozle.
+The browser must use a Nozle customer session (`csess_...`) for checkout. The `customer_id` must equal the session subject. A Nozle publishable key can only fetch the plan catalog. If you mount embedded Stripe checkout yourself, your app also needs the Stripe publishable key for the same Stripe account connected in Nozle.
+
+Checkout return URLs must use HTTPS and an exact configured origin. Nozle rejects wildcard, userinfo, and unapproved return URLs.
 
 Credit-funded completion response:
 
