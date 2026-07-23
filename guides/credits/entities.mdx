@@ -91,13 +91,14 @@ All mutation retries preserve their idempotency key until the result is known. C
 
 ## Integration sequence
 
-1. Create or bulk-upsert stable Entity IDs from your backend.
-2. Configure per-Entity grant rules and one pool policy per plan/Credit System.
-3. Read Entity balances before enabling mutation traffic.
-4. Enable the exact transfer target only for a sandbox organization and Credit System.
-5. Track usage with both `customer_id` and `entity_id` after the usage gate is enabled.
-6. Enable one sandbox seat target and verify active Entity count reconciliation.
-7. Run the acceptance audit before enabling shared fallback or broader traffic.
+1. Keep future Entity grant rules inactive and bulk-upsert stable Entity IDs from a reviewed export.
+2. Shadow-map historical event `user_id` values and resolve every missing or ambiguous match.
+3. Preview per-Entity grants in the read-only rollout command, then activate the matching rules and one pool policy per plan/Credit System.
+4. Read Entity balances before enabling mutation traffic.
+5. Enable the exact transfer target only for a sandbox organization and Credit System.
+6. Track usage with both `customer_id` and `entity_id` for selected test users after the usage gate is enabled.
+7. Enable one sandbox seat target and verify active Entity count reconciliation.
+8. Require a passing Wrrk acceptance audit before enabling shared fallback or broader traffic.
 
 <CardGroup cols={2}>
   <Card title="Entity API" href="/api/customer-entities" />

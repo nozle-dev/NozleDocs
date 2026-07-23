@@ -1,11 +1,11 @@
 ---
 title: Credit Rollout and Acceptance
-description: Shadow, load, canary, audit, and rollback for customer-level credits
+description: Migrate, shadow, preview, canary, audit, and roll back customer and Entity credits
 ---
 
-Phase 1 uses an expand → shadow → canary → enforce → contract rollout. It
-authorizes customer-level shared pools only. Per-user or per-project balances
-remain Phase 2 Entity work.
+Phase 1 uses an expand → shadow → canary → enforce → contract rollout for
+customer-level pools. Phase 2 adds a controlled Entity migration → event map →
+grant preview → test-user canary → acceptance sequence for per-user credits.
 
 <Warning>
 Keep both mutation gates empty until a specific canary is reviewed. Deploying
@@ -52,6 +52,7 @@ binary included in the Engine image. Keep the organization mutation gate off.
 ```
 export NOZLE_ENGINE_URL=https://api.nozle.app
 export NOZLE_API_KEY=sk_...
+export DATABASE_URL=postgresql://...
 
 credit-rollout shadow \
   --fixture cmd/credit-rollout/testdata/shadow.example.json
@@ -153,6 +154,167 @@ Required-seat acceptance exits nonzero when:
 
 Malformed UUID selectors, malformed `organization_uuid:metric_code` entries, and conflicting metrics in `NOZLE_ENTITY_SEAT_TARGETS` are configuration errors and fail closed. An empty value remains valid and keeps seat publication disabled.
 
+## Phase 2 Wrrk per-user rollout
+
+For Wrrk, one Nozle customer is a workspace and one Entity is a Wrrk user. The
+rollout proves exact monthly grants per user without replacing customer-level
+paid top-ups or the existing immutable ledger.
+
+<Warning>
+Keep the Wrrk Entity grant rules absent or inactive through Entity migration,
+event shadowing, and grant preview. The Engine sweeps eligible Entity grants
+every minute. Activating a rule can create spendable sources without another
+operator command.
+</Warning>
+
+### 1. Prepare reviewed inputs
+
+Create three secret-free JSON artifacts in a controlled location:
+
+- an Entity manifest with stable Wrrk workspace and user IDs;
+- an event export with `transaction_id`, durable Core `lago_customer_id` (also
+  accepted as `customer_uuid`), external `customer_id`, and the historical
+  `user_id` property;
+- a Wrrk rollout config naming every Free, Pro, and Max plan, its Lago billing
+  interval, exact decimal grant, monthly grant cadence, pool policy, usage
+  metric, Credit System, and selected canary subjects.
+
+The Wrrk config must include an annual plan. This makes annual billing with
+monthly credits an explicit acceptance condition instead of inferring credit
+cadence from invoice cadence.
+
+### 2. Preview and apply the Entity migration
+
+Preview is the default and does not contact the API:
+
+```bash
+credit-rollout entity-migrate \
+  --manifest reviewed-wrrk-entities.json \
+  --wrrk-config reviewed-wrrk.json
+```
+
+After reviewing counts and normalized IDs, apply with a secret key that has
+`entity:write`:
+
+```bash
+export NOZLE_ENGINE_URL=https://api.nozle.app
+export NOZLE_API_KEY=sk_...
+
+credit-rollout entity-migrate \
+  --manifest reviewed-wrrk-entities.json \
+  --wrrk-config reviewed-wrrk.json \
+  --apply
+```
+
+The command accepts only `active` and `suspended` records, sorts stable external
+IDs, sends at most 500 Entities per atomic bulk request, and derives each
+idempotency key from the organization, customer, and canonical batch content.
+Before the first request, a read-only database check proves the active API key
+belongs to the manifest's exact organization. Rerun an uncertain result with the
+same manifest and batch size. The manifest organization must match the reviewed
+Wrrk config. It never deletes an Entity or prints the key.
+
+### 3. Shadow-map historical events
+
+The shadow command reads the persisted Entity directory with the read-only
+PostgreSQL connection and does not modify Core events or Entities:
+
+```bash
+export DATABASE_URL=postgresql://...
+
+credit-rollout entity-shadow \
+  --fixture reviewed-wrrk-events.json \
+  --wrrk-config reviewed-wrrk.json
+```
+
+It exits nonzero for a missing external customer ID, missing/blank/non-string
+user property, missing Entity, duplicate or ambiguous match, or database lookup
+error. The durable UUID remains authoritative after customer deletion and
+external-ID reuse. If an older export omits it, the external customer ID must
+resolve to exactly one durable customer incarnation or the command fails as
+ambiguous. Exporting to the reviewed JSON boundary supports both PostgreSQL and
+ClickHouse Core event stores without giving Engine write access to either event
+store. The export's organization and user-property name must match the reviewed
+Wrrk config.
+
+### 4. Preview non-spendable grants
+
+With the Wrrk Entity grant rules still inactive, run:
+
+```bash
+export DATABASE_URL=postgresql://...
+
+credit-rollout grant-preview \
+  --wrrk-config reviewed-wrrk.json
+```
+
+The command uses the production grant period, customer timezone, join policy,
+cumulative lineage, and deterministic source-reference calculator in a
+repeatable-read, read-only transaction. It inserts no entitlement basis,
+balance source, operation, allocation, or outbox row. An absent active rule is
+modeled from the reviewed config. The command fails if a matching rule is already
+active, preventing a spendable configuration from being mistaken for the
+pre-activation preview stage.
+
+Review every Entity, amount, period start, validity window, and source reference
+before activating the Rails-owned rules and pool policies.
+
+### 5. Run Entity advisory checks and a test-user canary
+
+An Entity shadow fixture can assert `entity_id`, `pool_policy`, and each projected
+deduction's `source_scope`. `/usage/check` remains advisory.
+
+For mutation, start with `entity_only`, a fixed millisecond event time, and a
+stable idempotency prefix:
+
+```bash
+credit-rollout load \
+  --mode track \
+  --customer wrrk_workspace_123 \
+  --entity wrrk_user_42 \
+  --metric agent_execution \
+  --credit-system ai_credits \
+  --event-time 2026-07-23T12:00:00.750Z \
+  --idempotency-prefix wrrk-user-42-canary-20260723 \
+  --requests 100 \
+  --concurrency 10 \
+  --max-p99 300ms
+```
+
+The Nozle mutation selector is exact to organization, metric, and optionally
+Credit System—not Entity. Keep Wrrk's backend feature flag limited to the
+reviewed test users until Entity acceptance passes. Do not enable shared
+fallback yet.
+
+### 6. Require Wrrk acceptance
+
+After publication and reconciliation settle:
+
+```bash
+credit-rollout audit \
+  --organization-id 00000000-0000-0000-0000-000000000000 \
+  --wrrk-config reviewed-wrrk.json \
+  --require-wrrk-readiness \
+  --since 2h \
+  --settle-grace 2m
+```
+
+The required audit fails unless:
+
+- Free, Pro, and Max rules and pool policies match the reviewed config exactly;
+- every reviewed plan has an active Entity test subject with its exact current
+  monthly grant;
+- at least one annual-billing Entity proves independent monthly grant cadence;
+- every configured canary Entity has a successful consume in the window using
+  the expected snapshotted pool policy;
+- ledger, tenant, arithmetic, source, pool, transfer, outbox, publication, and
+  reconciliation invariants all remain clean.
+
+Retain the migration preview, migration result, event map, grant preview,
+advisory/load report, and final acceptance JSON as one evidence set. Enable
+`entity_then_customer` only after this audit and the existing conservation and
+concurrency tests pass.
+
 ## 6. Production canary
 
 Enable one reviewed exact target at a time. Monitor denial rate, p99 latency,
@@ -168,3 +330,7 @@ outbox deliberately. A retry of an already committed idempotency key still
 returns its stored result; a new key is rejected by the disabled gate. If a
 mutation committed, repair it with a compensating operation; never delete or
 rewrite ledger history.
+
+For Entity rollout, also archive the affected future grant rule if grant
+materialization must stop. Existing credits remain spendable according to their
+snapshotted policy; rule archival must not claw back or rewrite a source.

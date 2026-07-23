@@ -6,7 +6,7 @@ description: Create, list, update, suspend, reactivate, and delete customer Enti
 
 **Auth:** secret/internal credential. When API permissions are enabled, reads require `entity:read` and mutations require `entity:write`. Customer sessions cannot read the Entity directory.
 
-List Entities with an optional `status`, `limit` from 1 to 100, and opaque `cursor`:
+List Entities with an optional `status`, `limit` from 1 to 200, and opaque `cursor`:
 
 ```http
 GET /customers/workspace_123/entities?status=active&limit=50
@@ -79,6 +79,17 @@ Content-Type: application/json
   ]
 }
 ```
+
+For a large controlled migration, use `credit-rollout entity-migrate`. It sorts
+stable customer and Entity IDs, derives content-based idempotency keys, and
+splits the manifest into deterministic 500-Entity requests. Preview is the
+default; `--apply` is required to mutate.
+
+<Warning>
+An active Entity grant rule makes newly active Entities eligible for the
+one-minute grant sweep. Keep future rules inactive until the read-only grant
+preview has been reviewed if credits must remain non-spendable during import.
+</Warning>
 
 Delete through the lifecycle endpoint:
 
