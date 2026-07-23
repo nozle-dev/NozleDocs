@@ -60,6 +60,8 @@ await nozle.entities.suspend('workspace_123', 'user_42', {
 
 `suspend` and `activate` first read the Entity and preserve its current name and metadata. Retry an uncertain mutation with the same idempotency key.
 
+Entity reads include nullable `seat_sync` state when lifecycle seat billing applies. Inspect `operation_type`, publication `status`, `last_reconciled_at`, `reconciliation_status`, and expected/observed counts before treating the billing projection as synchronized. A `null` value means no seat-event synchronization projection or history exists for that Entity yet; it does not prove that no seat metric is configured.
+
 ## Read and transfer Entity credits
 
 ```ts

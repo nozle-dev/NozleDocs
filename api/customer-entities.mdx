@@ -37,6 +37,33 @@ Content-Type: application/json
 
 The upsert payload is a complete snapshot. When changing only status, send the current `name` and `metadata` so they are not cleared.
 
+When seat billing applies, Entity responses include nullable synchronization state:
+
+```json
+{
+  "id": "4f49c9ef-4f43-4ef9-94fe-4d084c538f2b",
+  "customer_id": "workspace_123",
+  "external_id": "user_42",
+  "status": "active",
+  "seat_sync": {
+    "metric_code": "seats",
+    "external_subscription_id": "subscription_123",
+    "operation_type": "add",
+    "reason": "lifecycle",
+    "status": "published",
+    "transaction_id": "entity-seat-...",
+    "attempt_count": 1,
+    "published_at": "2026-07-22T12:00:01Z",
+    "last_reconciled_at": "2026-07-22T12:01:00Z",
+    "reconciliation_status": "in_sync",
+    "expected_seat_count": 3,
+    "observed_seat_count": 3
+  }
+}
+```
+
+`seat_sync` is `null` when no seat-event synchronization projection or history exists for this Entity yet. It does not prove that the organization currently has no configured seat metric. `pending`, `processing`, `failed`, and `dead_lettered` describe durable event delivery; aggregate reconciliation separately reports `pending`, `in_sync`, `drift`, `repairing`, or `failed`.
+
 Bulk upsert accepts 1 to 500 unique external IDs:
 
 ```http
