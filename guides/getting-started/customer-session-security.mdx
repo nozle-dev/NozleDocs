@@ -1,0 +1,88 @@
+---
+title: "Customer-session integration"
+description: "Use publishable keys for the public catalog and scoped customer sessions for browser billing."
+---
+
+Nozle uses three credentials with separate responsibilities:
+
+| Credential | Where it lives | Allowed operations |
+|---|---|---|
+| Publishable key (`pk_`) | Browser | `GET /api/v1/plans` only |
+| Customer session (`csess_`) | Browser | Exact-customer billing, checkout, cancellation, top-up, entitlement, and credit operations granted by its scopes |
+| Secret key (`sk_`) | Trusted backend | Create customer sessions and perform server operations |
+
+Customer sessions are signed, bound to one organization and one customer, and expire after 15 minutes by default. Their lifetime cannot exceed one hour. Never place a secret key in browser code, and never fall back from a missing customer session to a publishable key.
+
+## Backend: mint a session
+
+Authenticate the user in your own backend, resolve their exact Nozle customer ID, and mint only the scopes your page needs.
+
+```ts
+import { Nozle } from '@nozle-js/node'
+
+export async function mintBillingSession(customerId: string) {
+  const nozle = new Nozle({ apiKey: process.env.NOZLE_SECRET_KEY! })
+
+  return nozle.customerSessions.create({
+    customerId,
+    expiresInSeconds: 900,
+    scopes: [
+      'billing:read',
+      'entitlements:read',
+      'credits:read',
+      'checkout:create',
+      'subscriptions:write',
+      'topups:create',
+    ],
+  })
+}
+```
+
+The secret key must possess every API permission represented by the requested scopes. Nozle rejects over-delegation.
+
+## Browser: catalog plus customer operations
+
+Pass the publishable key and the short-lived token as distinct properties.
+
+```tsx
+import { BillingProvider, PricingTable, useCheckoutSession } from '@nozle-js/react'
+
+export function BillingPage({ customerId, customerSessionToken }: {
+  customerId: string
+  customerSessionToken: string
+}) {
+  return (
+    <BillingProvider
+      publishableKey={import.meta.env.VITE_NOZLE_PUBLISHABLE_KEY}
+      customerSessionToken={customerSessionToken}
+      customerId={customerId}
+    >
+      <PricingTable />
+      <PlanCheckoutButton planCode="pro" />
+    </BillingProvider>
+  )
+}
+
+function PlanCheckoutButton({ planCode }: { planCode: string }) {
+  const { fetchClientSecret, checkout, isLoading } = useCheckoutSession()
+
+  return (
+    <button disabled={isLoading} onClick={() => void fetchClientSecret(planCode)}>
+      {checkout?.type === 'scheduled' ? 'Plan change scheduled' : 'Continue to checkout'}
+    </button>
+  )
+}
+```
+
+All browser plan changes use `/checkout`. A response may contain a Stripe client secret or URL, `type: "completed"`, or `type: "scheduled"`. Paid plans activate only after verified payment. Cancellation validates both the customer-session subject and subscription ownership. Return URLs must use an exact configured HTTPS origin.
+
+## Rollout order
+
+1. Prepare `NOZLE_CUSTOMER_SESSION_SECRET`.
+2. Deploy Engine with `NOZLE_SECURITY_ENFORCEMENT_ENABLED=false`.
+3. Deploy Core API and dashboard.
+4. Test the SDK and Nozle dashboard.
+5. Enable `NOZLE_SECURITY_ENFORCEMENT_ENABLED=true`.
+6. Verify publishable-key mutation requests return HTTP 403.
+
+The enforcement flag is a temporary rolling-deployment compatibility switch. New integrations must use customer sessions even while it is `false`; publishable-key customer access disappears when strict mode is enabled.
