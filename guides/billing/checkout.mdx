@@ -49,20 +49,7 @@ Plan checkout:
 }
 ```
 
-Free plans, trials without an upfront fixed charge, and Lago-classified downgrades do not create checkout. A paid upgrade fully funded by prepaid credits returns a completed response instead.
-
-Discounted annual plans can have a lower annualized amount than twelve monthly payments. Lago treats that monthly-to-annual move as a scheduled downgrade; `UpgradeModal` detects `checkout_not_required_for_downgrade` and delegates it to `/subscriptions/change` for the next billing boundary.
-
-Existing invoice checkout:
-
-```json
-{
-  "invoice_id": "invoice_uuid",
-  "return_url": "https://app.example.com/settings/billing"
-}
-```
-
-Plan checkout uses subscription activation rules internally. Invoice checkout does not create or mutate subscription activation rules.
+Free plans and paid upgrades fully funded by prepaid credits return a completed response instead. Downgrades and other cycle-end transitions return a scheduled response from the same `/checkout` endpoint; browser sessions never call `/billing/upgrade` or `/subscriptions/change`.
 
 ## Response
 
@@ -77,7 +64,7 @@ Plan checkout uses subscription activation rules internally. Invoice checkout do
 }
 ```
 
-The browser must use your Nozle publishable key (`pk_nozle_...`) for the SDK. If you mount embedded Stripe checkout yourself, your app also needs the Stripe publishable key for the same Stripe account connected in Nozle.
+The browser calls your authenticated merchant backend, which derives the Nozle customer and starts checkout with a restricted `sk_`. A Nozle publishable key is valid only for the plan catalog. If you mount embedded Stripe checkout yourself, your app also needs the Stripe publishable key for the same Stripe account connected in Nozle.
 
 Credit-funded completion response:
 
@@ -89,6 +76,17 @@ Credit-funded completion response:
   "plan_code": "growth",
   "amount_cents": 0,
   "currency": "USD"
+}
+```
+
+Scheduled transition response:
+
+```json
+{
+  "type": "scheduled",
+  "status": "pending",
+  "subscription_id": "subscription_uuid",
+  "plan_code": "starter"
 }
 ```
 

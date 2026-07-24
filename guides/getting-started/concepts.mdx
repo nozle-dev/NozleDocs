@@ -101,11 +101,10 @@ Nozle uses two types of API keys to separate client-safe and server-only operati
 
 | Key prefix | Name | Use case |
 |------------|------|----------|
-| `pk_` | Publishable | Safe for public client-side catalog, entitlement, and checkout flows. It cannot read the credit ledger. |
+| `pk_` | Publishable | Safe for `GET /api/v1/plans` only. Every customer read and mutation returns HTTP 403. |
 | `sk_` | Secret | Server-only. Used for sending events, managing subscriptions, configuring cost models, and reading margin data. Never expose in a browser. |
-| `csess_` | Customer session | Short-lived browser credential bound to one customer and `credits:read`. Mint it from your backend. |
 
 <CardGroup cols={2}>
   <Card title="Node SDK (secret key)" href="/sdks/node/installation" />
-  <Card title="React SDK (publishable/session auth)" href="/sdks/react/installation" />
+  <Card title="React SDK (public catalog + BFF checkout)" href="/sdks/react/installation" />
 </CardGroup>

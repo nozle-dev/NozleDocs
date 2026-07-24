@@ -5,10 +5,14 @@ api: "DELETE /subscriptions/{id}"
 
 Cancel a subscription. The cancellation takes effect at the end of the current billing period -- the customer retains access until then.
 
-**Auth:** `pk_` (publishable key) or `sk_` (secret key).
+**Auth:** secret key only. Publishable keys are always rejected.
 
 <ParamField path="id" type="string" required>
   The subscription ID to cancel.
+</ParamField>
+
+<ParamField body="customer_id" type="string" required>
+  External customer ID derived by the trusted merchant backend. The subscription must belong to that customer and organization.
 </ParamField>
 
 <ParamField body="reason" type="string">

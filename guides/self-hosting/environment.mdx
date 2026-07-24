@@ -24,22 +24,20 @@ Regardless of deployment model, you'll need Nozle API keys to use the SDKs:
 
 | Key Type | Prefix | Use |
 |----------|--------|-----|
-| Publishable | `pk_` | Client-side (React SDK) |
+| Publishable | `pk_` | Client-side public plan catalog only |
 | Secret | `sk_` | Server-side (Node/Python SDKs) |
 
-## Credit engine sessions
+## Credit engine browser and checkout settings
 
 | Variable | Description |
 |----------|-------------|
-| `NOZLE_CUSTOMER_SESSION_SECRET` | Separate high-entropy HMAC secret of at least 32 bytes, used to sign short-lived `credits:read` customer sessions. Required before deploying WP9 browser credit reads. |
 | `CORS_ORIGIN` | Transitional single-origin setting retained for old Engine replicas during a rolling deployment. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated browser-origin allowlist, for example `https://app.example.com,https://portal.example.com`. |
 | `CHECKOUT_RETURN_URL` | Independent absolute URL used when checkout requests omit a return URL. Do not reuse this as the CORS allowlist. |
+| `CHECKOUT_RETURN_URL_ALLOWED_ORIGINS` | Exact comma-separated HTTPS origins allowed for checkout returns. |
 | `NOZLE_CREDIT_USAGE_TRACK_TARGETS` | Preferred comma-separated exact mutation targets in `organization_uuid:metric_code` or `organization_uuid:metric_code:credit_system_code` form. Any configured exact target list takes precedence over the legacy organization allowlist. Leave empty by default. |
 | `NOZLE_CREDIT_USAGE_TRACK_ORGANIZATION_IDS` | Legacy comma-separated organization-wide mutation allowlist. Leave empty when using exact targets. |
 | `NOZLE_ENTITY_SEAT_TARGETS` | Comma-separated exact `organization_uuid:metric_code` targets for Entity lifecycle seat publication and active-count reconciliation. One metric per organization. Leave empty by default and deploy Engine migration 011 before enabling. |
-
-Rotate `NOZLE_CUSTOMER_SESSION_SECRET` deliberately: replacing it immediately invalidates every outstanding customer session. Never expose it through frontend build variables.
 
 During the environment rename, set all three CORS/checkout variables. New Engine versions prefer `CORS_ALLOWED_ORIGINS` and `CHECKOUT_RETURN_URL`; old versions continue reading `CORS_ORIGIN`. Remove `CORS_ORIGIN` only after all old Engine versions have been retired.
 

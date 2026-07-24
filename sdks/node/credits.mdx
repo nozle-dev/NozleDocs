@@ -1,6 +1,6 @@
 ---
 title: Product Credits
-description: Read balances, mint customer sessions, and track credit-backed usage
+description: Read balances and track credit-backed usage from a trusted backend
 ---
 
 ## Read balances and history
@@ -25,16 +25,7 @@ const nextPage = firstPage.next_cursor
   : null;
 ```
 
-## Mint a React read session
-
-```ts
-const session = await nozle.customerSessions.create({
-  customerId: 'customer_123',
-  expiresInSeconds: 900,
-});
-```
-
-Call this only from an authenticated backend route. Send `session.token` to `BillingProvider`; never send your `sk_` key to the browser.
+Keep credit reads behind authenticated backend routes. Derive the customer from the logged-in user or team, call Nozle with a restricted `sk_`, and return only the fields the browser needs.
 
 ## Manage Entities
 

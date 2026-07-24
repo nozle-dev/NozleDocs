@@ -1,57 +1,38 @@
 ---
 title: Authentication
-description: API key types, base URLs, and how to authenticate requests
+description: Public catalog and trusted-backend credentials
 ---
 
 ## Base URLs
 
-The Nozle API has two base URLs depending on the type of endpoint:
+| Base URL | Endpoints |
+|---|---|
+| `https://api.nozle.app/api/v1` | Entitlements, checkout, margin, credits, and Nozle intelligence APIs |
+| `https://core.nozle.app/api/v1` | Customers, events, plans, subscriptions, invoices, wallets, and billing resources |
 
-| Base URL | Endpoints | Description |
-|----------|-----------|-------------|
-| `https://api.nozle.app/api/v1` | Entitlements, Checkout, Margin, Cost Models, Credits, LLM Proxy | Nozle intelligence layer — features built on top of the billing engine |
-| `https://core.nozle.app/api/v1` | Customers, Events, Plans, Subscriptions, Invoices, Wallets, and all other billing resources | Full billing engine API |
+## Credential model
 
-<Info>
-Each endpoint page shows the correct base URL in the code examples on the right. You don't need to memorize which URL to use — just copy the snippet.
-</Info>
+| Key type | Prefix | Location | Access |
+|---|---|---|---|
+| Publishable | `pk_nozle_` | Browser | `GET /api/v1/plans` only |
+| Secret | `sk_nozle_` | Trusted backend | Organization-scoped server operations allowed by the key's permissions |
 
-## API Keys
+Send server credentials as a Bearer token:
 
-**Three credential types:**
-
-| Key Type | Prefix | Use | Example |
-|----------|--------|-----|---------|
-| Publishable | `pk_nozle_` | Client-side (React SDK, browsers) | `pk_nozle_abc123...` |
-| Secret | `sk_nozle_` | Server-side only (Node/Python SDKs, cURL) | `sk_nozle_xyz789...` |
-| Customer session | `csess_` | Short-lived browser reads for one customer | `csess_eyJ...` |
-
-All authenticated endpoints require a Bearer token in the Authorization header:
-
-```
+```http
 Authorization: Bearer sk_nozle_your_secret_key
 ```
 
-## Key Scoping
+The publishable-key boundary is unconditional: customer reads and mutations return HTTP 403 even if a browser supplies an arbitrary customer ID. Use an authenticated merchant backend for checkout, invoices, subscription status, cancellation, top-ups, entitlements, and credits. That backend derives the Nozle customer from the logged-in user or team and calls Nozle with a least-privilege `sk_`.
 
-- **Publishable keys** (`pk_nozle_...`) support public catalog and browser checkout flows. They cannot read the product-credit ledger or mutate usage.
-- **Secret keys** (`sk_nozle_...`) are server-side credentials for configuration, usage mutation, customer-session creation, and privileged reads.
-- **Customer sessions** (`csess_...`) carry only `credits:read`, are bound to one organization and external customer ID, and expire after at most one hour. They are accepted by the customer and Entity Credit System list, single-balance, and operation-history HTTP routes. They cannot list the customer's Entity directory and are rejected by `/auth/centrifugo-token` and all legacy billing routes.
+<Warning>
+Never expose a secret or master key in client-side code. CORS and `Origin` headers do not authenticate a caller.
+</Warning>
 
-Create customer sessions from your backend with `POST /api/v1/customer-sessions`, then pass the returned token alongside the React provider's existing publishable key. Only the product-credit hooks and components select it.
-
-## Public Endpoints
-
-These do not require an API key:
+## Public authentication endpoints
 
 - `POST /api/v1/auth/send-otp`
 - `POST /api/v1/auth/verify-otp`
 - `POST /api/v1/auth/signup`
 
-## Getting Your Keys
-
-Sign in at [app.nozle.app](https://app.nozle.app) → Settings → API Keys.
-
-<Warning>
-Never expose secret keys in client-side code. Use publishable keys for public checkout/catalog UI and a short-lived customer session for customer or Entity balance, source, or operation-history components.
-</Warning>
+Get API keys from [app.nozle.app](https://app.nozle.app) under **Settings → API Keys**.

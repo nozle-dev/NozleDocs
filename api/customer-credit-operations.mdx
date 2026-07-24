@@ -4,7 +4,7 @@ api: "GET /customers/{customer_id}/credit-operations"
 description: Paginate immutable grants, consumes, denials, and adjustments
 ---
 
-**Auth:** secret key or a customer session bound to `{customer_id}`.
+**Auth:** secret key only. Publishable keys are rejected.
 
 Query parameters:
 
@@ -14,7 +14,7 @@ Query parameters:
 
 ```http
 GET /customers/customer_123/credit-operations?credit_system_code=ai_credits&limit=50
-Authorization: Bearer csess_...
+Authorization: Bearer sk_nozle_...
 ```
 
 Each operation includes exact decimal amounts, status, metric and rate snapshots, occurrence time, and source-level allocations. A denied consume shows the required amount and reason but has no allocations.

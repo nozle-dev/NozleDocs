@@ -4,20 +4,20 @@ api: "GET /customers/{customer_id}/entities/{entity_id}/credit-systems"
 description: Read Entity, shared, and effective exact-decimal balances
 ---
 
-**Auth:** secret key or a customer session bound to `{customer_id}`. When API permissions are enabled, secret keys require `entity:read`. Bare publishable keys are rejected.
+**Auth:** secret key only. When API permissions are enabled, the key requires `entity:read`. Publishable keys are rejected.
 
 List all relevant Credit Systems:
 
 ```http
 GET /customers/workspace_123/entities/user_42/credit-systems
-Authorization: Bearer csess_...
+Authorization: Bearer sk_nozle_...
 ```
 
 Read one system:
 
 ```http
 GET /customers/workspace_123/entities/user_42/credit-systems/ai_credits/balance
-Authorization: Bearer csess_...
+Authorization: Bearer sk_nozle_...
 ```
 
 ```json
