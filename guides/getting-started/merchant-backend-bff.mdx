@@ -1,0 +1,99 @@
+---
+title: "Merchant backend billing"
+description: "Keep customer billing behind your authenticated backend while using a publishable key only for the public catalog."
+---
+
+Nozle uses a two-credential model:
+
+| Credential | Location | Allowed operations |
+|---|---|---|
+| Publishable key (`pk_`) | Browser | Public plan catalog only |
+| Restricted secret key (`sk_`) | Trusted merchant backend | Organization-scoped checkout, invoices, subscriptions, credits, cancellation, top-ups, entitlements, and events |
+
+The browser never receives a Nozle secret key and never chooses the authoritative Nozle customer. Your backend derives that customer from the authenticated application user or team.
+
+## Wrrk reference flow
+
+```text
+Wrrk browser
+  -> authenticated Wrrk POST /api/billing/checkout
+  -> Wrrk derives the Nozle customer from the logged-in team
+  -> Wrrk calls Nozle with its restricted sk_
+  -> Nozle returns the Stripe checkout result
+```
+
+### Backend route
+
+```ts
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle({
+  apiKey: process.env.NOZLE_SECRET_KEY!,
+  baseUrl: 'https://api.nozle.app',
+})
+
+const allowedPlans = new Set(['free', 'pro', 'max'])
+const allowedReturnOrigins = new Set(['https://wrrk.ai'])
+
+export async function postBillingCheckout(request: Request, user: AuthenticatedUser) {
+  const body = await request.json() as Record<string, unknown>
+  if ('customerId' in body || 'customer_id' in body) {
+    return Response.json({ error: 'customer_id_not_allowed' }, { status: 400 })
+  }
+
+  const planCode = String(body.planCode ?? '')
+  const returnUrl = new URL(String(body.returnUrl ?? ''))
+  if (!allowedPlans.has(planCode)) {
+    return Response.json({ error: 'invalid_plan' }, { status: 400 })
+  }
+  if (returnUrl.protocol !== 'https:' || !allowedReturnOrigins.has(returnUrl.origin)) {
+    return Response.json({ error: 'invalid_return_url' }, { status: 400 })
+  }
+
+  // This mapping is server-owned. Never accept it from the browser.
+  const nozleCustomerId = await lookupNozleCustomerForTeam(user.teamId)
+  const checkout = await nozle.checkout(nozleCustomerId, planCode, returnUrl.toString())
+
+  return Response.json(checkout)
+}
+```
+
+Cookie-authenticated routes must retain normal CSRF protection. Wrrk's secret key should grant only the API permissions required by its backend routes. Never use Nozle's master key for merchant traffic.
+
+### React
+
+```tsx
+import { BillingProvider, PricingTable } from '@nozle-js/react'
+
+export function BillingPage({ csrfToken }: { csrfToken: string }) {
+  return (
+    <BillingProvider
+      publishableKey={import.meta.env.VITE_NOZLE_PUBLISHABLE_KEY}
+      createCheckout={async ({ planCode, returnUrl }) => {
+        const response = await fetch('/api/billing/checkout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
+          body: JSON.stringify({ planCode, returnUrl }),
+        })
+
+        if (!response.ok) throw new Error('Checkout failed')
+        return response.json()
+      }}
+    >
+      <PricingTable returnUrl={window.location.href} />
+    </BillingProvider>
+  )
+}
+```
+
+Use equivalent authenticated backend endpoints for billing status, invoices, cancellation, top-ups, entitlements, and credits. Return only the fields your browser needs.
+
+## Payment authority
+
+Stripe webhook processing is authoritative. A redirect back to Wrrk never activates a paid plan. Nozle activates payment-gated changes only after verified, idempotently processed Stripe success; failed payments and 3DS remain in the payment flow.
+
+Billable and credit-consuming events also stay server-side through `@nozle-js/node` with the restricted `sk_`. CORS and `Origin` headers are browser controls, not authentication.

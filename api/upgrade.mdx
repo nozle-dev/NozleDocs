@@ -5,7 +5,7 @@ api: "POST /billing/upgrade"
 
 Change a customer's current plan through Lago's native no-checkout path from a trusted backend.
 
-**Auth:** secret key only. Publishable keys and customer sessions are rejected.
+**Auth:** secret key only. Publishable keys are rejected.
 
 <ParamField body="customer_id" type="string" required>
   External customer ID.
@@ -31,5 +31,5 @@ Paid upgrades return:
 Browser plan changes must use `POST /checkout` for upgrades and downgrades. Checkout previews the exact prorated invoice, preserves the current paid plan until payment succeeds, and returns `type: "scheduled"` when a lower plan takes effect at the next billing boundary.
 
 <Note>
-  Also available to trusted backends as `POST /subscriptions/change` (alias). Do not expose either route to browser sessions.
+  Also available to trusted backends as `POST /subscriptions/change` (alias). Do not expose either route to browser code.
 </Note>

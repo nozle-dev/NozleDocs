@@ -3,7 +3,7 @@ title: Real-Time Updates
 description: WebSocket for live entitlement changes
 ---
 
-Nozle supports WebSocket delivery for server-authorized real-time entitlement updates. The minimum customer-session contract is HTTP-only: neither publishable keys nor customer sessions can mint a realtime token.
+Nozle supports WebSocket delivery for server-authorized real-time entitlement updates. Browser publishable keys cannot mint a realtime token.
 
 **How it works:**
 1. BillingProvider connects to WebSocket on mount
@@ -11,7 +11,7 @@ Nozle supports WebSocket delivery for server-authorized real-time entitlement up
 3. When entitlements change (plan upgrade, usage limit hit, feature toggled), Nozle publishes to the channel
 4. React hooks (useCan, usePlan) update automatically — no polling
 
-Do not send `pk_`, `csess_`, or `sk_` credentials to a WebSocket endpoint. Until your backend implements a separate server-authorized realtime-token flow, omit `centrifugoUrl` and use the HTTP hooks documented in this guide.
+Do not send `pk_` or `sk_` credentials to a WebSocket endpoint. Until your backend implements a separate server-authorized realtime-token flow, omit realtime configuration and use authenticated backend reads.
 
 **Connection states:**
 The BillingState tracks connection:
@@ -27,4 +27,4 @@ const { connectionState } = useBillingContext();
 - Subscription is cancelled or expired
 
 **Without WebSocket:**
-If `centrifugoUrl` is not provided, the React SDK uses REST-only mode. Hooks fetch data on mount but do not receive live updates. This is the supported mode for customer sessions.
+The React SDK does not fetch customer entitlement state. Supply caller-owned state to presentational gates, or add a separately authenticated merchant realtime channel.

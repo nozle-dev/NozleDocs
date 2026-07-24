@@ -5,10 +5,10 @@ api: "GET /invoices"
 
 List all invoices for a customer. Returns invoices in reverse chronological order.
 
-**Auth:** customer session with `billing:read`, or a secret key. Publishable keys are always rejected.
+**Auth:** secret key only. Publishable keys are always rejected.
 
 <ParamField query="customer_id" type="string" required>
-  External customer ID. For a customer session, this must match the token subject.
+  External customer ID derived by the trusted merchant backend.
 </ParamField>
 
 ### Response

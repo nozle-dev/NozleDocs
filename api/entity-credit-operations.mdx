@@ -4,7 +4,7 @@ api: "GET /customers/{customer_id}/entities/{entity_id}/credit-operations"
 description: Paginate immutable Entity-attributed credit history
 ---
 
-**Auth:** secret key or a customer session bound to `{customer_id}`. When API permissions are enabled, secret keys require `entity:read`.
+**Auth:** secret key only. When API permissions are enabled, the key requires `entity:read`.
 
 Query parameters:
 
@@ -14,7 +14,7 @@ Query parameters:
 
 ```http
 GET /customers/workspace_123/entities/user_42/credit-operations?credit_system_code=ai_credits&limit=50
-Authorization: Bearer csess_...
+Authorization: Bearer sk_nozle_...
 ```
 
 The response includes grants, transfers, consumes, denials, expiry, revocation, refunds, and adjustments attributed to that exact Entity UUID. Each operation preserves exact decimal amounts, metric/rate snapshots, status, occurrence time, and source allocations.

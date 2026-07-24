@@ -34,19 +34,19 @@ Or via SDK:
 // Preview proration first
 const preview = await fetch('/api/v1/subscriptions/preview', {
   method: 'POST',
-  headers: { Authorization: 'Bearer csess_...', 'Content-Type': 'application/json' },
+  headers: { Authorization: 'Bearer sk_nozle_...', 'Content-Type': 'application/json' },
   body: JSON.stringify({ customer_id: 'cust_123', plan_code: 'scale' })
 });
 
 // Start payment-first checkout
 const checkout = await fetch('/api/v1/checkout', {
   method: 'POST',
-  headers: { Authorization: 'Bearer csess_...', 'Content-Type': 'application/json' },
+  headers: { Authorization: 'Bearer sk_nozle_...', 'Content-Type': 'application/json' },
   body: JSON.stringify({ customer_id: 'cust_123', plan_code: 'scale' })
 });
 ```
 
-The `csess_` token must be bound to `cust_123` and carry the required billing and checkout scopes. Publishable keys cannot preview or start checkout.
+Run these calls only from a trusted merchant backend. Derive `cust_123` from the authenticated user or team; publishable keys cannot preview or start checkout.
 
 **Cancel subscription:**
 

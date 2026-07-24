@@ -1,40 +1,32 @@
 declare module '@nozle-js/node' {
-  type CustomerSessionScope =
-    | 'credits:read'
-    | 'billing:read'
-    | 'entitlements:read'
-    | 'checkout:create'
-    | 'subscriptions:write'
-    | 'topups:create';
-
   export class Nozle {
     constructor(config: { apiKey: string });
-    customerSessions: {
-      create(input: {
-        customerId: string;
-        expiresInSeconds?: number;
-        scopes?: CustomerSessionScope[];
-      }): Promise<{ token: string; customer_id: string; expires_at: string; scope: CustomerSessionScope[] }>;
-    };
+    checkout(
+      customerId: string,
+      planCode: string,
+      returnUrl?: string,
+    ): Promise<
+      | { type: 'stripe'; url?: string; client_secret?: string; clientSecret?: string }
+      | { type: 'completed' | 'scheduled'; status: string }
+    >;
   }
 }
 
 declare module '@nozle-js/react' {
   import type { ReactNode } from 'react';
 
+  type CheckoutResult =
+    | { type: 'stripe'; url?: string; client_secret?: string; clientSecret?: string }
+    | { type: 'completed' | 'scheduled'; status: string };
+
   export function BillingProvider(props: {
-    publishableKey?: string;
-    customerSessionToken?: string;
-    customerId?: string;
+    publishableKey: string;
+    createCheckout?: (input: {
+      planCode: string;
+      returnUrl: string;
+    }) => Promise<CheckoutResult>;
     children: ReactNode;
   }): ReactNode;
 
-  export function PricingTable(): ReactNode;
-
-  export function useCheckoutSession(): {
-    fetchClientSecret(planCode: string, successUrl?: string): Promise<string | null>;
-    checkout: { type?: 'stripe' | 'completed' | 'scheduled' } | null;
-    isLoading: boolean;
-    error: Error | null;
-  };
+  export function PricingTable(props: { returnUrl?: string }): ReactNode;
 }

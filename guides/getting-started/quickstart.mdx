@@ -20,10 +20,9 @@ From the dashboard, navigate to **Settings > API Keys**. You will see two keys:
 |------------|---------|--------|
 | `pk_` | Publishable key | Public plan catalog only |
 | `sk_` | Secret key | Server-side only (Node.js, Python) |
-| `csess_` | Customer session | Exact-customer browser operations |
 
 <Warning>
-Never expose your `sk_` secret key in client-side code. Use `pk_` only for public pricing and mint a short-lived `csess_` token for every customer-specific React operation.
+Never expose your `sk_` secret key in client-side code. Use `pk_` only for public pricing and route every customer operation through your authenticated backend.
 </Warning>
 </Step>
 
@@ -151,66 +150,60 @@ Install the React SDK to get pre-built billing UI components.
 npm install @nozle-js/react
 ```
 
-Use a publishable key for public pricing only. Mint a customer session in your backend and pass it alongside the publishable key for checkout, billing, entitlement, and product-credit operations:
+Use a publishable key for public pricing. Provide a callback that calls your own authenticated backend for checkout:
 
 ```tsx title="app/providers.tsx"
-import { BillingProvider, ProductCreditBalance } from '@nozle-js/react';
+import { BillingProvider, PricingTable } from '@nozle-js/react';
 
-export function Providers({ children, sessionToken }: { children: React.ReactNode; sessionToken: string }) {
+export function Providers({ csrfToken }: { csrfToken: string }) {
   return (
-    <BillingProvider publishableKey="pk_..." customerSessionToken={sessionToken} customerId="customer_123">
-      <ProductCreditBalance creditSystemCode="ai_credits" />
-      {children}
+    <BillingProvider
+      publishableKey="pk_..."
+      createCheckout={async ({ planCode, returnUrl }) => {
+        const response = await fetch('/api/billing/checkout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+          body: JSON.stringify({planCode, returnUrl}),
+        })
+        if (!response.ok) throw new Error('Checkout failed')
+        return response.json()
+      }}
+    >
+      <PricingTable returnUrl={window.location.href} />
     </BillingProvider>
   );
 }
 ```
 
-Customer-session components use HTTP only. A bare publishable key cannot read or mutate any customer, and the session does not authenticate Centrifugo.
+Your backend authenticates the user, derives their Nozle customer, validates the plan and return URL, and calls Nozle with a restricted secret key.
 </Step>
 
 <Step>
 ## Show a pricing table and checkout
 
-Drop in a `PricingTable` to display your plans, and use `CheckoutButton` to let customers subscribe.
+Drop in a `PricingTable` to display plans. Its CTA invokes the merchant callback configured above.
 
 ```tsx title="app/pricing/page.tsx"
-import { PricingTable, CheckoutButton } from '@nozle-js/react';
+import { PricingTable } from '@nozle-js/react';
 
 export default function PricingPage() {
   return (
     <div>
       <h1>Choose your plan</h1>
-      <PricingTable
-        customerId="customer_123"
-        renderAction={(plan) => (
-          <CheckoutButton
-            customerId="customer_123"
-            planCode={plan.code}
-            successUrl="/dashboard"
-          >
-            Get started
-          </CheckoutButton>
-        )}
-      />
+      <PricingTable returnUrl={window.location.href} />
     </div>
   );
 }
 ```
 
-You can also gate features in your UI with the `useCan` hook:
+Fetch customer entitlements from your backend and pass the result into the presentational `FeatureGate`:
 
 ```tsx
-import { useCan } from '@nozle-js/react';
+import { FeatureGate } from '@nozle-js/react';
 
-function AiFeature({ customerId }: { customerId: string }) {
-  const { allowed, remaining } = useCan(customerId, 'api_calls');
-
-  if (!allowed) {
-    return <p>You have used all your API calls. Upgrade to continue.</p>;
-  }
-
-  return <p>You have {remaining} API calls remaining.</p>;
+function AiFeature({ allowed }: { allowed: boolean }) {
+  return <FeatureGate allowed={allowed} fallback={<p>Upgrade to continue.</p>}>AI feature</FeatureGate>;
 }
 ```
 </Step>

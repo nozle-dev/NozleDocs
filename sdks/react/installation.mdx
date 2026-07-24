@@ -1,144 +1,46 @@
 ---
 title: Installation
-description: Install and configure @nozle-js/react
+description: Configure the React SDK for public catalog reads and merchant-backed checkout
 ---
 
-<Steps>
-
-<Step>
-## Install the package
-
 ```bash
-npm install @nozle-js/react
-```
-</Step>
-
-<Step>
-## Configure browser and server authentication
-
-Keep your Nozle secret key server-side only. A publishable key powers only public plan catalog reads. Every customer-specific browser read or mutation requires a short-lived customer session.
-
-For Vite:
-
-```bash title=".env"
-VITE_NOZLE_PUBLISHABLE_KEY=pk_nozle_...
-VITE_NOZLE_API_URL=https://api.nozle.app
-VITE_STRIPE_PUBLISHABLE_KEY=pk_live_...
+npm install @nozle-js/react react react-dom @stripe/stripe-js @stripe/react-stripe-js
 ```
 
-For Next.js:
+The React SDK accepts a publishable key for the public plan catalog. It never accepts a secret key and does not call customer billing APIs directly.
 
-```bash title=".env.local"
-NEXT_PUBLIC_NOZLE_PUBLISHABLE_KEY=pk_nozle_...
-NEXT_PUBLIC_NOZLE_API_URL=https://api.nozle.app
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
-```
+```tsx
+import { BillingProvider, PricingTable } from '@nozle-js/react'
 
-`VITE_STRIPE_PUBLISHABLE_KEY` / `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is only needed if your app mounts embedded Stripe checkout. If you only redirect to a hosted checkout URL, you do not need to mount Stripe Elements in your app.
-
-Mint the read session in your authenticated backend route:
-
-```ts title="app/api/nozle-session/route.ts"
-const session = await nozle.customerSessions.create({
-  customerId: currentCustomerId,
-  expiresInSeconds: 900,
-  scopes: [
-    'billing:read',
-    'entitlements:read',
-    'credits:read',
-    'checkout:create',
-    'subscriptions:write',
-    'topups:create',
-  ],
-});
-
-return Response.json(session);
-```
-</Step>
-
-<Step>
-## Wrap your app with BillingProvider
-
-`BillingProvider` initializes the Nozle client and makes billing data available to all child components and hooks.
-
-```tsx title="src/App.tsx"
-import { BillingProvider } from '@nozle-js/react';
-
-function App({ children, currentCustomerId, customerSessionToken }) {
+export function BillingPage({ csrfToken }: { csrfToken: string }) {
   return (
     <BillingProvider
       publishableKey={import.meta.env.VITE_NOZLE_PUBLISHABLE_KEY}
-      customerSessionToken={customerSessionToken}
-      baseUrl={import.meta.env.VITE_NOZLE_API_URL ?? 'https://api.nozle.app'}
-      customerId={currentCustomerId}
-      workspaceId="ws_abc123"
+      baseUrl="https://api.nozle.app"
+      createCheckout={async ({ planCode, returnUrl }) => {
+        const response = await fetch('/api/billing/checkout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
+          body: JSON.stringify({ planCode, returnUrl }),
+        })
+        if (!response.ok) throw new Error('Checkout failed')
+        return response.json()
+      }}
     >
-      {children}
+      <PricingTable returnUrl={window.location.href} />
     </BillingProvider>
-  );
+  )
 }
 ```
 
-In Next.js, use `process.env.NEXT_PUBLIC_NOZLE_PUBLISHABLE_KEY` and `process.env.NEXT_PUBLIC_NOZLE_API_URL` instead of `import.meta.env.*`.
+The merchant route must authenticate the user, derive the Nozle customer from the user's team, reject browser customer identifiers, validate the requested plan and exact HTTPS return origin, and call Nozle with a least-privilege `sk_`.
 
-### Props
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `customerSessionToken` | `string` | -- | Short-lived `csess_...` credential for exact-customer billing, entitlement, checkout, cancellation, top-up, and credit operations. |
-| `publishableKey` | `string` | -- | Client-safe key for `GET /api/v1/plans` only. |
-| `customerId` | `string` | `''` | Your external customer ID. Required by customer-scoped hooks and billing components. |
-| `baseUrl` | `string` | `'https://api.nozle.app'` | API endpoint |
-| `workspaceId` | `string` | `''` | Your workspace ID |
-| `centrifugoUrl` | `string` | `undefined` | WebSocket URL for real-time entitlement updates |
-| `children` | `ReactNode` | **required** | Your app content |
-
-Provide `publishableKey` for public pricing and `customerSessionToken` for every customer operation. The SDK never falls back from a missing customer session to the publishable key.
-
-Customer-session reads are HTTP-only. `centrifugoUrl` remains available for existing server-authorized entitlement updates, but customer sessions cannot mint Centrifugo tokens and carry no realtime customer-credit claims.
+Use equivalent merchant endpoints for billing status, invoices, cancellation, top-ups, entitlements, and credits. Pass returned data into your own UI or the SDK's presentational components.
 
 <Warning>
-Never expose your `sk_nozle_...` secret key in browser code. Use the publishable key only for the public plan catalog and the customer session for all customer billing operations. A bare publishable key receives HTTP 403 from every customer endpoint.
+Never expose an `sk_`, master key, or internal credential in a browser bundle. Do not treat CORS or `Origin` as authentication.
 </Warning>
-</Step>
-
-<Step>
-## Configure Tailwind CSS
-
-Nozle components ship with a Tailwind preset that provides consistent theming out of the box. Add it to your Tailwind config:
-
-```js title="tailwind.config.js"
-import { nozlePreset } from '@nozle-js/react/styles/preset';
-
-export default {
-  presets: [nozlePreset],
-};
-```
-
-The preset registers the following CSS custom properties that you can override to match your brand:
-
-| Variable | Purpose |
-|----------|---------|
-| `--nozle-primary` | Primary accent color |
-| `--nozle-primary-foreground` | Text color on primary backgrounds |
-| `--nozle-background` | Page background |
-| `--nozle-foreground` | Default text color |
-| `--nozle-card` | Card background color |
-| `--nozle-border` | Border color |
-| `--nozle-muted` | Muted background (toggles, disabled states) |
-| `--nozle-muted-foreground` | Muted text color |
-| `--nozle-destructive` | Error / danger actions |
-| `--nozle-success` | Success indicators |
-| `--nozle-warning` | Warning indicators |
-| `--nozle-radius` | Border radius for components |
-
-Some components also accept component-specific CSS variables for finer control. For example, `PricingTable` supports `--nozle-pricing-bg`, `--nozle-pricing-card-bg`, `--nozle-pricing-highlight`, `--nozle-pricing-border`, and `--nozle-pricing-radius` -- all falling back to their global equivalents.
-</Step>
-
-</Steps>
-
-## Next steps
-
-- [React Billing Components](/sdks/react/components) -- pre-built billing UI components
-- [React Billing Hooks](/sdks/react/hooks) -- `useCan`, `useUsage`, and more
-- [React Feature Gates](/sdks/react/gates) -- feature gating with React components

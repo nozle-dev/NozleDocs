@@ -3,12 +3,12 @@ title: "Create Checkout Session"
 api: "POST /checkout"
 ---
 
-Create a payment-gated plan checkout. Browser callers must use a customer session bound to the exact customer.
+Create a payment-gated plan checkout from a trusted merchant backend.
 
-**Auth:** customer session with `checkout:create`, or a secret key. Publishable keys are always rejected.
+**Auth:** secret key only. Publishable keys are always rejected.
 
 <Info>
-With a customer session, `customer_id` must match the session subject. Nozle never returns your Stripe secret key to the browser. The response contains a hosted URL or Stripe Checkout `client_secret`, or reports an immediately completed or scheduled transition.
+The merchant backend derives `customer_id` from its authenticated user or team. Do not trust a browser-provided customer ID. The response contains a hosted URL or Stripe Checkout `client_secret`, or reports an immediately completed or scheduled transition.
 </Info>
 
 ## Modes
