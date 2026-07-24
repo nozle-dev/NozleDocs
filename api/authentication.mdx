@@ -22,9 +22,9 @@ Each endpoint page shows the correct base URL in the code examples on the right.
 
 | Key Type | Prefix | Use | Example |
 |----------|--------|-----|---------|
-| Publishable | `pk_nozle_` | Client-side (React SDK, browsers) | `pk_nozle_abc123...` |
+| Publishable | `pk_nozle_` | Public plan catalog only | `pk_nozle_abc123...` |
 | Secret | `sk_nozle_` | Server-side only (Node/Python SDKs, cURL) | `sk_nozle_xyz789...` |
-| Customer session | `csess_` | Short-lived browser reads for one customer | `csess_eyJ...` |
+| Customer session | `csess_` | Short-lived browser operations for one customer | `csess_eyJ...` |
 
 All authenticated endpoints require a Bearer token in the Authorization header:
 
@@ -34,11 +34,11 @@ Authorization: Bearer sk_nozle_your_secret_key
 
 ## Key Scoping
 
-- **Publishable keys** (`pk_nozle_...`) support public catalog and browser checkout flows. They cannot read the product-credit ledger or mutate usage.
+- **Publishable keys** (`pk_nozle_...`) may call only `GET /api/v1/plans`. Every customer read and mutation returns HTTP 403.
 - **Secret keys** (`sk_nozle_...`) are server-side credentials for configuration, usage mutation, customer-session creation, and privileged reads.
-- **Customer sessions** (`csess_...`) carry only `credits:read`, are bound to one organization and external customer ID, and expire after at most one hour. They are accepted by the customer and Entity Credit System list, single-balance, and operation-history HTTP routes. They cannot list the customer's Entity directory and are rejected by `/auth/centrifugo-token` and all legacy billing routes.
+- **Customer sessions** (`csess_...`) are bound to one organization and exactly one external customer ID, expire after at most one hour, and carry an explicit subset of `credits:read`, `billing:read`, `entitlements:read`, `checkout:create`, `subscriptions:write`, and `topups:create`. Every customer ID in the path, query, or body must match the session subject.
 
-Create customer sessions from your backend with `POST /api/v1/customer-sessions`, then pass the returned token alongside the React provider's existing publishable key. Only the product-credit hooks and components select it.
+Create customer sessions from your backend with `POST /api/v1/customer-sessions`. Use the publishable key only for catalog requests and the customer session for billing status, invoices, checkout, cancellation, top-ups, entitlements, and credit reads. Customer sessions cannot call `/subscribe`, mutate usage, or mint Centrifugo tokens.
 
 ## Public Endpoints
 
@@ -53,5 +53,5 @@ These do not require an API key:
 Sign in at [app.nozle.app](https://app.nozle.app) → Settings → API Keys.
 
 <Warning>
-Never expose secret keys in client-side code. Use publishable keys for public checkout/catalog UI and a short-lived customer session for customer or Entity balance, source, or operation-history components.
+Never expose secret keys in client-side code. Use publishable keys only for the public plan catalog and a short-lived customer session for every customer-specific browser operation.
 </Warning>

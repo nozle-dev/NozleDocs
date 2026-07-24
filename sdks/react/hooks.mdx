@@ -413,10 +413,10 @@ function CheckoutPage({ clientSecret }: { clientSecret: string }) {
 
 ## useSubscribe
 
-Create a subscription server-side. Calls `POST /v1/subscribe` with the plan code and customer ID from the store.
+Deprecated browser plan-selection hook. It calls `POST /api/v1/checkout` with the plan code and provider customer ID, so paid changes remain payment-gated and downgrades can return a scheduled result.
 
 <Warning>
-This hook posts to a server endpoint. If your API key is a publishable key (`pk_`), the server must handle authorization. For full server-side subscription creation, use a secret key (`sk_`) in a backend route instead.
+`useSubscribe` requires a customer session with `checkout:create`. It never calls `/subscribe` and never falls back to a publishable key. Trusted backends may use the Node SDK's secret-key-only `subscribe()` method when payment is handled separately.
 </Warning>
 
 ### Signature

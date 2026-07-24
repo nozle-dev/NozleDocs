@@ -1,7 +1,7 @@
 ---
 title: Create Customer Session
 api: "POST /customer-sessions"
-description: Mint a short-lived customer-bound token for browser credit reads
+description: Mint a short-lived customer-bound token for browser billing operations
 ---
 
 **Auth:** secret key (`sk_nozle_...`) only. Call this endpoint from your backend.
@@ -9,11 +9,20 @@ description: Mint a short-lived customer-bound token for browser credit reads
 ```json
 {
   "customer_id": "customer_123",
-  "expires_in_seconds": 900
+  "expires_in_seconds": 900,
+  "scopes": [
+    "billing:read",
+    "entitlements:read",
+    "credits:read",
+    "checkout:create",
+    "subscriptions:write",
+    "topups:create"
+  ]
 }
 ```
 
 `expires_in_seconds` is optional, defaults to 900 seconds, and must be between 60 and 3600.
+When `scopes` is omitted, the session defaults to `credits:read` only.
 
 ```json
 {
@@ -21,17 +30,21 @@ description: Mint a short-lived customer-bound token for browser credit reads
     "token": "csess_...",
     "customer_id": "customer_123",
     "expires_at": "2026-07-20T12:15:00Z",
-    "scope": ["credits:read"]
+    "scope": ["billing:read", "entitlements:read", "credits:read", "checkout:create", "subscriptions:write", "topups:create"]
   }
 }
 ```
 
-The customer must exist in the authenticated organization. The token is accepted by these bounded HTTP reads for that customer:
+The customer must exist in the authenticated organization. Requested scopes must be a subset of the secret key's API permissions. Available scopes are:
 
-- customer Credit System list, single-system balance, and operation history;
-- Entity Credit System list, single-system balance, and operation history for an Entity owned by that customer.
+- `billing:read` for billing status, current subscription, invoice list, and change previews;
+- `entitlements:read` for entitlement checks;
+- `credits:read` for customer and Entity Credit System balances and operation history;
+- `checkout:create` for payment-gated plan changes;
+- `subscriptions:write` for cancellation of the customer's own subscription;
+- `topups:create` for customer top-up checkout.
 
-It cannot list the customer's Entity directory, mint a Centrifugo token, subscribe to customer-credit realtime channels, track usage, create purchases, modify billing, or read another customer.
+Every customer ID in the request path, query, or body must match the session subject. The token cannot call `/subscribe`, list the customer's Entity directory, mint a Centrifugo token, subscribe to customer-credit realtime channels, track usage, or read or mutate another customer.
 
 Issue it after authenticating the user in your own application, keep it in memory where possible, and refresh it from your backend after expiry. Do not place a Nozle secret key in the browser or persist the session in long-lived local storage.
 
@@ -39,5 +52,13 @@ Issue it after authenticating the user in your own application, keep it in memor
 const session = await nozle.customerSessions.create({
   customerId: "customer_123",
   expiresInSeconds: 900,
+  scopes: [
+    "billing:read",
+    "entitlements:read",
+    "credits:read",
+    "checkout:create",
+    "subscriptions:write",
+    "topups:create",
+  ],
 });
 ```

@@ -16,7 +16,7 @@ npm install @nozle-js/react
 <Step>
 ## Configure browser and server authentication
 
-Keep your Nozle secret key server-side only. A publishable key can power public pricing and checkout UI, but product-credit balances and ledger history require a short-lived customer session.
+Keep your Nozle secret key server-side only. A publishable key powers only public plan catalog reads. Every customer-specific browser read or mutation requires a short-lived customer session.
 
 For Vite:
 
@@ -42,6 +42,14 @@ Mint the read session in your authenticated backend route:
 const session = await nozle.customerSessions.create({
   customerId: currentCustomerId,
   expiresInSeconds: 900,
+  scopes: [
+    'billing:read',
+    'entitlements:read',
+    'credits:read',
+    'checkout:create',
+    'subscriptions:write',
+    'topups:create',
+  ],
 });
 
 return Response.json(session);
@@ -64,7 +72,6 @@ function App({ children, currentCustomerId, customerSessionToken }) {
       baseUrl={import.meta.env.VITE_NOZLE_API_URL ?? 'https://api.nozle.app'}
       customerId={currentCustomerId}
       workspaceId="ws_abc123"
-      centrifugoUrl="wss://rt.nozle.app/connection/websocket"
     >
       {children}
     </BillingProvider>
@@ -78,21 +85,20 @@ In Next.js, use `process.env.NEXT_PUBLIC_NOZLE_PUBLISHABLE_KEY` and `process.env
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `customerSessionToken` | `string` | -- | Optional credential used only by the new product-credit read hooks and components. Short-lived `csess_...` token minted by your backend. |
-| `publishableKey` | `string` | -- | Client-safe key for public catalog, entitlement, and checkout UI. Cannot read product-credit balances. |
-| `apiKey` | `string` | -- | Backward-compatible auth-token alias. Never pass a secret key in browser code. |
+| `customerSessionToken` | `string` | -- | Short-lived `csess_...` credential for exact-customer billing, entitlement, checkout, cancellation, top-up, and credit operations. |
+| `publishableKey` | `string` | -- | Client-safe key for `GET /api/v1/plans` only. |
 | `customerId` | `string` | `''` | Your external customer ID. Required by customer-scoped hooks and billing components. |
 | `baseUrl` | `string` | `'https://api.nozle.app'` | API endpoint |
 | `workspaceId` | `string` | `''` | Your workspace ID |
 | `centrifugoUrl` | `string` | `undefined` | WebSocket URL for real-time entitlement updates |
 | `children` | `ReactNode` | **required** | Your app content |
 
-Provide `publishableKey` (or the backward-compatible `apiKey` alias) for the provider's existing billing and entitlement APIs. Add `customerSessionToken` only when rendering the new product-credit read hooks or components; those bounded HTTP calls select the customer session while all legacy `BillingPortal` calls continue using the publishable key.
+Provide `publishableKey` for public pricing and `customerSessionToken` for every customer operation. The SDK never falls back from a missing customer session to the publishable key.
 
-Product-credit reads are HTTP-only in WP9. `centrifugoUrl` remains available for existing entitlement updates, but customer sessions cannot mint Centrifugo tokens and carry no realtime customer-credit claims.
+Customer-session reads are HTTP-only. `centrifugoUrl` remains available for existing server-authorized entitlement updates, but customer sessions cannot mint Centrifugo tokens and carry no realtime customer-credit claims.
 
 <Warning>
-Never expose your `sk_nozle_...` secret key in browser code. Use `customerSessionToken` only for product-credit reads and a publishable key for the provider's existing checkout, catalog, entitlement, and legacy billing components. A customer session is bound to one customer and cannot mutate usage or billing.
+Never expose your `sk_nozle_...` secret key in browser code. Use the publishable key only for the public plan catalog and the customer session for all customer billing operations. A bare publishable key receives HTTP 403 from every customer endpoint.
 </Warning>
 </Step>
 

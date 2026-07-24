@@ -5,10 +5,10 @@ api: "GET /billing/status"
 
 Get the current billing status for a customer, including their active subscription and plan details. This is the primary endpoint for checking what plan a customer is on.
 
-**Auth:** `pk_` (publishable key) or `sk_` (secret key).
+**Auth:** customer session with `billing:read`, or a secret key. Publishable keys are always rejected.
 
 <ParamField query="customer_id" type="string" required>
-  External customer ID.
+  External customer ID. For a customer session, this must match the token subject.
 </ParamField>
 
 ### Response

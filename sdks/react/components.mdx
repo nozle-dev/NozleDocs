@@ -6,7 +6,7 @@ description: Drop-in billing UI components for React
 All components are exported from `@nozle-js/react` and use `--nozle-*` CSS custom properties for theming. They work with any design system -- just set the CSS variables on a parent element or `:root`.
 
 <Info>
-Checkout components use `BillingPortalProvider` with a publishable key. Product-credit read components use `BillingProvider` with a short-lived `customerSessionToken`; a bare publishable key cannot read product-credit balances or ledger operations. Customer sessions do not authenticate the legacy `BillingPortal` as a whole.
+`PricingTable` uses `BillingProvider.publishableKey` for the public plan catalog. Current-plan detection and every customer billing, entitlement, checkout, cancellation, top-up, and credit component use a short-lived `customerSessionToken`. A bare publishable key cannot read or mutate a customer.
 </Info>
 
 ---
@@ -15,7 +15,7 @@ Checkout components use `BillingPortalProvider` with a publishable key. Product-
 
 ### PricingTable
 
-Renders plan cards in a responsive grid with a monthly/annual toggle. Auto-fetches plans from the API when no `plans` prop is provided, and auto-detects the current plan when `customerId` is set.
+Renders plan cards in a responsive grid with a monthly/annual toggle. It uses the publishable key to fetch plans when no `plans` prop is provided. Auto-detecting the current plan when `customerId` is set also requires a customer session.
 
 ```tsx
 import { PricingTable } from '@nozle-js/react';
@@ -316,7 +316,7 @@ import { UpgradeModal } from '@nozle-js/react';
   targetPlanId="pro_monthly"
   customerId="cus_xxx"
   apiBaseUrl="https://api.nozle.app"
-  apiKey="pk_xxx"
+  customerSessionToken="csess_xxx"
   onStripeClientSecret={(secret) => setClientSecret(secret)}
   onCompleted={() => router.refresh()}
   onConfirm={() => setShowModal(false)}
@@ -330,12 +330,12 @@ import { UpgradeModal } from '@nozle-js/react';
 | `targetPlanId` | `string` | -- | Plan the customer is upgrading to |
 | `customerId` | `string` | -- | Customer identifier |
 | `apiBaseUrl` | `string` | `'https://api.nozle.app'` | API base URL |
-| `apiKey` | `string` | `''` | API key for authorization |
+| `customerSessionToken` | `string` | `''` | Customer session with billing and checkout scopes |
 | `onStripeClientSecret` | `(clientSecret: string) => void` | -- | Receives the Stripe Checkout Session secret |
 | `onCheckoutStarted` | `() => void` | -- | Called after Stripe checkout is created |
 | `onCompleted` | `() => void` | -- | Called when prepaid credits complete the change immediately |
-| `onScheduled` | `() => void` | -- | Called when checkout delegates a Lago-classified downgrade to the scheduled change endpoint |
-| `onConfirm` | `() => void` | -- | Backward-compatible callback after checkout creation, credit-funded completion, or scheduling |
+| `onScheduled` | `() => void` | -- | Called when checkout schedules the transition for the next billing boundary |
+| `onConfirm` | `() => void` | -- | Called after checkout creation, credit-funded completion, or scheduling |
 | `onCancel` | `() => void` | -- | Called when the user dismisses the modal |
 
 #### ProrationPreview type
@@ -417,12 +417,12 @@ import { CANCEL_REASONS } from '@nozle-js/react';
 
 ### BillingPortalProvider
 
-Context wrapper that provides `{ customerId, apiKey }` to all nested SDK components. Required by `CheckoutButton`, `UpgradeButton`, and `CreditTopUpButton`.
+Context wrapper that provides `{ customerId, customerSessionToken }` to all nested SDK components. Required by `CheckoutButton`, `UpgradeButton`, and `CreditTopUpButton`.
 
 ```tsx
 import { BillingPortalProvider } from '@nozle-js/react';
 
-<BillingPortalProvider customerId="cus_xxx" apiKey="pk_xxx">
+<BillingPortalProvider customerId="cus_xxx" customerSessionToken="csess_xxx">
   <PricingTable plans={plans} />
   <CheckoutButton planId="pro" />
 </BillingPortalProvider>
@@ -431,7 +431,7 @@ import { BillingPortalProvider } from '@nozle-js/react';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `customerId` | `string` | -- | Customer identifier passed to all child components |
-| `apiKey` | `string` | -- | Publishable API key (`pk_` prefix) |
+| `customerSessionToken` | `string` | -- | Scoped customer session (`csess_` prefix) |
 | `children` | `ReactNode` | -- | Child components |
 
 Access the context directly with the `useBillingPortal` hook:
@@ -439,7 +439,7 @@ Access the context directly with the `useBillingPortal` hook:
 ```ts
 import { useBillingPortal } from '@nozle-js/react';
 
-const { customerId, apiKey } = useBillingPortal();
+const { customerId, customerSessionToken } = useBillingPortal();
 ```
 
 ---

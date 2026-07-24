@@ -3,12 +3,12 @@ title: "Create Checkout Session"
 api: "POST /checkout"
 ---
 
-Create a Stripe embedded Checkout Session. The endpoint can be used from the browser with a Nozle publishable key.
+Create a payment-gated plan checkout. Browser callers must use a customer session bound to the exact customer.
 
-**Auth:** `pk_nozle_...` publishable key or `sk_nozle_...` secret key.
+**Auth:** customer session with `checkout:create`, or a secret key. Publishable keys are always rejected.
 
 <Info>
-With a publishable key, checkout is scoped to the organization and customer context allowed by that key. Nozle never returns your Stripe secret key to the browser. The response only includes a Stripe Checkout `client_secret`.
+With a customer session, `customer_id` must match the session subject. Nozle never returns your Stripe secret key to the browser. The response contains a hosted URL or Stripe Checkout `client_secret`, or reports an immediately completed or scheduled transition.
 </Info>
 
 ## Modes
@@ -27,22 +27,12 @@ Use this when a customer is selecting a plan.
 
 Plan checkout is payment-gated. Free-to-paid checkout uses an incomplete subscription. Paid-to-paid upgrades keep the old subscription active in a durable pending intent and apply the Lago upgrade only after Stripe confirms payment.
 
-If prepaid credits fully cover a paid plan change, Nozle applies it without Stripe and returns `type: "completed"`. Free plans, trials with no pay-in-advance fixed charge, and Lago-classified downgrades should use subscription flows instead of checkout.
-
-### Existing invoice checkout
-
-Use this for one-off payments such as add-ons, credit top-ups, or manually generated invoices.
-
-<ParamField body="invoice_id" type="string">
-  Existing Nozle invoice ID to collect payment for. When `invoice_id` is provided, `customer_id` and `plan_code` are not required.
-</ParamField>
-
-Invoice checkout does not create subscription activation rules. It only collects payment for the existing invoice.
+If prepaid credits fully cover a paid plan change, Nozle applies it without Stripe and returns `type: "completed"`. Free plans may also complete immediately. A downgrade or other cycle-end transition returns `type: "scheduled"`; browser callers still use this same endpoint.
 
 ## Return URL
 
 <ParamField body="return_url" type="string">
-  URL Stripe should return to after embedded checkout completes. If omitted, Nozle uses the configured dashboard return URL.
+  URL Stripe should return to after embedded checkout completes. It must use an exactly allowlisted HTTPS origin. If omitted, Nozle uses the configured dashboard return URL.
 </ParamField>
 
 <ParamField body="success_url" type="string">
@@ -61,23 +51,18 @@ Plan checkout:
 }
 ```
 
-Invoice checkout:
-
-```json
-{
-  "invoice_id": "invoice_uuid",
-  "return_url": "https://app.example.com/settings/billing"
-}
-```
-
 ## Response
 
 <ResponseField name="type" type="string" required>
-  Payment processor type. Currently `stripe`.
+  `stripe`, `completed`, or `scheduled`.
 </ResponseField>
 
-<ResponseField name="client_secret" type="string" required>
+<ResponseField name="client_secret" type="string">
   Stripe Checkout Session client secret. Pass this to `stripe.initEmbeddedCheckout()`.
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  Hosted checkout URL. Navigate the current page to this URL.
 </ResponseField>
 
 <ResponseField name="clientSecret" type="string">
@@ -110,6 +95,17 @@ When no external payment remains due:
   "invoice_id": "invoice_uuid",
   "amount_cents": 0,
   "currency": "USD"
+}
+```
+
+### Scheduled response
+
+```json
+{
+  "type": "scheduled",
+  "status": "pending",
+  "subscription_id": "subscription_uuid",
+  "plan_code": "starter"
 }
 ```
 

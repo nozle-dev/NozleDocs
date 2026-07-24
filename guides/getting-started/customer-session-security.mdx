@@ -76,13 +76,4 @@ function PlanCheckoutButton({ planCode }: { planCode: string }) {
 
 All browser plan changes use `/checkout`. A response may contain a Stripe client secret or URL, `type: "completed"`, or `type: "scheduled"`. Paid plans activate only after verified payment. Cancellation validates both the customer-session subject and subscription ownership. Return URLs must use an exact configured HTTPS origin.
 
-## Rollout order
-
-1. Prepare `NOZLE_CUSTOMER_SESSION_SECRET`.
-2. Deploy Engine with `NOZLE_SECURITY_ENFORCEMENT_ENABLED=false`.
-3. Deploy Core API and dashboard.
-4. Test the SDK and Nozle dashboard.
-5. Enable `NOZLE_SECURITY_ENFORCEMENT_ENABLED=true`.
-6. Verify publishable-key mutation requests return HTTP 403.
-
-The enforcement flag is a temporary rolling-deployment compatibility switch. New integrations must use customer sessions even while it is `false`; publishable-key customer access disappears when strict mode is enabled.
+The publishable-key boundary is unconditional. A `pk_` request to any customer read or mutation returns HTTP 403; there is no browser fallback.
