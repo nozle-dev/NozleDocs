@@ -3,7 +3,9 @@ title: "Cancel Subscription"
 api: "DELETE /subscriptions/{id}"
 ---
 
-Cancel a subscription. The cancellation takes effect at the end of the current billing period -- the customer retains access until then.
+Cancel a subscription immediately or schedule cancellation for the next Lago renewal boundary.
+
+Use this endpoint only from an authenticated merchant backend. Derive the customer from the logged-in user or team; never accept an authoritative `customer_id` from browser input.
 
 **Auth:** secret key only. Publishable keys are always rejected.
 
@@ -11,14 +13,22 @@ Cancel a subscription. The cancellation takes effect at the end of the current b
   The subscription ID to cancel.
 </ParamField>
 
-<ParamField body="customer_id" type="string" required>
+<ParamField query="customer_id" type="string" required>
   External customer ID derived by the trusted merchant backend. The subscription must belong to that customer and organization.
 </ParamField>
 
-<ParamField body="reason" type="string">
-  Optional cancellation reason for your records.
+<ParamField query="cancellation_policy" type="string" default="immediate">
+  `end_of_period` keeps the subscription active until its next renewal boundary. `immediate` terminates it now. The raw HTTP API defaults to `immediate` for backward compatibility; the Node.js and Python SDK methods default to `end_of_period`.
 </ParamField>
 
 ### Response
 
-Returns the updated subscription with a `canceled` status and the `ends_at` timestamp indicating when access expires.
+For `end_of_period`, the subscription remains `active` and `ending_at` contains the next renewal boundary. Lago's normal clock terminates it at that boundary and prevents another renewal invoice. Repeating the request does not extend an earlier scheduled ending.
+
+For `immediate`, the response contains the terminated subscription.
+
+```bash
+curl --request DELETE \
+  'https://api.nozle.app/api/v1/subscriptions/sub_123?customer_id=cust_123&cancellation_policy=end_of_period' \
+  --header 'Authorization: Bearer sk_live_...'
+```
