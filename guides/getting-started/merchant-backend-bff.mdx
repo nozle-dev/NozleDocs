@@ -92,6 +92,8 @@ export function BillingPage({ csrfToken }: { csrfToken: string }) {
 
 Use equivalent authenticated backend endpoints for billing status, invoices, cancellation, top-ups, entitlements, and credits. Return only the fields your browser needs.
 
+For cancellation, call `cancelSubscription(customerId, subscriptionId)` from the Node.js SDK or `cancel_subscription(customer_id, subscription_id)` from Python. Both default to `end_of_period`; the raw API keeps its historical `immediate` default. Do not accept either Nozle identifier directly from the browser—resolve both from merchant-owned records.
+
 ## Payment authority
 
 Stripe webhook processing is authoritative. A redirect back to Wrrk never activates a paid plan. Nozle activates payment-gated changes only after verified, idempotently processed Stripe success; failed payments and 3DS remain in the payment flow.

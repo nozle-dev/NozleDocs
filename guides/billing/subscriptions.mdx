@@ -50,9 +50,19 @@ Run these calls only from a trusted merchant backend. Derive `cust_123` from the
 
 **Cancel subscription:**
 
-```tsx
-<CancelSubscriptionButton subscriptionId="sub_123" onCancelled={() => router.push('/')} />
+Call cancellation from your authenticated backend. The SDK defaults to end-of-period cancellation:
+
+```typescript
+const result = await nozle.cancelSubscription('cust_123', 'sub_123')
+
+// The customer keeps access until this renewal boundary.
+console.log(result.subscription.ending_at)
 ```
 
-Two-step flow: confirm → select reason (Too expensive, Missing features, Switching to competitor, Not using it enough, Other).
-Calls `DELETE /api/v1/subscriptions/{id}` with the selected reason.
+Pass `immediate` explicitly only when the merchant has confirmed that access should end now:
+
+```typescript
+await nozle.cancelSubscription('cust_123', 'sub_123', 'immediate')
+```
+
+The browser should call your own cancellation route. That route authenticates the user, derives `cust_123` from the user's team, and calls Nozle with a least-privilege `sk_`.
