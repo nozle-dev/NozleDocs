@@ -106,89 +106,65 @@
             ]
           },
           {
-            "group": "Application Billing",
+            "group": "Nozle APIs",
             "pages": [
-              "billing-api/overview",
-              "api/create-customer",
-              "api/list-plans",
-              "api/subscribe",
-              "api/create-checkout",
-              "api/billing-status",
-              "api/entity-subscriptions",
-              "api/upgrade",
-              "api/cancel-subscription",
-              "api/list-invoices",
-              "api/events"
+              {
+                "group": "Checkout & Subscriptions",
+                "pages": [
+                  "billing-api/overview",
+                  "api/subscribe",
+                  "api/create-checkout",
+                  "api/billing-status",
+                  "api/entity-subscriptions",
+                  "api/upgrade",
+                  "api/cancel-subscription"
+                ]
+              },
+              {
+                "group": "Product Credits",
+                "pages": [
+                  "api/customer-credit-balances",
+                  "api/customer-credit-operations",
+                  "api/customer-entities",
+                  "api/entity-credit-balances",
+                  "api/entity-credit-operations",
+                  "api/entity-credit-transfers",
+                  "api/usage-check",
+                  "api/usage-track",
+                  "api/create-credit-top-up-purchase",
+                  "api/check-and-deduct",
+                  "api/credit-balance"
+                ]
+              },
+              {
+                "group": "Entitlements",
+                "pages": [
+                  "api/check-entitlement",
+                  "api/centrifugo-token"
+                ]
+              },
+              {
+                "group": "Margin Intelligence",
+                "pages": [
+                  "api/margin-summary",
+                  "api/margin-customers",
+                  "api/margin-trend",
+                  "api/margin-simulate",
+                  "api/list-cost-models",
+                  "api/create-cost-model",
+                  "api/delete-cost-model"
+                ]
+              },
+              {
+                "group": "AI Proxy",
+                "pages": [
+                  "api/llm-proxy"
+                ]
+              }
             ]
           },
           {
-            "group": "Entitlements",
-            "pages": [
-              "api/check-entitlement",
-              "api/centrifugo-token"
-            ]
-          },
-          {
-            "group": "Product Credits",
-            "pages": [
-              "api/customer-credit-balances",
-              "api/customer-credit-operations",
-              "api/customer-entities",
-              "api/entity-credit-balances",
-              "api/entity-credit-operations",
-              "api/entity-credit-transfers",
-              "api/usage-check",
-              "api/usage-track",
-              "api/create-credit-top-up-purchase",
-              "api/check-and-deduct",
-              "api/credit-balance"
-            ]
-          },
-          {
-            "group": "Margin Intelligence",
-            "pages": [
-              "api/margin-summary",
-              "api/margin-customers",
-              "api/margin-trend",
-              "api/margin-simulate",
-              "api/list-cost-models",
-              "api/create-cost-model",
-              "api/delete-cost-model"
-            ]
-          },
-          {
-            "group": "AI Proxy",
-            "pages": [
-              "api/llm-proxy"
-            ]
-          },
-          {
-            "group": "Features & Plan Entitlements",
-            "openapi": "nozle-openapi.yaml",
-            "expanded": false,
-            "pages": [
-              "api/check-entitlement",
-              "api/centrifugo-token",
-              "POST /features",
-              "GET /features",
-              "PUT /features/{code}",
-              "DELETE /features/{code}",
-              "GET /features/{code}",
-              "DELETE /features/{code}/privileges/{privilege_code}",
-              "POST /plans/{code}/entitlements",
-              "GET /plans/{code}/entitlements",
-              "PATCH /plans/{code}/entitlements",
-              "GET /plans/{code}/entitlements/{feature_code}",
-              "DELETE /plans/{code}/entitlements/{feature_code}",
-              "DELETE /plans/{code}/entitlements/{feature_code}/privileges/{privilege_code}",
-              "GET /subscriptions/{external_id}/entitlements",
-              "PATCH /subscriptions/{external_id}/entitlements",
-              "DELETE /subscriptions/{external_id}/entitlements/{feature_code}",
-              "DELETE /subscriptions/{external_id}/entitlements/{feature_code}/privileges/{privilege_code}"
-            ]
-          },
-          {
-            "group": "Billing",
+            "group": "Billing Resources",
             "pages": [
               {
                 "group": "Customers",
@@ -199,32 +175,39 @@
                   "GET /customers",
                   "GET /customers/{external_customer_id}",
                   "DELETE /customers/{external_customer_id}",
-                  "GET /customers/{external_customer_id}/applied_coupons",
-                  "DELETE /customers/{external_customer_id}/applied_coupons/{applied_coupon_id}",
-                  "GET /customers/{external_customer_id}/credit_notes",
-                  "GET /customers/{external_customer_id}/invoices",
-                  "GET /customers/{external_customer_id}/payments",
-                  "GET /customers/{external_customer_id}/payment_requests",
                   "GET /customers/{external_customer_id}/portal_url",
-                  "GET /customers/{external_customer_id}/subscriptions",
-                  "GET /customers/{external_customer_id}/current_usage",
-                  "GET /customers/{external_customer_id}/projected_usage",
-                  "GET /customers/{external_customer_id}/past_usage",
                   "POST /customers/{external_customer_id}/checkout_url"
                 ]
               },
               {
-                "group": "Events",
+                "group": "Plans",
                 "openapi": "nozle-openapi.yaml",
                 "expanded": false,
                 "pages": [
-                  "POST /events",
-                  "GET /events",
-                  "POST /events/batch",
-                  "POST /events/estimate_fees",
-                  "POST /events/estimate_instant_fees",
-                  "POST /events/batch_estimate_instant_fees",
-                  "GET /events/{transaction_id}"
+                  "POST /plans",
+                  "GET /plans",
+                  "PUT /plans/{code}",
+                  "GET /plans/{code}",
+                  "DELETE /plans/{code}",
+                  "POST /plans/{code}/metadata",
+                  "PATCH /plans/{code}/metadata",
+                  "DELETE /plans/{code}/metadata",
+                  "DELETE /plans/{code}/metadata/{key}",
+                  "POST /plans/{code}/charges",
+                  "GET /plans/{code}/charges",
+                  "GET /plans/{code}/charges/{charge_code}",
+                  "PUT /plans/{code}/charges/{charge_code}",
+                  "DELETE /plans/{code}/charges/{charge_code}",
+                  "POST /plans/{code}/charges/{charge_code}/filters",
+                  "GET /plans/{code}/charges/{charge_code}/filters",
+                  "GET /plans/{code}/charges/{charge_code}/filters/{filter_id}",
+                  "PUT /plans/{code}/charges/{charge_code}/filters/{filter_id}",
+                  "DELETE /plans/{code}/charges/{charge_code}/filters/{filter_id}",
+                  "POST /plans/{code}/fixed_charges",
+                  "GET /plans/{code}/fixed_charges",
+                  "GET /plans/{code}/fixed_charges/{fixed_charge_code}",
+                  "PUT /plans/{code}/fixed_charges/{fixed_charge_code}",
+                  "DELETE /plans/{code}/fixed_charges/{fixed_charge_code}"
                 ]
               },
               {
@@ -260,34 +243,45 @@
                 ]
               },
               {
-                "group": "Plans",
+                "group": "Features & Entitlements",
                 "openapi": "nozle-openapi.yaml",
                 "expanded": false,
                 "pages": [
-                  "POST /plans",
-                  "GET /plans",
-                  "PUT /plans/{code}",
-                  "GET /plans/{code}",
-                  "DELETE /plans/{code}",
-                  "POST /plans/{code}/metadata",
-                  "PATCH /plans/{code}/metadata",
-                  "DELETE /plans/{code}/metadata",
-                  "DELETE /plans/{code}/metadata/{key}",
-                  "POST /plans/{code}/charges",
-                  "GET /plans/{code}/charges",
-                  "GET /plans/{code}/charges/{charge_code}",
-                  "PUT /plans/{code}/charges/{charge_code}",
-                  "DELETE /plans/{code}/charges/{charge_code}",
-                  "POST /plans/{code}/charges/{charge_code}/filters",
-                  "GET /plans/{code}/charges/{charge_code}/filters",
-                  "GET /plans/{code}/charges/{charge_code}/filters/{filter_id}",
-                  "PUT /plans/{code}/charges/{charge_code}/filters/{filter_id}",
-                  "DELETE /plans/{code}/charges/{charge_code}/filters/{filter_id}",
-                  "POST /plans/{code}/fixed_charges",
-                  "GET /plans/{code}/fixed_charges",
-                  "GET /plans/{code}/fixed_charges/{fixed_charge_code}",
-                  "PUT /plans/{code}/fixed_charges/{fixed_charge_code}",
-                  "DELETE /plans/{code}/fixed_charges/{fixed_charge_code}"
+                  "POST /features",
+                  "GET /features",
+                  "PUT /features/{code}",
+                  "DELETE /features/{code}",
+                  "GET /features/{code}",
+                  "DELETE /features/{code}/privileges/{privilege_code}",
+                  "POST /plans/{code}/entitlements",
+                  "GET /plans/{code}/entitlements",
+                  "PATCH /plans/{code}/entitlements",
+                  "GET /plans/{code}/entitlements/{feature_code}",
+                  "DELETE /plans/{code}/entitlements/{feature_code}",
+                  "DELETE /plans/{code}/entitlements/{feature_code}/privileges/{privilege_code}",
+                  "GET /subscriptions/{external_id}/entitlements",
+                  "PATCH /subscriptions/{external_id}/entitlements",
+                  "DELETE /subscriptions/{external_id}/entitlements/{feature_code}",
+                  "DELETE /subscriptions/{external_id}/entitlements/{feature_code}/privileges/{privilege_code}"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Usage & Metering",
+            "pages": [
+              {
+                "group": "Usage Events",
+                "openapi": "nozle-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "POST /events",
+                  "GET /events",
+                  "POST /events/batch",
+                  "POST /events/estimate_fees",
+                  "POST /events/estimate_instant_fees",
+                  "POST /events/batch_estimate_instant_fees",
+                  "GET /events/{transaction_id}"
                 ]
               },
               {
@@ -303,6 +297,21 @@
                   "GET /billable_metrics/{code}"
                 ]
               },
+              {
+                "group": "Customer Usage",
+                "openapi": "nozle-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /customers/{external_customer_id}/current_usage",
+                  "GET /customers/{external_customer_id}/projected_usage",
+                  "GET /customers/{external_customer_id}/past_usage"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Invoicing & Payments",
+            "pages": [
               {
                 "group": "Invoices",
                 "openapi": "nozle-openapi.yaml",
@@ -334,12 +343,7 @@
                   "PUT /fees/{id}",
                   "DELETE /fees/{id}"
                 ]
-              }
-            ]
-          },
-          {
-            "group": "Payments & Credits",
-            "pages": [
+              },
               {
                 "group": "Wallets",
                 "openapi": "nozle-openapi.yaml",
@@ -480,8 +484,19 @@
             ]
           },
           {
-            "group": "System",
+            "group": "Platform & Operations",
             "pages": [
+              {
+                "group": "Billing Entities",
+                "openapi": "nozle-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "GET /billing_entities",
+                  "POST /billing_entities",
+                  "GET /billing_entities/{code}",
+                  "PUT /billing_entities/{code}"
+                ]
+              },
               {
                 "group": "Webhook Endpoints",
                 "openapi": "nozle-openapi.yaml",
@@ -495,23 +510,12 @@
                 ]
               },
               {
-                "group": "Webhooks Key",
+                "group": "Webhook Keys",
                 "openapi": "nozle-openapi.yaml",
                 "expanded": false,
                 "pages": [
                   "GET /webhooks/json_public_key",
                   "GET /webhooks/public_key"
-                ]
-              },
-              {
-                "group": "Billing Entities",
-                "openapi": "nozle-openapi.yaml",
-                "expanded": false,
-                "pages": [
-                  "GET /billing_entities",
-                  "POST /billing_entities",
-                  "GET /billing_entities/{code}",
-                  "PUT /billing_entities/{code}"
                 ]
               },
               {
@@ -551,16 +555,6 @@
                 "pages": [
                   "GET /api_logs",
                   "GET /api_logs/{request_id}"
-                ]
-              },
-              {
-                "group": "Customer Usage",
-                "openapi": "nozle-openapi.yaml",
-                "expanded": false,
-                "pages": [
-                  "GET /customers/{external_customer_id}/current_usage",
-                  "GET /customers/{external_customer_id}/projected_usage",
-                  "GET /customers/{external_customer_id}/past_usage"
                 ]
               }
             ]
