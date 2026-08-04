@@ -21,7 +21,7 @@ from nozle import Nozle
 nozle = Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
     base_url="https://api.nozle.app",
-    events_url="https://api.nozle.app",
+    events_url="https://core.nozle.app",
     timeout=10,
 )
 ```
@@ -30,7 +30,7 @@ nozle = Nozle(
 |---|---|---|---|
 | `api_key` | `str` | required | Organization credential. Protected operations require `sk_`. |
 | `base_url` | `str` | `http://localhost:8080` | Billing, entitlement, credit, Entity, usage, and margin API origin. |
-| `events_url` | `str` | `http://localhost:3000` | Metered event and credit-system API origin. |
+| `events_url` | `str` | `http://localhost:3000` | Core API origin for metered events, credit-system discovery, and Entity subscriptions. Use `https://core.nozle.app` in production. |
 | `timeout` | `float` | `10` | Per-request timeout in seconds. |
 
 Set both URLs explicitly outside local development. Trailing slashes are removed automatically.
@@ -52,7 +52,7 @@ from nozle import Nozle
 with Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
     base_url="https://api.nozle.app",
-    events_url="https://api.nozle.app",
+    events_url="https://core.nozle.app",
 ) as nozle:
     health = nozle.ping()
 ```

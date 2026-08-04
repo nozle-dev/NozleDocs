@@ -8,7 +8,7 @@ from nozle import Nozle, SubscriptionTransitionParams
 nozle = Nozle(
     api_key="sk_example",
     base_url="https://api.nozle.app",
-    events_url="https://api.nozle.app",
+    events_url="https://core.nozle.app",
     timeout=10,
 )
 
