@@ -1,53 +1,76 @@
 ---
-title: Entitlements
-description: Check feature access with nozle.can()
+title: "Entitlements"
+description: "Check feature access, usage limits, and margin state with nozle.can()."
 ---
 
-```typescript
-const result = await nozle.can('customer_123', 'api_calls');
-```
+```ts
+const check = await nozle.can('workspace_123', 'api_calls')
 
-**Returns CanResult:**
-```typescript
-{
-  allowed: boolean;      // Whether the feature is accessible
-  reason?: string;       // Why access was denied (if applicable)
-  used: number;          // Current usage count
-  limit: number;         // Usage limit for this feature
-  remaining: number;     // Remaining usage (limit - used)
-  cost_per_use_cents: number;    // Cost per unit (from cost model)
-  revenue_per_use_cents: number; // Revenue per unit (from plan pricing)
-  margin_per_use_cents: number;  // Margin per unit
-  min_margin_percent?: number;   // Minimum margin threshold if configured
-}
-```
-
-**How it works:**
-Calls `GET /api/v1/can?customer_id={id}&feature={feature}` on the Nozle API. It checks:
-1. Customer's active subscription and plan
-2. Plan entitlements (feature gates + usage limits)
-3. Current usage counters (cached for low latency)
-4. Cost model data for margin fields
-
-**Examples:**
-
-Feature gate check:
-```typescript
-const { allowed } = await nozle.can('cust_123', 'analytics');
-if (!allowed) return res.status(403).json({ error: 'Upgrade required' });
-```
-
-Usage limit check with margin awareness:
-```typescript
-const check = await nozle.can('cust_123', 'api_calls');
 if (!check.allowed) {
-  return res.status(429).json({
-    error: 'Usage limit reached',
-    used: check.used,
-    limit: check.limit,
-  });
-}
-if (check.margin_per_use_cents < 0) {
-  logger.warn('Negative margin for customer', { margin: check.margin_per_use_cents });
+  throw new Error(check.reason ?? 'Feature unavailable')
 }
 ```
+
+`can()` calls `GET /api/v1/can` with the customer, feature, and optional string metadata.
+
+## Signature
+
+```ts
+can(
+  customerId: string,
+  feature: string,
+  metadata?: Record<string, string>,
+): Promise<CanResult>
+```
+
+```ts
+const check = await nozle.can('workspace_123', 'model_access', {
+  model: 'example-large-model',
+  region: 'us-east',
+})
+```
+
+## `CanResult`
+
+| Field | Type | Description |
+|---|---|---|
+| `allowed` | `boolean` | Whether the request may proceed. |
+| `reason` | `string?` | Denial or decision reason. |
+| `used` | `number` | Current measured usage. |
+| `limit` | `number?` | Configured usage limit. |
+| `remaining` | `number?` | Remaining allowance. |
+| `overage` | `boolean?` | Whether usage is in overage. |
+| `cost_per_use_cents` | `number` | Computed unit cost. |
+| `revenue_per_use_cents` | `number` | Computed unit revenue. |
+| `margin_per_use_cents` | `number` | Unit margin. |
+| `margin_percent` | `number?` | Margin percentage. |
+| `min_margin_percent` | `number?` | Configured margin floor. |
+| `margin_level` | `string?` | Margin classification. |
+| `margin_enforcement_mode` | `string?` | Configured enforcement behavior. |
+| `warning` | `string?` | Non-blocking warning. |
+
+## HTTP handler pattern
+
+```ts
+const check = await nozle.can(customerId, 'analytics')
+
+if (!check.allowed) {
+  return Response.json(
+    {
+      error: check.reason ?? 'upgrade_required',
+      used: check.used,
+      limit: check.limit,
+      remaining: check.remaining,
+    },
+    { status: check.overage ? 429 : 403 },
+  )
+}
+
+return runAnalyticsQuery()
+```
+
+## Authorization guidance
+
+Perform entitlement checks on the trusted backend immediately before protected work. A React `FeatureGate` improves the interface but is not an authorization boundary.
+
+`can()` checks entitlement and usage state; it does not reserve product credits. Use `usage.track()` for atomic credit-backed consumption.

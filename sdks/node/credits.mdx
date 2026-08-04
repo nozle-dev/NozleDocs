@@ -1,114 +1,176 @@
 ---
-title: Product Credits
-description: Read balances and track credit-backed usage from a trusted backend
+title: "Product credits"
+description: "Discover credit systems, read exact balances, transfer Entity credits, and atomically consume usage."
 ---
 
-## Read balances and history
+Product-credit values are exact decimal strings. Do not convert balances, transfer amounts, or deductions to JavaScript `number` when precision matters.
+
+## List credit systems
 
 ```ts
-const balance = await nozle.credits.getBalance('customer_123', 'ai_credits');
-console.log(balance.available); // exact decimal string
+const systems = await nozle.creditSystems.list()
 
-const allBalances = await nozle.credits.listBalances('customer_123');
+for (const system of systems) {
+  console.log(system.code, system.unitName, system.status)
+}
+```
 
-const firstPage = await nozle.credits.listOperations('customer_123', {
+`list()` fetches every active page and returns normalized camel-case `CreditSystem` objects.
+
+## Customer balances
+
+```ts
+const balance = await nozle.credits.getBalance(
+  'workspace_123',
+  'ai_credits',
+)
+
+console.log(balance.available) // exact decimal string
+console.log(balance.sources)
+
+const allBalances = await nozle.credits.listBalances('workspace_123')
+```
+
+`CreditBalance` includes credit-system metadata, `available`, an `as_of` timestamp, and ordered balance sources. Sources identify their type, initial and remaining amounts, validity window, priority, scope, and transfer flags.
+
+## Customer operation history
+
+```ts
+const page = await nozle.credits.listOperations('workspace_123', {
   creditSystemCode: 'ai_credits',
   limit: 25,
-});
+})
 
-const nextPage = firstPage.next_cursor
-  ? await nozle.credits.listOperations('customer_123', {
+const nextPage = page.next_cursor
+  ? await nozle.credits.listOperations('workspace_123', {
       creditSystemCode: 'ai_credits',
       limit: 25,
-      cursor: firstPage.next_cursor,
+      cursor: page.next_cursor,
     })
-  : null;
+  : null
 ```
 
-Keep credit reads behind authenticated backend routes. Derive the customer from the logged-in user or team, call Nozle with a restricted `sk_`, and return only the fields the browser needs.
+`limit` must be an integer from 1 to 100. Operations expose exact credit amounts, status, reason, rate snapshot, event time, and source allocations.
 
-## Manage Entities
-
-Entity mutations require a secret key and a caller-supplied idempotency key:
-
-```ts
-await nozle.entities.upsert(
-  'workspace_123',
-  'user_42',
-  { name: 'Asha', status: 'active', metadata: { role: 'agent' } },
-  { idempotencyKey: 'entity-user-42-v1' },
-);
-
-const page = await nozle.entities.list('workspace_123', {
-  status: 'active',
-  limit: 50,
-});
-
-await nozle.entities.suspend('workspace_123', 'user_42', {
-  idempotencyKey: 'suspend-user-42',
-});
-```
-
-`suspend` and `activate` first read the Entity and preserve its current name and metadata. Retry an uncertain mutation with the same idempotency key.
-
-Entity lifecycle calls do not emit billable seat events. Track per-seat billing
-separately from your backend through the Events API.
-
-## Read and transfer Entity credits
+## Entity balances
 
 ```ts
 const balance = await nozle.credits.getEntityBalance(
   'workspace_123',
   'user_42',
   'ai_credits',
-);
+)
 
-console.log(balance.entity_available);
-console.log(balance.shared_available);
-console.log(balance.effective_available);
+console.log(balance.entity_available)
+console.log(balance.shared_available)
+console.log(balance.effective_available)
+console.log(balance.pool_policy)
 
+const allBalances = await nozle.credits.listEntityBalances(
+  'workspace_123',
+  'user_42',
+)
+```
+
+`pool_policy` is `entity_only`, `entity_then_customer`, `customer_only`, or `null` when no policy applies.
+
+## Entity operation history
+
+```ts
 const history = await nozle.credits.listEntityOperations(
   'workspace_123',
   'user_42',
-  { creditSystemCode: 'ai_credits', limit: 25 },
-);
+  {
+    creditSystemCode: 'ai_credits',
+    limit: 25,
+  },
+)
 ```
 
-Allocation/deallocation is backend-only, exact-decimal, and subject to the Engine's default-off exact transfer gate:
+## Allocate credits
+
+Transfers require a secret key, a positive decimal string with at most 12 decimal places, and an idempotency key.
 
 ```ts
-await nozle.credits.allocate(
+const allocation = await nozle.credits.allocate(
   'workspace_123',
   'user_42',
-  { creditSystemCode: 'ai_credits', amount: '100.000000000001' },
-  { idempotencyKey: 'allocate-user-42-100' },
-);
+  {
+    creditSystemCode: 'ai_credits',
+    amount: '100.000000000001',
+  },
+  { idempotencyKey: 'allocate-user-42-100-v1' },
+)
+
+console.log(allocation.transferred)
+console.log(allocation.parent_sources)
+console.log(allocation.entity_sources)
+console.log(allocation.replayed)
 ```
 
-## Check and consume
+## Deallocate credits
+
+```ts
+const deallocation = await nozle.credits.deallocate(
+  'workspace_123',
+  'user_42',
+  {
+    creditSystemCode: 'ai_credits',
+    amount: '25',
+  },
+  { idempotencyKey: 'deallocate-user-42-25-v1' },
+)
+```
+
+Transfers are subject to the Engine's exact transfer policy and source eligibility rules. Retry an uncertain transfer with the same key and payload.
+
+## Advisory usage check
 
 ```ts
 const check = await nozle.usage.check({
-  customerId: 'customer_123',
+  customerId: 'workspace_123',
+  entityId: 'user_42',
   billableMetricCode: 'agent_execution',
   creditSystemCode: 'ai_credits',
-});
+  properties: { model: 'example-model' },
+  occurredAt: new Date().toISOString(),
+})
 
-console.log(check.projected_remaining); // exact decimal string
-console.log(check.projected_deductions); // ordered, no mutation
-
-const result = await nozle.usage.track(
-  {
-    customerId: 'customer_123',
-    entityId: 'user_42', // optional; enables Entity attribution and pool policy
-    billableMetricCode: 'agent_execution',
-    creditSystemCode: 'ai_credits',
-    timestamp: new Date().toISOString(),
-  },
-  { idempotencyKey: 'execution_0183f' },
-);
+console.log(check.advisory) // true
+console.log(check.allowed)
+console.log(check.credits_required)
+console.log(check.projected_remaining)
+console.log(check.projected_deductions)
 ```
 
-`usage.check` is advisory. Its projected source plan is useful for shadow
-fixtures, but another request can spend credits before a later mutation. Only
-`usage.track` atomically reserves and deducts value.
+`usage.check()` does not reserve or mutate credits. Another request can spend the projected sources before a later consume request.
+
+## Atomic usage tracking
+
+```ts
+const result = await nozle.usage.track(
+  {
+    customerId: 'workspace_123',
+    entityId: 'user_42',
+    billableMetricCode: 'agent_execution',
+    creditSystemCode: 'ai_credits',
+    properties: { model: 'example-model' },
+    timestamp: new Date().toISOString(),
+  },
+  { idempotencyKey: 'agent-execution-0183f' },
+)
+
+if (!result.allowed) {
+  console.log(result.reason, result.available)
+}
+```
+
+`usage.track()` atomically evaluates the metric conversion, selects eligible sources, deducts credits, and records the operation. The optional Entity ID enables Entity attribution and configured pool policy.
+
+## Legacy wallet adapter
+
+`nozle.checkAndDeduct({ customerId, feature, credits })` remains available for the legacy Lago-wallet path. New product-credit integrations should use `usage.check()` and `usage.track()`.
+
+## Security
+
+Keep credit reads and all mutations behind authenticated backend routes. Derive customer and Entity IDs from server-owned identity data and return only fields the browser needs.

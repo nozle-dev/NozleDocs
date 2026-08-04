@@ -1,0 +1,114 @@
+---
+title: "Customers and Entities"
+description: "Upsert customers and manage idempotent Entity lifecycle operations."
+---
+
+Customers represent the merchant's billable account or workspace. Entities represent children of that customer, such as users, agents, projects, or environments.
+
+## Upsert a customer
+
+```ts
+const customer = await nozle.customers.upsert({
+  externalId: 'workspace_123',
+  name: 'Acme Workspace',
+  email: 'billing@example.com',
+})
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `externalId` | `string` | yes | Stable application-owned customer identifier. |
+| `name` | `string` | no | Display name. |
+| `email` | `string` | no | Billing or contact email. |
+
+## Read Entities
+
+```ts
+const entity = await nozle.entities.get('workspace_123', 'user_42')
+
+const page = await nozle.entities.list('workspace_123', {
+  status: 'active',
+  limit: 50,
+})
+
+const nextPage = page.next_cursor
+  ? await nozle.entities.list('workspace_123', {
+      status: 'active',
+      limit: 50,
+      cursor: page.next_cursor,
+    })
+  : null
+```
+
+`status` accepts `active`, `suspended`, or `deleted`. `limit` must be an integer from 1 to 100.
+
+## Upsert an Entity
+
+```ts
+const result = await nozle.entities.upsert(
+  'workspace_123',
+  'user_42',
+  {
+    name: 'Asha',
+    status: 'active',
+    metadata: { role: 'agent' },
+  },
+  { idempotencyKey: 'entity-user-42-v1' },
+)
+
+console.log(result.action)
+console.log(result.replayed)
+```
+
+Entity IDs and idempotency keys are limited to 255 UTF-8 bytes. Retry an uncertain mutation with the same key and payload.
+
+## Activate or suspend
+
+```ts
+await nozle.entities.suspend('workspace_123', 'user_42', {
+  idempotencyKey: 'suspend-user-42-v1',
+})
+
+await nozle.entities.activate('workspace_123', 'user_42', {
+  idempotencyKey: 'activate-user-42-v2',
+})
+```
+
+These helpers first fetch the Entity, then preserve its current `name` and `metadata` while changing `status`.
+
+## Bulk upsert
+
+```ts
+const result = await nozle.entities.bulkUpsert(
+  'workspace_123',
+  [
+    { externalId: 'user_42', name: 'Asha', status: 'active' },
+    { externalId: 'user_43', name: 'Ravi', status: 'suspended' },
+  ],
+  { idempotencyKey: 'workspace-123-users-import-7' },
+)
+
+console.log(result.counts)
+```
+
+Each bulk request must contain 1–500 unique Entity external IDs.
+
+## Seat billing is explicit
+
+Entity lifecycle methods do not emit billable seat events. If seats are billed through a Billable Metric, track add/remove operations separately with stable transaction IDs through `nozle.track()`.
+
+```ts
+await nozle.track(
+  'workspace_123',
+  'billable_seats',
+  { user_id: 'user_42', operation: 'add' },
+  {
+    subscriptionId: 'workspace_123_subscription',
+    transactionId: 'seat-add-user-42-v1',
+  },
+)
+```
+
+## Entity credits
+
+Use Entity IDs with `nozle.credits` and `nozle.usage` for per-Entity balances, transfers, attribution, and pool policy. See [Product credits](/sdks/node/credits).

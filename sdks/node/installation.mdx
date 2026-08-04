@@ -1,65 +1,116 @@
 ---
-title: Installation
-description: Install and configure @nozle-js/node
+title: "Installation"
+description: "Install and configure the server-only @nozle-js/node SDK."
 ---
+
+`@nozle-js/node` requires Node.js 18 or later and uses the built-in Fetch API.
 
 ```bash
 npm install @nozle-js/node
 ```
 
-Initialize the client:
+## Create a client
 
-```typescript
-import { Nozle } from '@nozle-js/node';
+```ts
+import { Nozle } from '@nozle-js/node'
 
-const nozle = new Nozle({
-  apiKey: 'sk_live_...',
+export const nozle = new Nozle({
+  apiKey: process.env.NOZLE_SECRET_KEY!,
   baseUrl: 'https://api.nozle.app',
   eventsUrl: 'https://api.nozle.app',
   timeout: 10_000,
-});
+})
 ```
 
-## NozleConfig props
+### Configuration
 
-- **apiKey** (`string`, required) -- Your secret key (`sk_`)
-- **baseUrl** (`string`, default: `'http://localhost:8080'`) -- Nozle API URL
-- **eventsUrl** (`string`, default: `'http://localhost:3000'`) -- Events ingestion URL (Lago)
-- **timeout** (`number`, default: `10000`) -- Request timeout in ms
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `apiKey` | `string` | required | Organization credential. Use a restricted `sk_` for server mutations. |
+| `baseUrl` | `string` | `http://localhost:8080` | Core API origin used for billing, entitlements, credits, entities, usage, and margin. |
+| `eventsUrl` | `string` | `http://localhost:3000` | Events/Core origin used by `track()` and credit-system discovery. |
+| `timeout` | `number` | `10000` | Per-request timeout in milliseconds. |
 
-## Available methods
+Set both URLs explicitly outside local development. Trailing slashes are removed automatically.
 
-### Core
-
-- `nozle.track()` -- send usage events
-- `nozle.can()` -- check entitlements
-- `nozle.ping()` -- health check
-
-### Billing
-
-- `nozle.plans()` -- list available plans
-- `nozle.checkout()` -- create Stripe checkout session
-- `nozle.subscribe()` -- create a subscription
-- `nozle.cancelSubscription(customerId, subscriptionId, policy?)` -- schedule end-of-period cancellation by default, or terminate immediately
-
-### Customers & Credits
-
-- `nozle.customers.upsert()` -- create or update a customer
-- `nozle.creditSystems.list()` -- list Rails-owned Credit Systems
-- `nozle.credits.getBalance()` / `listBalances()` / `listOperations()` -- read exact product-credit state
-- `nozle.usage.check()` / `track()` -- advisory check and atomic idempotent consumption
-
-`nozle.checkAndDeduct()` is retained only as a legacy Lago-wallet adapter.
-
-### LLM Auto-Capture
-
-- `wrapOpenAI()` -- wrap OpenAI client for automatic token tracking
-- `wrapAnthropic()` -- wrap Anthropic client for automatic token tracking
-
-### Margin Intelligence
-
-- `nozle.margin.summary()` / `byCustomer()` / `byMetric()` / `byPlan()` / `byModel()` / `trend()`
+```mermaid
+flowchart LR
+  App[Your backend] --> SDK[@nozle-js/node]
+  SDK -->|baseUrl| Core[Billing, entitlements, credits, usage, margin]
+  SDK -->|eventsUrl| Events[Metered events and credit-system catalog]
+```
 
 <Warning>
-Use `sk_` (secret) keys only. This SDK is for server-side use.
+This package is server-only. Never bundle an `sk_`, master key, or internal credential into browser code. Use `@nozle-js/react` with a publishable key for public catalog reads.
 </Warning>
+
+## Verify connectivity
+
+```ts
+const health = await nozle.ping()
+
+console.log(health.ok)
+console.log(health.engine)
+console.log(health.version)
+```
+
+## API surface
+
+### Core and billing
+
+| Method | Purpose |
+|---|---|
+| `nozle.ping()` | Check API health. |
+| `nozle.plans()` | List plans. |
+| `nozle.checkout()` | Create a payment-aware checkout result. |
+| `nozle.subscribe()` | Create a direct subscription where your workflow permits it. |
+| `nozle.track()` | Send a metered event through the Events API. |
+| `nozle.can()` | Check feature access, usage, and margin state. |
+
+### Namespaces
+
+| Namespace | Methods |
+|---|---|
+| `customers` | `upsert()` |
+| `creditSystems` | `list()` |
+| `entities` | `get()`, `list()`, `upsert()`, `activate()`, `suspend()`, `bulkUpsert()` |
+| `credits` | Customer and Entity balance/history reads, `allocate()`, `deallocate()` |
+| `usage` | Advisory `check()` and atomic, idempotent `track()` |
+| `margin` | `summary()`, `byCustomer()`, `byMetric()`, `byPlan()`, `byModel()`, `trend()` |
+
+The package also exports `wrapOpenAI()` and `wrapAnthropic()` for token metadata capture.
+
+## Key behavior
+
+- `checkout()` and `subscribe()` explicitly require an API key beginning with `sk_`.
+- Entity mutations, credit transfers, and `usage.track()` reject publishable `pk_` keys.
+- Mutation idempotency keys are caller-supplied and limited to 255 bytes.
+- Product-credit amounts are exact decimal strings, not JavaScript numbers.
+- Failed HTTP responses reject with an `Error` containing the operation and HTTP status.
+- Every request uses `AbortSignal.timeout(timeout)`.
+
+## Production pattern
+
+Create one client per process and reuse it:
+
+```ts
+// billing/nozle.ts
+import { Nozle } from '@nozle-js/node'
+
+export const nozle = new Nozle({
+  apiKey: process.env.NOZLE_SECRET_KEY!,
+  baseUrl: process.env.NOZLE_API_URL!,
+  eventsUrl: process.env.NOZLE_EVENTS_URL ?? process.env.NOZLE_API_URL!,
+})
+```
+
+Do not accept authoritative `customerId`, Entity IDs, plan codes, return origins, or idempotency keys blindly from a browser. Derive or validate them in your trusted backend.
+
+## Next steps
+
+- [Billing and subscriptions](/sdks/node/billing)
+- [Tracking events](/sdks/node/tracking-events)
+- [Customers and Entities](/sdks/node/customers-entities)
+- [Product credits](/sdks/node/credits)
+- [Entitlements](/sdks/node/entitlements)
+- [LLM auto-capture](/sdks/node/llm-auto-capture)

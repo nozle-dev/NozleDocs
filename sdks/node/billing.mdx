@@ -1,0 +1,102 @@
+---
+title: "Billing and subscriptions"
+description: "List plans and create payment-aware checkout or direct subscriptions from a trusted backend."
+---
+
+Billing methods run on your server with a secret key. Derive the Nozle customer from the authenticated application user or workspace.
+
+## List plans
+
+```ts
+const plans = await nozle.plans()
+
+for (const plan of plans) {
+  console.log(plan.code, plan.amount_cents, plan.amount_currency, plan.interval)
+}
+```
+
+Each `Plan` contains `code`, `name`, `amount_cents`, `amount_currency`, and `interval`.
+
+## Create checkout
+
+```ts
+const result = await nozle.checkout(
+  'workspace_123',
+  'pro_monthly',
+  'https://app.example.com/settings/billing',
+)
+```
+
+`checkout()` requires an `sk_` key and may return:
+
+```ts
+type CheckoutResult =
+  | {
+      type: 'stripe'
+      url?: string
+      client_secret?: string
+      clientSecret?: string
+      invoice_id?: string
+      amount_cents?: number
+      currency?: string
+    }
+  | {
+      type: 'completed' | 'scheduled'
+      status: string
+      subscription_id?: string
+      plan_code?: string
+    }
+```
+
+Handle every result shape explicitly:
+
+```ts
+if (result.type === 'stripe') {
+  if (result.url) return redirect(result.url)
+  if (result.client_secret || result.clientSecret) {
+    return { clientSecret: result.client_secret ?? result.clientSecret }
+  }
+  throw new Error('Stripe checkout returned no URL or client secret')
+}
+
+if (result.type === 'completed') {
+  return { status: result.status, refreshBilling: true }
+}
+
+return { status: result.status, scheduled: true }
+```
+
+Validate the exact HTTPS return origin on your server before passing it to Nozle.
+
+<Warning>
+Stripe webhook processing is authoritative. A checkout result, browser redirect, or client callback does not by itself prove that a paid subscription is active.
+</Warning>
+
+## Direct subscription
+
+```ts
+const subscription = await nozle.subscribe('workspace_123', 'free')
+
+console.log(subscription.subscription_id)
+console.log(subscription.status)
+```
+
+`subscribe()` requires an `sk_` key and returns `SubscribeResult`. Use checkout for payment-gated plan changes; use direct subscription only where your configured product flow does not require an interactive payment.
+
+## Cancellation
+
+Version `0.4.0` does not export a `cancelSubscription()` method. Call the [Cancel subscription API](/api/cancel-subscription) from your backend until cancellation support is added to the package.
+
+## Customer creation
+
+Create or update the customer before subscribing when needed:
+
+```ts
+const customer = await nozle.customers.upsert({
+  externalId: 'workspace_123',
+  name: 'Acme Workspace',
+  email: 'billing@example.com',
+})
+```
+
+See [Customers and Entities](/sdks/node/customers-entities) for lifecycle methods.

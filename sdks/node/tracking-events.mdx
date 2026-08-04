@@ -1,46 +1,92 @@
 ---
-title: Tracking Events
-description: Send usage events with nozle.track()
+title: "Tracking events"
+description: "Send idempotent metered events and control subscription attribution with nozle.track()."
 ---
 
-```typescript
+`nozle.track()` sends one event to `eventsUrl/api/v1/events`.
+
+```ts
 await nozle.track(
-  'customer_123',        // customer ID
-  'api_call',            // event code (matches your billable metric)
-  { model: 'gpt-4', tokens: 1500 },  // properties (metadata)
+  'workspace_123',
+  'api_calls',
+  { model: 'example-model', tokens: 1_500 },
   {
-    subscriptionId: 'sub_abc',  // optional: specific subscription
-    transactionId: 'tx_unique', // optional: idempotency key
-    timestamp: '2024-01-15T10:30:00Z'  // optional: event timestamp
-  }
-);
+    subscriptionId: 'workspace_123_subscription',
+    transactionId: 'request_0183f',
+    timestamp: '2026-08-04T10:30:00Z',
+  },
+)
 ```
 
-**Parameters:**
-- customerId (string): The external customer ID
-- event (string): Event code matching a billable metric in your workspace
-- metadata (`Record<string, unknown>`, optional): Properties attached to the event
-- options.subscriptionId (string, optional): Target a specific subscription
-- options.transactionId (string, optional): Unique ID for idempotency (auto-generated if omitted)
-- options.timestamp (string, optional): ISO 8601 timestamp (defaults to now)
+## Signature
 
-**How it works:**
-The SDK sends a `POST /api/v1/events` request to Nozle:
+```ts
+track(
+  customerId: string,
+  event: string,
+  metadata?: Record<string, unknown>,
+  options?: {
+    subscriptionId?: string
+    transactionId?: string
+    timestamp?: string
+  },
+): Promise<void>
+```
+
+| Argument | Description |
+|---|---|
+| `customerId` | External Nozle customer ID. |
+| `event` | Event code matching the Billable Metric code. |
+| `metadata` | Properties used by metric aggregation or cost attribution. |
+| `subscriptionId` | Explicit external subscription target. |
+| `transactionId` | Stable event ID used for idempotency. A UUID is generated when omitted. |
+| `timestamp` | Optional ISO 8601 event time. |
+
+## Subscription resolution
+
+When `subscriptionId` is omitted, the SDK queries `eventsUrl/api/v1/subscriptions` for active subscriptions belonging to the customer:
+
+- exactly one active subscription: its external ID is cached and used;
+- no active subscriptions: `track()` rejects;
+- multiple active subscriptions: `track()` rejects and requires an explicit `subscriptionId`.
+
+Pass `subscriptionId` explicitly for customers with multiple active subscriptions and for latency-sensitive event paths that should avoid the initial lookup.
+
+## Request payload
+
 ```json
 {
   "event": {
-    "transaction_id": "tx_unique",
-    "external_customer_id": "customer_123",
-    "code": "api_call",
-    "properties": { "model": "gpt-4", "tokens": 1500 },
-    "external_subscription_id": "sub_abc",
-    "timestamp": "2024-01-15T10:30:00Z"
+    "transaction_id": "request_0183f",
+    "external_customer_id": "workspace_123",
+    "external_subscription_id": "workspace_123_subscription",
+    "code": "api_calls",
+    "properties": {
+      "model": "example-model",
+      "tokens": 1500
+    },
+    "timestamp": "2026-08-04T10:30:00Z"
   }
 }
 ```
 
-**Best practices:**
-- Always set a transactionId for idempotency in production
-- Match event codes exactly to your billable metric codes
-- Properties are used for aggregation (e.g., SUM on "tokens" property)
-- For high-volume tracking, batch events or use a queue
+## Idempotency
+
+Generate a deterministic transaction ID from the business operation whenever possible. Retry the same logical event with the same ID.
+
+```ts
+const transactionId = `generation:${generationId}:completed`
+
+await nozle.track(customerId, 'text_generation', {
+  input_tokens: usage.inputTokens,
+  output_tokens: usage.outputTokens,
+}, { subscriptionId, transactionId })
+```
+
+## Operational guidance
+
+- Await `track()` when the request must know whether ingestion succeeded.
+- For high-volume workloads, publish through your own durable queue and call `track()` from a worker.
+- Do not create a new random transaction ID on each retry.
+- Match property names to the Billable Metric aggregation configuration exactly.
+- Use `usage.track()` instead when the operation must atomically enforce and deduct product credits.

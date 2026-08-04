@@ -1,65 +1,69 @@
 ---
-title: Margin Queries
-description: Query margin intelligence data with the Node SDK
+title: "Margin queries"
+description: "Query summary, customer, metric, plan, model, and trend margin data."
 ---
 
-The margin client is available as `nozle.margin`. All methods accept optional query params (`from`, `to` date strings).
+Margin methods are available under `nozle.margin` and call `GET /api/v1/margin/*`.
 
-## Summary
+```ts
+const range = {
+  from: '2026-07-01',
+  to: '2026-07-31',
+}
 
-```typescript
-const summary = await nozle.margin.summary({ from: '2024-01-01', to: '2024-01-31' });
+const summary = await nozle.margin.summary(range)
+const customers = await nozle.margin.byCustomer(range)
+const metrics = await nozle.margin.byMetric(range)
+const plans = await nozle.margin.byPlan(range)
+const models = await nozle.margin.byModel(range)
 ```
 
-## By Customer
+## Methods
 
-```typescript
-const byCustomer = await nozle.margin.byCustomer({ from: '2024-01-01', to: '2024-01-31' });
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `summary(params?)` | `/summary` | Aggregate margin summary. |
+| `byCustomer(params?)` | `/customers` | Margin grouped by customer. |
+| `byMetric(params?)` | `/metrics` | Margin grouped by Billable Metric. |
+| `byPlan(params?)` | `/plans` | Margin grouped by plan. |
+| `byModel(params?)` | `/models` | Margin grouped by model. |
+| `trend(params?)` | `/trend` | Time-series margin data. |
+
+## Date filters
+
+All methods accept optional `from` and `to` strings. Additional string query parameters are forwarded as provided.
+
+```ts
+const result = await nozle.margin.byCustomer({
+  from: '2026-07-01T00:00:00Z',
+  to: '2026-08-01T00:00:00Z',
+})
 ```
 
-## By Metric
+## Trend granularity
 
-```typescript
-const byMetric = await nozle.margin.byMetric();
-```
-
-## By Plan
-
-```typescript
-const byPlan = await nozle.margin.byPlan();
-```
-
-## By Model
-
-```typescript
-const byModel = await nozle.margin.byModel();
-```
-
-## Trend
-
-```typescript
+```ts
 const trend = await nozle.margin.trend({
-  from: '2024-01-01',
-  to: '2024-01-31',
-  granularity: 'day', // 'hour' | 'day' | 'week' | 'month'
-});
+  from: '2026-07-01',
+  to: '2026-07-31',
+  granularity: 'day',
+})
 ```
 
-## Parameters
+`granularity` accepts `hour`, `day`, `week`, or `month` and defaults to `day`.
 
-**MarginQueryParams:**
+## Result typing
 
-- `from` (string, optional) -- Start date (ISO 8601)
-- `to` (string, optional) -- End date (ISO 8601)
+Version `0.4.0` returns margin payloads as `unknown`; narrow them in your application or validate them with your schema library before use.
 
-**TrendParams** extends MarginQueryParams:
+```ts
+const summary = await nozle.margin.summary(range)
 
-- `granularity` (`'hour'` | `'day'` | `'week'` | `'month'`, default: `'day'`)
+if (!isMarginSummary(summary)) {
+  throw new Error('Unexpected margin response')
+}
+```
 
 <Info>
-All margin endpoints require a secret key (`sk_`). These are the same endpoints exposed at `GET /api/v1/margin/*` on the Nozle API.
+The Margin Simulate API is not exposed by the Node SDK in version `0.4.0`. Call the [Margin simulate API](/api/margin-simulate) directly from your backend when needed.
 </Info>
-
-<Warning>
-There is a `POST /api/v1/margin/simulate` endpoint on the API (not yet in the SDK) for what-if margin analysis.
-</Warning>
