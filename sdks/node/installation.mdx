@@ -19,7 +19,7 @@ import { Nozle } from '@nozle-js/node'
 export const nozle = new Nozle({
   apiKey: process.env.NOZLE_SECRET_KEY!,
   baseUrl: 'https://api.nozle.app',
-  eventsUrl: 'https://api.nozle.app',
+  eventsUrl: 'https://core.nozle.app',
   timeout: 10_000,
 })
 ```
@@ -30,7 +30,7 @@ export const nozle = new Nozle({
 |---|---|---|---|
 | `apiKey` | `string` | required | Organization credential. Use a restricted `sk_` for server mutations. |
 | `baseUrl` | `string` | `http://localhost:8080` | API origin used for billing, entitlements, credits, entities, usage, and margin. |
-| `eventsUrl` | `string` | `http://localhost:3000` | Event API origin used by `track()` and credit-system discovery. |
+| `eventsUrl` | `string` | `http://localhost:3000` | Core API origin used by `track()`, credit-system discovery, and Entity subscriptions. Use `https://core.nozle.app` in production. |
 | `timeout` | `number` | `10000` | Per-request timeout in milliseconds. |
 
 Set both URLs explicitly outside local development. Trailing slashes are removed automatically.
@@ -106,7 +106,7 @@ import { Nozle } from '@nozle-js/node'
 export const nozle = new Nozle({
   apiKey: process.env.NOZLE_SECRET_KEY!,
   baseUrl: process.env.NOZLE_API_URL!,
-  eventsUrl: process.env.NOZLE_EVENTS_URL ?? process.env.NOZLE_API_URL!,
+  eventsUrl: process.env.NOZLE_EVENTS_URL ?? 'https://core.nozle.app',
 })
 ```
 

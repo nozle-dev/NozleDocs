@@ -3,7 +3,7 @@ import { Nozle } from '@nozle-js/node';
 const nozle = new Nozle({
   apiKey: 'sk_example',
   baseUrl: 'https://api.nozle.app',
-  eventsUrl: 'https://api.nozle.app',
+  eventsUrl: 'https://core.nozle.app',
   timeout: 10_000,
 });
 
