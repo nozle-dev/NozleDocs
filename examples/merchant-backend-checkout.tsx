@@ -14,7 +14,7 @@ interface CheckoutRequest {
 }
 
 const allowedPlans = new Set(['free', 'pro', 'max']);
-const allowedReturnOrigins = new Set(['https://wrrk.ai']);
+const allowedReturnOrigins = new Set(['https://app.example.com']);
 
 async function lookupNozleCustomerForTeam(teamId: string): Promise<string> {
   return `team_${teamId}`;
@@ -68,7 +68,7 @@ export function BillingApp({
         return response.json();
       }}
     >
-      <PricingTable returnUrl="https://wrrk.ai/settings/billing" />
+      <PricingTable returnUrl="https://app.example.com/settings/billing" />
       {children}
     </BillingProvider>
   );

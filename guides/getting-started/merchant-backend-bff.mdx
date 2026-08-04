@@ -12,13 +12,13 @@ Nozle uses a two-credential model:
 
 The browser never receives a Nozle secret key and never chooses the authoritative Nozle customer. Your backend derives that customer from the authenticated application user or team.
 
-## Wrrk reference flow
+## Example merchant flow
 
 ```text
-Wrrk browser
-  -> authenticated Wrrk POST /api/billing/checkout
-  -> Wrrk derives the Nozle customer from the logged-in team
-  -> Wrrk calls Nozle with its restricted sk_
+Merchant browser
+  -> authenticated merchant POST /api/billing/checkout
+  -> merchant backend derives the Nozle customer from the logged-in team
+  -> merchant backend calls Nozle with its restricted sk_
   -> Nozle returns the Stripe checkout result
 ```
 
@@ -33,7 +33,7 @@ const nozle = new Nozle({
 })
 
 const allowedPlans = new Set(['free', 'pro', 'max'])
-const allowedReturnOrigins = new Set(['https://wrrk.ai'])
+const allowedReturnOrigins = new Set(['https://app.example.com'])
 
 export async function postBillingCheckout(request: Request, user: AuthenticatedUser) {
   const body = await request.json() as Record<string, unknown>
@@ -58,7 +58,7 @@ export async function postBillingCheckout(request: Request, user: AuthenticatedU
 }
 ```
 
-Cookie-authenticated routes must retain normal CSRF protection. Wrrk's secret key should grant only the API permissions required by its backend routes. Never use Nozle's master key for merchant traffic.
+Cookie-authenticated routes must retain normal CSRF protection. The merchant's secret key should grant only the API permissions required by its backend routes. Never use Nozle's master key for merchant traffic.
 
 ### React
 
@@ -96,6 +96,6 @@ For cancellation, call `cancelSubscription(customerId, subscriptionId)` from the
 
 ## Payment authority
 
-Stripe webhook processing is authoritative. A redirect back to Wrrk never activates a paid plan. Nozle activates payment-gated changes only after verified, idempotently processed Stripe success; failed payments and 3DS remain in the payment flow.
+Stripe webhook processing is authoritative. A redirect back to the merchant application never activates a paid plan. Nozle activates payment-gated changes only after verified, idempotently processed Stripe success; failed payments and 3DS remain in the payment flow.
 
 Billable and credit-consuming events also stay server-side through `@nozle-js/node` with the restricted `sk_`. CORS and `Origin` headers are browser controls, not authentication.
