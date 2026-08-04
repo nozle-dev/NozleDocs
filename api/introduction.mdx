@@ -1,0 +1,41 @@
+---
+title: API Introduction
+description: Build billing, metering, entitlement, credit, and margin workflows with Nozle
+---
+
+Nozle provides two complementary HTTP API surfaces:
+
+| Base URL | Use it for |
+|---|---|
+| `https://core.nozle.app/api/v1` | Customers, plans, subscriptions, usage events, invoices, wallets, payments, taxes, and billing configuration |
+| `https://api.nozle.app/api/v1` | Checkout, product credits, entitlements, margin intelligence, and other Nozle extensions |
+
+The complete Core API reference is generated from Nozle's OpenAPI contract. Nozle-specific workflow endpoints are documented alongside it.
+
+## Typical integration
+
+1. Create or update a customer using your application's stable external identifier.
+2. Define billable metrics and plans in the dashboard or Core API.
+3. Create a subscription or start a payment-gated checkout.
+4. Send idempotent usage events from your backend.
+5. Process signed webhooks and reconcile subscription, invoice, and payment state.
+
+## Authentication
+
+Server endpoints require a secret key in the Bearer authorization header:
+
+```http
+Authorization: Bearer sk_nozle_your_secret_key
+```
+
+Publishable keys are limited to the public plan catalog. Never expose a secret key in browser or mobile code. See [Authentication](/api/authentication) for the full trust-boundary model.
+
+## Identifiers
+
+Use `external_id`, `external_customer_id`, and `external_subscription_id` for identifiers owned by your application. Treat Nozle-generated UUIDs as opaque values and preserve exact compatibility field names shown in each endpoint schema.
+
+## Next steps
+
+- Review [API Standards](/api/api-standards) for requests, pagination, errors, and idempotency.
+- Start with [Customers](/api/create-customer), [Plans](/api/list-plans), or [Usage Events](/api/events).
+- Use the [Node.js SDK](/sdks/node/installation) or [Python SDK](/sdks/python/installation) for typed server integrations.

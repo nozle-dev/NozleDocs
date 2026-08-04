@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "**/*.mdx"
+      - "**/*.yaml"
       - "examples/**"
       - package.json
       - package-lock.json
@@ -15,6 +16,7 @@ on:
     branches: [main]
     paths:
       - "**/*.mdx"
+      - "**/*.yaml"
       - "examples/**"
       - package.json
       - package-lock.json
@@ -47,8 +49,19 @@ jobs:
             git ls-files | grep -Ei "$forbidden" >&2
             exit 1
           fi
-          if git grep -niE "$forbidden" -- .; then
+          if git grep -niE "$forbidden" -- . ':(exclude)nozle-openapi.yaml'; then
             echo "Published documentation contains a forbidden third-party product name." >&2
+            exit 1
+          fi
+          # The public Core contract still emits inherited compatibility field
+          # names and webhook headers. Permit only those exact wire identifiers;
+          # reject the third-party product name everywhere else in the spec.
+          sed -E \
+            -e 's/[lL][aA][gG][oO]_[A-Za-z0-9_]+//g' \
+            -e 's/X-[lL][aA][gG][oO]-[A-Za-z-]+//g' \
+            nozle-openapi.yaml > /tmp/nozle-openapi-brand-check.yaml
+          if grep -niE "$forbidden" /tmp/nozle-openapi-brand-check.yaml; then
+            echo "The OpenAPI specification contains third-party branding outside compatibility wire names." >&2
             exit 1
           fi
 
