@@ -1,0 +1,62 @@
+---
+title: API Standards
+description: Authentication, payloads, pagination, errors, and safe retries
+---
+
+## Requests and responses
+
+Nozle APIs use JSON request and response bodies. Send:
+
+```http
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer sk_nozle_your_secret_key
+```
+
+Timestamps use ISO 8601 UTC strings. Monetary amounts use integer minor units, such as cents, unless an endpoint explicitly documents a decimal string.
+
+## Pagination
+
+Collection endpoints use `page` and `per_page` query parameters. Paginated responses include metadata with the current page, adjacent pages, total pages, and total record count.
+
+```json
+{
+  "meta": {
+    "current_page": 1,
+    "next_page": 2,
+    "prev_page": null,
+    "total_pages": 4,
+    "total_count": 70
+  }
+}
+```
+
+## External identifiers
+
+Prefer stable external identifiers from your own system when an endpoint accepts them. They make reconciliation easier and prevent your application from depending on database-generated UUIDs.
+
+## Idempotency and retries
+
+For metered events and credit operations, generate a unique transaction or idempotency identifier and reuse it when retrying the same logical operation. Do not generate a new identifier after a timeout unless you intend to create a second operation.
+
+Retry transient network failures and HTTP `429` or `5xx` responses with exponential backoff and jitter. Do not automatically retry validation or authorization failures.
+
+## Errors
+
+Use the HTTP status code as the primary error category and log the response body for diagnosis. Common statuses include:
+
+| Status | Meaning |
+|---|---|
+| `400` | Malformed request |
+| `401` | Missing or invalid authentication |
+| `403` | Authenticated but not permitted |
+| `404` | Resource not found |
+| `422` | Valid JSON with invalid resource attributes |
+| `429` | Request rate exceeded |
+| `5xx` | Temporary server failure |
+
+See [Errors](/api/errors) for retry guidance and application-safe handling.
+
+## Compatibility names
+
+Some inherited response properties and webhook headers retain compatibility names from the underlying billing contract. Use the exact names displayed in the generated endpoint schemas; they remain stable even when the product-facing terminology differs.
