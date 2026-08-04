@@ -19,7 +19,7 @@ The PaymentMethodDisplay component shows the customer's saved card:
 
 ```tsx
 <PaymentMethodDisplay
-  paymentMethod={{ last4: '4242', brand: 'visa', expMonth: 12, expYear: 2025 }}
+  paymentMethod={{ last4: '4242', brand: 'visa', expMonth: 12, expYear: 2028 }}
   onUpdatePaymentMethod={() => router.push('/update-card')}
 />
 ```
@@ -35,12 +35,6 @@ When a payment fails, Nozle records the failed payment status. Dunning and retri
 
 Configure fixed top-up packages for a Credit System. Checkout creation produces an invoice/payment flow; credits are granted only after confirmed payment:
 
-```tsx
-<ProductCreditBalance creditSystemCode="ai_credits" />
-<CreditTopUpButton creditSystemCode="ai_credits" topUpPackageCode="starter_pack" />
-<CreditUsageHistory creditSystemCode="ai_credits" />
-```
+Expose top-up packages through your authenticated backend, start checkout from your billing UI, and refresh the balance only after payment confirmation. Product credits are separate from invoice wallet credits. See [Paid Credit Top-ups](/guides/credits/top-ups).
 
-Product credits are separate from Lago wallet credits. See [Paid Credit Top-ups](/guides/credits/top-ups).
-
-For detailed payment configuration, see:
+For related configuration, see [Checkout](/guides/billing/checkout), [Subscriptions](/guides/billing/subscriptions), and [Paid Credit Top-ups](/guides/credits/top-ups).

@@ -1,12 +1,10 @@
 ---
 title: Track and Consume Credits
 api: "POST /usage/track"
-description: Atomically consume credits and queue the matching Lago event
+description: Atomically consume credits and queue the matching billing event
 ---
 
-**Auth:** secret key only. The organization and BillableMetric must match the
-reviewed mutation gate. A gate may also require an explicit matching Credit
-System.
+**Auth:** secret key only. The customer, Billable Metric, and optional Credit System must belong to the authenticated organization.
 
 ```http
 POST /usage/track
@@ -32,5 +30,4 @@ Core event.
 
 Retry HTTP `503` with the same idempotency key. Reusing a key with a different payload returns `409`.
 
-For rollout configuration and exact target syntax, see [Credit Rollout and
-Acceptance](/guides/credits/rollout).
+For staged validation and canary guidance, see [Credit Rollout and Acceptance](/guides/credits/rollout).

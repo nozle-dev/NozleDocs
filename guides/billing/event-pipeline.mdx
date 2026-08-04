@@ -1,91 +1,71 @@
 ---
 title: Event Pipeline
-description: How usage events flow from your app to invoices
+description: How usage events move from your application into billing and margin reporting
 ---
 
-Usage-based billing starts with **events**. Every time a customer does something billable --- an API call, a model inference, a file upload --- your app sends an event to Nozle. Those events flow through a pipeline that ends with a line item on an invoice.
+Usage billing starts with an application-owned event. Each logical event should have a stable transaction ID, a customer, a Billable Metric code, and the properties required by that metric.
 
-## The full event flow
+## 1. Track from your backend
 
-### 1. Your app tracks usage
+```ts title="Node.js"
+import { Nozle } from '@nozle-js/node'
 
-Your application calls `nozle.track()` whenever a billable action occurs.
+const nozle = new Nozle({
+  apiKey: process.env.NOZLE_SECRET_KEY!,
+  baseUrl: 'https://api.nozle.app',
+  eventsUrl: 'https://api.nozle.app',
+})
 
-```ts title="Node SDK"
-import Nozle from '@nozle-js/node';
-
-const nozle = new Nozle({ secretKey: process.env.NOZLE_SECRET_KEY });
-
-await nozle.track('customer_123', 'api_call', {
-  model: 'gpt-4',
-  tokens: 1500,
-});
+await nozle.track(
+  'customer_123',
+  'api_calls',
+  { model: 'example-model', tokens: 1_500 },
+  {
+    subscriptionId: 'subscription_123',
+    transactionId: 'request_0183f',
+    timestamp: '2026-08-04T10:30:00Z',
+  },
+)
 ```
 
-```python title="Python SDK"
+```python title="Python"
 from nozle import Nozle
 
-nozle = Nozle(secret_key=os.environ["NOZLE_SECRET_KEY"])
+nozle = Nozle(
+    api_key="sk_example",
+    base_url="https://api.nozle.app",
+    events_url="https://api.nozle.app",
+)
 
-nozle.track("customer_123", "api_call", {
-    "model": "gpt-4",
-    "tokens": 1500,
-})
+nozle.track(
+    "customer_123",
+    "api_calls",
+    metadata={"model": "example-model", "tokens": 1_500},
+    subscription_id="subscription_123",
+    transaction_id="request_0183f",
+    timestamp="2026-08-04T10:30:00Z",
+)
 ```
 
-### 2. SDK sends the event to Nozle
+## 2. Ingest and deduplicate
 
-Under the hood, the SDK sends a `POST /api/v1/events` request to the Nozle API (via the configured `eventsUrl`). The request body looks like this:
+Nozle accepts the event through the configured Events API. Preserve both the transaction ID and event timestamp when retrying the same logical event. Deployments using the high-volume event store deduplicate on both values.
 
-```json
-{
-  "event": {
-    "transaction_id": "unique-id",
-    "external_customer_id": "customer_123",
-    "code": "api_call",
-    "properties": { "model": "gpt-4", "tokens": 1500 },
-    "external_subscription_id": "sub_abc",
-    "timestamp": "2024-01-15T10:30:00Z"
-  }
-}
-```
+## 3. Aggregate usage
 
-### 3. Nozle receives and stores the event
+Billable Metrics define how properties are aggregated, including count, sum, maximum, and unique count. Property names must match the metric configuration exactly.
 
-Nozle validates the event against the known billable metrics and persists it. Events are processed **asynchronously** --- they will not appear on invoices immediately.
+## 4. Invoice and analyze
 
-### 4. Events are aggregated
+Aggregated usage becomes invoice charges according to the plan's pricing model. The same event metadata can feed cost models and margin reporting.
 
-At billing period boundaries (monthly, weekly, or custom), Nozle aggregates all events for each billable metric based on its configured aggregation type:
+## Product-credit events
 
-| Aggregation | What it does | Example |
-|---|---|---|
-| **COUNT** | Counts the number of events | Number of API calls |
-| **SUM** | Sums a numeric property across events | Total tokens consumed |
-| **MAX** | Takes the maximum value of a property | Peak concurrent connections |
-| **UNIQUE COUNT** | Counts distinct values of a property | Unique models used |
+For actions that must be authorized and deducted from product credits, call `usage.track()` instead of sending a plain event. Nozle records the credit operation and queues the matching billing event in one durable workflow.
 
-### 5. Invoices are generated
+## Operational guidance
 
-Aggregated usage is applied to the subscription's charge model (standard, graduated, package, percentage, or volume) to produce charges. Those charges appear on the next invoice when the billing period closes.
-
-### 6. Invoices surface in your app
-
-Nozle exposes invoices via `GET /api/v1/invoices`, and the React SDK displays them to your customers through the `InvoiceList` component:
-
-```tsx
-import { InvoiceList } from '@nozle-js/react';
-
-function BillingPage() {
-  return <InvoiceList />;
-}
-```
-
-## Key points
-
-- **`code` must match a billable metric** configured in your Nozle workspace. If the code does not match any metric, the event is ignored.
-- **`properties` drive aggregation.** For a SUM metric on `tokens`, every event must include a `tokens` property with a numeric value.
-- **`transaction_id` provides idempotency.** Sending the same `transaction_id` twice will not create a duplicate event. Use a deterministic ID (e.g., a hash of the request) to guarantee exactly-once semantics.
-- **Events are asynchronous.** They will not appear on invoices until the billing period closes. For real-time usage visibility, query the current usage endpoint instead.
-
-## Further reading
+- Publish from a durable worker for high-volume or business-critical telemetry.
+- Reuse the same transaction ID and timestamp on retries.
+- Supply `subscriptionId` explicitly when a customer can have multiple active subscriptions.
+- Do not expect a plain event to reserve credits or synchronously update an invoice.

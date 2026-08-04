@@ -72,15 +72,16 @@ Pass `subscriptionId` explicitly for customers with multiple active subscription
 
 ## Idempotency
 
-Generate a deterministic transaction ID from the business operation whenever possible. Retry the same logical event with the same ID.
+Generate a deterministic transaction ID and capture the event timestamp from the business operation whenever possible. Retry the same logical event with both values unchanged.
 
 ```ts
 const transactionId = `generation:${generationId}:completed`
+const timestamp = generationCompletedAt.toISOString()
 
 await nozle.track(customerId, 'text_generation', {
   input_tokens: usage.inputTokens,
   output_tokens: usage.outputTokens,
-}, { subscriptionId, transactionId })
+}, { subscriptionId, transactionId, timestamp })
 ```
 
 ## Operational guidance
@@ -88,5 +89,6 @@ await nozle.track(customerId, 'text_generation', {
 - Await `track()` when the request must know whether ingestion succeeded.
 - For high-volume workloads, publish through your own durable queue and call `track()` from a worker.
 - Do not create a new random transaction ID on each retry.
+- Do not regenerate the timestamp when retrying an accepted business event.
 - Match property names to the Billable Metric aggregation configuration exactly.
 - Use `usage.track()` instead when the operation must atomically enforce and deduct product credits.

@@ -9,9 +9,9 @@ Paid top-ups use fixed catalog packages. A package snapshots its Credit System, 
 Create purchase -> checkout/invoice -> payment succeeds -> idempotent credit source
 ```
 
-Checkout creation never grants credits. Core durably records the successful payment signal and Engine materializes exactly one source and one originating grant operation. A reconciliation sweep repairs missed delivery without duplicating credits.
+Checkout creation never grants credits. Nozle durably records the successful payment signal, then materializes exactly one source and one originating grant operation. A reconciliation sweep repairs missed delivery without duplicating credits.
 
-The React `CreditTopUpButton` submits `creditSystemCode` and `topUpPackageCode`, reuses its idempotency key after network failure, and uses same-page hosted-checkout navigation.
+Expose available packages through your authenticated backend and start checkout from your own billing UI or a merchant callback. Refresh the product-credit balance only after payment confirmation.
 
 <Warning>
 The package's money-to-credit exchange is different from a metric rate. `$10 -> 250 AI credits` defines a product package; `1 agent execution -> 2 AI credits` defines usage cost.

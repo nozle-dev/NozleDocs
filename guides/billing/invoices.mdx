@@ -1,40 +1,42 @@
 ---
 title: Invoices
-description: Invoice generation and delivery
+description: Understand invoice generation, payment state, and customer delivery
 ---
 
-Invoices are generated automatically and accessible through Nozle's API and React SDK.
+Nozle generates invoices from recurring charges, metered usage, one-off purchases, and subscription transitions.
 
-## Viewing invoices
+## Read invoices
 
-### React: InvoiceList component
+Fetch invoices from your authenticated backend with `GET /api/v1/invoices?customer_id={id}`. Derive the customer from the logged-in user or workspace rather than browser input.
 
-```tsx
-<InvoiceList customerId="cust_123" />
+Typical states include `draft`, `open`, `paid`, `void`, and `uncollectible`.
+
+## Lifecycle
+
+1. Nozle calculates recurring and usage charges.
+2. The invoice is created according to the plan's billing timing.
+3. Stripe collects payment when configured.
+4. Verified payment events update invoice and subscription state.
+5. The invoice PDF becomes available for customer delivery.
+
+## React applications
+
+The current React SDK does not fetch customer invoices. Expose a narrow merchant endpoint and render the returned fields in your application.
+
+```ts
+const response = await fetch('/api/billing/invoices', {
+  credentials: 'include',
+})
+
+const invoices = await response.json()
 ```
-
-Shows: invoice number, date, amount, currency, status, PDF download link.
-
-### API: GET /api/v1/invoices?customer_id=\{id\}
-
-Returns array of invoices with statuses: `draft`, `open`, `paid`, `void`, `uncollectible`.
-
-## Invoice lifecycle
-
-1. Invoice generated at billing period end (or on subscription change)
-2. Invoice starts as "draft" or "open"
-3. Payment is collected via Stripe
-4. Stripe webhook updates status to "paid"
-5. PDF is generated and available for download
-6. Email with invoice sent via Loops SMTP (no-reply@nozle.app)
 
 ## Email delivery
 
-Invoices are emailed automatically via Loops (smtp.loops.so:587). The from address is no-reply@nozle.app.
+Invoice delivery uses the transactional email configuration associated with your deployment. Configure the sender identity and SMTP provider for self-hosted environments; Nozle Cloud manages delivery infrastructure.
 
 ## Further reading
 
-For deeper invoice configuration (grace periods, numbering, net payment terms, taxes), see:
-
-- Credit Notes
-- Taxes
+- [Payments](/guides/billing/payments)
+- [Subscriptions](/guides/billing/subscriptions)
+- [API authentication](/api/authentication)

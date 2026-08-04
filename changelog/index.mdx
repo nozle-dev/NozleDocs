@@ -1,21 +1,67 @@
 ---
 title: Changelog
-description: What's new in Nozle
+description: Product and developer-platform updates from Nozle
 ---
+
+## August 2026
+
+_Updated through August 4, 2026._
+
+### Subscription settlement controls
+
+- Added preview and apply APIs for cancellation, downgrade, and uncancel transitions.
+- Added merchant-controlled timing, billing-anchor, proration, credit, refund, offset, and final-invoice policies.
+- Added idempotent transition application so uncertain requests can be retried safely.
+- Released the settlement controls in `@nozle-js/node` 0.4.2 and `nozle-sdk` 0.4.2.
+
+### Developer experience
+
+- Completed the React, Node.js, and Python SDK references with current signatures and security guidance.
+- Added rendered React component previews and a dedicated theming reference.
+- Replaced customer-specific examples with neutral, reusable integration examples.
+
+## July 2026
+
+### Product credits
+
+- Introduced exact-decimal credit systems, plan grants, paid top-ups, immutable balance sources, and operation history.
+- Added advisory usage checks and atomic, idempotent credit consumption.
+- Added durable usage-event publication and reconciliation so committed deductions survive downstream outages.
+- Added customer and Entity balance APIs, per-Entity grants, shared-pool policies, and top-up allocation/deallocation.
+
+### Payment-first billing
+
+- Paid plan changes now preserve the current plan until payment succeeds.
+- Added payment-aware checkout results for hosted Stripe, embedded Stripe, immediate completion, and scheduled changes.
+- Added durable upgrade webhook processing and support for end-of-period cancellation.
+- Added merchant-configurable billing anchors and transition-policy defaults.
+
+### Security and tenancy
+
+- Restricted publishable keys to the public plan catalog.
+- Moved customer billing operations behind authenticated merchant backends and least-privilege secret keys.
+- Hardened customer, organization, mutation, and internal service authorization.
+- Removed automatic seat billing from Entity lifecycle changes; merchants now emit explicit, idempotent seat events.
+
+### SDKs and dashboard
+
+- Added product-credit and Entity APIs to the Node.js and Python SDKs.
+- Refactored React checkout around merchant-owned callbacks and forwarded validated return URLs to Stripe.
+- Added customer and Entity credit dashboards, paid top-up checkout, and refreshed analytics and settings interfaces.
 
 ## June 2026
 
 ### Entitlement rework
-- `can()` endpoint now supports two-path resolution (feature gates + usage limits)
-- Margin-aware responses: `cost_per_use_cents`, `revenue_per_use_cents`, `margin_per_use_cents`
-- React SDK `useCan` hook and gate components updated
+
+- Added two-path entitlement resolution for feature gates and usage limits.
+- Added margin-aware decision fields: `cost_per_use_cents`, `revenue_per_use_cents`, and `margin_per_use_cents`.
 
 ### Checkout flow
-- Embedded Stripe checkout is invoice-first
-- Plan checkout is payment-gated: subscriptions activate only after Stripe confirms payment
-- Existing invoice checkout supports one-off payments such as credit top-ups and add-ons
+
+- Introduced invoice-first embedded Stripe checkout.
+- Made plan activation payment-gated.
+- Added one-off invoice checkout for credit top-ups and add-ons.
 
 ### SDK updates
-- `@nozle-js/node` 0.3.0 — LLM auto-capture for OpenAI and Anthropic
-- `@nozle-js/react` 0.5.2 — New gate components, billing portal improvements
-- `nozle-sdk` (Python) 0.3.0 — LLM auto-capture, entitlement checks
+
+- Released initial LLM usage capture for OpenAI and Anthropic in the Node.js and Python SDKs.

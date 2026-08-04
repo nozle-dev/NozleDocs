@@ -15,9 +15,9 @@ PostgreSQL balance sources plus immutable allocations are the credit source of t
 - paid payments and subscription periods materialize one deterministic source;
 - exact rate arithmetic is enforced in Rails, Go, and PostgreSQL.
 
-## Lago publication
+## Billing-event publication
 
-Usage publication is at-least-once. The credit operation ID becomes the Lago transaction ID, so retrying after a timeout cannot create a second usage effect. Workers claim rows in bounded waves, use leases longer than the maximum POST and reconciliation duration, and truncate stored errors without breaking UTF-8.
+Usage publication is at-least-once. The credit operation ID becomes the billing transaction ID, so retrying after a timeout cannot create a second usage effect. Workers claim rows in bounded waves and reconcile published events against committed operations.
 
 ## Reconciliation
 
@@ -26,7 +26,7 @@ Continuous jobs detect:
 - source remaining amount that disagrees with immutable allocations;
 - successful consumes missing allocations or an outbox row;
 - denied consumes with side effects;
-- missing Lago events;
+- missing billing events;
 - missing subscription grants;
 - successful top-up payments without a credit source.
 
@@ -34,11 +34,7 @@ Repairs use idempotent materialization or explicit compensating operations. They
 
 ## Acceptance audit
 
-The Engine image includes a read-only `credit-rollout audit` command.
-It checks source balances against allocations, allocation chains, operation
-totals, rate arithmetic, source/operation pairs, outbox envelopes, tenant
-ownership, publication, and initial reconciliation. It exits nonzero on drift
-and never repairs data.
+Self-hosted Nozle deployments include read-only credit audit tooling. It checks source balances against allocations, operation totals, rate arithmetic, delivery envelopes, tenant ownership, publication, and reconciliation. It exits nonzero on drift and never repairs data.
 
 Run it after the canary settle window and retain the JSON report. See [Credit
 Rollout and Acceptance](/guides/credits/rollout).

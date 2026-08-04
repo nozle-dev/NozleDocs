@@ -3,7 +3,7 @@ title: Product Credits Overview
 description: Customer-level credit systems, balances, sources, and ledger behavior
 ---
 
-Nozle product credits are customer-level units used to authorize metered actions. They are separate from Lago wallet credits, which apply monetary value to invoices.
+Nozle product credits are product-level units used to authorize metered actions. They are separate from invoice wallet credits, which apply monetary value to invoices.
 
 ```text
 Billable metric -> exact conversion rate -> credit system -> customer sources
@@ -21,12 +21,12 @@ For example, one `agent_execution` event can cost `2` AI credits while one `voic
 - **Operation and allocation ledger:** explains every accepted, denied, granted, or adjusted amount.
 
 <Warning>
-Product credits are not Lago wallet credits. Do not use wallet endpoints or the legacy `/check-and-deduct` adapter for new credit-system integrations.
+Product credits are not invoice wallet credits. Do not use wallet endpoints or the legacy `/check-and-deduct` adapter for new credit-system integrations.
 </Warning>
 
 ## Customer and Entity pools
 
-Customer balances remain the shared pool. Entities add stable per-user or per-project attribution, per-Entity grants, and optional shared fallback without replacing that pool. A successful usage request atomically deducts the configured source order and writes an immutable operation before its Lago event is published through the durable outbox.
+Customer balances remain the shared pool. Entities add stable per-user or per-project attribution, per-Entity grants, and optional shared fallback without replacing that pool. A successful usage request atomically deducts the configured source order and writes an immutable operation before its billing event is published through the durable outbox.
 
 ## Read access
 

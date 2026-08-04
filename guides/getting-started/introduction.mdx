@@ -3,14 +3,14 @@ title: Introduction
 description: What is Nozle and who is it for
 ---
 
-Nozle is an AI billing and margin intelligence platform. It gives AI companies usage-based billing, real-time entitlements, and per-customer margin visibility in a single integrated stack.
+Nozle is billing infrastructure for AI products. It combines usage metering, subscriptions, product credits, entitlements, payments, and unit-economics reporting behind one API and SDK surface.
 
 ## Who is Nozle for?
 
 Nozle is built for AI companies that:
 
 - Bill customers based on API calls, tokens, compute time, or other usage metrics
-- Need real-time visibility into per-customer and per-model costs
+- Need visibility into per-customer and per-model costs
 - Want feature gating and usage limits without building entitlement logic from scratch
 - Use Stripe for payments and need managed checkout flows
 
@@ -18,16 +18,17 @@ Nozle is built for AI companies that:
 
 | Capability | What it does |
 |---|---|
-| **Usage-based billing** | Meter any event, aggregate in real time, and invoice automatically |
-| **Real-time entitlements** | Feature gates and usage limits evaluated at the edge with sub-100ms latency |
+| **Usage-based billing** | Meter product events, aggregate usage, and invoice on your configured billing schedule |
+| **Entitlements** | Evaluate feature access and usage limits from a trusted backend |
+| **Product credits** | Grant, sell, allocate, and atomically consume exact-decimal product units |
 | **Margin intelligence** | Per-customer, per-model cost tracking so you know your true margins |
-| **Stripe checkout** | Embedded checkout and subscription management with no custom Stripe code |
+| **Stripe checkout** | Payment-aware checkout and subscription transitions with webhook-authoritative activation |
 
 ## Architecture
 
 Nozle is built around two layers:
 
-1. **Nozle API** -- The backend that handles Stripe checkout, margin analytics, entitlement evaluation, and usage event ingestion. Runs at `api.nozle.app`.
+1. **Nozle API** -- The backend for checkout, subscriptions, credits, entitlements, margin analytics, and usage ingestion. Runs at `api.nozle.app`.
 
 2. **SDKs** -- Client and server libraries that connect your application to Nozle.
 
@@ -39,9 +40,9 @@ You interact with Nozle through the SDKs or REST API -- all the complexity of bi
 
 Nozle ships three SDKs:
 
-- **`@nozle-js/react`** -- 25+ billing components and hooks for React apps. Checkout buttons, usage meters, plan selectors, and a full billing portal out of the box.
-- **`@nozle-js/node`** -- Server-side billing operations and event tracking for Node.js. Report usage events, check entitlements, manage customers.
-- **`nozle-sdk`** (Python) -- Server-side billing for Python backends. Same capabilities as the Node SDK.
+- **`@nozle-js/react`** -- Public catalog, checkout orchestration, pricing, usage, and presentational gate components.
+- **`@nozle-js/node`** -- Server-side billing, credits, subscriptions, event tracking, entitlements, and margin queries.
+- **`nozle-sdk`** (Python) -- Typed server-side access to the same core billing and credit workflows.
 
 ## Production URLs
 
@@ -53,4 +54,4 @@ Nozle ships three SDKs:
 
 ## Next steps
 
-Head to the [Quickstart](/guides/getting-started/quickstart) to integrate Nozle into your app in under 10 minutes, or read [Architecture](/guides/getting-started/architecture) for a deeper look at how the system fits together.
+Head to the [Quickstart](/guides/getting-started/quickstart) to track your first event and connect checkout, or read [Architecture](/guides/getting-started/architecture) for a deeper look at the trust boundaries and data flow.

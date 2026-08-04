@@ -48,10 +48,11 @@ Supply the subscription explicitly for customers with multiple subscriptions and
 
 ## Idempotency
 
-Use a deterministic transaction ID for each logical event and reuse it on retries.
+Use a deterministic transaction ID and stable event timestamp for each logical event. Reuse both on retries.
 
 ```python
 transaction_id = f"generation:{generation_id}:completed"
+timestamp = generation_completed_at.isoformat()
 
 nozle.track(
     customer_id,
@@ -62,6 +63,7 @@ nozle.track(
     },
     subscription_id=subscription_id,
     transaction_id=transaction_id,
+    timestamp=timestamp,
 )
 ```
 
@@ -81,6 +83,7 @@ def generation_completed(event: GenerationCompleted) -> dict[str, bool]:
         metadata={"tokens": event.tokens},
         subscription_id=event.subscription_id,
         transaction_id=f"generation:{event.id}:completed",
+        timestamp=event.completed_at.isoformat(),
     )
     return {"accepted": True}
 ```

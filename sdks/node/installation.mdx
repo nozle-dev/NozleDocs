@@ -5,6 +5,8 @@ description: "Install and configure the server-only @nozle-js/node SDK."
 
 `@nozle-js/node` requires Node.js 18 or later and uses the built-in Fetch API.
 
+Entity subscription APIs are introduced in `0.5.0`.
+
 ```bash
 npm install @nozle-js/node
 ```
@@ -27,8 +29,8 @@ export const nozle = new Nozle({
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `apiKey` | `string` | required | Organization credential. Use a restricted `sk_` for server mutations. |
-| `baseUrl` | `string` | `http://localhost:8080` | Core API origin used for billing, entitlements, credits, entities, usage, and margin. |
-| `eventsUrl` | `string` | `http://localhost:3000` | Events/Core origin used by `track()` and credit-system discovery. |
+| `baseUrl` | `string` | `http://localhost:8080` | API origin used for billing, entitlements, credits, entities, usage, and margin. |
+| `eventsUrl` | `string` | `http://localhost:3000` | Event API origin used by `track()` and credit-system discovery. |
 | `timeout` | `number` | `10000` | Per-request timeout in milliseconds. |
 
 Set both URLs explicitly outside local development. Trailing slashes are removed automatically.
@@ -36,7 +38,7 @@ Set both URLs explicitly outside local development. Trailing slashes are removed
 ```mermaid
 flowchart LR
   App[Your backend] --> SDK[@nozle-js/node]
-  SDK -->|baseUrl| Core[Billing, entitlements, credits, usage, margin]
+  SDK -->|baseUrl| API[Billing, entitlements, credits, usage, margin]
   SDK -->|eventsUrl| Events[Metered events and credit-system catalog]
 ```
 
@@ -56,7 +58,7 @@ console.log(health.version)
 
 ## API surface
 
-### Core and billing
+### API and billing
 
 | Method | Purpose |
 |---|---|
@@ -64,6 +66,9 @@ console.log(health.version)
 | `nozle.plans()` | List plans. |
 | `nozle.checkout()` | Create a payment-aware checkout result. |
 | `nozle.subscribe()` | Create a direct subscription where your workflow permits it. |
+| `nozle.cancelSubscription()` | Cancel immediately or at the renewal boundary. |
+| `nozle.previewSubscriptionTransition()` | Preview cancellation, downgrade, or uncancel settlement. |
+| `nozle.applySubscriptionTransition()` | Apply an idempotent settlement transition. |
 | `nozle.track()` | Send a metered event through the Events API. |
 | `nozle.can()` | Check feature access, usage, and margin state. |
 
@@ -74,6 +79,7 @@ console.log(health.version)
 | `customers` | `upsert()` |
 | `creditSystems` | `list()` |
 | `entities` | `get()`, `list()`, `upsert()`, `activate()`, `suspend()`, `bulkUpsert()` |
+| `entitySubscriptions` | `ensure()`, `get()`, `list()`, `checkout()`, `changePlan()`, `cancel()`, `remove()` |
 | `credits` | Customer and Entity balance/history reads, `allocate()`, `deallocate()` |
 | `usage` | Advisory `check()` and atomic, idempotent `track()` |
 | `margin` | `summary()`, `byCustomer()`, `byMetric()`, `byPlan()`, `byModel()`, `trend()` |
@@ -82,7 +88,7 @@ The package also exports `wrapOpenAI()` and `wrapAnthropic()` for token metadata
 
 ## Key behavior
 
-- `checkout()` and `subscribe()` explicitly require an API key beginning with `sk_`.
+- Billing mutations and settlement transitions require an API key beginning with `sk_`.
 - Entity mutations, credit transfers, and `usage.track()` reject publishable `pk_` keys.
 - Mutation idempotency keys are caller-supplied and limited to 255 bytes.
 - Product-credit amounts are exact decimal strings, not JavaScript numbers.

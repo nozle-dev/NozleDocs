@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nozle import Nozle
+from nozle import Nozle, SubscriptionTransitionParams
 
 
 nozle = Nozle(
@@ -35,6 +35,20 @@ def exercise_python_sdk() -> None:
         print(checkout.get("url") or checkout.get("client_secret"))
 
     nozle.subscribe("workspace_123", "free")
+    nozle.cancel_subscription("workspace_123", "subscription_123")
+    transition: SubscriptionTransitionParams = {
+        "customer_id": "workspace_123",
+        "subscription_id": "subscription_123",
+        "operation": "downgrade",
+        "timing": "end_of_period",
+        "target_plan_code": "growth_monthly",
+        "credit_action": "none",
+    }
+    nozle.preview_subscription_transition(transition)
+    nozle.apply_subscription_transition(
+        transition,
+        idempotency_key="transition-subscription-123-growth-v1",
+    )
     nozle.can("workspace_123", "analytics", {"region": "us-east"})
     nozle.track(
         "workspace_123",
@@ -42,6 +56,7 @@ def exercise_python_sdk() -> None:
         metadata={"tokens": 1_500},
         subscription_id="workspace_123_subscription",
         transaction_id="request_0183f",
+        timestamp="2026-08-04T10:30:00Z",
     )
 
     nozle.entities.get("workspace_123", "user_42")
@@ -71,6 +86,31 @@ def exercise_python_sdk() -> None:
             {"external_id": "user_43", "name": "Ravi", "status": "suspended"},
         ],
         idempotency_key="workspace-123-users-import-7",
+    )
+
+    nozle.entity_subscriptions.ensure("workspace_123", "user_42")
+    nozle.entity_subscriptions.get("workspace_123", "user_42")
+    nozle.entity_subscriptions.list("workspace_123")
+    nozle.entity_subscriptions.checkout(
+        "workspace_123",
+        "user_42",
+        plan_code="pro_monthly",
+        billing_time="anniversary",
+        return_url="https://app.example.com/settings/billing",
+        idempotency_key="checkout-user-42-pro-v1",
+    )
+    nozle.entity_subscriptions.change_plan(
+        "workspace_123",
+        "user_42",
+        plan_code="max_annual",
+        return_url="https://app.example.com/settings/billing",
+        idempotency_key="change-user-42-max-v1",
+    )
+    nozle.entity_subscriptions.cancel(
+        "workspace_123",
+        "user_42",
+        timing="end_of_period",
+        idempotency_key="cancel-user-42-v1",
     )
 
     nozle.credit_systems.list()

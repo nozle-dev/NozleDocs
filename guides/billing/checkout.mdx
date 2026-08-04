@@ -1,19 +1,18 @@
 ---
 title: Checkout
-description: Stripe embedded checkout flow
+description: Payment-aware Stripe checkout through an authenticated merchant backend
 ---
 
-Nozle uses Stripe's embedded checkout for payment collection. The flow:
+Nozle supports hosted and embedded Stripe payment results. The flow:
 
-1. Customer selects a plan (PricingTable or CheckoutButton component)
-2. React SDK calls `POST /api/v1/checkout` with `{ customer_id, plan_code, return_url }`
-3. Nozle keeps the current plan active and computes the exact invoice/proration
-4. If money remains due, Nozle creates a Stripe embedded Checkout Session
-5. Returns `{ type: "stripe", client_secret }`
-6. The Checkout component renders Stripe Embedded Checkout using the `cs_...` secret
-7. Customer enters payment details
-8. Stripe sends `payment_intent.succeeded` or `payment_intent.payment_failed` to Nozle
-9. Nozle marks the invoice paid/failed and applies the paid plan change only after success
+1. Customer selects a plan in your application
+2. The React SDK calls your authenticated merchant callback with `{ planCode, returnUrl }`
+3. Your backend derives the customer, validates the plan and return origin, and calls Nozle with `sk_`
+4. Nozle keeps the current plan active and computes the exact invoice or proration
+5. If money remains due, Nozle returns a hosted Stripe URL or embedded client secret
+6. Customer completes payment with Stripe
+7. Stripe sends signed payment events to Nozle
+8. Nozle applies the paid plan change only after verified success
 
 <Info>
 Plan checkout is payment-gated: a paid plan change is not applied until Stripe confirms payment through the webhook. If prepaid credits reduce the exact amount due to zero, Nozle applies the change transactionally and returns `type: "completed"` without creating a Stripe session.
@@ -95,16 +94,24 @@ Scheduled transition response:
 ### Option A -- CheckoutButton (simplest)
 
 ```tsx
-<CheckoutButton planId="growth" label="Subscribe to Growth" />
+<CheckoutButton
+  planCode="growth"
+  returnUrl="https://app.example.com/settings/billing"
+  label="Subscribe to Growth"
+  onStripeClientSecret={setClientSecret}
+/>
 ```
 
-### Option B -- Custom flow with useCheckout
+### Option B -- Custom flow with `useCheckoutSession`
 
 ```tsx
-const { fetchClientSecret, isLoading } = useCheckout();
+const { fetchClientSecret, isLoading } = useCheckoutSession();
 
 const handleCheckout = async () => {
-  const clientSecret = await fetchClientSecret('growth', '/success');
+  const clientSecret = await fetchClientSecret(
+    'growth',
+    'https://app.example.com/settings/billing',
+  );
   // Pass the cs_... secret to <Checkout>
 };
 ```

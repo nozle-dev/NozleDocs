@@ -1,0 +1,124 @@
+---
+title: "Entity Subscriptions"
+description: "Give individual customer Entities independent plans, billing periods, and subscription lifecycles."
+---
+
+Entity subscriptions let one customer pay for multiple independently managed subscriptions. Each Entity keeps a stable subscription identity while using the standard Nozle plan, invoice, checkout, renewal, and reporting lifecycle.
+
+**Auth:** secret key only. Publishable keys are rejected.
+
+```text
+Customer: workspace_123
+├── Entity: user_42  → Pro monthly
+└── Entity: user_43  → Max annual
+```
+
+Nozle validates the live Entity before creating or changing its subscription. Suspended or deleted Entities cannot start checkout. A newly created Entity that reuses an older external ID cannot inherit the older Entity's subscription.
+
+## Ensure a subscription identity
+
+```http
+PUT /customers/workspace_123/entities/user_42/subscription
+Authorization: Bearer sk_...
+```
+
+This operation is idempotent. It creates the stable Entity-to-subscription identity but does not select or activate a plan.
+
+## Read subscriptions
+
+Read one Entity subscription:
+
+```http
+GET /customers/workspace_123/entities/user_42/subscription
+Authorization: Bearer sk_...
+```
+
+List all Entity subscriptions for a customer:
+
+```http
+GET /customers/workspace_123/entity-subscriptions
+Authorization: Bearer sk_...
+```
+
+The response reports the current and pending plans independently for each Entity:
+
+```json
+{
+  "external_customer_id": "workspace_123",
+  "external_entity_id": "user_42",
+  "external_subscription_id": "entity-sub-7e1782f4-...",
+  "status": "active",
+  "current_plan": {
+    "code": "pro_monthly",
+    "name": "Pro",
+    "interval": "monthly",
+    "amount_cents": 1499,
+    "amount_currency": "USD",
+    "status": "active"
+  },
+  "pending_plan": null,
+  "billing_time": "anniversary",
+  "cancel_at_period_end": false
+}
+```
+
+## Start checkout
+
+```http
+POST /customers/workspace_123/entities/user_42/subscription/checkout
+Authorization: Bearer sk_...
+Idempotency-Key: checkout-user-42-pro-v1
+Content-Type: application/json
+
+{
+  "plan_code": "pro_monthly",
+  "billing_time": "anniversary",
+  "return_url": "https://app.example.com/settings/billing"
+}
+```
+
+`billing_time` accepts `anniversary` or `calendar` for the initial subscription. Paid plans remain incomplete until verified payment succeeds. Retrying an incomplete checkout for the same plan reuses its subscription and invoice instead of creating another charge.
+
+## Change plan
+
+```http
+POST /customers/workspace_123/entities/user_42/subscription/change-plan
+Authorization: Bearer sk_...
+Idempotency-Key: change-user-42-max-v1
+Content-Type: application/json
+
+{
+  "plan_code": "max_annual",
+  "return_url": "https://app.example.com/settings/billing"
+}
+```
+
+The configured plan-transition policy determines whether the change is immediate, payment-gated, or scheduled for the renewal boundary. Changing one Entity never changes another Entity's subscription.
+
+## Cancel
+
+```http
+POST /customers/workspace_123/entities/user_42/subscription/cancel
+Authorization: Bearer sk_...
+Idempotency-Key: cancel-user-42-v1
+Content-Type: application/json
+
+{
+  "timing": "end_of_period"
+}
+```
+
+Cancellation supports the same settlement controls as customer subscriptions. Prefer `end_of_period` unless the merchant explicitly intends to terminate access immediately.
+
+## Remove an unused identity
+
+```http
+DELETE /customers/workspace_123/entities/user_42/subscription
+Authorization: Bearer sk_...
+```
+
+Removal is allowed only when the identity has no active, pending, or incomplete subscription. Historical billing records remain immutable.
+
+<Warning>
+Stripe webhooks are authoritative for paid activation. Do not grant paid access from a browser redirect or checkout callback alone.
+</Warning>

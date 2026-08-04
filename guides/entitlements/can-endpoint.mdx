@@ -43,11 +43,9 @@ Call this endpoint from a trusted backend with a restricted secret key. Derive `
 | `margin_per_use_cents` | `number` | `revenue - cost` per unit |
 | `min_margin_percent` | `number?` | Minimum margin threshold if configured |
 
-## Performance
+## Runtime behavior
 
-- **Cached**: ~5ms p99 response time
-- Cache is invalidated when subscription changes or usage counters update
-- Automatic fallback if cache is unavailable
+The service may cache entitlement and usage state. Always treat the returned decision as point-in-time and enforce it immediately before protected work.
 
 ## Denial reasons
 
@@ -70,8 +68,4 @@ nozle.can('cust_123', 'api_calls')
 nozle.can('cust_123', 'api_calls')
 ```
 
-**React:**
-
-```tsx
-useCan('cust_123', 'api_calls') // with real-time WebSocket updates
-```
+**React:** fetch the result through your authenticated backend and pass it to `FeatureGate`, `UsageGate`, or your own UI.

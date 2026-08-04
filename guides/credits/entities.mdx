@@ -10,7 +10,7 @@ Customer  = workspace or company
 Entity    = one stable subject inside that customer
 ```
 
-An Entity belongs to exactly one customer and organization. Its external ID can be reused only through the Engine's tombstoned incarnation rules; financial history remains bound to the durable Entity UUID.
+An Entity belongs to exactly one customer and organization. Recreating an Entity with the same external ID produces a different incarnation; financial history remains bound to the original durable Entity UUID.
 
 ## Pool policies
 
@@ -40,7 +40,7 @@ Entity plan grants and allocated paid top-ups remain separate sources. Allocatio
 Only unused allocated top-up value can be returned. Subscription grants are never presented as transferable company value.
 
 <Warning>
-Allocation and deallocation are backend-only mutations. They require a secret/internal credential, an idempotency key, and an exact organization plus Credit System rollout target. The transfer gate is default-off.
+Allocation and deallocation are backend-only mutations. They require a secret credential, an idempotency key, and eligible paid top-up sources.
 </Warning>
 
 Keep amounts as decimal strings throughout your application. Do not convert them to JavaScript numbers or binary floating-point values.
@@ -58,6 +58,8 @@ Entities can be `active`, `suspended`, or `deleted`.
 
 Entities and billable seats are separate contracts. Creating, suspending,
 reactivating, or deleting an Entity never changes billed usage.
+
+Entity subscriptions are also separate from credit pools and seat metrics. Use an Entity subscription only when that Entity owns an independent plan. Credit allocation still follows the configured pool policy, while seat billing still follows explicit usage events.
 
 If your product bills per seat, configure a recurring unique-count Billable
 Metric:
@@ -110,13 +112,14 @@ All mutation retries preserve their idempotency key until the result is known. C
 1. Create or bulk-upsert stable Entity IDs from your backend.
 2. Configure per-Entity grant rules and one pool policy per plan/Credit System.
 3. Read Entity balances before enabling mutation traffic.
-4. Enable the exact transfer target only for a sandbox organization and Credit System.
-5. Track usage with both `customer_id` and `entity_id` after the usage gate is enabled.
+4. Test transfers with a sandbox customer and Credit System.
+5. Track usage with both `customer_id` and `entity_id` after the sandbox results are accepted.
 6. If applicable, send seat events independently from your backend and verify current usage.
 7. Run the acceptance audit before enabling shared fallback or broader traffic.
 
 <CardGroup cols={2}>
   <Card title="Entity API" href="/api/customer-entities" />
+  <Card title="Entity subscriptions" href="/api/entity-subscriptions" />
   <Card title="Entity balances" href="/api/entity-credit-balances" />
   <Card title="Node SDK" href="/sdks/node/credits" />
   <Card title="React components" href="/sdks/react/components" />

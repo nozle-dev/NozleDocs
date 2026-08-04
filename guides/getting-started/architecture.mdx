@@ -1,84 +1,102 @@
 ---
 title: Architecture
-description: How Nozle's platform components connect
+description: How Nozle connects your product, billing backend, and payment provider
 ---
 
-Nozle is a unified platform: a single API that handles billing, entitlements, margin intelligence, and payment processing via Stripe.
+Nozle separates public catalog UI from customer-authorized billing operations. Browsers can read plans with a publishable key; your authenticated backend owns every customer lookup and mutation.
 
 ## Overview
 
-```
-Your App
-  │
-  ├──► React SDK ──► Nozle API (api.nozle.app)
-  │                      │
-  │                      ├──► Billing ──► Invoices, Subscriptions
-  │                      │
-  │                      ├──► Stripe ──► Payments
-  │                      │
-  │                      └──► WebSocket ──► Real-time updates to React SDK
-  │
-  └──► Node/Python SDK ──► Nozle API
-```
-
-## Nozle API
-
-The primary API surface at `api.nozle.app`. Every request from your application hits this layer.
-
-**What it handles:**
-
-- **Authentication** — API key validation with publishable (`pk_`) and secret (`sk_`) scoping
-- **Entitlements** — `can()` endpoint with low-latency caching for sub-millisecond feature checks
-- **Checkout** — creates Stripe Checkout sessions and processes webhooks for subscription activation
-- **Margin intelligence** — cost-vs-revenue analytics by customer, model, metric, and plan
-- **Cost models** — define what each usage unit costs you
-- **Billing** — usage-based invoicing, subscription management, and plan configuration
-- **Subscription management** — orchestrates subscriptions with proration, upgrades, and cancellation
-
-Your application never talks to internal billing services directly. All access goes through the Nozle API.
-
-## Stripe
-
-Stripe handles payments. Nozle uses Stripe for:
-
-- **Checkout sessions** — customers enter payment details via Stripe's hosted UI
-- **Webhook processing** — successful payments and subscription changes trigger backend updates
-- **Subscription activation** — when Stripe confirms a checkout, the Nozle API activates the subscription and provisions entitlements
-
-## Real-Time Updates
-
-When billing state changes — a plan upgrade, usage limit reached, or feature toggled — the update pushes to connected React SDK clients via WebSocket. No polling required.
-
-This means your UI reacts to billing changes instantly. A customer completes checkout, and their feature gates unlock without a page refresh.
-
-## Request Flow Examples
-
-### Checking an entitlement
-
-```
-Your App → SDK calls can("feature-x")
-  → Nozle API checks cache
-    → Cache hit: returns allow/deny in < 1ms
-    → Cache miss: queries billing data, caches result, returns
+```mermaid
+flowchart LR
+  Browser[Customer browser] -->|pk_: public plans| API[Nozle API]
+  Browser -->|authenticated request| Merchant[Your backend]
+  Merchant -->|restricted sk_| API
+  Merchant -->|events, entitlement checks, credits| API
+  API --> Billing[Subscriptions and invoicing]
+  API --> Ledger[Credit and usage ledger]
+  API --> Margin[Cost and margin analytics]
+  API --> Stripe[Stripe checkout and payments]
+  Stripe -->|verified webhooks| API
 ```
 
-### Reporting usage
+## Trust boundaries
 
-```
-Your Server → SDK calls nozle.track(...)
-  → Nozle API validates API key
-    → Event is ingested and aggregated against billable metric
-      → Reflected in next invoice
+### Browser
+
+The browser may:
+
+- fetch the public plan catalog with `pk_`;
+- render React SDK components; and
+- call your authenticated merchant routes.
+
+It must not receive a Nozle secret key or choose an authoritative customer, subscription, Entity, or credit account.
+
+### Merchant backend
+
+Your backend:
+
+- authenticates the application user;
+- derives Nozle identifiers from server-owned records;
+- validates plan codes and exact return origins;
+- calls Nozle with a least-privilege `sk_`; and
+- returns only the fields required by the browser.
+
+### Nozle API
+
+The API handles:
+
+- plan catalog and subscriptions;
+- payment-aware checkout and settlement transitions;
+- usage events and invoice aggregation;
+- product-credit grants, top-ups, transfers, and atomic consumption;
+- entitlement decisions;
+- cost models and margin reporting; and
+- durable payment and usage-event reconciliation.
+
+## Payment authority
+
+Stripe collects payment details and sends signed events to Nozle. A redirect or browser callback never activates a paid plan by itself. Nozle applies payment-gated changes only after verified webhook processing.
+
+## Request flows
+
+### Entitlement check
+
+```text
+Your backend
+  -> derives customer from the authenticated user
+  -> calls can(customer, feature)
+  -> receives allow/deny, usage, and optional margin context
+  -> enforces the result before protected work
 ```
 
-### Customer checkout
+### Metered event
 
+```text
+Your worker
+  -> sends a stable transaction ID and metric properties
+  -> Nozle validates and records the event
+  -> billing aggregation includes it in the configured period
 ```
-Your App → SDK opens checkout
-  → Nozle API creates Stripe Checkout Session
-    → Customer enters payment details on Stripe
-      → Stripe webhook hits Nozle API
-        → Subscription activated, entitlements provisioned
-          → WebSocket pushes update to React SDK
-            → UI unlocks features instantly
+
+### Credit-backed action
+
+```text
+Your backend
+  -> calls usage.track with an idempotency key
+  -> Nozle locks eligible credit sources
+  -> records an immutable operation and exact deductions
+  -> publishes the matching billing event through a durable outbox
 ```
+
+### Paid checkout
+
+```text
+Browser -> merchant backend -> Nozle checkout -> Stripe
+Stripe webhook -> Nozle verifies payment -> subscription change applies
+Browser refreshes billing state from merchant backend
+```
+
+## Optional realtime delivery
+
+Realtime customer updates require a server-authorized token flow. The current React SDK does not fetch customer entitlements or mint realtime tokens from a publishable key. Applications may refresh through authenticated backend reads or operate their own authorized realtime channel.

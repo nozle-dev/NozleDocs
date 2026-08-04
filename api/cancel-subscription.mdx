@@ -3,7 +3,7 @@ title: "Cancel Subscription"
 api: "DELETE /subscriptions/{id}"
 ---
 
-Cancel a subscription immediately or schedule cancellation for the next Lago renewal boundary.
+Cancel a subscription immediately or schedule cancellation for the next renewal boundary.
 
 Use this endpoint only from an authenticated merchant backend. Derive the customer from the logged-in user or team; never accept an authoritative `customer_id` from browser input.
 
@@ -23,7 +23,7 @@ Use this endpoint only from an authenticated merchant backend. Derive the custom
 
 ### Response
 
-For `end_of_period`, the subscription remains `active` and `ending_at` contains the next renewal boundary. Lago's normal clock terminates it at that boundary and prevents another renewal invoice. Repeating the request does not extend an earlier scheduled ending.
+For `end_of_period`, the subscription remains `active` and `ending_at` contains the next renewal boundary. The billing engine terminates it at that boundary and prevents another renewal invoice. Repeating the request does not extend an earlier scheduled ending.
 
 For `immediate`, the response contains the terminated subscription.
 

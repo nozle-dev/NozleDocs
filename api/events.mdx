@@ -1,41 +1,43 @@
 ---
 title: Events
-description: Track usage events from your application
+description: Send metered usage events from a trusted backend
 ---
 
-
-Base URL: `https://api.nozle.app/api/v1`
-
-Events are tracked via the SDKs (`nozle.track()`) rather than a direct REST endpoint. The SDKs batch and send events to the engine automatically.
+Use the Node.js or Python SDK for event ingestion. The SDK sends one event per `track()` call; it does not batch automatically.
 
 <Info>
-See the [Node.js Event Tracking](/sdks/node/tracking-events) or [Python Event Tracking](/sdks/python/tracking-events) guides for SDK-based event ingestion.
+See [Node.js event tracking](/sdks/node/tracking-events) or [Python event tracking](/sdks/python/tracking-events) for subscription resolution and idempotency behavior.
 </Info>
 
-## How it works
+## Event envelope
 
-1. Your application calls `nozle.track()` with a metric code, customer ID, and optional properties
-2. The SDK batches events and sends them to `POST /api/v1/events` internally
-3. The engine processes events for billing aggregation and margin calculation
-
-## Event structure
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `customer_id` | string | Yes | External customer ID |
-| `metric_code` | string | Yes | Billable metric code (e.g. `api_calls`, `llm_tokens`) |
-| `value` | number | No | Usage quantity (default: 1) |
-| `properties` | object | No | Additional metadata (e.g. `model`, `region`) |
-| `timestamp` | string | No | ISO 8601 timestamp (default: now) |
-
-```bash title="cURL (direct, for testing)"
-curl -X POST https://api.nozle.app/api/v1/events \
-  -H "Authorization: Bearer sk_live_your_secret_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "customer_id": "cust_123",
-    "metric_code": "api_calls",
-    "value": 1,
-    "properties": {"endpoint": "/v1/chat"}
-  }'
+```json
+{
+  "event": {
+    "transaction_id": "request_0183f",
+    "external_customer_id": "customer_123",
+    "external_subscription_id": "subscription_123",
+    "code": "api_calls",
+    "properties": {
+      "model": "example-model",
+      "tokens": 1500
+    },
+    "timestamp": "2026-08-04T10:30:00Z"
+  }
+}
 ```
+
+| Field | Required | Description |
+|---|---|---|
+| `transaction_id` | yes | Stable identifier for the logical event. Preserve it with the same timestamp on retries. |
+| `external_customer_id` | yes | Customer that generated usage. |
+| `external_subscription_id` | recommended | Subscription receiving usage. Required when resolution would be ambiguous. |
+| `code` | yes | Billable Metric code. |
+| `properties` | no | Aggregation and attribution metadata. |
+| `timestamp` | no | ISO 8601 occurrence time. |
+
+For direct HTTP ingestion, send this envelope to the Events API configured for your organization with a secret key. Prefer the SDKs so subscription lookup, UUID generation, timeout handling, and errors remain consistent.
+
+<Note>
+For retry safety, preserve the complete event identity. High-volume event storage deduplicates using both `transaction_id` and `timestamp`.
+</Note>

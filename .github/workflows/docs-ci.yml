@@ -39,6 +39,19 @@ jobs:
       - name: Validate navigation JSON
         run: jq empty docs.json
 
+      - name: Reject third-party product names
+        run: |
+          forbidden='([lL][aA][gG][oO]|[aA][uU][tT][uU][mM][nN])'
+          if git ls-files | grep -Eiq "$forbidden"; then
+            echo "A published file name contains a forbidden third-party product name." >&2
+            git ls-files | grep -Ei "$forbidden" >&2
+            exit 1
+          fi
+          if git grep -niE "$forbidden" -- .; then
+            echo "Published documentation contains a forbidden third-party product name." >&2
+            exit 1
+          fi
+
       - name: Check internal links
         run: npx --yes mintlify@4.2.715 broken-links
 
@@ -46,3 +59,4 @@ jobs:
         run: |
           npm ci --ignore-scripts
           npm run typecheck:examples
+          python -m py_compile examples/python-sdk.py

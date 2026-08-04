@@ -1,68 +1,105 @@
 ---
 title: Subscriptions
-description: Upgrade, downgrade, and cancel subscription flows
+description: Create, upgrade, downgrade, cancel, and restore subscriptions safely
 ---
 
-**View current subscription:**
+Subscription changes run from a trusted merchant backend. Derive customer and subscription IDs from server-owned records; never accept either as authoritative browser input.
 
-React: CurrentPlan component or GET /api/v1/subscriptions/current
-```tsx
-<CurrentPlan customerId="cust_123" onChangePlan={() => router.push('/plans')} />
+## Create a subscription
+
+Use checkout for payment-gated plans. Direct subscription creation is available for flows that do not require interactive payment.
+
+```ts
+const subscription = await nozle.subscribe('customer_123', 'free')
 ```
 
-**Upgrade/Downgrade:**
+## Payment-aware plan changes
 
-The UpgradeButton component handles the full flow:
-1. Shows proration preview (calls POST /api/v1/subscriptions/preview)
-2. Displays credit (unused time on current plan), debit (new plan cost), net amount, next billing date
-3. On confirm, calls `POST /api/v1/checkout`
-4. If payment is due, the current plan stays active while Stripe Checkout is shown
-5. The upgrade applies after the Stripe success webhook; a fully credit-funded change completes immediately
-6. A lower annualized plan, including some discounted monthly-to-annual switches, is scheduled at Lago's next billing boundary
+Use checkout for paid upgrades. The current paid plan remains active until verified payment succeeds. A lower-value change may return a scheduled result for the next billing boundary.
+
+```ts
+const checkout = await nozle.checkout(
+  'customer_123',
+  'scale_monthly',
+  'https://app.example.com/settings/billing',
+)
+```
+
+The React `UpgradeButton` opens a caller-supplied preview and delegates checkout to your `BillingProvider.createCheckout` callback:
 
 ```tsx
 <UpgradeButton
-  targetPlanId="scale"
-  label="Upgrade to Scale"
-  onStripeClientSecret={(secret) => setClientSecret(secret)}
-  onUpgraded={() => toast('Upgraded with prepaid credits')}
+  planCode="scale_monthly"
+  preview={preview}
+  onStripeClientSecret={setClientSecret}
+  onUpgraded={refreshBillingState}
+  onDowngradeScheduled={refreshBillingState}
 />
 ```
 
-Or via SDK:
-```typescript
-// Preview proration first
-const preview = await fetch('/api/v1/subscriptions/preview', {
-  method: 'POST',
-  headers: { Authorization: 'Bearer sk_nozle_...', 'Content-Type': 'application/json' },
-  body: JSON.stringify({ customer_id: 'cust_123', plan_code: 'scale' })
-});
+## Simple cancellation
 
-// Start payment-first checkout
-const checkout = await fetch('/api/v1/checkout', {
-  method: 'POST',
-  headers: { Authorization: 'Bearer sk_nozle_...', 'Content-Type': 'application/json' },
-  body: JSON.stringify({ customer_id: 'cust_123', plan_code: 'scale' })
-});
-```
+The Node.js and Python SDKs default to end-of-period cancellation:
 
-Run these calls only from a trusted merchant backend. Derive `cust_123` from the authenticated user or team; publishable keys cannot preview or start checkout.
-
-**Cancel subscription:**
-
-Call cancellation from your authenticated backend. The SDK defaults to end-of-period cancellation:
-
-```typescript
-const result = await nozle.cancelSubscription('cust_123', 'sub_123')
-
-// The customer keeps access until this renewal boundary.
+```ts
+const result = await nozle.cancelSubscription('customer_123', 'subscription_123')
 console.log(result.subscription.ending_at)
 ```
 
-Pass `immediate` explicitly only when the merchant has confirmed that access should end now:
-
-```typescript
-await nozle.cancelSubscription('cust_123', 'sub_123', 'immediate')
+```python
+result = nozle.cancel_subscription("customer_123", "subscription_123")
+print(result["subscription"].get("ending_at"))
 ```
 
-The browser should call your own cancellation route. That route authenticates the user, derives `cust_123` from the user's team, and calls Nozle with a least-privilege `sk_`.
+Pass `immediate` explicitly only after the merchant confirms that access should end now.
+
+## Settlement transitions
+
+The backend SDKs provide preview and apply operations for `cancel`, `downgrade`, and `uncancel`.
+
+```ts
+const params = {
+  customerId: 'customer_123',
+  subscriptionId: 'subscription_123',
+  operation: 'downgrade' as const,
+  timing: 'end_of_period' as const,
+  targetPlanCode: 'growth_monthly',
+  creditAction: 'none' as const,
+}
+
+const preview = await nozle.previewSubscriptionTransition(params)
+
+const result = await nozle.applySubscriptionTransition(
+  params,
+  'transition-subscription-123-growth-v1',
+)
+```
+
+Settlement options include:
+
+- timing: `end_of_period` or `immediate`;
+- billing anchor: `keep_anchor` or `reset_anchor`;
+- proration: `prorate_immediately` or `none`;
+- credit action: `credit`, `refund`, `offset`, or `none`;
+- refund mode: `prorated` or `full`; and
+- final invoice: `generate` or `skip`.
+
+Preview first, present the monetary effect to the merchant, and apply with a stable idempotency key. End-of-period transitions require `creditAction: 'none'`; uncancel does not accept settlement options.
+
+<Warning>
+Payment webhooks and the applied transition result are authoritative. Do not unlock paid access from a browser callback alone.
+</Warning>
+
+## Independent plans per Entity
+
+One customer can own multiple Entity subscriptions with different plans and billing intervals:
+
+```text
+Customer: workspace_123
+├── user_42 → Pro monthly
+└── user_43 → Max annual
+```
+
+Each Entity receives a stable subscription identity and follows the standard checkout, invoice, renewal, transition, and cancellation lifecycle. Operations are isolated: upgrading, downgrading, or cancelling one Entity does not mutate another Entity.
+
+Nozle revalidates the live Entity before checkout. Suspended, deleted, or recreated Entity identities fail closed. See [Entity Subscriptions](/api/entity-subscriptions).

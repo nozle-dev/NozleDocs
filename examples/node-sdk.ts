@@ -24,6 +24,20 @@ export async function exerciseNodeSdk() {
   if (checkout.type === 'stripe') checkout.url;
 
   await nozle.subscribe('workspace_123', 'free');
+  await nozle.cancelSubscription('workspace_123', 'subscription_123');
+  const transition = {
+    customerId: 'workspace_123',
+    subscriptionId: 'subscription_123',
+    operation: 'downgrade' as const,
+    timing: 'end_of_period' as const,
+    targetPlanCode: 'growth_monthly',
+    creditAction: 'none' as const,
+  };
+  await nozle.previewSubscriptionTransition(transition);
+  await nozle.applySubscriptionTransition(
+    transition,
+    'transition-subscription-123-growth-v1',
+  );
   await nozle.can('workspace_123', 'analytics', { region: 'us-east' });
   await nozle.track(
     'workspace_123',
@@ -58,6 +72,25 @@ export async function exerciseNodeSdk() {
     ],
     { idempotencyKey: 'workspace-123-users-import-7' },
   );
+
+  await nozle.entitySubscriptions.ensure('workspace_123', 'user_42');
+  await nozle.entitySubscriptions.get('workspace_123', 'user_42');
+  await nozle.entitySubscriptions.list('workspace_123');
+  await nozle.entitySubscriptions.checkout('workspace_123', 'user_42', {
+    planCode: 'pro_monthly',
+    billingTime: 'anniversary',
+    returnUrl: 'https://app.example.com/settings/billing',
+    idempotencyKey: 'checkout-user-42-pro-v1',
+  });
+  await nozle.entitySubscriptions.changePlan('workspace_123', 'user_42', {
+    planCode: 'max_annual',
+    returnUrl: 'https://app.example.com/settings/billing',
+    idempotencyKey: 'change-user-42-max-v1',
+  });
+  await nozle.entitySubscriptions.cancel('workspace_123', 'user_42', {
+    timing: 'end_of_period',
+    idempotencyKey: 'cancel-user-42-v1',
+  });
 
   await nozle.creditSystems.list();
   await nozle.credits.getBalance('workspace_123', 'ai_credits');
