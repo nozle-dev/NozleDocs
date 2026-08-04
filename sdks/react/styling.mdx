@@ -1,0 +1,78 @@
+---
+title: "Theming"
+description: "Theme React SDK components with CSS variables and application styles."
+---
+
+React SDK components use inline structural styles plus CSS variables. Set variables on a page wrapper or `:root` to match your design system.
+
+```css
+:root {
+  --nozle-primary: #5b5bd6;
+  --nozle-primary-foreground: #ffffff;
+  --nozle-background: #ffffff;
+  --nozle-card: #ffffff;
+  --nozle-foreground: #18181b;
+  --nozle-muted: #f4f4f5;
+  --nozle-muted-foreground: #71717a;
+  --nozle-border: #e4e4e7;
+  --nozle-accent: #7c3aed;
+  --nozle-accent-foreground: #ffffff;
+  --nozle-warning: #d97706;
+  --nozle-warning-bg: #fffbeb;
+  --nozle-warning-text: #92400e;
+  --nozle-warning-border: #fcd34d;
+  --nozle-destructive: #dc2626;
+  --nozle-radius: 12px;
+  --nozle-shadow: 0 12px 30px rgb(24 24 27 / 0.12);
+}
+```
+
+## Pricing-table variables
+
+`PricingTable` supports narrower overrides in addition to the shared variables:
+
+| Variable | Fallback | Purpose |
+|---|---|---|
+| `--nozle-pricing-bg` | `--nozle-background` | Table background. |
+| `--nozle-pricing-card-bg` | `--nozle-card` | Plan card background. |
+| `--nozle-pricing-highlight` | `--nozle-primary` | Highlight border, badge, and CTA. |
+| `--nozle-pricing-border` | `--nozle-border` | Standard plan-card border. |
+| `--nozle-pricing-radius` | `--nozle-radius` | Plan-card corner radius. |
+
+```tsx
+<section
+  style={{
+    '--nozle-pricing-highlight': '#0f766e',
+    '--nozle-pricing-radius': '18px',
+  } as React.CSSProperties}
+>
+  <PricingTable highlightPlan="growth_monthly" />
+</section>
+```
+
+## Utility classes
+
+Some presentational components include utility class names for layout. If your application does not use Tailwind, the important visual structure still comes from inline styles, but you may provide equivalent styles for classes such as `space-y-3`, `space-y-4`, and `w-full`.
+
+## Legacy preset export
+
+The package exposes `nozlePreset` from `@nozle-js/react/styles/preset`. It contains Tailwind component rules for older `data-nozle` markup. Current components primarily use the CSS variables above, so new integrations should theme with variables rather than depend on the preset.
+
+## Dark surfaces
+
+Scope variables to any container to render components on a dark surface:
+
+```css
+.billing-dark {
+  --nozle-background: #111827;
+  --nozle-card: #172033;
+  --nozle-foreground: #f9fafb;
+  --nozle-muted: #263247;
+  --nozle-muted-foreground: #a8b3c7;
+  --nozle-border: #334155;
+  --nozle-primary: #818cf8;
+  --nozle-primary-foreground: #111827;
+}
+```
+
+Ensure your chosen foreground, border, warning, and destructive colors meet your accessibility contrast requirements.

@@ -1,29 +1,135 @@
 ---
-title: Hooks
-description: Public catalog and merchant-checkout hooks
+title: "Provider and hooks"
+description: "Read the public catalog, start merchant-backed checkout, and access the React SDK context."
 ---
 
-## usePlans
+The current React SDK exports two data hooks: `usePlans` and `useCheckoutSession`. Customer-specific hooks such as `useCan`, `useUsage`, and `usePlan` are intentionally not browser exports; retrieve that state from your authenticated backend.
 
-Fetches the public plan catalog using the provider's `pk_`.
+## `usePlans`
 
-```tsx
-const { plans, isLoading } = usePlans()
-```
-
-## useCheckoutSession
-
-Invokes the merchant-provided `createCheckout` callback. The hook passes only `planCode` and `returnUrl`; it does not send a customer ID.
+Fetches `GET /api/v1/plans` through the `BillingProvider` catalog client.
 
 ```tsx
-const { fetchClientSecret, checkout, isLoading, error } = useCheckoutSession()
+import { usePlans } from '@nozle-js/react'
 
-const clientSecret = await fetchClientSecret(
-  'pro',
-  'https://app.example.com/settings/billing',
-)
+function PlanList() {
+  const { plans, isLoading } = usePlans()
+
+  if (isLoading) return <p>Loading plans…</p>
+
+  return plans.map((plan) => (
+    <div key={plan.code}>
+      {plan.name}: {plan.amount_currency} {plan.amount_cents / 100}
+    </div>
+  ))
+}
 ```
 
-The callback may return a Stripe client secret or URL, `type: "completed"`, or `type: "scheduled"`. If the callback is missing, the hook rejects with a configuration error.
+### Return value
 
-Customer billing, invoices, cancellation, top-ups, subscriptions, entitlement checks, and credit reads are intentionally absent from the browser SDK. Implement authenticated merchant endpoints and pass their results into presentational components.
+| Field | Type | Description |
+|---|---|---|
+| `plans` | `CatalogPlan[]` | Public plans returned by Nozle. |
+| `isLoading` | `boolean` | `true` until the catalog request settles. |
+
+`CatalogPlan` contains `code`, `name`, `amount_cents`, `amount_currency`, and `interval`.
+
+## `useCheckoutSession`
+
+Calls `BillingProvider.createCheckout` with a plan code and return URL.
+
+```tsx
+import { useCheckoutSession } from '@nozle-js/react'
+
+function BuyProButton() {
+  const { fetchClientSecret, checkout, isLoading, error } = useCheckoutSession()
+
+  async function startCheckout() {
+    const clientSecret = await fetchClientSecret(
+      'pro',
+      'https://app.example.com/settings/billing',
+    )
+
+    if (clientSecret) {
+      // Render <Checkout clientSecret={clientSecret} ... />
+    }
+  }
+
+  return (
+    <>
+      <button disabled={isLoading} onClick={() => void startCheckout()}>
+        {isLoading ? 'Starting…' : 'Choose Pro'}
+      </button>
+      {error && <p role="alert">{error.message}</p>}
+      {checkout && 'type' in checkout && checkout.type === 'scheduled' && (
+        <p>Your change is scheduled.</p>
+      )}
+    </>
+  )
+}
+```
+
+If checkout returns a hosted URL, the hook navigates to it and returns `null`. It returns a string only for an embedded Stripe client secret. Completed and scheduled results are available through `checkout`.
+
+### Return value
+
+| Field | Type | Description |
+|---|---|---|
+| `fetchClientSecret` | `(planCode, returnUrl?) => Promise<string \| null>` | Starts checkout and returns an embedded Stripe secret when present. |
+| `checkout` | `CheckoutResult \| null` | Most recent raw checkout result. |
+| `isLoading` | `boolean` | Whether checkout creation is in progress. |
+| `error` | `Error \| null` | Most recent checkout error. |
+
+## `useBillingContext`
+
+Returns the required billing context and throws outside `BillingProvider`.
+
+```tsx
+const { client, createCheckout } = useBillingContext()
+```
+
+Use this only when building a custom catalog or checkout component. Prefer `usePlans` and `useCheckoutSession` for common flows.
+
+## `useOptionalBillingContext`
+
+Returns the billing context or `null` outside a provider. `PricingTable` uses this behavior so caller-supplied plans can render without a catalog provider.
+
+## `useNozleClient`
+
+Returns the browser-safe `NozleClient`:
+
+```ts
+interface NozleClient {
+  publishableKey: string
+  baseUrl: string
+  catalogFetch(path: string, init?: RequestInit): Promise<Response>
+}
+```
+
+`catalogFetch` is for public catalog endpoints only. Do not use it to proxy customer billing requests.
+
+## `BillingContext`
+
+`BillingContext` is exported for advanced integrations that need React's direct context API. Its value is either `null` or:
+
+```ts
+interface BillingContextValue {
+  client: NozleClient
+  createCheckout?: CreateCheckout
+}
+```
+
+Prefer `useBillingContext` or `useOptionalBillingContext` in application components so missing-provider behavior stays explicit.
+
+## Checkout result types
+
+`createCheckout` may resolve to:
+
+- Stripe hosted checkout: `{ type: 'stripe', url }`;
+- embedded Stripe: `{ type: 'stripe', clientSecret }`;
+- Razorpay: `{ type: 'razorpay', orderId }`;
+- immediate completion: `{ type: 'completed', ... }`;
+- scheduled change: `{ type: 'scheduled', ... }`; or
+- legacy hosted checkout: `{ url }`.
+
+Stripe webhooks remain authoritative. A browser redirect or completion callback does not activate a paid plan by itself.

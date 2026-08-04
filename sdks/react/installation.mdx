@@ -1,13 +1,22 @@
 ---
-title: Installation
-description: Configure the React SDK for public catalog reads and merchant-backed checkout
+title: "Installation"
+description: "Install the React SDK and configure public catalog reads with merchant-backed checkout."
 ---
 
 ```bash
 npm install @nozle-js/react react react-dom @stripe/stripe-js @stripe/react-stripe-js
 ```
 
-The React SDK accepts a publishable key for the public plan catalog. It never accepts a secret key and does not call customer billing APIs directly.
+The React SDK has two browser-safe responsibilities:
+
+- read the public plan catalog with a publishable `pk_` key; and
+- render checkout and billing UI using data or callbacks supplied by your application.
+
+It does not accept a secret key, choose a Nozle customer, or call customer billing APIs directly.
+
+## Configure `BillingProvider`
+
+Wrap billing UI in `BillingProvider`. Your `createCheckout` callback calls an authenticated merchant endpoint; that endpoint derives the customer from the logged-in user or team and calls Nozle with a restricted `sk_`.
 
 ```tsx
 import { BillingProvider, PricingTable } from '@nozle-js/react'
@@ -27,20 +36,53 @@ export function BillingPage({ csrfToken }: { csrfToken: string }) {
           },
           body: JSON.stringify({ planCode, returnUrl }),
         })
+
         if (!response.ok) throw new Error('Checkout failed')
         return response.json()
       }}
     >
-      <PricingTable returnUrl={window.location.href} />
+      <PricingTable returnUrl="https://app.example.com/settings/billing" />
     </BillingProvider>
   )
 }
 ```
 
-The merchant route must authenticate the user, derive the Nozle customer from the user's team, reject browser customer identifiers, validate the requested plan and exact HTTPS return origin, and call Nozle with a least-privilege `sk_`.
+### Provider props
 
-Use equivalent merchant endpoints for billing status, invoices, cancellation, top-ups, entitlements, and credits. Pass returned data into your own UI or the SDK's presentational components.
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `publishableKey` | `string` | required | Browser-safe key beginning with `pk_`. |
+| `createCheckout` | `(input) => Promise<CheckoutResult>` | — | Merchant callback used by checkout components. |
+| `baseUrl` | `string` | `https://api.nozle.app` | Nozle API origin used for public catalog requests. |
+| `children` | `ReactNode` | required | Components that consume the billing context. |
+
+`BillingProvider` throws when `publishableKey` does not begin with `pk_`.
+
+## Implement the merchant endpoint
+
+The merchant endpoint must:
+
+1. authenticate the application user;
+2. derive the Nozle customer from server-owned user or team data;
+3. reject browser-provided customer identifiers;
+4. validate the requested plan and exact HTTPS return origin; and
+5. call Nozle with a least-privilege `sk_`.
+
+See [Merchant backend billing](/guides/getting-started/merchant-backend-bff) for a complete route.
+
+## Framework notes
+
+All interactive exports are client components. In Next.js App Router, render the provider and interactive SDK components from a file containing `"use client"`.
+
+Customer billing status, invoices, subscriptions, cancellation, credits, usage, and entitlements must come from your authenticated backend. Pass that returned state into components such as `FeatureGate`, `UsageMeter`, and `PlanBadge`.
 
 <Warning>
-Never expose an `sk_`, master key, or internal credential in a browser bundle. Do not treat CORS or `Origin` as authentication.
+Never expose an `sk_`, master key, customer session, or internal credential in a browser bundle. CORS and `Origin` headers are not authentication.
 </Warning>
+
+## Next steps
+
+- Browse [components](/sdks/react/components).
+- Use the [provider hooks](/sdks/react/hooks).
+- Add [feature gates](/sdks/react/gates).
+- Match the components to your product with [theming](/sdks/react/styling).
