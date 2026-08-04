@@ -1,36 +1,59 @@
 ---
 title: Entitlements Overview
-description: Feature gating and usage limits
+description: Enforce feature access and usage limits from a trusted backend
 ---
 
-Entitlements control what customers can do based on their subscription plan.
+Entitlements control what a customer can do based on subscription and usage state.
 
-**Two types:**
-1. **Feature gates** — boolean access (can this customer use analytics? yes/no)
-2. **Usage limits** — numeric caps (this customer can make 10,000 API calls/month)
+## Two decision types
 
-**How it works:**
-1. Define features and assign them to plans (in the dashboard or via API)
-2. Check access at runtime using can() — in your API (Node/Python SDK) or UI (React useCan hook)
-3. Get real-time updates via WebSocket (React SDK auto-subscribes)
+1. **Feature gates** — boolean access, such as analytics or SSO.
+2. **Usage limits** — numeric caps, such as monthly requests or generated reports.
 
-**Server-side check:**
-```typescript
-const { allowed, remaining, limit, used } = await nozle.can('cust_123', 'api_calls');
-if (!allowed) return res.status(403).json({ error: 'Upgrade required' });
+## Server-side enforcement
+
+```ts
+const check = await nozle.can('customer_123', 'api_calls')
+
+if (!check.allowed) {
+  return Response.json(
+    { error: check.reason ?? 'not_allowed', remaining: check.remaining },
+    { status: check.overage ? 429 : 403 },
+  )
+}
+
+return performProtectedWork()
 ```
 
-**Client-side check:**
+Call `can()` immediately before protected work. The response can include usage and margin context in addition to the allow/deny decision.
+
+## React presentation
+
+Fetch entitlement state through your authenticated backend and pass it into presentational gates:
+
 ```tsx
-const { allowed, loading } = useCan('cust_123', 'api_calls');
-// Or use declarative gates:
-<FeatureGate customerId="cust_123" feature="analytics" fallback={<UpgradePrompt />}>
+<FeatureGate
+  allowed={entitlement.allowed}
+  loading={entitlement.loading}
+  fallback={<UpgradePrompt planName="Growth" />}
+>
   <Dashboard />
 </FeatureGate>
 ```
 
-**What makes Nozle's entitlements powerful:**
-- Real-time WebSocket updates — no polling
-- Low-latency cached counters for sub-millisecond checks
-- Margin-aware responses (cost/revenue/margin per use)
-- React SDK components (FeatureGate, UsageGate, PlanGate, LockedOverlay)
+The React component improves the interface; your backend check remains the authorization boundary.
+
+## Updates
+
+Refresh entitlement state after checkout, subscription, or usage changes. For push-based updates, issue a separate server-authorized realtime token or publish through your own authenticated channel. Never send `pk_` or `sk_` credentials to a browser WebSocket connection.
+
+## Margin-aware decisions
+
+`can()` can return unit cost, revenue, margin, thresholds, and warnings. Use those fields for observability or merchant-defined policy without exposing them to customers unless required.
+
+<CardGroup cols={2}>
+  <Card title="The can() endpoint" href="/guides/entitlements/can-endpoint" />
+  <Card title="React feature gates" href="/sdks/react/gates" />
+  <Card title="Node.js entitlements" href="/sdks/node/entitlements" />
+  <Card title="Python entitlements" href="/sdks/python/entitlements" />
+</CardGroup>

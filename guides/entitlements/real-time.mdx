@@ -1,30 +1,46 @@
 ---
-title: Real-Time Updates
-description: WebSocket for live entitlement changes
+title: Backend-authorized updates
+description: Keep entitlement UI current without exposing customer credentials
 ---
 
-Nozle supports WebSocket delivery for server-authorized real-time entitlement updates. Browser publishable keys cannot mint a realtime token.
+Nozle customer state is server-authorized. Publishable keys cannot read customer entitlements or mint realtime tokens.
 
-**How it works:**
-1. BillingProvider connects to WebSocket on mount
-2. Subscribes to channel: workspace:\{workspaceId\}:entitlements
-3. When entitlements change (plan upgrade, usage limit hit, feature toggled), Nozle publishes to the channel
-4. React hooks (useCan, usePlan) update automatically — no polling
+## Recommended baseline
 
-Do not send `pk_` or `sk_` credentials to a WebSocket endpoint. Until your backend implements a separate server-authorized realtime-token flow, omit realtime configuration and use authenticated backend reads.
+Refresh through your authenticated backend after events that can change access:
 
-**Connection states:**
-The BillingState tracks connection:
-```typescript
-const { connectionState } = useBillingContext();
-// 'connecting' | 'connected' | 'disconnected'
+- checkout completion confirmed by your backend;
+- plan changes or cancellation;
+- usage approaching or crossing a limit; and
+- administrative entitlement changes.
+
+```ts
+const response = await fetch('/api/billing/entitlements', {
+  credentials: 'include',
+})
+
+const entitlement = await response.json()
 ```
 
-**When updates are pushed:**
-- Customer upgrades/downgrades plan
-- Usage counter crosses a limit threshold
-- Admin toggles a feature
-- Subscription is cancelled or expired
+## Push delivery
 
-**Without WebSocket:**
-The React SDK does not fetch customer entitlement state. Supply caller-owned state to presentational gates, or add a separately authenticated merchant realtime channel.
+Applications that need push updates can use a server-authorized realtime channel:
+
+1. authenticate the application user on your backend;
+2. derive the Nozle customer or workspace from server-owned records;
+3. issue a short-lived, narrowly scoped token; and
+4. publish only the customer fields required by the UI.
+
+Do not send a Nozle `pk_` or `sk_` credential to the WebSocket endpoint.
+
+## React integration
+
+The current React SDK provides presentational gates. Store your authenticated backend result in your application state and pass `allowed`, `loading`, plan, and usage values to those components.
+
+```tsx
+<FeatureGate allowed={state.analyticsAllowed} loading={state.loading}>
+  <Analytics />
+</FeatureGate>
+```
+
+This model keeps the authorization boundary on the server while allowing polling, request-driven refresh, or your own realtime transport.

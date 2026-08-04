@@ -1,36 +1,49 @@
 ---
 title: Errors
-description: Error codes and rate limits
+description: HTTP errors, validation failures, and retry guidance
 ---
 
-**HTTP Status Codes:**
+## HTTP status codes
 
 | Status | Meaning |
-|--------|---------|
-| 200 | Success |
-| 400 | Bad request — missing or invalid parameters |
-| 401 | Unauthorized — missing or invalid API key |
-| 403 | Forbidden — key doesn't have permission (e.g., pk_ key on sk_-only endpoint) |
-| 404 | Not found — resource doesn't exist |
-| 429 | Rate limited — too many requests |
-| 500 | Internal server error |
+|---|---|
+| `200`–`299` | Successful request. |
+| `400` | Missing, invalid, or conflicting parameters. |
+| `401` | Missing or invalid credential. |
+| `403` | Credential lacks permission or a publishable key attempted a protected operation. |
+| `404` | Resource was not found within the authenticated organization. |
+| `409` | Idempotency key or resource-state conflict. |
+| `422` | Request is syntactically valid but violates a product rule. |
+| `429` | Request was rate limited. |
+| `503` | Temporary dependency, lock, or service failure. |
 
-**Error Response Format:**
+## Response shape
+
+Endpoints return a short error description and may include a stable code or additional fields:
+
 ```json
 {
-  "error": "description of what went wrong"
+  "error": "insufficient credits",
+  "code": "insufficient_credits"
 }
 ```
 
-**Rate Limits:**
-- Default: 10 requests/second per API key
-- Events endpoint (track): higher limit for batch ingestion
-- Rate limit headers are not currently returned (planned)
+Do not parse human-readable text when a machine-readable `code` is available.
 
-**Common errors and fixes:**
+## Retry guidance
 
-"invalid api key" → Check your key prefix (pk_ vs sk_) and that it hasn't been revoked
-"customer not found" → The external_customer_id doesn't match any customer in your workspace
-"feature not found" → The feature key doesn't match any entitlement on the customer's plan
-"subscription not active" → Customer doesn't have an active subscription
-"insufficient credits" → Credit balance too low for the operation
+- Retry read requests only within your latency and request budget.
+- Retry idempotent mutations with the same idempotency key and payload.
+- Retry events with the same transaction ID.
+- Honor `Retry-After` when returned.
+- Do not retry validation, authorization, or insufficient-credit decisions without changing the underlying state.
+
+## Common failures
+
+| Error | Check |
+|---|---|
+| Invalid API key | Key prefix, revocation state, and target environment. |
+| Customer not found | Server-owned external customer mapping and organization scope. |
+| Feature not found | Feature code and plan entitlement configuration. |
+| Subscription not active | Checkout payment state and subscription boundary. |
+| Insufficient credits | Effective balance, source expiry, Entity status, and pool policy. |

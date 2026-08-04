@@ -27,17 +27,15 @@ Regardless of deployment model, you'll need Nozle API keys to use the SDKs:
 | Publishable | `pk_` | Client-side public plan catalog only |
 | Secret | `sk_` | Server-side (Node/Python SDKs) |
 
-## Credit engine browser and checkout settings
+## Credit API browser and checkout settings
 
 | Variable | Description |
 |----------|-------------|
-| `CORS_ORIGIN` | Transitional single-origin setting retained for old Engine replicas during a rolling deployment. |
+| `CORS_ORIGIN` | Transitional single-origin setting retained for older API replicas during a rolling deployment. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated browser-origin allowlist, for example `https://app.example.com,https://portal.example.com`. |
 | `CHECKOUT_RETURN_URL` | Independent absolute URL used when checkout requests omit a return URL. Do not reuse this as the CORS allowlist. |
 | `CHECKOUT_RETURN_URL_ALLOWED_ORIGINS` | Exact comma-separated HTTPS origins allowed for checkout returns. |
-| `NOZLE_CREDIT_USAGE_TRACK_TARGETS` | Preferred comma-separated exact mutation targets in `organization_uuid:metric_code` or `organization_uuid:metric_code:credit_system_code` form. Any configured exact target list takes precedence over the legacy organization allowlist. Leave empty by default. |
-| `NOZLE_CREDIT_USAGE_TRACK_ORGANIZATION_IDS` | Legacy comma-separated organization-wide mutation allowlist. Leave empty when using exact targets. |
 
-During the environment rename, set all three CORS/checkout variables. New Engine versions prefer `CORS_ALLOWED_ORIGINS` and `CHECKOUT_RETURN_URL`; old versions continue reading `CORS_ORIGIN`. Remove `CORS_ORIGIN` only after all old Engine versions have been retired.
+Use separate values for browser CORS and checkout return validation. CORS controls which browser origins may call an endpoint; it does not authenticate callers or make a return URL safe.
 
 Get your keys from the Nozle dashboard at [app.nozle.app](https://app.nozle.app).

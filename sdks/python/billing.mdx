@@ -72,7 +72,73 @@ Use checkout for payment-gated changes. Use direct subscription only when the co
 
 ## Cancellation
 
-Version `0.4.0` does not export `cancel_subscription()`. Call the [Cancel subscription API](/api/cancel-subscription) directly from your backend until package support is added.
+```python
+result = nozle.cancel_subscription(
+    "workspace_123",
+    "subscription_123",
+    policy="end_of_period",
+)
+```
+
+The policy defaults to `end_of_period` and also accepts `immediate`.
+
+## Entity subscriptions
+
+```python
+nozle.entity_subscriptions.ensure("workspace_123", "user_42")
+
+checkout = nozle.entity_subscriptions.checkout(
+    "workspace_123",
+    "user_42",
+    plan_code="pro_monthly",
+    billing_time="anniversary",
+    return_url="https://app.example.com/settings/billing",
+    idempotency_key="checkout-user-42-pro-v1",
+)
+```
+
+Change or cancel only that Entity:
+
+```python
+nozle.entity_subscriptions.change_plan(
+    "workspace_123",
+    "user_42",
+    plan_code="max_annual",
+    return_url="https://app.example.com/settings/billing",
+    idempotency_key="change-user-42-max-v1",
+)
+
+nozle.entity_subscriptions.cancel(
+    "workspace_123",
+    "user_42",
+    timing="end_of_period",
+    idempotency_key="cancel-user-42-v1",
+)
+```
+
+Every method requires an `sk_` key. See [Entity Subscriptions](/api/entity-subscriptions) for lifecycle and payment behavior.
+
+## Settlement transitions
+
+```python
+params = {
+    "customer_id": "workspace_123",
+    "subscription_id": "subscription_123",
+    "operation": "downgrade",
+    "timing": "end_of_period",
+    "target_plan_code": "growth_monthly",
+    "credit_action": "none",
+}
+
+preview = nozle.preview_subscription_transition(params)
+
+transition = nozle.apply_subscription_transition(
+    params,
+    idempotency_key="transition-subscription-123-growth-v1",
+)
+```
+
+Apply requires an idempotency key up to 255 UTF-8 bytes. See [Subscriptions](/guides/billing/subscriptions) for settlement options and validation rules.
 
 ## Upsert the customer first
 

@@ -85,7 +85,75 @@ console.log(subscription.status)
 
 ## Cancellation
 
-Version `0.4.0` does not export a `cancelSubscription()` method. Call the [Cancel subscription API](/api/cancel-subscription) from your backend until cancellation support is added to the package.
+```ts
+const result = await nozle.cancelSubscription(
+  'workspace_123',
+  'subscription_123',
+  'end_of_period',
+)
+```
+
+The policy defaults to `end_of_period` and also accepts `immediate`.
+
+## Entity subscriptions
+
+Use Entity subscriptions when users, agents, projects, or workspaces under one paying customer can have different plans.
+
+```ts
+await nozle.entitySubscriptions.ensure('workspace_123', 'user_42')
+
+const checkout = await nozle.entitySubscriptions.checkout(
+  'workspace_123',
+  'user_42',
+  {
+    planCode: 'pro_monthly',
+    billingTime: 'anniversary',
+    returnUrl: 'https://app.example.com/settings/billing',
+    idempotencyKey: 'checkout-user-42-pro-v1',
+  },
+)
+```
+
+Change or cancel only that Entity:
+
+```ts
+await nozle.entitySubscriptions.changePlan('workspace_123', 'user_42', {
+  planCode: 'max_annual',
+  returnUrl: 'https://app.example.com/settings/billing',
+  idempotencyKey: 'change-user-42-max-v1',
+})
+
+await nozle.entitySubscriptions.cancel('workspace_123', 'user_42', {
+  timing: 'end_of_period',
+  idempotencyKey: 'cancel-user-42-v1',
+})
+```
+
+Every method requires an `sk_` key. See [Entity Subscriptions](/api/entity-subscriptions) for lifecycle and payment behavior.
+
+## Settlement transitions
+
+Preview and apply merchant-configurable cancellation, downgrade, and uncancel operations:
+
+```ts
+const params = {
+  customerId: 'workspace_123',
+  subscriptionId: 'subscription_123',
+  operation: 'downgrade' as const,
+  timing: 'end_of_period' as const,
+  targetPlanCode: 'growth_monthly',
+  creditAction: 'none' as const,
+}
+
+const preview = await nozle.previewSubscriptionTransition(params)
+
+const transition = await nozle.applySubscriptionTransition(
+  params,
+  'transition-subscription-123-growth-v1',
+)
+```
+
+Apply requires an idempotency key up to 255 bytes. See [Subscriptions](/guides/billing/subscriptions) for settlement options and validation rules.
 
 ## Customer creation
 

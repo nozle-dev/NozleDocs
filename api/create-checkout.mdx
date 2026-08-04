@@ -25,7 +25,7 @@ Use this when a customer is selecting a plan.
   The plan code to subscribe the customer to (e.g. `pro`).
 </ParamField>
 
-Plan checkout is payment-gated. Free-to-paid checkout uses an incomplete subscription. Paid-to-paid upgrades keep the old subscription active in a durable pending intent and apply the Lago upgrade only after Stripe confirms payment.
+Plan checkout is payment-gated. Free-to-paid checkout uses an incomplete subscription. Paid-to-paid upgrades keep the old subscription active in a durable pending intent and apply the billing change only after Stripe confirms payment.
 
 If prepaid credits fully cover a paid plan change, Nozle applies it without Stripe and returns `type: "completed"`. Free plans may also complete immediately. A downgrade or other cycle-end transition returns `type: "scheduled"`; browser callers still use this same endpoint.
 

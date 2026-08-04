@@ -31,6 +31,25 @@ declare module '@nozle-js/node' {
     metadata: Record<string, unknown>;
   }
 
+  export interface EntitySubscription {
+    external_customer_id: string;
+    external_entity_id: string;
+    external_subscription_id: string;
+    status: string;
+    current_plan: {
+      code: string;
+      name: string;
+      interval: string;
+      amount_cents: number;
+      amount_currency: string;
+      status: string;
+      effective_at: string | null;
+    } | null;
+    pending_plan: EntitySubscription['current_plan'];
+    billing_time: 'calendar' | 'anniversary' | null;
+    cancel_at_period_end: boolean | null;
+  }
+
   export interface CreditBalance {
     available: string;
     sources: Array<{ remaining: string; type: string }>;
@@ -62,6 +81,41 @@ declare module '@nozle-js/node' {
       subscription_id: string;
       status: string;
     }>;
+    cancelSubscription(
+      customerId: string,
+      subscriptionId: string,
+      policy?: 'end_of_period' | 'immediate',
+    ): Promise<{
+      subscription: {
+        external_id: string;
+        status: string;
+        ending_at: string | null;
+        terminated_at?: string | null;
+      };
+    }>;
+    previewSubscriptionTransition(params: {
+      customerId: string;
+      subscriptionId: string;
+      operation: 'cancel' | 'downgrade' | 'uncancel';
+      timing?: 'end_of_period' | 'immediate';
+      targetPlanCode?: string;
+      billingAnchor?: 'keep_anchor' | 'reset_anchor';
+      prorationBehavior?: 'prorate_immediately' | 'none';
+      creditAction?: 'credit' | 'refund' | 'offset' | 'none';
+      refundMode?: 'prorated' | 'full';
+      finalInvoiceAction?: 'generate' | 'skip';
+    }): Promise<{ subscription_transition: { amount_due_cents: number } }>;
+    applySubscriptionTransition(
+      params: {
+        customerId: string;
+        subscriptionId: string;
+        operation: 'cancel' | 'downgrade' | 'uncancel';
+        timing?: 'end_of_period' | 'immediate';
+        targetPlanCode?: string;
+        creditAction?: 'credit' | 'refund' | 'offset' | 'none';
+      },
+      idempotencyKey: string,
+    ): Promise<{ subscription_transition: { id: string; replayed: boolean } }>;
     track(
       customerId: string,
       event: string,
@@ -146,6 +200,38 @@ declare module '@nozle-js/node' {
         }>,
         options: { idempotencyKey: string },
       ): Promise<{ counts: Record<string, number>; replayed: boolean }>;
+    };
+    entitySubscriptions: {
+      ensure(customerId: string, entityId: string): Promise<EntitySubscription>;
+      get(customerId: string, entityId: string): Promise<EntitySubscription>;
+      list(customerId: string): Promise<{ entity_subscriptions: EntitySubscription[] }>;
+      checkout(
+        customerId: string,
+        entityId: string,
+        params: {
+          planCode: string;
+          returnUrl?: string;
+          billingTime?: 'calendar' | 'anniversary';
+          idempotencyKey?: string;
+        },
+      ): Promise<CheckoutResult>;
+      changePlan(
+        customerId: string,
+        entityId: string,
+        params: { planCode: string; returnUrl?: string; idempotencyKey?: string },
+      ): Promise<CheckoutResult>;
+      cancel(
+        customerId: string,
+        entityId: string,
+        params: {
+          idempotencyKey: string;
+          timing?: 'end_of_period' | 'immediate';
+          creditAction?: 'credit' | 'refund' | 'offset' | 'none';
+          refundMode?: 'prorated' | 'full';
+          finalInvoiceAction?: 'generate' | 'skip';
+        },
+      ): Promise<{ entity_subscription: EntitySubscription }>;
+      remove(customerId: string, entityId: string): Promise<void>;
     };
     credits: {
       getBalance(customerId: string, creditSystemCode: string): Promise<CreditBalance>;

@@ -5,6 +5,8 @@ description: "Install and configure the typed, synchronous Nozle Python SDK."
 
 `nozle-sdk` supports Python 3.9 through 3.13, uses `requests`, and includes a `py.typed` marker.
 
+Entity subscription APIs are introduced in `0.5.0`.
+
 ```bash
 pip install nozle-sdk
 ```
@@ -36,8 +38,8 @@ Set both URLs explicitly outside local development. Trailing slashes are removed
 ```mermaid
 flowchart LR
   App[Python backend] --> SDK[nozle-sdk]
-  SDK -->|base_url| Engine[Billing, entitlements, credits, usage, margin]
-  SDK -->|events_url| Core[Metered events and credit-system catalog]
+  SDK -->|base_url| API[Billing, entitlements, credits, usage, margin]
+  SDK -->|events_url| Events[Metered events and credit-system catalog]
 ```
 
 ## Manage the HTTP session
@@ -71,11 +73,12 @@ This is a backend SDK. Never expose an `sk_`, master key, or internal credential
 
 | Area | Methods |
 |---|---|
-| Core | `ping()`, `plans()`, `track()`, `can()` |
-| Billing | `checkout()`, `subscribe()` |
+| API | `ping()`, `plans()`, `track()`, `can()` |
+| Billing | `checkout()`, `subscribe()`, `cancel_subscription()`, transition preview/apply |
 | Customers | `customers.upsert()` |
 | Credit systems | `credit_systems.list()` |
 | Entities | `get()`, `list()`, `upsert()`, `activate()`, `suspend()`, `bulk_upsert()` |
+| Entity subscriptions | `ensure()`, `get()`, `list()`, `checkout()`, `change_plan()`, `cancel()`, `remove()` |
 | Credits | Customer and Entity balance/history reads, `allocate()`, `deallocate()` |
 | Usage | Advisory `check()` and atomic `track()` |
 | Margin | `summary()`, `by_customer()`, `by_metric()`, `by_plan()`, `by_model()`, `trend()` |
