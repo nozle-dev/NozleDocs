@@ -1,0 +1,87 @@
+---
+title: "Billing and subscriptions"
+description: "List plans and create checkout or direct subscriptions from Python."
+---
+
+## List plans
+
+`plans()` accepts either `pk_` or `sk_` credentials.
+
+```python
+plans = nozle.plans()
+
+for plan in plans:
+    print(
+        plan["code"],
+        plan["amount_cents"],
+        plan["amount_currency"],
+        plan["interval"],
+    )
+```
+
+Each `Plan` is a typed dictionary containing `code`, `name`, `amount_cents`, `amount_currency`, and `interval`.
+
+## Create checkout
+
+```python
+result = nozle.checkout(
+    "workspace_123",
+    "pro_monthly",
+    return_url="https://app.example.com/settings/billing",
+)
+```
+
+`checkout()` requires `sk_` and returns one of three typed result variants:
+
+- `StripeCheckoutResult` with a hosted `url` or embedded `client_secret`;
+- `CompletedCheckoutResult`; or
+- `ScheduledCheckoutResult`.
+
+```python
+if result["type"] == "stripe":
+    if "url" in result:
+        redirect_to = result["url"]
+    else:
+        client_secret = result.get("client_secret") or result.get("clientSecret")
+elif result["type"] == "completed":
+    refresh_billing_state()
+else:
+    show_scheduled_change(result["status"])
+```
+
+Validate the exact HTTPS return origin before passing a browser-provided URL to this method.
+
+### Deprecated `success_url`
+
+`success_url=` remains a deprecated alias for `return_url=`. The SDK emits `DeprecationWarning`, sends only `return_url`, and rejects conflicting values with `NozleValidationError`.
+
+<Warning>
+Stripe webhooks remain authoritative. Checkout return values and browser redirects are interface signals, not proof that a paid subscription is active.
+</Warning>
+
+## Direct subscription
+
+```python
+subscription = nozle.subscribe("workspace_123", "free")
+
+print(subscription["subscription_id"])
+print(subscription["status"])
+```
+
+Use checkout for payment-gated changes. Use direct subscription only when the configured flow does not require interactive payment.
+
+## Cancellation
+
+Version `0.4.0` does not export `cancel_subscription()`. Call the [Cancel subscription API](/api/cancel-subscription) directly from your backend until package support is added.
+
+## Upsert the customer first
+
+```python
+customer = nozle.customers.upsert(
+    "workspace_123",
+    name="Acme Workspace",
+    email="billing@example.com",
+)
+```
+
+See [Customers and Entities](/sdks/python/customers-entities) for lifecycle details.

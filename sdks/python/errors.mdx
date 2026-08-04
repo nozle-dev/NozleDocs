@@ -1,0 +1,77 @@
+---
+title: "Errors and retries"
+description: "Handle local validation, authentication, transport, and structured API errors safely."
+---
+
+All SDK exceptions derive from `NozleError`.
+
+| Exception | Meaning |
+|---|---|
+| `NozleValidationError` | Local contract validation failed before network I/O. Also derives from `ValueError`. |
+| `NozleAuthenticationError` | The operation used an unsupported key type. Derives from `NozleValidationError`. |
+| `NozleTransportError` | No HTTP response was received due to a `requests` transport failure. |
+| `NozleAPIError` | Nozle returned a non-2xx response or an invalid JSON success payload. |
+
+```python
+from nozle import (
+    NozleAPIError,
+    NozleAuthenticationError,
+    NozleTransportError,
+    NozleValidationError,
+)
+
+try:
+    result = nozle.usage.track(
+        "workspace_123",
+        "agent_execution",
+        idempotency_key="execution-0183f",
+    )
+except NozleAuthenticationError:
+    logger.exception("Nozle secret-key configuration is invalid")
+except NozleValidationError as error:
+    logger.warning("Invalid Nozle request: %s", error)
+except NozleTransportError as error:
+    logger.warning("Nozle transport failed for %s", error.operation)
+except NozleAPIError as error:
+    logger.warning(
+        "Nozle %s returned %s: %r",
+        error.operation,
+        error.status_code,
+        error.response_details,
+    )
+```
+
+Catch `NozleAuthenticationError` before `NozleValidationError` if the branches need different handling because authentication errors are a validation subtype.
+
+## Safe API details
+
+`NozleAPIError` exposes:
+
+- `operation`;
+- `status_code`; and
+- `response_details`.
+
+The transport redacts known secret, token, authorization, and key fields and replaces the active API key if it appears in a string response.
+
+## Retry behavior
+
+The SDK configures zero automatic HTTP retries. This avoids replaying mutations without application context.
+
+- For idempotent Entity, credit-transfer, and usage mutations, retry with the same idempotency key and payload.
+- For `track()`, retry the same event with the same transaction ID.
+- Decide whether a read is safe to retry according to your request budget.
+- Do not generate a new idempotency key after an uncertain outcome.
+
+## LLM wrapper warnings
+
+LLM wrappers preserve successful provider responses when Nozle tracking fails. They emit `NozleTrackingWarning` instead of replacing the provider result.
+
+```python
+import warnings
+
+from nozle import NozleTrackingWarning
+
+warnings.simplefilter("always", NozleTrackingWarning)
+```
+
+Use manual queued tracking when telemetry delivery must be durable.

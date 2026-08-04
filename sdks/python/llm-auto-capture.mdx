@@ -1,120 +1,131 @@
 ---
-title: LLM Auto-Capture
-description: Automatically track LLM token usage for billing
+title: "LLM auto-capture"
+description: "Wrap synchronous or asynchronous OpenAI and Anthropic clients to emit token metadata."
 ---
 
-Nozle's LLM wrappers intercept OpenAI and Anthropic API calls, extract token usage, and automatically send billing events — no manual tracking code needed.
+The wrappers patch the supplied provider client's create method and preserve its normal return value. They support synchronous calls, asynchronous calls, synchronous streams, and asynchronous streams.
 
-Cost calculation happens **server-side** via the Go engine's [cost model](/guides/margin/cost-models) system. The SDK only sends raw token counts.
+Only model, token counts, latency, and an optional feature tag are sent. Prompt and completion content are not captured.
 
 ## OpenAI
 
 ```bash
-pip install nozle-sdk[openai]  # installs openai>=1.0
+pip install "nozle-sdk[openai]"
 ```
 
 ```python
 from openai import OpenAI
+
 from nozle import Nozle, wrap_openai
 
-nozle = Nozle(api_key="sk_live_...")
+nozle = Nozle(
+    api_key="sk_example",
+    base_url="https://api.nozle.app",
+    events_url="https://api.nozle.app",
+)
+
 openai = wrap_openai(
     OpenAI(),
     nozle,
-    customer_id="cust_123",
-    feature="code_completion",   # optional: tag for entitlement tracking
-    metric_code="llm_tokens",    # optional: defaults to "llm_tokens"
+    customer_id="workspace_123",
+    metric_code="llm_tokens",
+    feature="assistant_reply",
 )
 
-# Use OpenAI normally — tracking happens automatically
 response = openai.chat.completions.create(
-    model="gpt-4o",
+    model="example-chat-model",
     messages=[{"role": "user", "content": "Hello"}],
 )
 ```
 
-### Streaming
+### OpenAI streaming
 
-Streaming is fully supported. Usage is captured from the final chunk:
+Request usage metadata so the final stream chunk contains token counts:
 
 ```python
 stream = openai.chat.completions.create(
-    model="gpt-4o",
-    messages=[{"role": "user", "content": "Explain quantum computing"}],
+    model="example-chat-model",
+    messages=[{"role": "user", "content": "Explain vector search"}],
     stream=True,
+    stream_options={"include_usage": True},
 )
 
 for chunk in stream:
     print(chunk.choices[0].delta.content or "", end="")
-# Token usage is automatically tracked after the stream completes
 ```
 
 ## Anthropic
 
 ```bash
-pip install nozle-sdk[anthropic]  # installs anthropic>=0.30.0
+pip install "nozle-sdk[anthropic]"
 ```
 
 ```python
 from anthropic import Anthropic
+
 from nozle import Nozle, wrap_anthropic
 
-nozle = Nozle(api_key="sk_live_...")
 anthropic = wrap_anthropic(
     Anthropic(),
     nozle,
-    customer_id="cust_123",
-    feature="code_completion",
+    customer_id="workspace_123",
+    metric_code="llm_tokens",
+    feature="assistant_reply",
 )
 
 message = anthropic.messages.create(
-    model="claude-sonnet-4-20250514",
-    max_tokens=1024,
+    model="example-anthropic-model",
+    max_tokens=1_024,
     messages=[{"role": "user", "content": "Hello"}],
 )
 ```
 
-## Parameters
+Anthropic streams read input usage from `message_start` and output usage from `message_delta` events.
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `customer_id` | str | Yes | Customer to bill for this usage |
-| `metric_code` | str | No | Billable metric code (default: `"llm_tokens"`) |
-| `feature` | str | No | Feature tag for entitlement tracking |
+## Wrapper arguments
 
-## What gets tracked
+| Argument | Required | Default | Description |
+|---|---|---|---|
+| `client` | yes | — | OpenAI or Anthropic client instance. |
+| `nozle` | yes | — | Configured `Nozle` client. |
+| `customer_id` | yes | — | Customer passed to `track()`. |
+| `metric_code` | no | `llm_tokens` | Event code. |
+| `feature` | no | `None` | Optional event property. |
 
-Each LLM call sends a single event via `nozle.track()` with these properties:
+## Tracked properties
 
-| Property | Source | Description |
-|----------|--------|-------------|
-| `model` | Response | Model name (e.g. `gpt-4o`, `claude-sonnet-4-20250514`) |
-| `input_tokens` | Response usage | Prompt/input token count |
-| `output_tokens` | Response usage | Completion/output token count |
-| `latency_ms` | Measured | End-to-end call duration |
-| `feature` | wrap options | Feature tag (if provided) |
+```json
+{
+  "model": "example-chat-model",
+  "input_tokens": 320,
+  "output_tokens": 84,
+  "latency_ms": 742,
+  "feature": "assistant_reply"
+}
+```
 
-<Info>
-The SDK does **not** calculate costs. The Go engine matches the `model` property against your [cost models](/guides/margin/cost-models) with `per_model` type and calculates `cost_cents` server-side. Make sure you have a cost model configured for the `llm_tokens` metric with rates for your models.
-</Info>
+Cost calculation remains server-side through your Billable Metric and cost-model configuration.
 
-## Privacy
+## Failure behavior
 
-Wrappers **never** capture prompt content or completion text — only metadata (model name, token counts, latency). No PII passes through the billing pipeline.
+The wrappers attempt tracking after a successful provider result. Tracking failures do not replace that result; the SDK emits `NozleTrackingWarning`.
 
-## Manual tracking
+For async provider calls, synchronous Nozle tracking runs in a worker thread through `asyncio.to_thread()`.
 
-If you prefer manual control or use a provider without a wrapper, you can track LLM usage directly:
+The wrapper does not expose `subscription_id` or `transaction_id`, so `track()` resolves the customer's single active subscription and creates a transaction UUID. Use manual queued tracking when you require durable delivery or deterministic IDs.
 
 ```python
-response = openai.chat.completions.create(
-    model="gpt-4o",
-    messages=messages,
-)
+response = provider_call()
 
-nozle.track("cust_123", "llm_tokens", metadata={
-    "model": response.model,
-    "input_tokens": response.usage.prompt_tokens,
-    "output_tokens": response.usage.completion_tokens,
-})
+nozle.track(
+    "workspace_123",
+    "llm_tokens",
+    metadata={
+        "model": response.model,
+        "input_tokens": response.input_tokens,
+        "output_tokens": response.output_tokens,
+    },
+    subscription_id="workspace_123_subscription",
+    transaction_id=f"llm:{response.id}:usage",
+)
 ```

@@ -1,63 +1,103 @@
 ---
-title: Installation
-description: Install and configure the Nozle Python SDK
+title: "Installation"
+description: "Install and configure the typed, synchronous Nozle Python SDK."
 ---
+
+`nozle-sdk` supports Python 3.9 through 3.13, uses `requests`, and includes a `py.typed` marker.
 
 ```bash
 pip install nozle-sdk
 ```
 
-Initialize:
+## Create a client
+
+```python
+import os
+
+from nozle import Nozle
+
+nozle = Nozle(
+    api_key=os.environ["NOZLE_SECRET_KEY"],
+    base_url="https://api.nozle.app",
+    events_url="https://api.nozle.app",
+    timeout=10,
+)
+```
+
+| Argument | Type | Default | Description |
+|---|---|---|---|
+| `api_key` | `str` | required | Organization credential. Protected operations require `sk_`. |
+| `base_url` | `str` | `http://localhost:8080` | Billing, entitlement, credit, Entity, usage, and margin API origin. |
+| `events_url` | `str` | `http://localhost:3000` | Metered event and credit-system API origin. |
+| `timeout` | `float` | `10` | Per-request timeout in seconds. |
+
+Set both URLs explicitly outside local development. Trailing slashes are removed automatically.
+
+```mermaid
+flowchart LR
+  App[Python backend] --> SDK[nozle-sdk]
+  SDK -->|base_url| Engine[Billing, entitlements, credits, usage, margin]
+  SDK -->|events_url| Core[Metered events and credit-system catalog]
+```
+
+## Manage the HTTP session
+
+The client is synchronous and owns a reusable `requests.Session`. Use it as a context manager when its lifetime is scoped:
 
 ```python
 from nozle import Nozle
 
-nozle = Nozle(
-    api_key="sk_live_...",
+with Nozle(
+    api_key=os.environ["NOZLE_SECRET_KEY"],
     base_url="https://api.nozle.app",
     events_url="https://api.nozle.app",
-    timeout=10,   # seconds (default: 10)
-)
+) as nozle:
+    health = nozle.ping()
 ```
 
-## Parameters
+For an application-wide singleton, call `nozle.close()` during shutdown.
 
-- **api_key** (`str`, required): Your secret key (`sk_`)
-- **base_url** (`str`, default: `"http://localhost:8080"`): Nozle API URL
-- **events_url** (`str`, default: `"http://localhost:3000"`): Events ingestion URL (Lago)
-- **timeout** (`int`, default: `10`): Request timeout in seconds
+## Authentication model
 
-## Available methods
-
-### Core
-
-- `nozle.track()` — send usage events
-- `nozle.can()` — check entitlements
-- `nozle.ping()` — health check
-
-### Billing
-
-- `nozle.plans()` — list available plans
-- `nozle.checkout()` — create Stripe checkout session
-- `nozle.subscribe()` — create a subscription
-- `nozle.cancel_subscription(customer_id, subscription_id, policy="end_of_period")` — schedule end-of-period cancellation by default, or terminate immediately
-
-### Customers & Credits
-
-- `nozle.customers.upsert()` — create or update a customer
-- `nozle.check_and_deduct()` — atomically check and deduct wallet credits
-
-### LLM Auto-Capture
-
-- `wrap_openai()` — wrap OpenAI client for automatic token tracking
-- `wrap_anthropic()` — wrap Anthropic client for automatic token tracking
-
-### Margin Intelligence
-
-- `nozle.margin.summary()` / `by_customer()` / `by_metric()` / `by_plan()` / `by_model()` / `trend()`
-
-The Python SDK mirrors the Node.js SDK's API surface exactly.
+- `plans()` accepts either a publishable `pk_` or secret `sk_` key.
+- Every customer, event, checkout, subscription, credit, Entity, usage, entitlement, health, and margin operation requires `sk_`.
+- Wrong key types fail locally with `NozleAuthenticationError` before network I/O.
 
 <Warning>
-Use `sk_` (secret) keys only. This SDK is for server-side use.
+This is a backend SDK. Never expose an `sk_`, master key, or internal credential to browser or mobile code.
 </Warning>
+
+## API surface
+
+| Area | Methods |
+|---|---|
+| Core | `ping()`, `plans()`, `track()`, `can()` |
+| Billing | `checkout()`, `subscribe()` |
+| Customers | `customers.upsert()` |
+| Credit systems | `credit_systems.list()` |
+| Entities | `get()`, `list()`, `upsert()`, `activate()`, `suspend()`, `bulk_upsert()` |
+| Credits | Customer and Entity balance/history reads, `allocate()`, `deallocate()` |
+| Usage | Advisory `check()` and atomic `track()` |
+| Margin | `summary()`, `by_customer()`, `by_metric()`, `by_plan()`, `by_model()`, `trend()` |
+| LLMs | `wrap_openai()`, `wrap_anthropic()` |
+
+`check_and_deduct()` remains available for the legacy wallet path.
+
+## Transport behavior
+
+- The SDK does not automatically retry requests.
+- Mutations therefore execute at most once per SDK call.
+- Connection and timeout failures raise `NozleTransportError`.
+- Non-2xx responses raise structured `NozleAPIError`.
+- Sensitive values in API error payloads are redacted.
+
+See [Errors and retries](/sdks/python/errors) for handling guidance.
+
+## Next steps
+
+- [Billing and subscriptions](/sdks/python/billing)
+- [Tracking events](/sdks/python/tracking-events)
+- [Customers and Entities](/sdks/python/customers-entities)
+- [Product credits](/sdks/python/credits)
+- [Entitlements](/sdks/python/entitlements)
+- [LLM auto-capture](/sdks/python/llm-auto-capture)

@@ -1,39 +1,63 @@
 ---
-title: Entitlements
-description: Check feature access with nozle.can()
+title: "Entitlements"
+description: "Check feature access, usage limits, and margin state with nozle.can()."
 ---
 
 ```python
-result = nozle.can("customer_123", "api_calls")
+check = nozle.can("workspace_123", "api_calls")
+
+if not check["allowed"]:
+    raise PermissionError(check.get("reason", "Feature unavailable"))
 ```
 
-Returns a dict matching the Node SDK's CanResult:
+## Metadata
+
+Metadata values must be strings and are encoded as a JSON query parameter.
+
 ```python
-{
-    "allowed": True,
-    "used": 1500,
-    "limit": 10000,
-    "remaining": 8500,
-    "cost_per_use_cents": 2,
-    "revenue_per_use_cents": 5,
-    "margin_per_use_cents": 3,
-}
+check = nozle.can(
+    "workspace_123",
+    "model_access",
+    {"model": "example-large-model", "region": "us-east"},
+)
 ```
 
-**Example — Guard an endpoint:**
+## `CanResult`
+
+| Field | Type | Description |
+|---|---|---|
+| `allowed` | `bool` | Whether the request may proceed. |
+| `reason` | `str`, optional | Decision reason. |
+| `used` | `int` | Current usage. |
+| `limit` | `int`, optional | Configured limit. |
+| `remaining` | `int`, optional | Remaining allowance. |
+| `overage` | `bool`, optional | Whether usage is in overage. |
+| `cost_per_use_cents` | `int` | Unit cost. |
+| `revenue_per_use_cents` | `int` | Unit revenue. |
+| `margin_per_use_cents` | `int` | Unit margin. |
+| `margin_percent` | `float`, optional | Margin percentage. |
+| `min_margin_percent` | `float`, optional | Configured margin floor. |
+| `margin_level` | `str`, optional | Margin classification. |
+| `margin_enforcement_mode` | `str`, optional | Enforcement behavior. |
+| `warning` | `str`, optional | Non-blocking warning. |
+
+## FastAPI pattern
+
 ```python
-from fastapi import FastAPI, HTTPException
-from nozle import Nozle
+from fastapi import HTTPException
 
-app = FastAPI()
-nozle = Nozle(api_key="sk_...", base_url="https://api.nozle.app", events_url="https://api.nozle.app")
+check = nozle.can(customer_id, "analytics")
 
-@app.post("/generate")
-async def generate(customer_id: str, prompt: str):
-    check = nozle.can(customer_id, "api_calls")
-    if not check["allowed"]:
-        raise HTTPException(429, detail=f"Limit reached: {check['used']}/{check['limit']}")
-    # ... proceed with generation
+if not check["allowed"]:
+    raise HTTPException(
+        status_code=429 if check.get("overage") else 403,
+        detail={
+            "reason": check.get("reason", "upgrade_required"),
+            "used": check["used"],
+            "limit": check.get("limit"),
+            "remaining": check.get("remaining"),
+        },
+    )
 ```
 
-The margin fields (cost_per_use_cents, revenue_per_use_cents, margin_per_use_cents) let you make real-time decisions based on profitability.
+Perform this check immediately before protected server work. React gates are not an authorization boundary. `can()` also does not reserve product credits; use `usage.track()` for atomic consumption.

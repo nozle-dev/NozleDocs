@@ -1,0 +1,158 @@
+---
+title: "Product credits"
+description: "Discover credit systems, read exact balances, transfer Entity credits, and consume usage atomically."
+---
+
+Product-credit amounts are exact decimal strings. Keep them as `str`; do not convert them to `float` when precision matters.
+
+## List credit systems
+
+```python
+systems = nozle.credit_systems.list()
+
+for system in systems:
+    print(system["code"], system["unit_name"], system["status"])
+```
+
+The SDK follows all active pages and returns normalized `CreditSystem` typed dictionaries.
+
+## Customer balances
+
+```python
+balance = nozle.credits.get_balance("workspace_123", "ai_credits")
+
+print(balance["available"])
+print(balance["sources"])
+
+all_balances = nozle.credits.list_balances("workspace_123")
+```
+
+## Customer operation history
+
+```python
+page = nozle.credits.list_operations(
+    "workspace_123",
+    credit_system_code="ai_credits",
+    limit=25,
+)
+
+next_page = (
+    nozle.credits.list_operations(
+        "workspace_123",
+        credit_system_code="ai_credits",
+        limit=25,
+        cursor=page["next_cursor"],
+    )
+    if page["next_cursor"]
+    else None
+)
+```
+
+Limits must be integers from 1 to 100. Operations include exact amounts, status, reason, rate snapshot, occurrence time, and source allocations.
+
+## Entity balances
+
+```python
+balance = nozle.credits.get_entity_balance(
+    "workspace_123",
+    "user_42",
+    "ai_credits",
+)
+
+print(balance["entity_available"])
+print(balance["shared_available"])
+print(balance["effective_available"])
+print(balance["pool_policy"])
+
+all_balances = nozle.credits.list_entity_balances(
+    "workspace_123",
+    "user_42",
+)
+```
+
+`pool_policy` is `entity_only`, `entity_then_customer`, `customer_only`, or `None`.
+
+## Entity operation history
+
+```python
+history = nozle.credits.list_entity_operations(
+    "workspace_123",
+    "user_42",
+    credit_system_code="ai_credits",
+    limit=25,
+)
+```
+
+## Allocate credits
+
+```python
+allocation = nozle.credits.allocate(
+    "workspace_123",
+    "user_42",
+    credit_system_code="ai_credits",
+    amount="100.000000000001",
+    idempotency_key="allocate-user-42-100-v1",
+)
+
+print(allocation["transferred"])
+print(allocation["parent_sources"])
+print(allocation["entity_sources"])
+print(allocation["replayed"])
+```
+
+## Deallocate credits
+
+```python
+deallocation = nozle.credits.deallocate(
+    "workspace_123",
+    "user_42",
+    credit_system_code="ai_credits",
+    amount="25",
+    idempotency_key="deallocate-user-42-25-v1",
+)
+```
+
+Transfer amounts must be positive decimal strings with at most 12 decimal places. Idempotency keys are required and limited to 255 UTF-8 bytes.
+
+## Advisory usage check
+
+```python
+check = nozle.usage.check(
+    "workspace_123",
+    "agent_execution",
+    entity_id="user_42",
+    credit_system_code="ai_credits",
+    properties={"model": "example-model"},
+)
+
+print(check["advisory"])
+print(check["credits_required"])
+print(check.get("projected_remaining"))
+print(check.get("projected_deductions"))
+```
+
+`usage.check()` does not reserve or mutate credits.
+
+## Atomic usage tracking
+
+```python
+result = nozle.usage.track(
+    "workspace_123",
+    "agent_execution",
+    entity_id="user_42",
+    credit_system_code="ai_credits",
+    properties={"model": "example-model"},
+    idempotency_key="agent-execution-0183f",
+)
+
+if not result["allowed"]:
+    print(result.get("reason"), result.get("available"))
+```
+
+`usage.track()` atomically evaluates the metric conversion, selects eligible sources, deducts credits, and records the operation. Entity IDs enable per-Entity attribution and configured pool policy.
+
+## Legacy wallet adapter
+
+`nozle.check_and_deduct(customer_id, feature, credits)` remains available for the legacy wallet path. New product-credit integrations should use `usage.check()` and `usage.track()`.
+
+Keep reads and mutations behind authenticated backend routes and derive customer and Entity IDs from trusted identity data.

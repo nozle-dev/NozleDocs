@@ -1,0 +1,112 @@
+---
+title: "Customers and Entities"
+description: "Upsert customers and manage idempotent Entity lifecycle operations."
+---
+
+Customers represent billable accounts or workspaces. Entities represent children such as users, agents, projects, or environments.
+
+## Upsert a customer
+
+```python
+customer = nozle.customers.upsert(
+    "workspace_123",
+    name="Acme Workspace",
+    email="billing@example.com",
+)
+```
+
+`external_id` is required. `name` and `email` are optional.
+
+## Read Entities
+
+```python
+entity = nozle.entities.get("workspace_123", "user_42")
+
+page = nozle.entities.list(
+    "workspace_123",
+    status="active",
+    limit=50,
+)
+
+next_page = (
+    nozle.entities.list(
+        "workspace_123",
+        status="active",
+        limit=50,
+        cursor=page["next_cursor"],
+    )
+    if page["next_cursor"]
+    else None
+)
+```
+
+Entity status accepts `active`, `suspended`, or `deleted`. List limits must be integers from 1 to 100.
+
+## Upsert an Entity
+
+```python
+result = nozle.entities.upsert(
+    "workspace_123",
+    "user_42",
+    status="active",
+    name="Asha",
+    metadata={"role": "agent"},
+    idempotency_key="entity-user-42-v1",
+)
+
+print(result["action"])
+print(result["replayed"])
+```
+
+Entity IDs and idempotency keys are limited to 255 UTF-8 bytes. Retry an uncertain mutation with the same key and payload.
+
+## Suspend and activate
+
+```python
+nozle.entities.suspend(
+    "workspace_123",
+    "user_42",
+    idempotency_key="suspend-user-42-v1",
+)
+
+nozle.entities.activate(
+    "workspace_123",
+    "user_42",
+    idempotency_key="activate-user-42-v2",
+)
+```
+
+These helpers first fetch the Entity and preserve its current name and metadata.
+
+## Bulk upsert
+
+```python
+result = nozle.entities.bulk_upsert(
+    "workspace_123",
+    [
+        {"external_id": "user_42", "name": "Asha", "status": "active"},
+        {"external_id": "user_43", "name": "Ravi", "status": "suspended"},
+    ],
+    idempotency_key="workspace-123-users-import-7",
+)
+
+print(result["counts"])
+```
+
+Each bulk call accepts 1–500 unique Entity IDs.
+
+## Seat billing is explicit
+
+Entity lifecycle methods do not emit Billable Metric seat events. Track seat additions and removals separately when your catalog bills seats.
+
+```python
+nozle.track(
+    "workspace_123",
+    "billable_seats",
+    metadata={"user_id": "user_42", "operation": "add"},
+    subscription_id="workspace_123_subscription",
+    transaction_id="seat-add-user-42-v1",
+)
+```
+
+Use the same Entity ID with `nozle.credits` and `nozle.usage` for per-Entity balances and attribution.
