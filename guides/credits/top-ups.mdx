@@ -13,6 +13,23 @@ Checkout creation never grants credits. Nozle durably records the successful pay
 
 Expose available packages through your authenticated backend and start checkout from your own billing UI or a merchant callback. Refresh the product-credit balance only after payment confirmation.
 
+## Customer pool and Entity allocation
+
+A successful top-up creates a paid source at the customer level. It does not choose an Entity automatically.
+
+```text
+$10 purchase -> 250 customer credits
+                   ├── allocate 100 -> user_42
+                   ├── allocate 100 -> support_bot
+                   └── retain 50 in the customer pool
+```
+
+Use the Entity allocation API to move paid value to an active Entity. Allocation preserves the parent purchase, payment provenance, priority, and expiry. Returning unused value moves it back to the same parent source.
+
+Subscription grants cannot be allocated or returned: they already belong to the customer or Entity selected by the plan grant rule.
+
+See [Entity Credit Transfers](/api/entity-credit-transfers) for request examples.
+
 <Warning>
 The package's money-to-credit exchange is different from a metric rate. `$10 -> 250 AI credits` defines a product package; `1 agent execution -> 2 AI credits` defines usage cost.
 </Warning>

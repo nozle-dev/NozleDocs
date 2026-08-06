@@ -103,3 +103,5 @@ Customer: workspace_123
 Each Entity receives a stable subscription identity and follows the standard checkout, invoice, renewal, transition, and cancellation lifecycle. Operations are isolated: upgrading, downgrading, or cancelling one Entity does not mutate another Entity.
 
 Nozle revalidates the live Entity before checkout. Suspended, deleted, or recreated Entity identities fail closed. See [Entity Subscriptions](/api/entity-subscriptions).
+
+For seat-pool purchases, bulk Entity checkout combines multiple Pro/Max-style Entity subscriptions into one invoice and one Stripe payment. The first successful paid Entity checkout can establish an anniversary billing anchor for the customer; later Entity purchases align to that anchor and prorate their initial period.

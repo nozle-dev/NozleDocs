@@ -92,6 +92,20 @@ export function BillingPage({ csrfToken }: { csrfToken: string }) {
 
 Use equivalent authenticated backend endpoints for billing status, invoices, cancellation, top-ups, entitlements, and credits. Return only the fields your browser needs.
 
+## Mixed Entity seat purchase
+
+For a seat-pool UI, accept merchant intent such as `{ proSeats: 2, maxSeats: 1 }`, not Nozle customer or subscription identifiers. Your backend:
+
+1. resolves the customer from the authenticated workspace;
+2. creates or reuses active unassigned Entity placeholders;
+3. assigns one allowed plan code to each placeholder;
+4. sends the complete basket to `POST /customers/{customer_id}/entity-subscriptions/checkout` with one idempotency key; and
+5. returns the embedded Stripe client secret or completed result.
+
+Use one bulk request rather than one checkout call per seat. The bulk request creates one invoice, preserves one payment boundary, and aligns later purchases to the customer's established Entity billing anchor.
+
+The browser may decide requested quantities, but the backend owns generated Entity IDs, plan allowlists, customer mapping, billing mode, and return-origin validation.
+
 For cancellation, call `cancelSubscription(customerId, subscriptionId)` from the Node.js SDK or `cancel_subscription(customer_id, subscription_id)` from Python. Both default to `end_of_period`; the raw API keeps its historical `immediate` default. Do not accept either Nozle identifier directly from the browser—resolve both from merchant-owned records.
 
 ## Payment authority

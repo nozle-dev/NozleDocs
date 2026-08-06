@@ -136,3 +136,22 @@ const result = await nozle.subscribe('customer_123', 'growth');
 ```
 
 `subscribe()` requires a secret key (`sk_`). Embedded checkout should be used when Nozle needs to collect payment before activating a paid plan.
+
+## Mixed Entity plan checkout
+
+Seat-based products can sell different Entity plans in one invoice and one payment. Your backend first creates or reuses active placeholder Entities, then calls the bulk Entity checkout endpoint with the selected plan for each placeholder.
+
+```text
+Customer workspace
+├── seat_pro_001 -> Pro monthly
+├── seat_pro_002 -> Pro monthly
+└── seat_max_001 -> Max monthly
+           │
+           └── one Nozle invoice -> one Stripe checkout
+```
+
+Keep the secret key in your backend. The browser should send only merchant-facing intent, such as `{ proSeats: 2, maxSeats: 1 }`; your backend derives the customer, creates stable Entity IDs, validates the return origin, and calls Nozle.
+
+Use `billing_time: "anniversary"` when the first successful purchase should establish the customer's renewal day. Later Entity purchases align to that day and use Nozle's invoice proration.
+
+See [Entity Subscriptions](/api/entity-subscriptions#purchase-multiple-entity-plans-together) for the complete request and response.
