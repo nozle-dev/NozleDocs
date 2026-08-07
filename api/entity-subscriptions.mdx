@@ -1,6 +1,7 @@
 ---
 title: "Entity Subscriptions"
 description: "Give individual customer Entities independent plans, billing periods, and subscription lifecycles."
+api: "POST /customers/{customer_id}/entity-subscriptions/checkout"
 ---
 
 Entity subscriptions let one customer pay for multiple independently managed subscriptions. Each Entity keeps a stable subscription identity while using the standard Nozle plan, invoice, checkout, renewal, and reporting lifecycle.
@@ -82,6 +83,46 @@ Content-Type: application/json
 ## Purchase multiple Entity plans together
 
 Use bulk Entity checkout when a customer purchases a mixed pool of plans in one payment. The merchant backend supplies one item per Entity; Nozle creates one invoice and one Stripe checkout for the complete basket.
+
+Use the Node SDK from your trusted backend. It wraps the API request, validates the basket, and returns the checkout contract:
+
+```ts
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle({
+  apiKey: process.env.NOZLE_SECRET_KEY!,
+  eventsUrl: 'https://core.nozle.app',
+})
+
+const checkout = await nozle.entitySubscriptions.checkoutMany('workspace_123', {
+  billingTime: 'anniversary',
+  returnUrl: 'https://wrrk.ai/settings/billing',
+  idempotencyKey: 'workspace-123-seat-purchase-v1',
+  items: [
+    { externalEntityId: 'seat_pro_001', planCode: 'pro_monthly' },
+    { externalEntityId: 'seat_max_001', planCode: 'max_monthly' },
+  ],
+})
+
+// Return this result to your frontend. Never expose NOZLE_SECRET_KEY.
+```
+
+On the frontend, pass a Stripe result to the React checkout component:
+
+```tsx
+import { Checkout } from '@nozle-js/react'
+
+if (checkout.type === 'stripe' && checkout.client_secret) {
+  return (
+    <Checkout
+      clientSecret={checkout.client_secret}
+      publishableKey={import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY}
+    />
+  )
+}
+```
+
+The endpoint below remains available for backends that do not use the Node SDK.
 
 ```http
 POST /customers/workspace_123/entity-subscriptions/checkout
