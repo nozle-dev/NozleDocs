@@ -107,6 +107,30 @@ const checkout = await nozle.entitySubscriptions.checkoutMany('workspace_123', {
 // Return this result to your frontend. Never expose NOZLE_SECRET_KEY.
 ```
 
+The Python SDK exposes the same backend operation:
+
+```python
+import os
+
+from nozle import Nozle
+
+nozle = Nozle(
+    api_key=os.environ["NOZLE_SECRET_KEY"],
+    events_url="https://core.nozle.app",
+)
+
+checkout = nozle.entity_subscriptions.checkout_many(
+    "workspace_123",
+    billing_time="anniversary",
+    return_url="https://wrrk.ai/settings/billing",
+    idempotency_key="workspace-123-seat-purchase-v1",
+    items=[
+        {"external_entity_id": "seat_pro_001", "plan_code": "pro_monthly"},
+        {"external_entity_id": "seat_max_001", "plan_code": "max_monthly"},
+    ],
+)
+```
+
 On the frontend, pass a Stripe result to the React checkout component:
 
 ```tsx
