@@ -39,6 +39,14 @@ Entity plan grants and allocated paid top-ups remain separate sources. Allocatio
 
 Only unused allocated top-up value can be returned. Subscription grants are never presented as transferable company value.
 
+Paid top-ups initially belong to the customer pool. They are not assigned automatically to the Entity that initiated checkout or to the first paid Entity. Your backend can:
+
+- leave the credits in the customer pool for a plan that allows shared-pool spending;
+- allocate an exact amount to one Entity; or
+- split the purchase across multiple Entities.
+
+For example, a 250-credit top-up can allocate 100 credits to `user_42`, 100 to `support_bot`, and leave 50 in the customer pool. Each allocation remains linked to the exact paid parent source.
+
 <Warning>
 Allocation and deallocation are backend-only mutations. They require a secret credential, an idempotency key, and eligible paid top-up sources.
 </Warning>
@@ -60,6 +68,8 @@ Entities and billable seats are separate contracts. Creating, suspending,
 reactivating, or deleting an Entity never changes billed usage.
 
 Entity subscriptions are also separate from credit pools and seat metrics. Use an Entity subscription only when that Entity owns an independent plan. Credit allocation still follows the configured pool policy, while seat billing still follows explicit usage events.
+
+An Entity-owned subscription grant is materialized only for that subscription's owning Entity. A Pro Entity receives the Pro grant and a Max Entity receives the Max grant; Nozle does not copy every active Entity plan grant to every Entity under the customer.
 
 If your product bills per seat, configure a recurring unique-count Billable
 Metric:

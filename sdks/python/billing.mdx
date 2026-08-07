@@ -118,6 +118,8 @@ nozle.entity_subscriptions.cancel(
 
 Every method requires an `sk_` key. See [Entity Subscriptions](/api/entity-subscriptions) for lifecycle and payment behavior.
 
+The Python SDK currently exposes single-Entity checkout and plan changes. For a mixed seat-pool purchase, call the bulk Entity checkout endpoint from your trusted backend. Do not loop over `entity_subscriptions.checkout()`, because each call creates an independent checkout instead of one combined invoice.
+
 ## Settlement transitions
 
 ```python

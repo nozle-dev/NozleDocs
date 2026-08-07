@@ -131,6 +131,8 @@ await nozle.entitySubscriptions.cancel('workspace_123', 'user_42', {
 
 Every method requires an `sk_` key. See [Entity Subscriptions](/api/entity-subscriptions) for lifecycle and payment behavior.
 
+The Node.js SDK currently exposes single-Entity checkout and plan changes. For a mixed seat-pool purchase, call the bulk Entity checkout endpoint from the same trusted backend and return only the Stripe result to your browser. Do not loop over `entitySubscriptions.checkout()`: that would create separate invoices and payments.
+
 ## Settlement transitions
 
 Preview and apply merchant-configurable cancellation, downgrade, and uncancel operations:

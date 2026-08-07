@@ -79,6 +79,83 @@ Content-Type: application/json
 
 `billing_time` accepts `anniversary` or `calendar` for the initial subscription. Paid plans remain incomplete until verified payment succeeds. Retrying an incomplete checkout for the same plan reuses its subscription and invoice instead of creating another charge.
 
+## Purchase multiple Entity plans together
+
+Use bulk Entity checkout when a customer purchases a mixed pool of plans in one payment. The merchant backend supplies one item per Entity; Nozle creates one invoice and one Stripe checkout for the complete basket.
+
+```http
+POST /customers/workspace_123/entity-subscriptions/checkout
+Authorization: Bearer sk_...
+Idempotency-Key: workspace-123-seat-purchase-v1
+Content-Type: application/json
+
+{
+  "entity_subscription_checkout": {
+    "billing_time": "anniversary",
+    "return_url": "https://app.example.com/settings/billing",
+    "items": [
+      {
+        "external_entity_id": "seat_pro_001",
+        "plan_code": "pro_monthly"
+      },
+      {
+        "external_entity_id": "seat_max_001",
+        "plan_code": "max_monthly"
+      }
+    ]
+  }
+}
+```
+
+The request accepts up to 100 unique Entities. Every plan must be paid, use the same currency, and use the same interval. Each Entity must be active and must not already have an active, pending, or incomplete subscription.
+
+```json
+{
+  "entity_subscription_checkout": {
+    "id": "checkout_batch_uuid",
+    "type": "stripe",
+    "status": "open",
+    "client_secret": "cs_...",
+    "invoice_id": "invoice_uuid",
+    "amount_cents": 4498,
+    "currency": "USD",
+    "replayed": false,
+    "items": [
+      {
+        "external_entity_id": "seat_pro_001",
+        "external_subscription_id": "entity-sub-...",
+        "plan_code": "pro_monthly",
+        "subscription_status": "incomplete"
+      }
+    ]
+  }
+}
+```
+
+Nozle supports these result types:
+
+- `stripe`: mount the returned client secret in Stripe Checkout;
+- `processing`: Stripe completed, but the verified payment event is still being processed; and
+- `completed`: the invoice is already settled, so no Stripe session is required.
+
+The idempotency key covers the customer, billing mode, return URL, Entity IDs, and plans. Retry the exact request with the same key. A different basket with the same key returns a conflict.
+
+## Shared customer billing anchor
+
+Bulk Entity checkout establishes one stable billing calendar for the paying customer:
+
+- if the customer has never completed a paid Entity checkout, the first successful payment establishes the anchor;
+- failed or abandoned first checkout does not establish an anchor;
+- concurrent first-paid checkouts are rejected while the anchor is unresolved;
+- later Entity purchases align to the established anchor and prorate their first period; and
+- the anchor remains stable even if the customer temporarily has no paid Entities.
+
+For a fresh Wrrk-style seat pool, send `billing_time: "anniversary"`. For example, a successful first payment on August 6 renews on the sixth. A seat added on August 20 is charged only through September 6, then joins the normal renewal invoice.
+
+<Info>
+The anchor is established only after confirmed payment. Creating an invoice or receiving a browser redirect is not enough.
+</Info>
+
 ## Change plan
 
 ```http
