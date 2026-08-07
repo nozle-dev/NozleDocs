@@ -29,8 +29,8 @@ export const nozle = new Nozle({
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `apiKey` | `string` | required | Organization credential. Use a restricted `sk_` for server mutations. |
-| `baseUrl` | `string` | `http://localhost:8080` | API origin used for billing, entitlements, credits, entities, usage, and margin. |
-| `eventsUrl` | `string` | `http://localhost:3000` | Core API origin used by `track()`, credit-system discovery, and Entity subscriptions. Use `https://core.nozle.app` in production. |
+| `baseUrl` | `string` | `http://localhost:8080` | API origin used for entitlements, credits, entities, usage, and margin. |
+| `eventsUrl` | `string` | `http://localhost:3000` | Core API origin used for customer writes, billing resources, `track()`, credit-system discovery, and Entity subscriptions. Use `https://core.nozle.app` in production. |
 | `timeout` | `number` | `10000` | Per-request timeout in milliseconds. |
 
 Set both URLs explicitly outside local development. Trailing slashes are removed automatically.
@@ -38,8 +38,8 @@ Set both URLs explicitly outside local development. Trailing slashes are removed
 ```mermaid
 flowchart LR
   App[Your backend] --> SDK[@nozle-js/node]
-  SDK -->|baseUrl| API[Billing, entitlements, credits, usage, margin]
-  SDK -->|eventsUrl| Events[Metered events and credit-system catalog]
+  SDK -->|baseUrl| API[Entitlements, credits, usage, margin]
+  SDK -->|eventsUrl| Core[Customers, billing resources, metered events]
 ```
 
 <Warning>

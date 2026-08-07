@@ -7,6 +7,10 @@ Customers represent the merchant's billable account or workspace. Entities repre
 
 ## Upsert a customer
 
+`customers.upsert()` sends the merchant's secret key directly to Nozle Core.
+Core derives the owning organization from that key; the SDK never provisions a
+customer through a global or master organization.
+
 ```ts
 const customer = await nozle.customers.upsert({
   externalId: 'workspace_123',

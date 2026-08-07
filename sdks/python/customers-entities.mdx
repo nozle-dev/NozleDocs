@@ -7,6 +7,10 @@ Customers represent billable accounts or workspaces. Entities represent children
 
 ## Upsert a customer
 
+`customers.upsert()` sends the merchant's secret key directly to Nozle Core.
+Core derives the owning organization from that key; the SDK never provisions a
+customer through a global or master organization.
+
 ```python
 customer = nozle.customers.upsert(
     "workspace_123",
