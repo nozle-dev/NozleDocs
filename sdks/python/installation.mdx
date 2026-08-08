@@ -29,8 +29,8 @@ nozle = Nozle(
 | Argument | Type | Default | Description |
 |---|---|---|---|
 | `api_key` | `str` | required | Organization credential. Protected operations require `sk_`. |
-| `base_url` | `str` | `http://localhost:8080` | Billing, entitlement, credit, Entity, usage, and margin API origin. |
-| `events_url` | `str` | `http://localhost:3000` | Core API origin for metered events, credit-system discovery, and Entity subscriptions. Use `https://core.nozle.app` in production. |
+| `base_url` | `str` | `http://localhost:8080` | Entitlement, credit, Entity, usage, and margin API origin. |
+| `events_url` | `str` | `http://localhost:3000` | Core API origin for customer writes, billing resources, metered events, credit-system discovery, and Entity subscriptions. Use `https://core.nozle.app` in production. |
 | `timeout` | `float` | `10` | Per-request timeout in seconds. |
 
 Set both URLs explicitly outside local development. Trailing slashes are removed automatically.
@@ -38,8 +38,8 @@ Set both URLs explicitly outside local development. Trailing slashes are removed
 ```mermaid
 flowchart LR
   App[Python backend] --> SDK[nozle-sdk]
-  SDK -->|base_url| API[Billing, entitlements, credits, usage, margin]
-  SDK -->|events_url| Events[Metered events and credit-system catalog]
+  SDK -->|base_url| API[Entitlements, credits, usage, margin]
+  SDK -->|events_url| Core[Customers, billing resources, metered events]
 ```
 
 ## Manage the HTTP session
