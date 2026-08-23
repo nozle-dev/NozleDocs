@@ -26,11 +26,6 @@ tags:
     externalDocs:
       description: Find out more
       url: https://docs.nozle.app/api-reference
-  - name: Billable Metrics
-    description: Everything about Billable metric collection
-    externalDocs:
-      description: Find out more
-      url: https://docs.nozle.app/api-reference
   - name: Features
     description: Everything about Feature collection
     externalDocs:
@@ -345,7 +340,7 @@ paths:
             items:
               type: string
             example:
-              - BillableMetric
+              - Feature
               - Invoice
       responses:
         '200':
@@ -587,7 +582,7 @@ paths:
           explode: true
           schema:
             type: string
-            example: /billable_metrics/
+            example: /features/
       responses:
         '200':
           description: List of api logs
@@ -862,9 +857,9 @@ paths:
           schema:
             type: string
             example: ext-subscription-123
-        - name: is_billable_metric_recurring
+        - name: is_feature_recurring
           in: query
-          description: Indicates whether the billable metric associated with the usage is recurring.
+          description: Indicates whether the feature associated with the usage is recurring.
           required: false
           schema:
             type: boolean
@@ -876,9 +871,9 @@ paths:
           schema:
             type: string
             example: plan-code-123
-        - name: billable_metric_code
+        - name: feature_code
           in: query
-          description: The code of the usage-based billable metrics for which the usage analytics is calculated.
+          description: The code of the usage-based features for which the usage analytics is calculated.
           required: false
           schema:
             type: string
@@ -970,155 +965,12 @@ paths:
                 $ref: '#/components/schemas/AppliedCouponsPaginated'
         '401':
           $ref: '#/components/responses/Unauthorized'
-  /billable_metrics:
-    post:
-      tags:
-        - Billable Metrics
-      summary: Create a billable metric
-      description: This endpoint creates a new billable metric representing a pricing component of your application.
-      operationId: createBillableMetric
-      requestBody:
-        description: Billable metric payload
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BillableMetricCreateInput'
-        required: true
-      responses:
-        '200':
-          description: Billable metric created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BillableMetric'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-    get:
-      tags:
-        - Billable Metrics
-      summary: List all billable metrics
-      description: This endpoint retrieves all existing billable metrics that represent pricing components of your application.
-      operationId: findAllBillableMetrics
-      parameters:
-        - $ref: '#/components/parameters/page'
-        - $ref: '#/components/parameters/per_page'
-      responses:
-        '200':
-          description: List of billable metrics
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BillableMetricsPaginated'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /billable_metrics/evaluate_expression:
-    post:
-      tags:
-        - Billable Metrics
-      summary: Evaluate an expression for a billable metric
-      description: Evaluate an expression for a billable metric creation by providing the expression and test data
-      operationId: evaluateBillableMetricExpression
-      requestBody:
-        description: Billable metric expression evaluation payload
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BillableMetricEvaluateExpressionInput'
-        required: true
-      responses:
-        '200':
-          description: Billable metric expression evaluation result
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BillableMetricEvaluateExpressionResult'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-  /billable_metrics/{code}:
-    parameters:
-      - name: code
-        in: path
-        description: Code of the existing billable metric.
-        required: true
-        schema:
-          type: string
-          example: storage
-    put:
-      tags:
-        - Billable Metrics
-      summary: Update a billable metric
-      description: This endpoint updates an existing billable metric representing a pricing component of your application.
-      operationId: updateBillableMetric
-      requestBody:
-        description: Billable metric payload
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BillableMetricUpdateInput'
-        required: true
-      responses:
-        '200':
-          description: Billable metric updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BillableMetric'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-    delete:
-      tags:
-        - Billable Metrics
-      summary: Delete a billable metric
-      description: This endpoint deletes an existing billable metric representing a pricing component of your application.
-      operationId: destroyBillableMetric
-      responses:
-        '200':
-          description: Billable metric deleted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BillableMetric'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    get:
-      tags:
-        - Billable Metrics
-      summary: Retrieve a billable metric
-      description: This endpoint retrieves an existing billable metric that represents a pricing component of your application. The billable metric is identified by its unique code.
-      operationId: findBillableMetric
-      responses:
-        '200':
-          description: Billable metric
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BillableMetric'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
   /features:
     post:
       tags:
         - Features
       summary: Create a feature
-      description: This endpoint creates a new feature representing an entitlement component of your application.
+      description: This endpoint creates a boolean, config, or metered feature in your product catalog.
       operationId: createFeature
       requestBody:
         description: Feature payload
@@ -1144,7 +996,7 @@ paths:
       tags:
         - Features
       summary: List all features
-      description: This endpoint retrieves all existing features that represent entitlement components of your application.
+      description: This endpoint retrieves all existing boolean, config, and metered features.
       operationId: findAllFeatures
       parameters:
         - $ref: '#/components/parameters/page'
@@ -1156,6 +1008,25 @@ paths:
           explode: true
           schema:
             type: string
+        - name: feature_types[]
+          in: query
+          description: Filter by feature behavior.
+          required: false
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - boolean
+                - config
+                - metered
+        - name: consumable
+          in: query
+          description: Filter metered features by whether usage is consumable.
+          required: false
+          schema:
+            type: boolean
       responses:
         '200':
           description: List of features
@@ -1165,6 +1036,33 @@ paths:
                 $ref: '#/components/schemas/FeaturesPaginated'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /features/evaluate_expression:
+    post:
+      tags:
+        - Features
+      summary: Evaluate a metered Feature expression
+      description: Evaluate a metered Feature expression against test event data.
+      operationId: evaluateFeatureExpression
+      requestBody:
+        description: Feature expression evaluation payload
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeatureEvaluateExpressionInput'
+        required: true
+      responses:
+        '200':
+          description: Feature expression evaluation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureEvaluateExpressionResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /features/{code}:
     parameters:
       - name: code
@@ -1178,7 +1076,7 @@ paths:
       tags:
         - Features
       summary: Update a feature
-      description: This endpoint updates an existing feature representing an entitlement component of your application.
+      description: This endpoint updates an existing feature. Its code and feature type are immutable after creation.
       operationId: updateFeature
       requestBody:
         description: Feature payload
@@ -1208,7 +1106,7 @@ paths:
       tags:
         - Features
       summary: Delete a feature
-      description: This endpoint deletes an existing feature representing an entitlement component of your application. Deleting a feature will remove it from all plans and subscriptions.
+      description: This endpoint soft-deletes an existing feature, prevents future use, and preserves historical records.
       operationId: destroyFeature
       responses:
         '200':
@@ -1225,7 +1123,7 @@ paths:
       tags:
         - Features
       summary: Retrieve a feature
-      description: This endpoint retrieves an existing feature that represents an entitlement component of your application. The feature is identified by its unique code.
+      description: This endpoint retrieves an existing feature by its immutable code.
       operationId: findFeature
       responses:
         '200':
@@ -2947,9 +2845,9 @@ paths:
           schema:
             type: string
             example: storage
-        - name: billable_metric_code
+        - name: feature_code
           in: query
-          description: Filter usage to a specific billable metric by its code.
+          description: Filter usage to a specific feature by its code.
           required: false
           schema:
             type: string
@@ -3096,9 +2994,9 @@ paths:
           schema:
             type: string
             example: sub_1234567890
-        - name: billable_metric_code
+        - name: feature_code
           in: query
-          description: Billable metric code filter to apply to the charge usage
+          description: Feature code filter to apply to the charge usage
           required: false
           explode: true
           schema:
@@ -3357,7 +3255,7 @@ paths:
       tags:
         - Events
       summary: Estimate fees for a pay in advance charge
-      description: Estimate the fees that would be created after reception of an event for a billable metric attached to one or multiple pay in advance charges
+      description: Estimate the fees that would be created after reception of an event for a feature attached to one or multiple pay in advance charges
       operationId: eventEstimateFees
       requestBody:
         description: Event estimate payload
@@ -3388,7 +3286,7 @@ paths:
       tags:
         - Events
       summary: Estimate instant fees for a pay in advance charge
-      description: Estimate the fees that would be created after reception of an event for a billable metric attached to one or multiple pay in advance standard or percentage charges
+      description: Estimate the fees that would be created after reception of an event for a feature attached to one or multiple pay in advance standard or percentage charges
       operationId: eventEstimateInstantFees
       requestBody:
         description: Event estimate instant payload
@@ -3419,7 +3317,7 @@ paths:
       tags:
         - Events
       summary: Batch estimate instant fees for a pay in advance charge
-      description: Estimate the fees that would be created after reception of an event for a billable metric attached to one or multiple pay in advance standard or percentage charges
+      description: Estimate the fees that would be created after reception of an event for a feature attached to one or multiple pay in advance standard or percentage charges
       operationId: eventBatchEstimateInstantFees
       requestBody:
         description: Batch event estimate instant payload
@@ -3521,9 +3419,9 @@ paths:
               - credit
               - commitment
             example: charge
-        - name: billable_metric_code
+        - name: feature_code
           in: query
-          description: Filter results by the `code` of the billable metric attached to the fee. Only applies to `charge` types.
+          description: Filter results by the `code` of the feature attached to the fee. Only applies to `charge` types.
           required: false
           explode: true
           schema:
@@ -6889,17 +6787,17 @@ webhooks:
       responses:
         '200':
           description: Return a 200 status to indicate that the data was received successfully
-  billable_metric_created:
+  feature_created:
     post:
-      operationId: billableMetricCreated
-      summary: A new billable metric has been created
-      description: A new billable metric has been created
+      operationId: featureCreated
+      summary: A new feature has been created
+      description: A new feature has been created
       parameters:
         - $ref: '#/components/parameters/webhook_signature'
         - $ref: '#/components/parameters/webhook_signature_algorithm'
         - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
-        description: Details of the new billable metric
+        description: Details of the new feature
         content:
           application/json:
             schema:
@@ -6908,37 +6806,37 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
-                - billable_metric
+                - feature
               properties:
                 webhook_type:
                   type: string
                   enum:
-                    - billable_metric.created
+                    - feature.created
                 object_type:
                   type: string
                   enum:
-                    - billable_metric
+                    - feature
                 organization_id:
                   type: string
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-                billable_metric:
-                  $ref: '#/components/schemas/BillableMetricObject'
+                feature:
+                  $ref: '#/components/schemas/FeatureObject'
       responses:
         '200':
           description: Return a 200 status to indicate that the data was received successfully
-  billable_metric_updated:
+  feature_updated:
     post:
-      operationId: billableMetricUpdated
-      summary: A billable metric has been updated
-      description: A billable metric has been updated
+      operationId: featureUpdated
+      summary: A feature has been updated
+      description: A feature has been updated
       parameters:
         - $ref: '#/components/parameters/webhook_signature'
         - $ref: '#/components/parameters/webhook_signature_algorithm'
         - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
-        description: Details of the billable metric
+        description: Details of the feature
         content:
           application/json:
             schema:
@@ -6947,37 +6845,37 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
-                - billable_metric
+                - feature
               properties:
                 webhook_type:
                   type: string
                   enum:
-                    - billable_metric.updated
+                    - feature.updated
                 object_type:
                   type: string
                   enum:
-                    - billable_metric
+                    - feature
                 organization_id:
                   type: string
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-                billable_metric:
-                  $ref: '#/components/schemas/BillableMetricObject'
+                feature:
+                  $ref: '#/components/schemas/FeatureObject'
       responses:
         '200':
           description: Return a 200 status to indicate that the data was received successfully
-  billable_metric_deleted:
+  feature_deleted:
     post:
-      operationId: billableMetricDeleted
-      summary: A billable metric has been deleted
-      description: A billable metric has been deleted
+      operationId: featureDeleted
+      summary: A feature has been deleted
+      description: A feature has been deleted
       parameters:
         - $ref: '#/components/parameters/webhook_signature'
         - $ref: '#/components/parameters/webhook_signature_algorithm'
         - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
-        description: Details of the billable metric
+        description: Details of the feature
         content:
           application/json:
             schema:
@@ -6986,23 +6884,23 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
-                - billable_metric
+                - feature
               properties:
                 webhook_type:
                   type: string
                   enum:
-                    - billable_metric.deleted
+                    - feature.deleted
                 object_type:
                   type: string
                   enum:
-                    - billable_metric
+                    - feature
                 organization_id:
                   type: string
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-                billable_metric:
-                  $ref: '#/components/schemas/BillableMetricObject'
+                feature:
+                  $ref: '#/components/schemas/FeatureObject'
       responses:
         '200':
           description: Return a 200 status to indicate that the data was received successfully
@@ -10660,7 +10558,7 @@ components:
         resource_type:
           type: string
           description: The resource type of the resource_id record.
-          example: BillableMetric
+          example: Feature
         organization_id:
           type: string
           format: uuid
@@ -10894,7 +10792,7 @@ components:
         request_body:
           type: string
           format: object
-          example: '{ "billable_metric": { "name": "Storage", "code": "storage" } }'
+          example: '{ "feature": { "name": "Storage", "code": "storage" } }'
         request_origin:
           type: string
           description: This field represents the API origin of the requested URL
@@ -10902,7 +10800,7 @@ components:
         request_path:
           type: string
           description: This field represents the API path of the requested URL
-          example: /billable_metrics
+          example: /features
         created_at:
           type: string
           format: date-time
@@ -11021,7 +10919,7 @@ components:
           example: '2023-11-01T00:00:00.000Z'
         code:
           type: string
-          description: The code of the usage-based billable metrics.
+          description: The code of the usage-based features.
           example: code1
         amount_cents:
           type: integer
@@ -11135,18 +11033,18 @@ components:
           type: integer
           description: The total amount for usages for a period, expressed in cents.
           example: 50000
-        billable_metric_code:
+        feature_code:
           type: string
-          description: The code of the usage-based billable metrics.
+          description: The code of the usage-based features.
           example: code1
         units:
           type: string
-          description: The total number of units for the usage-based billable metrics.
+          description: The total number of units for the usage-based features.
           pattern: ^[0-9]+.?[0-9]*$
           example: '1.0'
-        is_billable_metric_deleted:
+        is_feature_deleted:
           type: boolean
-          description: Indicates whether the billable metric associated with the usage is deleted.
+          description: Indicates whether the feature associated with the usage is deleted.
           example: false
     Usages:
       type: object
@@ -11591,9 +11489,9 @@ components:
       properties:
         applied_coupon:
           $ref: '#/components/schemas/AppliedCouponObject'
-    BillableMetricFilterObject:
+    FeatureFilterObject:
       type: object
-      description: Values used to apply differentiated pricing based on additional event properties.
+      description: Values used to segment metered Feature events.
       required:
         - key
         - values
@@ -11601,122 +11499,14 @@ components:
         key:
           type: string
           example: region
-          description: Filter key to add to the event properties payload
         values:
           type: array
           items:
             type: string
-            example: us-east-1
-          description: List of possible filter values
-    BillableMetricObject:
+          example:
+            - us-east-1
+    FeatureFilterInput:
       type: object
-      required:
-        - lago_id
-        - name
-        - code
-        - aggregation_type
-        - recurring
-        - created_at
-      properties:
-        lago_id:
-          type: string
-          format: uuid
-          example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-          description: Unique identifier of the billable metric created by Nozle.
-        name:
-          type: string
-          example: Storage
-          description: Name of the billable metric.
-        code:
-          type: string
-          example: storage
-          description: Unique code used to identify the billable metric associated with the API request. This code associates each event with the correct metric.
-        description:
-          type:
-            - string
-            - 'null'
-          example: GB of storage used in my application
-          description: Internal description of the billable metric.
-        recurring:
-          type: boolean
-          example: false
-          description: |-
-            Defines if the billable metric is persisted billing period over billing period.
-
-            - If set to `true`: the accumulated number of units calculated from the previous billing period is persisted to the next billing period.
-            - If set to `false`: the accumulated number of units is reset to 0 at the end of the billing period.
-            - If not defined in the request, default value is `false`.
-        rounding_function:
-          type:
-            - string
-            - 'null'
-          enum:
-            - ceil
-            - floor
-            - round
-            - null
-          example: round
-          description: Refers to the numeric value or mathematical expression that will be rounded based on the calculated number of billing units. Possible values are `round`, `ceil` and `floor`.
-        rounding_precision:
-          type:
-            - integer
-            - 'null'
-          example: 2
-          description: Specifies the number of decimal places to which the `rounding_function` will be rounded. It can be a positive or negative value.
-        created_at:
-          type: string
-          format: date-time
-          example: '2022-09-14T16:35:31Z'
-          description: Creation date of the billable metric.
-        expression:
-          type: string
-          example: round((ended_at - started_at) * units)
-          description: Expression used to calculate the event units. The expression is evalutated for each event and the result is then used to calculate the total aggregated units.
-        field_name:
-          type:
-            - string
-            - 'null'
-          example: gb
-          description: Property of the billable metric used for aggregating usage data. This field is not required for `count_agg`.
-        aggregation_type:
-          type: string
-          description: Aggregation method used to compute usage for this billable metric.
-          example: sum_agg
-          enum:
-            - count_agg
-            - sum_agg
-            - max_agg
-            - unique_count_agg
-            - weighted_sum_agg
-            - latest_agg
-        weighted_interval:
-          type:
-            - string
-            - 'null'
-          enum:
-            - seconds
-            - null
-          example: seconds
-          description: Parameter exclusively utilized in conjunction with the `weighted_sum` aggregation type. It serves to adjust the aggregation result by assigning weights and proration to the result based on time intervals. When this field is not provided, the default time interval is assumed to be in `seconds`.
-        filters:
-          type: array
-          items:
-            $ref: '#/components/schemas/BillableMetricFilterObject'
-    BillableMetricsPaginated:
-      type: object
-      required:
-        - Billable Metrics
-        - meta
-      properties:
-        billable_metrics:
-          type: array
-          items:
-            $ref: '#/components/schemas/BillableMetricObject'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
-    BillableMetricFilterInput:
-      type: object
-      description: Values used to apply differentiated pricing based on additional event properties.
       required:
         - key
         - values
@@ -11724,177 +11514,12 @@ components:
         key:
           type: string
           example: region
-          description: Filter key to add to the event properties payload
         values:
           type: array
           items:
             type: string
-            example: us-east-1
-          description: List of possible filter values
-    BillableMetricBaseInput:
-      type: object
-      properties:
-        name:
-          type: string
-          example: Storage
-          description: Name of the billable metric.
-        code:
-          type: string
-          example: storage
-          description: Unique code used to identify the billable metric associated with the API request. This code associates each event with the correct metric.
-        description:
-          type:
-            - string
-            - 'null'
-          example: GB of storage used in my application
-          description: Internal description of the billable metric.
-        recurring:
-          type: boolean
-          example: false
-          description: |-
-            Defines if the billable metric is persisted billing period over billing period.
-
-            - If set to `true`: the accumulated number of units calculated from the previous billing period is persisted to the next billing period.
-            - If set to `false`: the accumulated number of units is reset to 0 at the end of the billing period.
-            - If not defined in the request, default value is `false`.
-        expression:
-          type:
-            - string
-            - 'null'
-          example: round((ended_at - started_at) * units)
-          description: |
-            Expression used to calculate the event units. The expression is evalutated for each event and the result is then used to calculate the total aggregated units.
-            Accepted function are `ceil`, `concat` and `round` as well as `+`, `-`, `\` and `*` operations.
-            Round is accepting an optional second parameter to specify the number of decimal.
-        rounding_function:
-          type:
-            - string
-            - 'null'
-          enum:
-            - ceil
-            - floor
-            - round
-            - null
-          example: round
-          description: Refers to the numeric value or mathematical expression that will be rounded based on the calculated number of billing units. Possible values are `round`, `ceil` and `floor`.
-        rounding_precision:
-          type:
-            - integer
-            - 'null'
-          example: 2
-          description: Specifies the number of decimal places to which the `rounding_function` will be rounded. It can be a positive or negative value.
-        field_name:
-          type:
-            - string
-            - 'null'
-          example: gb
-          description: Property of the billable metric used for aggregating usage data. This field is not required for `count_agg`.
-        aggregation_type:
-          type: string
-          example: sum_agg
-          description: Aggregation method used to compute usage for this billable metric.
-          enum:
-            - count_agg
-            - sum_agg
-            - max_agg
-            - unique_count_agg
-            - weighted_sum_agg
-            - latest_agg
-        weighted_interval:
-          type:
-            - string
-            - 'null'
-          enum:
-            - seconds
-            - null
-          example: seconds
-          description: Parameter exclusively utilized in conjunction with the `weighted_sum` aggregation type. It serves to adjust the aggregation result by assigning weights and proration to the result based on time intervals. When this field is not provided, the default time interval is assumed to be in `seconds`.
-        filters:
-          type: array
-          items:
-            $ref: '#/components/schemas/BillableMetricFilterInput'
-    BillableMetricCreateInput:
-      type: object
-      required:
-        - billable_metric
-      properties:
-        billable_metric:
-          $ref: '#/components/schemas/BillableMetricBaseInput'
-          required:
-            - name
-            - code
-            - aggregation_type
-    BillableMetric:
-      type: object
-      required:
-        - billable_metric
-      properties:
-        billable_metric:
-          $ref: '#/components/schemas/BillableMetricObject'
-    BillableMetricEvaluateExpressionInput:
-      type: object
-      required:
-        - expression
-        - event
-      properties:
-        expression:
-          type: string
-          example: round((ended_at - started_at) * units)
-          description: |
-            Expression used to calculate the event units. The expression is evalutated for each event and the result is then used to calculate the total aggregated units.
-            Accepted function are `ceil`, `concat` and `round` as well as `+`, `-`, `\` and `*` operations.
-            Round is accepting an optional second parameter to specify the number of decimal.
-        event:
-          type: object
-          required:
-            - code
-            - properties
-          properties:
-            code:
-              type: string
-              example: storage
-              description: The code that identifies a targeted billable metric.
-            timestamp:
-              anyOf:
-                - type: integer
-                - type: string
-              example: '1651240791'
-              description: |
-                This field captures the Unix timestamp in seconds indicating the occurrence of the event in Coordinated Universal Time (UTC).
-                If this timestamp is not provided, the API will automatically set it to the time of event reception.
-            properties:
-              type: object
-              description: This field represents additional properties associated with the event. They can be used when evaluating the expression.
-              additionalProperties:
-                oneOf:
-                  - type: string
-                  - type: integer
-                  - type: number
-              example:
-                gb: 10
-    BillableMetricEvaluateExpressionResult:
-      type: object
-      required:
-        - expression_result
-      properties:
-        expression_result:
-          type: object
-          required:
-            - value
-          properties:
-            value:
-              anyOf:
-                - type: string
-                - type: number
-              example: 1
-              description: Result of evaluating the expression
-    BillableMetricUpdateInput:
-      type: object
-      required:
-        - billable_metric
-      properties:
-        billable_metric:
-          $ref: '#/components/schemas/BillableMetricBaseInput'
+          example:
+            - us-east-1
     FeaturePrivilegeObject:
       type: object
       required:
@@ -11936,20 +11561,23 @@ components:
     FeatureObject:
       type: object
       required:
+        - lago_id
         - code
         - name
-        - description
-        - privileges
+        - feature_type
         - created_at
       properties:
+        lago_id:
+          type: string
+          format: uuid
+          example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+          description: Unique identifier of the Feature created by Nozle.
         code:
           type: string
           example: seats
-          description: Unique code used to identify the feature. Max 255 characters.
+          description: Immutable code used for entitlement checks and metered events.
         name:
-          type:
-            - string
-            - 'null'
+          type: string
           example: Number of seats
           description: Name of the feature. Max 255 characters.
         description:
@@ -11958,6 +11586,14 @@ components:
             - 'null'
           example: Number of users of the account
           description: Description of the feature. Max 600 characters.
+        feature_type:
+          type: string
+          enum:
+            - boolean
+            - config
+            - metered
+          example: metered
+          description: Determines which Feature configuration is active. Immutable after creation.
         privileges:
           type: array
           items:
@@ -11982,7 +11618,75 @@ components:
                 select_options:
                   - google
                   - okta
-          description: Privileges associated with this feature. Can be empty.
+          description: Privileges for boolean and config Features. Config Features require at least one.
+        aggregation_type:
+          type:
+            - string
+            - 'null'
+          enum:
+            - count_agg
+            - sum_agg
+            - max_agg
+            - unique_count_agg
+            - weighted_sum_agg
+            - latest_agg
+            - custom_agg
+            - null
+          example: sum_agg
+          description: Aggregation method for a metered Feature.
+        consumable:
+          type:
+            - boolean
+            - 'null'
+          example: true
+          description: Whether metered usage consumes an allowance or Credit System balance.
+        recurring:
+          type:
+            - boolean
+            - 'null'
+          example: false
+          description: Whether accumulated usage carries into the next billing period.
+        field_name:
+          type:
+            - string
+            - 'null'
+          example: tokens
+          description: Event property aggregated by the metered Feature.
+        expression:
+          type:
+            - string
+            - 'null'
+          example: round((ended_at - started_at) * units)
+        custom_aggregator:
+          type:
+            - string
+            - 'null'
+          description: Custom aggregation implementation when aggregation_type is custom_agg.
+        weighted_interval:
+          type:
+            - string
+            - 'null'
+          enum:
+            - seconds
+            - null
+        rounding_function:
+          type:
+            - string
+            - 'null'
+          enum:
+            - ceil
+            - floor
+            - round
+            - null
+        rounding_precision:
+          type:
+            - integer
+            - 'null'
+          example: 2
+        filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeatureFilterObject'
         created_at:
           type: string
           format: date-time
@@ -11991,7 +11695,7 @@ components:
     FeaturesPaginated:
       type: object
       required:
-        - Features
+        - features
         - meta
       properties:
         features:
@@ -12003,6 +11707,13 @@ components:
     FeatureBaseInput:
       type: object
       properties:
+        feature_type:
+          type: string
+          enum:
+            - boolean
+            - config
+            - metered
+          description: Immutable Feature behavior selected at creation.
         name:
           type:
             - string
@@ -12070,6 +11781,59 @@ components:
                   - google
                   - okta
           description: Privileges associated with this feature. Can be empty.
+        aggregation_type:
+          type: string
+          enum:
+            - count_agg
+            - sum_agg
+            - max_agg
+            - unique_count_agg
+            - weighted_sum_agg
+            - latest_agg
+            - custom_agg
+          description: Required for metered Features.
+        consumable:
+          type: boolean
+          description: Required for metered Features.
+        recurring:
+          type: boolean
+          default: false
+        field_name:
+          type:
+            - string
+            - 'null'
+        expression:
+          type:
+            - string
+            - 'null'
+        custom_aggregator:
+          type:
+            - string
+            - 'null'
+        weighted_interval:
+          type:
+            - string
+            - 'null'
+          enum:
+            - seconds
+            - null
+        rounding_function:
+          type:
+            - string
+            - 'null'
+          enum:
+            - ceil
+            - floor
+            - round
+            - null
+        rounding_precision:
+          type:
+            - integer
+            - 'null'
+        filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeatureFilterInput'
     FeatureCreateInput:
       type: object
       required:
@@ -12081,6 +11845,8 @@ components:
             - type: object
               required:
                 - code
+                - name
+                - feature_type
               properties:
                 code:
                   type: string
@@ -12100,6 +11866,50 @@ components:
       properties:
         feature:
           $ref: '#/components/schemas/FeatureBaseInput'
+    FeatureEvaluateExpressionInput:
+      type: object
+      required:
+        - expression
+        - event
+      properties:
+        expression:
+          type: string
+          example: round((ended_at - started_at) * units)
+        event:
+          type: object
+          required:
+            - code
+            - properties
+          properties:
+            code:
+              type: string
+              example: storage
+            timestamp:
+              anyOf:
+                - type: integer
+                - type: string
+              example: '1651240791'
+            properties:
+              type: object
+              additionalProperties:
+                oneOf:
+                  - type: string
+                  - type: integer
+                  - type: number
+    FeatureEvaluateExpressionResult:
+      type: object
+      required:
+        - expression_result
+      properties:
+        expression_result:
+          type: object
+          required:
+            - value
+          properties:
+            value:
+              anyOf:
+                - type: string
+                - type: number
     CouponObject:
       type: object
       required:
@@ -12112,7 +11922,7 @@ components:
         - created_at
         - reusable
         - limited_plans
-        - limited_billable_metrics
+        - limited_features
       properties:
         lago_id:
           type: string
@@ -12169,13 +11979,13 @@ components:
             type: string
           example:
             - startup_plan
-        limited_billable_metrics:
+        limited_features:
           type: boolean
-          description: The coupon is limited to specific billable metrics. The possible values can be `true` or `false`.
+          description: The coupon is limited to specific features. The possible values can be `true` or `false`.
           example: false
-        billable_metric_codes:
+        feature_codes:
           type: array
-          description: An array of billable metric codes to which the coupon is applicable. By specifying the billable metric codes in this field, you can restrict the coupon's usage to specific metrics only.
+          description: An array of feature codes to which the coupon is applicable. By specifying the feature codes in this field, you can restrict the coupon's usage to specific metrics only.
           items:
             type: string
           example: []
@@ -12348,13 +12158,13 @@ components:
               description: An array of plan codes to which the coupon is applicable. By specifying the plan codes in this field, you can restrict the coupon's usage to specific plans only.
               example:
                 - startup_plan
-            billable_metric_codes:
+            feature_codes:
               type:
                 - array
                 - 'null'
               items:
                 type: string
-              description: An array of billable metric codes to which the coupon is applicable. By specifying the billable metric codes in this field, you can restrict the coupon's usage to specific metrics only.
+              description: An array of feature codes to which the coupon is applicable. By specifying the feature codes in this field, you can restrict the coupon's usage to specific metrics only.
               example: []
     CouponCreateInput:
       type: object
@@ -12945,7 +12755,7 @@ components:
               description: |
                 The name of the fee item. The value depends on the type of the fee item:
 
-                - If the fee item is a `charge`, it is the billable metric name.
+                - If the fee item is a `charge`, it is the feature name.
                 - If the fee item is a `add-on`, it is the add-on name.
                 - If the fee item is a `credit`, it is the wallet transaction name if set, or `"credit"` if not.
                 - If the fee item is a `fixed_charge`, it is the fixed charge add-on name.
@@ -12958,7 +12768,7 @@ components:
               description: |
                 The description of the fee item. The value depends on the type of the fee item:
 
-                - If the fee item is a `charge`, it is the billable metric description.
+                - If the fee item is a `charge`, it is the feature description.
                 - If the fee item is a `add-on`, it is the add-on description.
                 - If the fee item is a `credit`, it is always `"credit"`.
                 - If the fee item is a `fixed_charge`, it is the fixed charge add-on description.
@@ -12969,7 +12779,7 @@ components:
               description: |
                 Specifies the name that will be displayed on an invoice. If no value is set for this field, we'll fallback to a value that depends on the type of the fee items:
 
-                - If the fee item is a `charge`, we'll fallback to the `invoice_display_name` of the `charge` or the billable metric name if no `invoice_display_name` is set.
+                - If the fee item is a `charge`, we'll fallback to the `invoice_display_name` of the `charge` or the feature name if no `invoice_display_name` is set.
                 - If the fee item is a `add-on`, we'll fallback to the `invoice_name` of the `add-on` or the `name` of the `add-on`.
                 - If the fee item is a `credit`, we'll fallback to the wallet transaction name if set, or `credit` if not.
                 - If the fee item is a `fixed_charge`, we'll fallback to the `invoice_display_name` of the `fixed_charge` or the `invoice_name` of the `fixed_charge_add_on` if no `invoice_display_name` is set.
@@ -12999,10 +12809,10 @@ components:
               type: string
               enum:
                 - AddOn
-                - BillableMetric
+                - Feature
                 - Subscription
                 - WalletTransaction
-              description: The type of the fee item. Possible values are `AddOn`, `BillableMetric`, `WalletTransaction`, `Subscription`.
+              description: The type of the fee item. Possible values are `AddOn`, `Feature`, `WalletTransaction`, `Subscription`.
               example: Subscription
             grouped_by:
               type: object
@@ -15961,11 +15771,11 @@ components:
               description: An array of fee types to which the wallet is applicable. By specifying the fee types in this field, you can restrict the wallet's usage to specific fee types only.
               example:
                 - charge
-            billable_metric_codes:
+            feature_codes:
               type: array
               items:
                 type: string
-              description: An array of billable metric codes to which the wallet is applicable. By specifying the billable metric codes in this field, you can restrict the wallet's usage to specific metrics only.
+              description: An array of feature codes to which the wallet is applicable. By specifying the feature codes in this field, you can restrict the wallet's usage to specific metrics only.
               example:
                 - bm1
         recurring_transaction_rules:
@@ -16154,13 +15964,13 @@ components:
                   description: An array of fee types to which the wallet is applicable. By specifying the fee types in this field, you can restrict the wallet's usage to specific fee types only.
                   example:
                     - charge
-                billable_metric_codes:
+                feature_codes:
                   type:
                     - array
                     - 'null'
                   items:
                     type: string
-                  description: An array of billable metric codes to which the wallet is applicable. By specifying the billable metric codes in this field, you can restrict the wallet's usage to specific metrics only.
+                  description: An array of feature codes to which the wallet is applicable. By specifying the feature codes in this field, you can restrict the wallet's usage to specific metrics only.
                   example: []
             paid_top_up_min_amount_cents:
               type:
@@ -16488,13 +16298,13 @@ components:
                   description: An array of fee types to which the wallet is applicable. By specifying the fee types in this field, you can restrict the wallet's usage to specific fee types only.
                   example:
                     - charge
-                billable_metric_codes:
+                feature_codes:
                   type:
                     - array
                     - 'null'
                   items:
                     type: string
-                  description: An array of billable metric codes to which the wallet is applicable. By specifying the billable metric codes in this field, you can restrict the wallet's usage to specific metrics only.
+                  description: An array of feature codes to which the wallet is applicable. By specifying the feature codes in this field, you can restrict the wallet's usage to specific metrics only.
                   example: []
             metadata:
               $ref: '#/components/schemas/MetadataInput'
@@ -16539,7 +16349,7 @@ components:
         - lago_id
         - lago_organization_id
         - external_subscription_id
-        - billable_metric
+        - feature
         - alert_type
         - code
         - name
@@ -16568,7 +16378,7 @@ components:
           type: string
           description: The wallet external unique identifier (provided by your own application).
           example: wallet_code
-        billable_metric:
+        feature:
           type: 'null'
         alert_type:
           type: string
@@ -16876,7 +16686,7 @@ components:
         - amount_cents
         - amount_currency
         - charge
-        - billable_metric
+        - feature
       properties:
         units:
           type: string
@@ -16930,9 +16740,9 @@ components:
                 - 'null'
               description: Specifies the name that will be displayed on an invoice. If no value is set for this field, the name of the actual charge will be used as the default display name.
               example: Setup
-        billable_metric:
+        feature:
           type: object
-          description: The related billable metric object.
+          description: The related feature object.
           required:
             - lago_id
             - name
@@ -16943,18 +16753,18 @@ components:
               type: string
               format: uuid
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-              description: Unique identifier assigned to the billable metric within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the billable metric's record within the Nozle system.
+              description: Unique identifier assigned to the feature within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the feature's record within the Nozle system.
             name:
               type: string
               example: Storage
-              description: The name of the billable metric used for this charge.
+              description: The name of the feature used for this charge.
             code:
               type: string
               example: storage
-              description: The code of the billable metric used for this charge.
+              description: The code of the feature used for this charge.
             aggregation_type:
               type: string
-              description: The aggregation type of the billable metric used for this charge. Possible values are `count_agg`, `sum_agg`, `max_agg` or `unique_count_agg`.
+              description: The aggregation type of the feature used for this charge. Possible values are `count_agg`, `sum_agg`, `max_agg` or `unique_count_agg`.
               enum:
                 - count_agg
                 - sum_agg
@@ -17144,7 +16954,7 @@ components:
         - projected_amount_cents
         - amount_currency
         - charge
-        - billable_metric
+        - feature
         - groups
       properties:
         units:
@@ -17201,9 +17011,9 @@ components:
               type: string
               description: Specifies the name that will be displayed on an invoice. If no value is set for this field, the name of the actual charge will be used as the default display name.
               example: Setup
-        billable_metric:
+        feature:
           type: object
-          description: The related billable metric object.
+          description: The related feature object.
           required:
             - lago_id
             - name
@@ -17214,18 +17024,18 @@ components:
               type: string
               format: uuid
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-              description: Unique identifier assigned to the billable metric within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the billable metric's record within the Nozle system.
+              description: Unique identifier assigned to the feature within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the feature's record within the Nozle system.
             name:
               type: string
               example: Storage
-              description: The name of the billable metric used for this charge.
+              description: The name of the feature used for this charge.
             code:
               type: string
               example: storage
-              description: The code of the billable metric used for this charge.
+              description: The code of the feature used for this charge.
             aggregation_type:
               type: string
-              description: The aggregation type of the billable metric used for this charge. Possible values are `count_agg`, `sum_agg`, `max_agg` or `unique_count_agg`.
+              description: The aggregation type of the feature used for this charge. Possible values are `count_agg`, `sum_agg`, `max_agg` or `unique_count_agg`.
               enum:
                 - count_agg
                 - sum_agg
@@ -17447,7 +17257,7 @@ components:
         code:
           type: string
           example: storage
-          description: The code that identifies a targeted billable metric. It is essential that this code matches the `code` property of one of your active billable metrics. If the provided code does not correspond to any active billable metric, it will be ignored during the process.
+          description: The code that identifies a targeted feature. It is essential that this code matches the `code` property of one of your active features. If the provided code does not correspond to any active feature, it will be ignored during the process.
         timestamp:
           type: string
           format: date-time
@@ -17461,13 +17271,13 @@ components:
           description: The precise total amount that was sent in the event payload. This filed is used by the `dynamic` pricing model.
         properties:
           type: object
-          description: This field represents additional properties associated with the event, which are utilized in the calculation of the final fee. This object becomes mandatory when the targeted billable metric employs a `sum_agg`, `max_agg`, or `unique_count_agg` aggregation method. However, when using a simple `count_agg`, this object is not required.
+          description: This field represents additional properties associated with the event, which are utilized in the calculation of the final fee. This object becomes mandatory when the targeted feature employs a `sum_agg`, `max_agg`, or `unique_count_agg` aggregation method. However, when using a simple `count_agg`, this object is not required.
           properties:
             operation_type:
               type:
                 - string
                 - 'null'
-              description: The `operation_type` field is only necessary when adding or removing a specific unit when the targeted billable metric adopts a `unique_count_agg` aggregation method. In other cases, the `operation_type` field is not required. The valid values for the `operation_type` field are `add` or `remove`, which indicate whether the unit is being added or removed from the unique count aggregation, respectively.
+              description: The `operation_type` field is only necessary when adding or removing a specific unit when the targeted feature adopts a `unique_count_agg` aggregation method. In other cases, the `operation_type` field is not required. The valid values for the `operation_type` field are `add` or `remove`, which indicate whether the unit is being added or removed from the unique count aggregation, respectively.
               enum:
                 - add
                 - remove
@@ -17532,7 +17342,7 @@ components:
         code:
           type: string
           example: storage
-          description: The code that identifies a targeted billable metric. It is essential that this code matches the `code` property of one of your active billable metrics. If the provided code does not correspond to any active billable metric, it will be ignored during the process.
+          description: The code that identifies a targeted feature. It is essential that this code matches the `code` property of one of your active features. If the provided code does not correspond to any active feature, it will be ignored during the process.
         timestamp:
           oneOf:
             - type: integer
@@ -17552,7 +17362,7 @@ components:
           type:
             - object
             - 'null'
-          description: This field represents additional properties associated with the event, which are utilized in the calculation of the final fee. This object becomes mandatory when the targeted billable metric employs a `sum_agg`, `max_agg`, or `unique_count_agg` aggregation method. However, when using a simple `count_agg`, this object is not required.
+          description: This field represents additional properties associated with the event, which are utilized in the calculation of the final fee. This object becomes mandatory when the targeted feature employs a `sum_agg`, `max_agg`, or `unique_count_agg` aggregation method. However, when using a simple `count_agg`, this object is not required.
           additionalProperties:
             oneOf:
               - type: string
@@ -17620,14 +17430,14 @@ components:
             code:
               type: string
               example: storage
-              description: The code that identifies a targeted billable metric. It is essential that this code matches the `code` property of one of your active billable metrics. If the provided code does not correspond to any active billable metric, it will be ignored during the process.
+              description: The code that identifies a targeted feature. It is essential that this code matches the `code` property of one of your active features. If the provided code does not correspond to any active feature, it will be ignored during the process.
             external_subscription_id:
               type: string
               example: sub_1234567890
               description: The unique identifier of the subscription within your application.
             properties:
               type: object
-              description: This field represents additional properties associated with the event, which are utilized in the calculation of the final fee. This object becomes mandatory when the targeted billable metric employs a `sum_agg`, `max_agg`, or `unique_count_agg` aggregation method. However, when using a simple `count_agg`, this object is not required.
+              description: This field represents additional properties associated with the event, which are utilized in the calculation of the final fee. This object becomes mandatory when the targeted feature employs a `sum_agg`, `max_agg`, or `unique_count_agg` aggregation method. However, when using a simple `count_agg`, this object is not required.
     Fees:
       type: object
       required:
@@ -17651,14 +17461,14 @@ components:
             code:
               type: string
               example: storage
-              description: The code that identifies a targeted billable metric. It is essential that this code matches the `code` property of one of your active billable metrics. If the provided code does not correspond to any active billable metric, it will be ignored during the process.
+              description: The code that identifies a targeted feature. It is essential that this code matches the `code` property of one of your active features. If the provided code does not correspond to any active feature, it will be ignored during the process.
             external_subscription_id:
               type: string
               example: sub_1234567890
               description: The unique identifier of the subscription within your application.
             properties:
               type: object
-              description: This field represents additional properties associated with the event, which are utilized in the calculation of the final fee. This object becomes mandatory when the targeted billable metric employs a `sum_agg`, `max_agg`, or `unique_count_agg` aggregation method. However, when using a simple `count_agg`, this object is not required.
+              description: This field represents additional properties associated with the event, which are utilized in the calculation of the final fee. This object becomes mandatory when the targeted feature employs a `sum_agg`, `max_agg`, or `unique_count_agg` aggregation method. However, when using a simple `count_agg`, this object is not required.
             transaction_id:
               type:
                 - string
@@ -17819,15 +17629,15 @@ components:
               example: charge
             code:
               type: string
-              description: The code of the fee item. It will be the code of the `billable_metric`.
+              description: The code of the fee item. It will be the code of the `feature`.
               example: startup
             name:
               type: string
-              description: The name of the fee item. It will be the name of the `billable_metric`.
+              description: The name of the fee item. It will be the name of the `feature`.
               example: Startup
             description:
               type: string
-              description: The description of the fee item. It will be the name of the `billable_metric`.
+              description: The description of the fee item. It will be the name of the `feature`.
               example: Startup description
             invoice_display_name:
               type: string
@@ -17851,14 +17661,14 @@ components:
             lago_item_id:
               type: string
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-              description: Unique identifier of the fee item, created by Nozle. It will be the identifier of the `billable_metric`.
+              description: Unique identifier of the fee item, created by Nozle. It will be the identifier of the `feature`.
               format: uuid
             item_type:
               type: string
               enum:
-                - BillableMetric
-              description: The type of the fee item. Values is `BillableMetric`.
-              example: BillableMetric
+                - Feature
+              description: The type of the fee item. Values is `Feature`.
+              example: Feature
             grouped_by:
               type: object
               description: Key value list of event properties aggregated by the charge model
@@ -19033,7 +18843,7 @@ components:
           description: List of all thresholds utilized for calculating the charge.
         values:
           type: object
-          description: List of possible filter values. The key and values must match one of the billable metric filters.
+          description: List of possible filter values. The key and values must match one of the feature filters.
           additionalProperties:
             type: array
             items:
@@ -19045,8 +18855,8 @@ components:
       type: object
       required:
         - lago_id
-        - lago_billable_metric_id
-        - billable_metric_code
+        - lago_feature_id
+        - feature_code
         - created_at
         - charge_model
         - invoiceable
@@ -19062,10 +18872,10 @@ components:
           format: uuid
           description: Unique identifier of charge, created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_billable_metric_id:
+        lago_feature_id:
           type: string
           format: uuid
-          description: Unique identifier of the billable metric created by Nozle.
+          description: Unique identifier of the feature created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
         code:
           type:
@@ -19073,9 +18883,9 @@ components:
             - 'null'
           description: Unique code identifying the charge within the plan.
           example: api_requests_charge
-        billable_metric_code:
+        feature_code:
           type: string
-          description: Unique code identifying a billable metric.
+          description: Unique code identifying a feature.
           example: requests
         invoice_display_name:
           type:
@@ -19492,8 +19302,8 @@ components:
           description: Additional usage-based charges for this plan.
           example:
             - lago_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
-              lago_billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
-              billable_metric_code: requests
+              lago_feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
+              feature_code: requests
               created_at: '2023-06-27T19:43:42Z'
               charge_model: package
               invoiceable: true
@@ -19508,8 +19318,8 @@ components:
                 package_size: 1000
               filters: []
             - lago_id: 1a901a90-1a90-1a90-1a90-1a901a901a92
-              lago_billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a92
-              billable_metric_code: cpu
+              lago_feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a92
+              feature_code: cpu
               created_at: '2023-06-27T19:43:42Z'
               charge_model: graduated
               invoiceable: true
@@ -19530,8 +19340,8 @@ components:
                     per_unit_amount: '0.4'
               filters: []
             - lago_id: 1a901a90-1a90-1a90-1a90-1a901a901a93
-              lago_billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a93
-              billable_metric_code: seats
+              lago_feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a93
+              feature_code: seats
               created_at: '2023-06-27T19:43:42Z'
               charge_model: standard
               invoiceable: true
@@ -19561,8 +19371,8 @@ components:
                     region:
                       - Africa
             - lago_id: 1a901a90-1a90-1a90-1a90-1a901a901a94
-              lago_billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a94
-              billable_metric_code: storage
+              lago_feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a94
+              feature_code: storage
               created_at: '2023-06-27T19:43:42Z'
               charge_model: volume
               invoiceable: true
@@ -19583,8 +19393,8 @@ components:
                     per_unit_amount: '0.5'
               filters: []
             - lago_id: 1a901a90-1a90-1a90-1a90-1a901a901a95
-              lago_billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a95
-              billable_metric_code: payments
+              lago_feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a95
+              feature_code: payments
               created_at: '2023-06-27T19:43:42Z'
               charge_model: percentage
               invoiceable: false
@@ -19735,7 +19545,7 @@ components:
           description: List of all thresholds utilized for calculating the charge.
         values:
           type: object
-          description: List of possible filter values. The key and values must match one of the billable metric filters.
+          description: List of possible filter values. The key and values must match one of the feature filters.
           additionalProperties:
             type: array
             items:
@@ -19848,13 +19658,13 @@ components:
               items:
                 type: object
                 required:
-                  - billable_metric_id
+                  - feature_id
                   - charge_model
                 properties:
-                  billable_metric_id:
+                  feature_id:
                     type: string
                     format: uuid
-                    description: Unique identifier of the billable metric created by Nozle.
+                    description: Unique identifier of the feature created by Nozle.
                     example: 1a901a90-1a90-1a90-1a90-1a901a901a90
                   code:
                     type: string
@@ -19933,7 +19743,7 @@ components:
                     description: Specifies whether the charge accepts a target wallet for prepaid credits deduction.
                     example: false
               example:
-                - billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
+                - feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
                   charge_model: package
                   invoiceable: true
                   invoice_display_name: Setup
@@ -19947,7 +19757,7 @@ components:
                     package_size: 1000
                   tax_codes:
                     - french_standard_vat
-                - billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a92
+                - feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a92
                   charge_model: graduated
                   invoiceable: true
                   invoice_display_name: Setup
@@ -19964,7 +19774,7 @@ components:
                         from_value: 11
                         flat_amount: '0'
                         per_unit_amount: '0.4'
-                - billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a93
+                - feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a93
                   charge_model: standard
                   invoiceable: true
                   invoice_display_name: Setup
@@ -19972,7 +19782,7 @@ components:
                   prorated: false
                   min_amount_cents: 0
                   properties: {}
-                - billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a94
+                - feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a94
                   charge_model: volume
                   invoiceable: true
                   invoice_display_name: Setup
@@ -19989,7 +19799,7 @@ components:
                         to_value: null
                         flat_amount: '0'
                         per_unit_amount: '0.5'
-                - billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a95
+                - feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a95
                   charge_model: percentage
                   invoiceable: false
                   invoice_display_name: Setup
@@ -20198,10 +20008,10 @@ components:
                     format: uuid
                     description: Unique identifier of the charge created by Nozle.
                     example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-                  billable_metric_id:
+                  feature_id:
                     type: string
                     format: uuid
-                    description: Unique identifier of the billable metric created by Nozle.
+                    description: Unique identifier of the feature created by Nozle.
                     example: 1a901a90-1a90-1a90-1a90-1a901a901a90
                   code:
                     type: string
@@ -20276,7 +20086,7 @@ components:
                     description: Specifies whether the charge accepts a target wallet for prepaid credits deduction.
                     example: false
               example:
-                - billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
+                - feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
                   charge_model: package
                   invoiceable: true
                   invoice_display_name: Setup
@@ -20289,7 +20099,7 @@ components:
                     package_size: 1000
                   tax_codes:
                     - french_standard_vat
-                - billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a92
+                - feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a92
                   charge_model: graduated
                   invoiceable: true
                   invoice_display_name: Setup
@@ -20306,7 +20116,7 @@ components:
                         from_value: 11
                         flat_amount: '0'
                         per_unit_amount: '0.4'
-                - billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a93
+                - feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a93
                   charge_model: standard
                   invoiceable: true
                   invoice_display_name: Setup
@@ -20315,7 +20125,7 @@ components:
                   prorated: false
                   min_amount_cents: 0
                   properties: {}
-                - billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a94
+                - feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a94
                   charge_model: volume
                   invoiceable: true
                   invoice_display_name: Setup
@@ -20332,7 +20142,7 @@ components:
                         to_value: null
                         flat_amount: '0'
                         per_unit_amount: '0.5'
-                - billable_metric_id: 1a901a90-1a90-1a90-1a90-1a901a901a95
+                - feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a95
                   charge_model: percentage
                   invoiceable: false
                   invoice_display_name: Setup
@@ -20560,10 +20370,10 @@ components:
         - $ref: '#/components/schemas/ChargeOverridableInput'
         - type: object
           properties:
-            billable_metric_id:
+            feature_id:
               type: string
               format: uuid
-              description: Unique identifier of the billable metric created by Nozle.
+              description: Unique identifier of the feature created by Nozle.
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
             code:
               type: string
@@ -20611,7 +20421,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/ChargeInput'
             - required:
-                - billable_metric_id
+                - feature_id
                 - charge_model
             - properties:
                 cascade_updates:
@@ -20678,7 +20488,7 @@ components:
           description: List of all thresholds utilized for calculating the charge.
         values:
           type: object
-          description: List of possible filter values. The key and values must match one of the billable metric filters.
+          description: List of possible filter values. The key and values must match one of the feature filters.
           additionalProperties:
             type: array
             items:
@@ -20724,7 +20534,7 @@ components:
               description: List of all thresholds utilized for calculating the charge.
             values:
               type: object
-              description: List of possible filter values. The key and values must match one of the billable metric filters.
+              description: List of possible filter values. The key and values must match one of the feature filters.
               additionalProperties:
                 type: array
                 items:
@@ -20762,7 +20572,7 @@ components:
               description: List of all thresholds utilized for calculating the charge.
             values:
               type: object
-              description: List of possible filter values. The key and values must match one of the billable metric filters.
+              description: List of possible filter values. The key and values must match one of the feature filters.
               additionalProperties:
                 type: array
                 items:
@@ -20944,10 +20754,10 @@ components:
                 format: uuid
                 description: Unique identifier of the charge created by Nozle.
                 example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-              billable_metric_id:
+              feature_id:
                 type: string
                 format: uuid
-                description: Unique identifier of the billable metric created by Nozle.
+                description: Unique identifier of the feature created by Nozle.
                 example: 1a901a90-1a90-1a90-1a90-1a901a901a90
               code:
                 type: string
@@ -21344,7 +21154,7 @@ components:
         - lago_id
         - lago_organization_id
         - external_subscription_id
-        - billable_metric
+        - feature
         - alert_type
         - code
         - name
@@ -21373,18 +21183,18 @@ components:
           type: 'null'
         wallet_code:
           type: 'null'
-        billable_metric:
-          $ref: '#/components/schemas/BillableMetricObject'
-          description: The billable metric associated with the alert. Only for alerts based on a billable metric.
+        feature:
+          $ref: '#/components/schemas/FeatureObject'
+          description: The feature associated with the alert. Only for alerts based on a feature.
         alert_type:
           type: string
           description: The type of alert.
           enum:
             - current_usage_amount
-            - billable_metric_current_usage_amount
-            - billable_metric_current_usage_units
+            - feature_current_usage_amount
+            - feature_current_usage_units
             - lifetime_usage_amount
-          example: billable_metric_current_usage_amount
+          example: feature_current_usage_amount
         code:
           type: string
           description: Unique code used to identify the alert.
@@ -21453,19 +21263,19 @@ components:
                   description: The type of alert.
                   enum:
                     - current_usage_amount
-                    - billable_metric_current_usage_amount
-                    - billable_metric_current_usage_units
+                    - feature_current_usage_amount
+                    - feature_current_usage_units
                     - lifetime_usage_amount
-                  example: billable_metric_current_usage_amount
+                  example: feature_current_usage_amount
                 code:
                   type: string
                   description: Unique code used to identify the alert.
                   example: storage_threshold_alert
-                billable_metric_code:
+                feature_code:
                   type:
                     - string
                     - 'null'
-                  description: The code of the billable metric associated with the alert. Only for alerts based on a billable metric.
+                  description: The code of the feature associated with the alert. Only for alerts based on a feature.
                   example: storage_usage
     AlertBatchCreateInput:
       type: object
@@ -21489,19 +21299,19 @@ components:
                     description: The type of alert.
                     enum:
                       - current_usage_amount
-                      - billable_metric_current_usage_amount
-                      - billable_metric_current_usage_units
+                      - feature_current_usage_amount
+                      - feature_current_usage_units
                       - lifetime_usage_amount
-                    example: billable_metric_current_usage_amount
+                    example: feature_current_usage_amount
                   code:
                     type: string
                     description: Unique code used to identify the alert.
                     example: storage_threshold_alert
-                  billable_metric_code:
+                  feature_code:
                     type:
                       - string
                       - 'null'
-                    description: The code of the billable metric associated with the alert. Only for alerts based on a billable metric.
+                    description: The code of the feature associated with the alert. Only for alerts based on a feature.
                     example: storage_usage
     Alert:
       type: object
@@ -21520,11 +21330,11 @@ components:
             - $ref: '#/components/schemas/AlertBaseInput'
             - type: object
               properties:
-                billable_metric_code:
+                feature_code:
                   type:
                     - string
                     - 'null'
-                  description: The code of the billable metric associated with the alert. Only for alerts based on a billable metric.
+                  description: The code of the feature associated with the alert. Only for alerts based on a feature.
                   example: storage_usage
     SubscriptionEntitlementPrivilegeObject:
       allOf:
@@ -22227,7 +22037,7 @@ components:
         - lago_subscription_id
         - external_subscription_id
         - external_customer_id
-        - billable_metric_code
+        - feature_code
         - alert_type
         - alert_code
         - alert_name
@@ -22264,21 +22074,21 @@ components:
           type: string
           description: The customer external unique identifier (provided by your own application).
           example: cust_1234567890
-        billable_metric_code:
+        feature_code:
           type:
             - string
             - 'null'
-          description: The code of the billable metric associated with the alert. Only for alerts based on a billable metric.
+          description: The code of the feature associated with the alert. Only for alerts based on a feature.
           example: storage_usage
         alert_type:
           type: string
           description: The type of alert triggered.
           enum:
             - current_usage_amount
-            - billable_metric_current_usage_amount
-            - billable_metric_current_usage_units
+            - feature_current_usage_amount
+            - feature_current_usage_units
             - lifetime_usage_amount
-          example: billable_metric_current_usage_amount
+          example: feature_current_usage_amount
         alert_code:
           type: string
           description: Unique code used to identify the alert triggered.

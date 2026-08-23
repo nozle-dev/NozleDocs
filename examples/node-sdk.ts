@@ -121,7 +121,7 @@ export async function exerciseNodeSdk() {
   await nozle.usage.check({
     customerId: 'workspace_123',
     entityId: 'user_42',
-    billableMetricCode: 'agent_execution',
+    featureCode: 'agent_execution',
     creditSystemCode: 'ai_credits',
     properties: { model: 'example-model' },
   });
@@ -129,7 +129,7 @@ export async function exerciseNodeSdk() {
     {
       customerId: 'workspace_123',
       entityId: 'user_42',
-      billableMetricCode: 'agent_execution',
+      featureCode: 'agent_execution',
       creditSystemCode: 'ai_credits',
       properties: { model: 'example-model' },
     },
