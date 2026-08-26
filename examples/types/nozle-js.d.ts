@@ -271,7 +271,7 @@ declare module '@nozle-js/node' {
       check(params: {
         customerId: string;
         entityId?: string;
-        billableMetricCode: string;
+        featureCode: string;
         creditSystemCode?: string;
         properties?: Record<string, unknown>;
         occurredAt?: string;
@@ -285,7 +285,7 @@ declare module '@nozle-js/node' {
         params: {
           customerId: string;
           entityId?: string;
-          billableMetricCode: string;
+          featureCode: string;
           creditSystemCode?: string;
           properties?: Record<string, unknown>;
           timestamp?: string;

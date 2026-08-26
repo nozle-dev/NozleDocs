@@ -36,7 +36,7 @@ track(
 | Argument | Description |
 |---|---|
 | `customerId` | External Nozle customer ID. |
-| `event` | Event code matching the Billable Metric code. |
+| `event` | Event code matching the Feature code. |
 | `metadata` | Properties used by metric aggregation or cost attribution. |
 | `subscriptionId` | Explicit external subscription target. |
 | `transactionId` | Stable event ID used for idempotency. A UUID is generated when omitted. |
@@ -90,5 +90,5 @@ await nozle.track(customerId, 'text_generation', {
 - For high-volume workloads, publish through your own durable queue and call `track()` from a worker.
 - Do not create a new random transaction ID on each retry.
 - Do not regenerate the timestamp when retrying an accepted business event.
-- Match property names to the Billable Metric aggregation configuration exactly.
+- Match property names to the Feature aggregation configuration exactly.
 - Use `usage.track()` instead when the operation must atomically enforce and deduct product credits.
