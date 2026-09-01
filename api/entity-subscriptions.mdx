@@ -96,7 +96,7 @@ const nozle = new Nozle({
 
 const checkout = await nozle.entitySubscriptions.checkoutMany('workspace_123', {
   billingTime: 'anniversary',
-  returnUrl: 'https://wrrk.ai/settings/billing',
+  returnUrl: 'https://app.example.com/settings/billing',
   idempotencyKey: 'workspace-123-seat-purchase-v1',
   items: [
     { externalEntityId: 'seat_pro_001', planCode: 'pro_monthly' },
@@ -122,7 +122,7 @@ nozle = Nozle(
 checkout = nozle.entity_subscriptions.checkout_many(
     "workspace_123",
     billing_time="anniversary",
-    return_url="https://wrrk.ai/settings/billing",
+    return_url="https://app.example.com/settings/billing",
     idempotency_key="workspace-123-seat-purchase-v1",
     items=[
         {"external_entity_id": "seat_pro_001", "plan_code": "pro_monthly"},
@@ -215,7 +215,7 @@ Bulk Entity checkout establishes one stable billing calendar for the paying cust
 - later Entity purchases align to the established anchor and prorate their first period; and
 - the anchor remains stable even if the customer temporarily has no paid Entities.
 
-For a fresh Wrrk-style seat pool, send `billing_time: "anniversary"`. For example, a successful first payment on August 6 renews on the sixth. A seat added on August 20 is charged only through September 6, then joins the normal renewal invoice.
+For a fresh seat pool, send `billing_time: "anniversary"`. For example, a successful first payment on August 6 renews on the sixth. A seat added on August 20 is charged only through September 6, then joins the normal renewal invoice.
 
 <Info>
 The anchor is established only after confirmed payment. Creating an invoice or receiving a browser redirect is not enough.

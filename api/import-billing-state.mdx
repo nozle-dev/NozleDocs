@@ -1,0 +1,96 @@
+---
+title: Import External Billing State
+api: "POST /customers/{customer_id}/billing-state-imports"
+description: Import an existing paid subscription without creating a Nozle invoice or payment
+---
+
+Use this Core API when another system already bills the customer and Nozle should provide the plan entitlements without charging them again.
+
+**Base URL:** `https://core.nozle.app/api/v1`
+
+**Auth:** secret key with `subscription:write` when API permissions are enabled. Publishable keys are rejected. `Idempotency-Key` is required.
+
+## Import the subscription
+
+```http
+POST /customers/workspace_123/billing-state-imports
+Authorization: Bearer sk_nozle_...
+Idempotency-Key: workspace-123-pro-cutover-v1
+Content-Type: application/json
+
+{
+  "billing_state_import": {
+    "dry_run": false,
+    "subscription": {
+      "plan_code": "pro_monthly",
+      "status": "active",
+      "billing_authority": "external",
+      "external_reference": "merchant_subscription_123",
+      "current_period_start": "2026-08-15T00:00:00Z",
+      "current_period_end": "2026-09-15T00:00:00Z"
+    }
+  }
+}
+```
+
+For an Entity subscription, add `external_entity_id` beside `subscription`:
+
+```json
+{
+  "billing_state_import": {
+    "external_entity_id": "user_42",
+    "subscription": {
+      "plan_code": "pro_monthly",
+      "status": "active",
+      "billing_authority": "external",
+      "external_reference": "merchant_user_42_pro",
+      "current_period_start": "2026-08-15T00:00:00Z",
+      "current_period_end": "2026-09-15T00:00:00Z"
+    }
+  }
+}
+```
+
+The referenced customer, plan, and optional Entity must already exist in the authenticated organization. The period must contain the current time.
+
+## Response
+
+```json
+{
+  "billing_state_import": {
+    "id": "import_uuid",
+    "status": "completed",
+    "dry_run": false,
+    "external_customer_id": "workspace_123",
+    "subscription": {
+      "id": "subscription_uuid",
+      "external_subscription_id": "merchant_subscription_123",
+      "external_reference": "merchant_subscription_123",
+      "plan_code": "pro_monthly",
+      "status": "active",
+      "billing_authority": "external",
+      "credit_import_required": true,
+      "current_period_start": "2026-08-15T00:00:00Z",
+      "current_period_end": "2026-09-15T00:00:00Z",
+      "invoice_created": false
+    },
+    "replayed": false
+  }
+}
+```
+
+Nozle creates no invoice, checkout, payment-provider customer, or payment request. Externally billed subscriptions are excluded from Nozle invoicing, upgrades, cancellation, dunning, and payment collection.
+
+If `credit_import_required` is `true`, import every opening Credit System balance before switching usage authority to Nozle. Scheduled plan grants remain paused until that import is complete.
+
+## Dry run and retries
+
+Set `dry_run` to `true` to validate the request without writing subscription state.
+
+Retry an uncertain response with the same idempotency key and identical payload. A replay returns the original result. Reusing the key with a different request is rejected.
+
+<Warning>
+This endpoint does not transfer billing authority to Nozle. Adopting payment collection later requires a separate explicit migration flow.
+</Warning>
+
+Next: [Import the opening credit balance](/api/import-opening-credit-balance).
