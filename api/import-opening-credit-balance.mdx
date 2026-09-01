@@ -27,7 +27,7 @@ Content-Type: application/json
 }
 ```
 
-For an Entity-scoped balance, include the exact Entity ID associated with the imported subscription:
+For an Entity-scoped balance, include the exact Entity ID associated with the imported subscription. Copy `external_subscription_id` from the Core billing-state import response; do not substitute the request's `external_reference`.
 
 ```json
 {
@@ -40,7 +40,7 @@ For an Entity-scoped balance, include the exact Entity ID associated with the im
 }
 ```
 
-`granted_amount` must exactly match the active plan grant rule. `remaining_amount` must be between zero and the granted amount. Send amounts as decimal strings.
+`granted_amount` must exactly match Nozle's computed grant for the imported current period. This normally equals the plan grant-rule amount, but an Entity rule using prorated joining can produce a smaller current-period grant. `remaining_amount` must be between zero and the computed granted amount. Send amounts as decimal strings and use a dry run to validate the amount before importing.
 
 ## Response
 

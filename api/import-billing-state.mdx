@@ -51,7 +51,7 @@ For an Entity subscription, add `external_entity_id` beside `subscription`:
 }
 ```
 
-The referenced customer, plan, and optional Entity must already exist in the authenticated organization. The period must contain the current time.
+The referenced customer, plan, and optional Entity must already exist in the authenticated organization. The period must contain the current time. When a recurring credit grant uses the same cadence as the plan, the imported period is authoritative: the opening balance expires at `current_period_end`, and subsequent grant periods continue from that boundary. Independent grant cadences remain independent—for example, monthly credits on an annual plan still reset monthly—and lifetime grants remain non-expiring.
 
 ## Response
 
@@ -83,9 +83,11 @@ Nozle creates no invoice, checkout, payment-provider customer, or payment reques
 
 If `credit_import_required` is `true`, import every opening Credit System balance before switching usage authority to Nozle. Scheduled plan grants remain paused until that import is complete.
 
+For an Entity import, save the `external_subscription_id` returned in this response. Nozle generates that identifier for the Entity subscription; `external_reference` remains your source-system audit reference and is not used as the Entity subscription ID.
+
 ## Dry run and retries
 
-Set `dry_run` to `true` to validate the request without writing subscription state.
+Set `dry_run` to `true` to run the same idempotency, Entity ownership, subscription-slot, grant-scope, and period checks as execution without writing subscription state.
 
 Retry an uncertain response with the same idempotency key and identical payload. A replay returns the original result. Reusing the key with a different request is rejected.
 
