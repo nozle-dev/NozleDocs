@@ -51,7 +51,7 @@ For an Entity subscription, add `external_entity_id` beside `subscription`:
 }
 ```
 
-The referenced customer, plan, and optional Entity must already exist in the authenticated organization. The period must contain the current time. Periods use exact timestamp-based, half-open boundaries: `current_period_start` is inclusive and `current_period_end` is the first instant of the next period. Non-midnight payment-provider boundaries are preserved exactly—for example, `2026-08-15T10:37:42Z` through `2026-09-15T10:37:42Z`. The imported boundaries are authoritative for current usage reporting and opening-balance expiry. Independent credit-grant cadences remain independent—for example, monthly credits on an annual plan still reset monthly—and lifetime grants remain non-expiring.
+The referenced customer, plan, and optional Entity must already exist in the authenticated organization. The period must contain the current time and span exactly one plan interval. Periods use exact timestamp-based, half-open boundaries: `current_period_start` is inclusive and `current_period_end` is the first instant of the next period. Non-midnight payment-provider boundaries are preserved exactly—for example, a monthly period from `2026-08-15T10:37:42Z` must end at `2026-09-15T10:37:42Z`. Weekly, monthly, quarterly, semiannual, and yearly calendar advancement is supported, including month-end and leap-year clamping. Shorter, longer, or otherwise mismatched periods are rejected. The imported boundaries are authoritative for current usage reporting and opening-balance expiry. Independent credit-grant cadences remain independent—for example, monthly credits on an annual plan still reset monthly—and lifetime grants remain non-expiring.
 
 ## Response
 
