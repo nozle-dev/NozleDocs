@@ -1,0 +1,86 @@
+---
+title: Import Opening Credit Balance
+api: "POST /customers/{customer_id}/credit-balance-imports"
+description: Seed the remaining plan credits for an externally billed subscription without an invoice
+---
+
+Call this Engine API after [importing the externally billed subscription](/api/import-billing-state). It records the customer's current spendable balance without charging them again.
+
+**Base URL:** `https://api.nozle.app/api/v1`
+
+**Auth:** secret key with `credit_system:write` when API permissions are enabled. Publishable keys are rejected. `Idempotency-Key` is required.
+
+## Import a customer balance
+
+```http
+POST /customers/workspace_123/credit-balance-imports
+Authorization: Bearer sk_nozle_...
+Idempotency-Key: workspace-123-ai-credits-cutover-v1
+Content-Type: application/json
+
+{
+  "external_subscription_id": "merchant_subscription_123",
+  "credit_system_code": "ai_credits",
+  "granted_amount": "500",
+  "remaining_amount": "320",
+  "dry_run": false
+}
+```
+
+For an Entity-scoped balance, include the exact Entity ID associated with the imported subscription. Copy `external_subscription_id` from the Core billing-state import response; do not substitute the request's `external_reference`.
+
+```json
+{
+  "external_entity_id": "user_42",
+  "external_subscription_id": "entity-sub-123",
+  "credit_system_code": "ai_credits",
+  "granted_amount": "500",
+  "remaining_amount": "320",
+  "dry_run": false
+}
+```
+
+`granted_amount` must exactly match Nozle's computed grant for the imported current period. This normally equals the plan grant-rule amount, but an Entity rule using prorated joining can produce a smaller current-period grant. `remaining_amount` must be between zero and the computed granted amount. Send amounts as decimal strings and use a dry run to validate the amount before importing.
+
+## Response
+
+```json
+{
+  "credit_balance_import": {
+    "operation_id": "operation_uuid",
+    "balance_source_id": "source_uuid",
+    "external_customer_id": "workspace_123",
+    "external_subscription_id": "merchant_subscription_123",
+    "credit_system_code": "ai_credits",
+    "granted_amount": "500.000000000000",
+    "remaining_amount": "320.000000000000",
+    "current_period_start": "2026-08-15T00:00:00Z",
+    "expires_at": "2026-09-15T00:00:00Z",
+    "invoice_created": false,
+    "dry_run": false,
+    "replayed": false
+  }
+}
+```
+
+The import preserves both facts:
+
+```text
+Plan allowance       500 credits
+Already consumed     180 credits
+Opening balance      320 credits
+```
+
+It does not create an invoice or publish a usage event. It also marks the current plan grant as already represented, preventing the scheduler from adding another 500 credits during cutover.
+
+If the plan grants more than one Credit System, import each one. Nozle freezes the applicable grant definitions when the billing state is imported, so later catalog edits cannot change the amounts required during an in-progress cutover. Automatic plan grants resume only after every balance from that frozen snapshot has been imported.
+
+## Dry run and retries
+
+Set `dry_run` to `true` to validate the customer, subscription, Entity, Credit System, grant rule, period, and amounts without writing ledger state.
+
+Retry an uncertain response with the same idempotency key and identical payload. A replay returns the original imported values, even if the customer has consumed credits since the import. Reusing the key with a different request returns `409`.
+
+<Warning>
+Do not run the merchant's local credit deduction and Nozle `.track()` as simultaneous authorities. After the import is accepted, switch the gate cleanly: use `.can()` for the advisory check and `.track()` for the authoritative deduction.
+</Warning>
