@@ -129,7 +129,7 @@ declare module '@nozle-js/node' {
     can(
       customerId: string,
       feature: string,
-      metadata?: Record<string, string>,
+      metadata?: Record<string, unknown>,
     ): Promise<{
       allowed: boolean;
       reason?: string;
@@ -137,9 +137,21 @@ declare module '@nozle-js/node' {
       limit?: number;
       remaining?: number;
       overage?: boolean;
-      cost_per_use_cents: number;
-      revenue_per_use_cents: number;
-      margin_per_use_cents: number;
+      economics?: {
+        status: "estimated" | "not_configured" | "unavailable" | "stale";
+        reporting_currency?: string;
+        estimated_cost?: string;
+        estimated_revenue?: string;
+        estimated_margin?: string;
+        estimated_margin_percent?: string;
+        cost_rule_version_ids?: string[];
+        exclusions?: string[];
+        policy_version_id?: string;
+        policy_decision?: "allow" | "warn" | "deny";
+        policy_reason?: string;
+        reason?: string;
+        calculated_at: string;
+      };
     }>;
     checkAndDeduct(params: {
       customerId: string;

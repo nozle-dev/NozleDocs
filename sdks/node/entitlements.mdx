@@ -11,7 +11,7 @@ if (!check.allowed) {
 }
 ```
 
-`can()` calls `GET /api/v1/can` with the customer, feature, and optional string metadata.
+`can()` calls `GET /api/v1/can` with the customer, feature, and optional metadata.
 
 ## Signature
 
@@ -19,7 +19,7 @@ if (!check.allowed) {
 can(
   customerId: string,
   feature: string,
-  metadata?: Record<string, string>,
+  metadata?: Record<string, unknown>,
 ): Promise<CanResult>
 ```
 
@@ -40,14 +40,7 @@ const check = await nozle.can('workspace_123', 'model_access', {
 | `limit` | `number?` | Configured usage limit. |
 | `remaining` | `number?` | Remaining allowance. |
 | `overage` | `boolean?` | Whether usage is in overage. |
-| `cost_per_use_cents` | `number` | Computed unit cost. |
-| `revenue_per_use_cents` | `number` | Computed unit revenue. |
-| `margin_per_use_cents` | `number` | Unit margin. |
-| `margin_percent` | `number?` | Margin percentage. |
-| `min_margin_percent` | `number?` | Configured margin floor. |
-| `margin_level` | `string?` | Margin classification. |
-| `margin_enforcement_mode` | `string?` | Configured enforcement behavior. |
-| `warning` | `string?` | Non-blocking warning. |
+| `economics` | `object?` | Point-in-time Cost Sheet estimate with exact decimal strings, Cost Rule version identifiers, and explicit exclusions. |
 
 ## HTTP handler pattern
 

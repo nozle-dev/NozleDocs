@@ -1,0 +1,55 @@
+---
+title: Cost Events
+description: Send detailed internal cost usage from a trusted backend
+---
+
+Use Cost Events for internal usage that needs more detail than the customer-facing Feature Event, such as artificial intelligence tokens, emails, storage operations, or third-party requests.
+
+The Cost Model creation flow includes a provider-neutral **Artificial Intelligence tokens** template. You can enter rates manually or select an effective-dated provider price catalogue version. Nozle creates one `ai_tokens` meter and separate exact rules for each configured token category.
+
+The supported Version One categories are `input`, `cached_input`, `cache_write`, `output`, and `reasoning`. Provider catalogue references are retained on the Cost Rule so negotiated overrides remain traceable to their base prices. Unknown provider, model, or token-category combinations enter the Uncosted queue instead of silently becoming zero-cost usage.
+
+```json
+{
+  "cost_event_id": "cost_01994d7e",
+  "cost_meter_code": "ai_tokens",
+  "parent_transaction_id": "feature_01994d7e",
+  "external_customer_id": "customer_123",
+  "request_id": "provider_request_987",
+  "operation_key": "planning",
+  "properties": {
+    "tokens": 900,
+    "provider": "openai",
+    "model": "configured-model-a",
+    "type": "input"
+  },
+  "timestamp": 1788345001
+}
+```
+
+At least one attribution field is required:
+
+- `parent_transaction_id` links the cost to an existing or future Feature Event in the same organization.
+- `external_customer_id` records a customer-direct cost that is not linked to a Feature.
+- Both may be provided; asynchronous processing verifies that they resolve to the same customer.
+
+The endpoint requires a secret key. It returns `202 Accepted` after Kafka durably acknowledges the message; cost calculation and analytics happen asynchronously.
+
+If `cost_event_id` is omitted, Nozle generates and returns a version 7 universally unique identifier. Reuse the same identifier and payload when retrying a Cost Event.
+
+## Provider wrapper flow
+
+The Node.js and Python OpenAI and Anthropic wrappers can create the parent Feature Event and its detailed Cost Events together. Set `costMeterCode` in Node.js or `cost_meter_code` in Python. The wrapper generates the parent `transaction_id` before delivery, so child Cost Events may safely arrive before the Feature Event.
+
+Each non-zero category is emitted separately with canonical properties:
+
+```json
+{
+  "tokens": 900,
+  "provider": "openai",
+  "model": "configured-model-a",
+  "type": "cached_input"
+}
+```
+
+The provider response remains authoritative to the application. Tracking failures never replace a successful provider response.

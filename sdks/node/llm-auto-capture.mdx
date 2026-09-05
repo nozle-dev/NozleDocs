@@ -1,9 +1,9 @@
 ---
 title: "LLM auto-capture"
-description: "Wrap OpenAI or Anthropic clients to emit token metadata through nozle.track()."
+description: "Wrap OpenAI or Anthropic clients to emit a Feature Event and optional detailed Cost Events."
 ---
 
-The wrappers patch the supplied client instance's create method, preserve its return value, and emit one `nozle.track()` event when provider usage metadata is available.
+The wrappers patch the supplied client instance's create method, preserve its return value, and emit one Feature Event when provider usage metadata is available. When `costMeterCode` is configured, they also emit separate detailed Cost Events linked to that Feature Event.
 
 They capture model, input tokens, output tokens, latency, and an optional feature tag. Prompt and completion content are not inspected or sent.
 
@@ -26,6 +26,7 @@ const nozle = new Nozle({
 const openai = wrapOpenAI(new OpenAI(), nozle, {
   customerId: 'workspace_123',
   metricCode: 'llm_tokens',
+  costMeterCode: 'ai_tokens',
   feature: 'assistant_reply',
 })
 
@@ -67,6 +68,7 @@ import { Nozle, wrapAnthropic } from '@nozle-js/node'
 const anthropic = wrapAnthropic(new Anthropic(), nozle, {
   customerId: 'workspace_123',
   metricCode: 'llm_tokens',
+  costMeterCode: 'ai_tokens',
   feature: 'assistant_reply',
 })
 
@@ -85,12 +87,14 @@ For Anthropic streams, the wrapper reads input usage from `message_start` and ou
 |---|---|---|---|
 | `customerId` | `string` | yes | Customer passed to `nozle.track()`. |
 | `metricCode` | `string` | no | Event code; defaults to `llm_tokens`. |
+| `costMeterCode` | `string` | no | Cost Event Meter code. When set, emits categorized token Cost Events linked to the Feature Event. |
 | `feature` | `string` | no | Included as a `feature` event property. |
 
 ## Event properties
 
 ```json
 {
+  "provider": "openai",
   "model": "example-chat-model",
   "input_tokens": 320,
   "output_tokens": 84,
@@ -99,11 +103,16 @@ For Anthropic streams, the wrapper reads input usage from `message_start` and ou
 }
 ```
 
-Cost calculation remains server-side. Configure the Feature and model cost rules to interpret these raw values.
+The Feature Event preserves the total input and output counts. Detailed Cost Events use canonical properties `{ tokens, provider, model, type }` and one of these non-zero categories:
+
+- OpenAI: `input`, `cached_input`, `output`, and `reasoning`.
+- Anthropic: `input`, `cached_input`, `cache_write`, and `output`.
+
+Cost calculation remains server-side. Configure the `ai_tokens` Cost Event Meter and effective-dated provider/model/category Cost Rules to interpret these events.
 
 ## Delivery behavior
 
-The wrapper starts tracking without awaiting it so billing telemetry does not delay the provider response. It also relies on `nozle.track()` subscription resolution when no explicit subscription can be supplied through `WrapOptions`.
+The wrapper generates the Feature Event `transaction_id` before delivery and uses it as `parent_transaction_id` on every detailed Cost Event. Parent and child events may therefore arrive out of order. Tracking runs without delaying the provider response, and a tracking failure never replaces a successful provider result.
 
 For workflows requiring durable delivery, explicit transaction IDs, or strict error handling, track manually through your queue instead of relying on the wrapper.
 

@@ -1,92 +1,71 @@
 ---
 title: Cost Models
-description: Define per-unit costs for margin calculation
+description: Configure exact, versioned costs for Features, detailed Cost Events, and shared periods
 ---
 
-Cost models tell Nozle what each unit of usage costs you. Without cost models, the margin engine can't calculate your AI spend.
+Cost Intelligence compares finalized billing revenue with the internal cost of serving each customer. New cost configuration uses versioned Cost Sheets rather than the legacy JSON Cost Model API.
 
-## Cost model types
+## Choose a cost path
 
-| Type | Use case | How it works |
-|------|----------|-------------|
-| `per_unit` | Fixed cost per event | Every event costs the same (e.g. $0.03 per API call) |
-| `per_model` | LLM token pricing | Different input and output rates per provider model identifier |
-| `tiered` | Volume discounts | Cost per unit changes at thresholds |
+### Feature Event Cost
 
-## Create a cost model (sk\_ key required)
+Use this when the customer-facing Feature Event contains enough information to calculate cost. A simple example is a Copilot Action that earns `$0.10` and has an internal cost of `$0.05` per accepted event.
 
-### Per-model (recommended for LLM)
+The existing `/events` request is unchanged. Nozle evaluates the Cost Rule asynchronously after Kafka acknowledges the Feature Event.
 
-```bash
-curl -X POST https://api.nozle.app/api/v1/cost-models \
-  -H "Authorization: Bearer sk_nozle_..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "LLM Token Pricing",
-    "metric_code": "llm_tokens",
-    "cost_type": "per_model",
-    "model_rates": {
-      "provider-model-large": { "input": 250, "output": 1000 },
-      "provider-model-small": { "input": 40, "output": 160 }
-    }
-  }'
-```
+### Detailed Cost Event
 
-Rates are in **cents per 1M tokens**. The margin engine calculates cost automatically when events arrive with `model`, `input_tokens`, and `output_tokens` properties.
+Use `/cost-events` when one customer-facing action contains several internal operations, such as multiple artificial intelligence model calls, emails, or database operations.
 
-### Per-unit
+A Cost Event may include:
 
-```bash
-curl -X POST https://api.nozle.app/api/v1/cost-models \
-  -H "Authorization: Bearer sk_nozle_..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "API Call Cost",
-    "metric_code": "api_calls",
-    "cost_type": "per_unit",
-    "amount_cents": 3
-  }'
-```
+- `parent_transaction_id` to attach it to a Feature Event;
+- `external_customer_id` to attribute it directly to a customer;
+- both identifiers, in which case Nozle verifies that they resolve to the same customer.
 
-### Tiered
+### Shared Period Cost
 
-```bash
-curl -X POST https://api.nozle.app/api/v1/cost-models \
-  -H "Authorization: Bearer sk_nozle_..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Volume Pricing",
-    "metric_code": "api_calls",
-    "cost_type": "tiered",
-    "tier_mode": "SLAB",
-    "tiers": [
-      { "up_to": 10000, "unit_amount_cents": 5, "flat_amount_cents": 0 },
-      { "up_to": 100000, "unit_amount_cents": 3, "flat_amount_cents": 0 },
-      { "up_to": null, "unit_amount_cents": 1, "flat_amount_cents": 0 }
-    ]
-  }'
-```
+Use this for infrastructure or contracts that cannot be honestly assigned to one event. A Shared Cost Pool has a service period, recognition method, allocation period, recurrence, and customer-eligibility policy. Version One allocates equally across the selected eligible population, including free and paid customers.
 
-## List cost models
+## Pricing models
 
-```bash
-curl https://api.nozle.app/api/v1/cost-models \
-  -H "Authorization: Bearer sk_nozle_..."
-```
+Feature Event and Detailed Cost Event rules use the same exact-decimal rating engine:
 
-## Delete a cost model
+| Pricing model | Meaning |
+|---|---|
+| Standard | One rate per unit |
+| Package | One amount per package of units, with optional free units |
+| Graduated | Each tier applies only to usage inside that tier |
+| Volume | The final period total selects one rate for all period usage |
 
-```bash
-curl -X DELETE https://api.nozle.app/api/v1/cost-models/{id} \
-  -H "Authorization: Bearer sk_nozle_..."
-```
+Rules also select a pricing period and accumulation scope. For example, a monthly provider contract can accumulate across the organization, while a customer-specific contract can accumulate separately for each customer.
 
-## How it connects to margin
+Volume pricing is recalculated for the complete period. If late usage changes the applicable tier, Nozle appends an immutable adjustment instead of rewriting earlier ledger entries.
 
-Once a cost model is configured, every usage event matching the `metric_code` is automatically enriched with cost data:
+## Prevent double counting
 
-1. SDK sends `nozle.track(customerId, "llm_tokens", { model: "provider-model-large", input_tokens: 500, output_tokens: 200 })`
-2. The margin engine looks up the cost model for `llm_tokens`
-3. For `per_model` type: calculates `(500 × 250 + 200 × 1000) / 1,000,000 = $0.000325`
-4. Stores revenue, cost, and margin in the margin events table
-5. Dashboard shows per-customer, per-model, per-feature margin breakdown
+Each Feature has an effective-dated cost-composition mode:
+
+- `feature_event_only`: include the direct Feature Event cost and retain linked detailed Cost Events as excluded from margin.
+- `detailed_events_only`: include linked detailed Cost Events and omit the direct Feature Event cost.
+- `add_both`: include both paths intentionally.
+
+Independent cost components are additive. Components in the same variant group are mutually exclusive, and the highest-priority matching rule wins. Publishing fails when same-priority variants overlap ambiguously.
+
+## Artificial Intelligence token template
+
+The guided template creates an `ai_tokens` Cost Event Meter using `tokens` as quantity and `provider`, `model`, and `type` as dimensions. It supports input, cached input, cache creation, output, and reasoning categories.
+
+Rates may be entered manually or loaded from an effective-dated provider price catalogue. Custom rates retain their base catalogue references for audit. A catalogue entry must use the Cost Sheet currency, match the rule dimensions, and be effective on the rule date.
+
+The setup review shows the exact cost of 1,000 tokens for every configured category before publication. Unknown provider, model, or category combinations enter the Uncosted queue rather than becoming zero-cost usage.
+
+## Reporting and audit
+
+PostgreSQL stores the authoritative immutable cost ledger, period totals, source state, and projection outbox. ClickHouse stores a rebuildable analytics projection used by the dashboard.
+
+The dashboard shows Feature profitability, customer profitability, Cost Events, Shared Costs, and Uncosted sources. Finalized billing revenue and estimated event revenue are separate and are never added together.
+
+<Warning>
+The legacy `/cost-models` endpoints are retained only as a temporary rollback surface. They do not configure the new Cost Intelligence ledger and should not be used for new integrations.
+</Warning>

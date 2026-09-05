@@ -6,21 +6,22 @@ description: Cost and revenue visibility for AI products
 AI products often bill per request, token, workflow, or model while serving costs vary by provider, model, usage pattern, and customer. Billing totals alone do not show whether each customer or plan is economically healthy.
 
 **What Nozle provides:**
-- Per-customer margin: how much you earn vs. spend on each customer
-- Per-model margin: which LLM models are profitable vs. loss-leaders
-- Per-metric margin: margin breakdown by feature
-- Per-plan margin: which pricing tiers are profitable
-- Trend analysis: margin over time with configurable granularity
-- Margin simulation: what-if analysis for pricing changes
+
+- Feature profitability from customer-facing Feature Events and linked detailed Cost Events
+- Customer profitability including direct and allocated shared costs
+- Provider and model cost breakdowns for artificial intelligence usage
+- An Uncosted review queue instead of silently assuming missing rates are zero
+- Finalized margin based on finalized invoices and fees
+- Side-effect-free estimated economics for optional `/can` margin policies
 
 **How it works:**
-1. You define cost models (what each unit costs you)
-2. Nozle tracks usage events (what you charge customers)
-3. Nozle computes margin = revenue - cost per event, per customer, per model
-4. Data is stored for fast analytical queries
-5. Query via SDK (nozle.margin.*) or API (GET /api/v1/margin/*)
+1. You create versioned Cost Sheets for Feature Event, Detailed Cost Event, or Shared Period costs.
+2. Feature Events continue through `/events`; optional detailed costs use `/cost-events`.
+3. Nozle stores calculated cost in an immutable PostgreSQL ledger and projects it to ClickHouse for analytics.
+4. Finalized revenue is read from finalized invoices and fees and is never added to estimated event revenue.
+5. The dashboard reports Feature, customer, Cost Event, Shared Cost, and Uncosted views.
 
 **Access:**
 All margin endpoints require a secret key (sk_). Margin data is server-side only — it should not be exposed to customers.
 
-The `can()` endpoint can return unit cost, revenue, and margin fields so your backend can log warnings or apply merchant-defined policy at decision time.
+The `can()` endpoint can return a labelled decimal `economics` estimate so your backend can log warnings or apply a versioned merchant policy. Calling `/can` never writes usage or financial ledger entries.

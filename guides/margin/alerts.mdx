@@ -5,18 +5,22 @@ description: Margin floor alerts and cost spike detection
 
 Margin alerts help you detect when profitability drops below acceptable thresholds.
 
-**Margin floor:**
-The can() endpoint can include a min_margin_percent field. When a customer's margin drops below this threshold, you can take action — warn them, throttle usage, or adjust pricing.
+**Estimated margin:**
+The `can()` endpoint can include a point-in-time `economics` estimate. Check its status and exclusions before using it for an operational warning.
 
 ```typescript
 const check = await nozle.can('cust_123', 'api_calls');
-if (check.margin_per_use_cents < 0) {
+if (
+  check.economics?.status === 'estimated' &&
+  Number(check.economics.estimated_margin) < 0
+) {
   // This customer is costing you money
   logger.alert('Negative margin detected', {
     customer: 'cust_123',
-    margin: check.margin_per_use_cents,
-    cost: check.cost_per_use_cents,
-    revenue: check.revenue_per_use_cents,
+    margin: check.economics.estimated_margin,
+    cost: check.economics.estimated_cost,
+    revenue: check.economics.estimated_revenue,
+    exclusions: check.economics.exclusions,
   });
 }
 ```

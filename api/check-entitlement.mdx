@@ -35,22 +35,12 @@ Check whether a customer is entitled to use a feature under their current plan. 
   Units still available
 </ResponseField>
 
-<ResponseField name="cost_per_use_cents" type="number">
-  Your cost per unit (from cost models)
+<ResponseField name="economics" type="object">
+  Optional point-in-time economics estimate from the published Cost Sheet. Monetary values are exact decimal strings in `reporting_currency`, not integer cents.
 </ResponseField>
 
-<ResponseField name="revenue_per_use_cents" type="number">
-  What you charge per unit
-</ResponseField>
-
-<ResponseField name="margin_per_use_cents" type="number">
-  Profit per unit
-</ResponseField>
-
-<ResponseField name="min_margin_percent" type="number">
-  Minimum margin threshold configured for this feature, if any
-</ResponseField>
+The `economics.status` value is `estimated`, `not_configured`, `unavailable`, or `stale`. When present, `exclusions` explains costs that cannot be known before the operation runs, such as future Detailed Cost Events.
 
 <Info>
-When `allowed` is `false`, the `reason` field tells you why -- use it to show contextual upgrade prompts in your UI.
+When `allowed` is `false`, the `reason` field tells you why -- use it to show contextual upgrade prompts in your UI. The entitlement decision is authoritative for access at that instant. The economics object is an estimate only and does not create usage, alter a pricing period, or write a financial ledger entry.
 </Info>

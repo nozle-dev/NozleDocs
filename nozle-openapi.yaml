@@ -61,6 +61,14 @@ tags:
     externalDocs:
       description: Find out more
       url: https://docs.nozle.app/api-reference
+  - name: Cost Events
+    description: Detailed internal cost usage linked to Feature Events or customers
+  - name: Shared Costs
+    description: Preview and finalize allocated period costs
+  - name: Cost Intelligence
+    description: Ledger-backed cost analytics and profitability inputs
+  - name: Cost Intelligence Operations
+    description: Administrative replay tools for recoverable cost-processing failures
   - name: Organizations
     description: Everything about Organization collection
     externalDocs:
@@ -3343,6 +3351,216 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+  /cost-events:
+    post:
+      tags:
+        - Cost Events
+      summary: Send a detailed internal Cost Event
+      description: |
+        Publishes internal cost usage linked to a Feature Event, directly to a customer, or to both.
+        This endpoint requires a secret key and returns only after Kafka acknowledges the message.
+        Financial rating and analytics processing continue asynchronously.
+      operationId: createCostEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostEventInput'
+      responses:
+        '202':
+          description: Cost Event accepted for asynchronous processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostEventAccepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: Kafka could not durably acknowledge the Cost Event
+  /cost-intelligence/shared-costs/{id}/preview:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Shared Cost Pool identifier
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags:
+        - Shared Costs
+      summary: Preview a Shared Period Cost allocation
+      description: |
+        Calculates the recognized amount and exact customer allocation without writing ledger entries.
+        Eligible customers include free and paid customers with an accepted Feature Event or a
+        customer-resolved Cost Event during the overlap between the allocation period and service period.
+        Pools configured for active provisioned customers instead use subscriptions that overlap the period;
+        free and paid plans are treated equally.
+      operationId: previewSharedCostAllocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SharedCostAllocationInput'
+      responses:
+        '200':
+          description: Shared cost allocation preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharedCostAllocationPreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /cost-intelligence/shared-costs/{id}/allocate:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Shared Cost Pool identifier
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags:
+        - Shared Costs
+      summary: Finalize a Shared Period Cost allocation
+      description: |
+        Freezes the eligible customer population for a closed allocation period and writes immutable
+        customer allocation entries to the PostgreSQL cost ledger. Repeating the same request is idempotent.
+      operationId: createSharedCostAllocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SharedCostAllocationInput'
+      responses:
+        '200':
+          description: Finalized allocation run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharedCostAllocationRun'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The allocation period is still open
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /cost-intelligence/report:
+    get:
+      tags:
+        - Cost Intelligence
+      summary: Retrieve ledger-backed Cost Intelligence data
+      description: |
+        Returns cost totals and breakdowns from the rebuildable ClickHouse projection, plus the
+        authoritative PostgreSQL review queue for uncosted, pending-parent, and excluded sources.
+        This endpoint returns cost data only. The dashboard combines it with finalized billing invoice
+        and fee revenue without adding estimated event revenue.
+      operationId: getCostIntelligenceReport
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Inclusive beginning of the report period. Defaults to 30 days before the request.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Exclusive end of the report period. Defaults to the request time.
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          description: Maximum rows returned for each breakdown and detail collection.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        '200':
+          description: Cost Intelligence report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostIntelligenceReport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: A report data source could not be queried
+  /admin/cost-intelligence/replay-source:
+    post:
+      tags:
+        - Cost Intelligence Operations
+      summary: Replay an uncosted source
+      description: |
+        Retries rating for an uncosted Feature Event or an uncosted or pending Cost Event.
+        A source that already produced ledger entries is rejected so replay cannot duplicate money.
+      operationId: replayCostIntelligenceSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostIntelligenceSourceReplayInput'
+      responses:
+        '200':
+          description: Source replay result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostIntelligenceReplayResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: The source is not eligible for replay
+  /admin/cost-intelligence/replay-projection:
+    post:
+      tags:
+        - Cost Intelligence Operations
+      summary: Requeue a cost-ledger projection
+      description: Clears the delivery state for one existing PostgreSQL ledger entry so the outbox relay projects it to ClickHouse again.
+      operationId: replayCostIntelligenceProjection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostIntelligenceProjectionReplayInput'
+      responses:
+        '200':
+          description: Projection queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostIntelligenceReplayResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /events/{transaction_id}:
     parameters:
       - name: transaction_id
@@ -3359,9 +3577,7 @@ paths:
       description: |
         This endpoint is used for retrieving a specific usage measurement event that has been sent to a customer or a subscription.
 
-        Note that transaction_id is unique per external_subscription_id so multiple subscriptions can share the same transaction_id. This endpoint will only return the first event found with the given transaction_id.
-
-        WARNING: If your Nozle organization is configured to use the Clickhouse-based event pipeline, multiple events can share the same `transaction_id` (with different timestamps). This endpoint will only return the first event found.
+        `transaction_id` identifies one logical Feature Event across the authenticated organization. Retries must preserve the same identifier and complete payload.
       operationId: findEvent
       responses:
         '200':
@@ -17321,7 +17537,6 @@ components:
     EventInputObject:
       type: object
       required:
-        - transaction_id
         - external_subscription_id
         - code
       properties:
@@ -17329,12 +17544,9 @@ components:
           type: string
           example: transaction_1234567890
           description: |
-            This field represents a unique identifier for the event.
-            It is crucial for ensuring idempotency, meaning that each event can be uniquely identified and processed without causing any unintended side effects.
-
-            WARNING: If the Nozle organization is configured to use the new Clickhouse-based event pipeline (designed for high-volume processing), the idempotency logic is handled differently.
-            Event uniqueness is maintained with both `transaction_id` and `timestamp` fields.
-            If a new event arrives with identical values for these two fields as an existing event, the new one will overwrite the previous event rather than being rejected.
+            Organization-wide identifier for one logical Feature Event and all of its retries.
+            If omitted, Nozle generates a version 7 universally unique identifier and returns it in the response.
+            Reusing an identifier with a different subscription, timestamp, code, or properties is a conflict rather than a new event.
         external_subscription_id:
           type: string
           example: sub_1234567890
@@ -17370,6 +17582,365 @@ components:
               - type: number
           example:
             gb: 10
+    CostEventInput:
+      type: object
+      required:
+        - cost_meter_code
+      anyOf:
+        - required:
+            - parent_transaction_id
+        - required:
+            - external_customer_id
+      properties:
+        cost_event_id:
+          type: string
+          maxLength: 255
+          description: Organization-scoped retry identifier. Nozle generates a version 7 universally unique identifier when omitted.
+          example: cost_01994d7e
+        cost_meter_code:
+          type: string
+          maxLength: 255
+          description: Code of the Cost Event Meter used to interpret quantity and dimensions.
+          example: ai_tokens
+        parent_transaction_id:
+          type: string
+          description: Organization-scoped transaction identifier of the parent Feature Event. The Cost Event may arrive before its parent.
+          example: feature_01994d7e
+        external_customer_id:
+          type: string
+          description: Customer receiving the cost. Required when no parent Feature Event is supplied.
+          example: customer_123
+        request_id:
+          type: string
+          description: Optional upstream provider request identifier for investigation and reconciliation.
+          example: provider_request_987
+        operation_key:
+          type: string
+          description: Optional logical operation within the parent Feature Event.
+          example: planning
+        properties:
+          type: object
+          additionalProperties: true
+          description: Quantity and dimensions consumed by the Cost Event Meter.
+          example:
+            tokens: 900
+            model: configured-model-a
+            type: input
+        timestamp:
+          type: number
+          format: double
+          description: Unix timestamp in seconds. Nozle uses the reception time when omitted.
+          example: 1788345001
+    CostEventAccepted:
+      type: object
+      required:
+        - status
+        - cost_event_id
+      properties:
+        status:
+          type: string
+          enum:
+            - accepted
+        cost_event_id:
+          type: string
+          example: cost_01994d7e
+    SharedCostAllocationInput:
+      type: object
+      required:
+        - allocation_period_start
+      properties:
+        allocation_period_start:
+          type: string
+          format: date-time
+          description: Any timestamp within the allocation period to preview or finalize.
+          example: '2026-08-01T00:00:00Z'
+    SharedCostCustomerAllocation:
+      type: object
+      required:
+        - external_customer_id
+        - amount
+      properties:
+        external_customer_id:
+          type: string
+          example: customer_123
+        amount:
+          type: string
+          description: Exact decimal allocation in the organization's reporting currency.
+          example: '10.000000000000'
+    SharedCostAllocationPreview:
+      type: object
+      required:
+        - allocation_period_start
+        - allocation_period_end
+        - eligibility_period_start
+        - eligibility_period_end
+        - recognized_amount
+        - currency
+        - consumer_count
+        - allocations
+      properties:
+        allocation_period_start:
+          type: string
+          format: date-time
+        allocation_period_end:
+          type: string
+          format: date-time
+        eligibility_period_start:
+          type: string
+          format: date-time
+        eligibility_period_end:
+          type: string
+          format: date-time
+        recognized_amount:
+          type: string
+          example: '1000.000000000000'
+        currency:
+          type: string
+          example: USD
+        consumer_count:
+          type: integer
+          example: 100
+        allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SharedCostCustomerAllocation'
+    SharedCostAllocationRun:
+      type: object
+      required:
+        - id
+        - status
+        - allocation_period_start
+        - allocation_period_end
+        - recognized_amount
+        - currency
+        - consumer_count
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - completed
+            - unallocated
+        allocation_period_start:
+          type: string
+          format: date-time
+        allocation_period_end:
+          type: string
+          format: date-time
+        recognized_amount:
+          type: string
+          example: '1000.000000000000'
+        currency:
+          type: string
+          example: USD
+        consumer_count:
+          type: integer
+          example: 100
+    CostIntelligenceSummary:
+      type: object
+      required:
+        - total_cost
+        - direct_cost
+        - shared_cost
+        - ledger_entry_count
+        - currency
+      properties:
+        total_cost:
+          type: string
+          example: '1234.567890000000'
+        direct_cost:
+          type: string
+          example: '1034.567890000000'
+        shared_cost:
+          type: string
+          example: '200.000000000000'
+        ledger_entry_count:
+          type: integer
+          format: int64
+          example: 1842
+        currency:
+          type: string
+          example: USD
+    CostIntelligenceBreakdown:
+      type: object
+      required:
+        - key
+        - cost
+        - customer_count
+        - entry_count
+        - currency
+      properties:
+        key:
+          type: string
+          example: copilot_action
+        cost:
+          type: string
+          example: '42.125000000000'
+        customer_count:
+          type: integer
+          format: int64
+          example: 17
+        entry_count:
+          type: integer
+          format: int64
+          example: 830
+        currency:
+          type: string
+          example: USD
+    CostIntelligenceLedgerEntry:
+      type: object
+      required:
+        - ledger_entry_id
+        - source_external_id
+        - entry_kind
+        - status
+        - quantity
+        - amount
+        - currency
+        - filter_values
+        - occurred_at
+      properties:
+        ledger_entry_id:
+          type: string
+          format: uuid
+        source_external_id:
+          type: string
+          example: cost_01994d7e
+        parent_transaction_id:
+          type: string
+          example: feature_01994d7e
+        external_customer_id:
+          type: string
+          example: customer_123
+        feature_code:
+          type: string
+          example: copilot_action
+        entry_kind:
+          type: string
+          example: direct_cost
+        status:
+          type: string
+          example: rated
+        quantity:
+          type: string
+          example: '900'
+        amount:
+          type: string
+          example: '0.002250000000'
+        currency:
+          type: string
+          example: USD
+        filter_values:
+          type: string
+          description: Canonical serialized dimensions used to select the Cost Rule.
+          example: '{"model":"configured-model-a","type":"input"}'
+        occurred_at:
+          type: string
+          format: date-time
+    CostIntelligenceUncostedSource:
+      type: object
+      required:
+        - source_type
+        - source_external_id
+        - status
+        - occurred_at
+      properties:
+        source_type:
+          type: string
+          enum:
+            - feature_event
+            - cost_event
+        source_external_id:
+          type: string
+        feature_code:
+          type: string
+        external_customer_id:
+          type: string
+        status:
+          type: string
+          enum:
+            - uncosted
+            - pending_parent
+            - excluded_from_margin
+        failure_code:
+          type: string
+        failure_message:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+    CostIntelligenceReport:
+      type: object
+      required:
+        - from
+        - to
+        - summary
+        - features
+        - customers
+        - cost_events
+        - shared_costs
+        - uncosted
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        summary:
+          $ref: '#/components/schemas/CostIntelligenceSummary'
+        features:
+          type: array
+          items:
+            $ref: '#/components/schemas/CostIntelligenceBreakdown'
+        customers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CostIntelligenceBreakdown'
+        cost_events:
+          type: array
+          items:
+            $ref: '#/components/schemas/CostIntelligenceLedgerEntry'
+        shared_costs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CostIntelligenceLedgerEntry'
+        uncosted:
+          type: array
+          items:
+            $ref: '#/components/schemas/CostIntelligenceUncostedSource'
+    CostIntelligenceSourceReplayInput:
+      type: object
+      required:
+        - source_type
+        - source_external_id
+      properties:
+        source_type:
+          type: string
+          enum:
+            - feature_event
+            - cost_event
+        source_external_id:
+          type: string
+          description: Feature Event `transaction_id` or Cost Event `cost_event_id`.
+    CostIntelligenceProjectionReplayInput:
+      type: object
+      required:
+        - ledger_entry_id
+      properties:
+        ledger_entry_id:
+          type: string
+          format: uuid
+    CostIntelligenceReplayResult:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: queued
     EventInput:
       type: object
       required:

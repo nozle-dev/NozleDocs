@@ -12,7 +12,7 @@ if not check["allowed"]:
 
 ## Metadata
 
-Metadata values must be strings and are encoded as a JSON query parameter.
+Metadata is encoded as a JSON query parameter and may include numeric quantities required by a Cost Rule.
 
 ```python
 check = nozle.can(
@@ -32,14 +32,7 @@ check = nozle.can(
 | `limit` | `int`, optional | Configured limit. |
 | `remaining` | `int`, optional | Remaining allowance. |
 | `overage` | `bool`, optional | Whether usage is in overage. |
-| `cost_per_use_cents` | `int` | Unit cost. |
-| `revenue_per_use_cents` | `int` | Unit revenue. |
-| `margin_per_use_cents` | `int` | Unit margin. |
-| `margin_percent` | `float`, optional | Margin percentage. |
-| `min_margin_percent` | `float`, optional | Configured margin floor. |
-| `margin_level` | `str`, optional | Margin classification. |
-| `margin_enforcement_mode` | `str`, optional | Enforcement behavior. |
-| `warning` | `str`, optional | Non-blocking warning. |
+| `economics` | `dict`, optional | Point-in-time Cost Sheet estimate with exact decimal strings, Cost Rule version identifiers, and explicit exclusions. |
 
 ## FastAPI pattern
 
