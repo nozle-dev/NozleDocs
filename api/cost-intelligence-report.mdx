@@ -19,6 +19,7 @@ The dashboard provides:
 - **Cost Events:** individual detailed ledger entries with customer, parent Feature Event, quantity, dimensions, and amount.
 - **Shared Costs:** allocated Shared Period Cost ledger entries.
 - **Uncosted:** Feature Events and Cost Events that need a rule, parent, or configuration correction.
+- **Conflicts:** asynchronously detected identifier reuse where the same identifier arrived with a different payload.
 
 Fixed subscription revenue remains at customer and company level in Version One. Nozle does not invent a Feature allocation for it.
 
@@ -30,7 +31,7 @@ Each organization selects one reporting currency for Cost Intelligence. Cost Rul
 
 `GET /cost-intelligence/report` returns the calculated cost portion of the report. It reads aggregated ledger projections from ClickHouse and the authoritative Uncosted queue from PostgreSQL. The dashboard’s GraphQL layer adds finalized billing revenue afterward.
 
-The optional `from` and `to` query parameters are Coordinated Universal Time timestamps. `from` is inclusive and `to` is exclusive. `limit` applies independently to each breakdown and detail collection and is capped at 500.
+The optional `from` and `to` query parameters are Coordinated Universal Time timestamps. `from` is inclusive and `to` is exclusive. `limit` applies independently to each breakdown and detail collection and is capped at 500. A linked Cost Event that remains in `pending_parent` for 24 hours is moved to `uncosted` with `parent_resolution_deadline_exceeded` so it remains visible for review instead of waiting forever.
 
 ## Recovery
 

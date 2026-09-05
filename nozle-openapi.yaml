@@ -3468,7 +3468,8 @@ paths:
       summary: Retrieve ledger-backed Cost Intelligence data
       description: |
         Returns cost totals and breakdowns from the rebuildable ClickHouse projection, plus the
-        authoritative PostgreSQL review queue for uncosted, pending-parent, and excluded sources.
+        authoritative PostgreSQL review queues for uncosted, pending-parent, excluded, and
+        identifier-conflict sources.
         This endpoint returns cost data only. The dashboard combines it with finalized billing invoice
         and fee revenue without adding estimated event revenue.
       operationId: getCostIntelligenceReport
@@ -17461,6 +17462,7 @@ components:
           description: Unique identifier assigned to the event within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the event's record within the Nozle system
         transaction_id:
           type: string
+          maxLength: 255
           example: transaction_1234567890
           description: This field represents a unique identifier for the event. It is crucial for ensuring idempotency, meaning that each event can be uniquely identified and processed without causing any unintended side effects.
         lago_customer_id:
@@ -17513,6 +17515,7 @@ components:
           description: Unique identifier assigned to the subscription within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the subscription's record within the Nozle system
         external_subscription_id:
           type: string
+          maxLength: 255
           example: sub_1234567890
           description: The unique identifier of the subscription within your application. It is a mandatory field when the customer possesses multiple subscriptions or when the `external_customer_id` is not provided.
         created_at:
@@ -17542,6 +17545,7 @@ components:
       properties:
         transaction_id:
           type: string
+          maxLength: 255
           example: transaction_1234567890
           description: |
             Organization-wide identifier for one logical Feature Event and all of its retries.
@@ -17549,10 +17553,12 @@ components:
             Reusing an identifier with a different subscription, timestamp, code, or properties is a conflict rather than a new event.
         external_subscription_id:
           type: string
+          maxLength: 255
           example: sub_1234567890
           description: The unique identifier of the subscription in your application. This field is mandatory in order to link events to the correct customer subscription.
         code:
           type: string
+          maxLength: 255
           example: storage
           description: The code that identifies a targeted feature. It is essential that this code matches the `code` property of one of your active features. If the provided code does not correspond to any active feature, it will be ignored during the process.
         timestamp:
@@ -17604,18 +17610,22 @@ components:
           example: ai_tokens
         parent_transaction_id:
           type: string
+          maxLength: 255
           description: Organization-scoped transaction identifier of the parent Feature Event. The Cost Event may arrive before its parent.
           example: feature_01994d7e
         external_customer_id:
           type: string
+          maxLength: 255
           description: Customer receiving the cost. Required when no parent Feature Event is supplied.
           example: customer_123
         request_id:
           type: string
+          maxLength: 255
           description: Optional upstream provider request identifier for investigation and reconciliation.
           example: provider_request_987
         operation_key:
           type: string
+          maxLength: 255
           description: Optional logical operation within the parent Feature Event.
           example: planning
         properties:
@@ -17871,6 +17881,39 @@ components:
         occurred_at:
           type: string
           format: date-time
+    CostIntelligenceProcessingConflict:
+      type: object
+      required:
+        - source_type
+        - source_external_id
+        - accepted_payload_hash
+        - conflicting_payload_hash
+        - source_topic
+        - source_partition
+        - source_offset
+        - detected_at
+      properties:
+        source_type:
+          type: string
+          enum:
+            - feature_event
+            - cost_event
+        source_external_id:
+          type: string
+        accepted_payload_hash:
+          type: string
+        conflicting_payload_hash:
+          type: string
+        source_topic:
+          type: string
+        source_partition:
+          type: integer
+        source_offset:
+          type: integer
+          format: int64
+        detected_at:
+          type: string
+          format: date-time
     CostIntelligenceReport:
       type: object
       required:
@@ -17882,6 +17925,7 @@ components:
         - cost_events
         - shared_costs
         - uncosted
+        - conflicts
       properties:
         from:
           type: string
@@ -17911,6 +17955,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CostIntelligenceUncostedSource'
+        conflicts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CostIntelligenceProcessingConflict'
     CostIntelligenceSourceReplayInput:
       type: object
       required:

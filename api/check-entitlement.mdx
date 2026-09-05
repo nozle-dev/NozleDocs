@@ -36,10 +36,10 @@ Check whether a customer is entitled to use a feature under their current plan. 
 </ResponseField>
 
 <ResponseField name="economics" type="object">
-  Optional point-in-time economics estimate from the published Cost Sheet. Monetary values are exact decimal strings in `reporting_currency`, not integer cents.
+  Optional point-in-time economics estimate from the published Cost Sheet. Monetary values are exact decimal strings in `currency`, not integer cents.
 </ResponseField>
 
-The `economics.status` value is `estimated`, `not_configured`, `unavailable`, or `stale`. When present, `exclusions` explains costs that cannot be known before the operation runs, such as future Detailed Cost Events.
+The `economics.status` value is `estimated`, `not_configured`, `unavailable`, or `stale`. `includes` identifies what was calculated and `excludes` explains costs that cannot be known before the operation runs. When a margin policy applies, the separate `policy` object reports its version, thresholds, stale-data fallback, decision, and reason.
 
 <Info>
 When `allowed` is `false`, the `reason` field tells you why -- use it to show contextual upgrade prompts in your UI. The entitlement decision is authoritative for access at that instant. The economics object is an estimate only and does not create usage, alter a pricing period, or write a financial ledger entry.

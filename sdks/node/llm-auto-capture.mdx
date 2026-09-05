@@ -38,14 +38,13 @@ const response = await openai.chat.completions.create({
 
 ### OpenAI streaming
 
-The wrapper reads usage from stream chunks. Request usage in the stream so a final usage-bearing chunk is available:
+The wrapper automatically requests usage metadata for streaming calls and reads the final usage-bearing chunk:
 
 ```ts
 const stream = await openai.chat.completions.create({
   model: 'example-chat-model',
   messages: [{ role: 'user', content: 'Explain vector search' }],
   stream: true,
-  stream_options: { include_usage: true },
 })
 
 for await (const chunk of stream) {

@@ -41,14 +41,13 @@ response = openai.chat.completions.create(
 
 ### OpenAI streaming
 
-Request usage metadata so the final stream chunk contains token counts:
+The wrapper automatically requests usage metadata so the final stream chunk contains token counts:
 
 ```python
 stream = openai.chat.completions.create(
     model="example-chat-model",
     messages=[{"role": "user", "content": "Explain vector search"}],
     stream=True,
-    stream_options={"include_usage": True},
 )
 
 for chunk in stream:

@@ -12,15 +12,15 @@ The `can()` endpoint can include a point-in-time `economics` estimate. Check its
 const check = await nozle.can('cust_123', 'api_calls');
 if (
   check.economics?.status === 'estimated' &&
-  Number(check.economics.estimated_margin) < 0
+  Number(check.economics.estimated_incremental_margin) < 0
 ) {
   // This customer is costing you money
   logger.alert('Negative margin detected', {
     customer: 'cust_123',
-    margin: check.economics.estimated_margin,
-    cost: check.economics.estimated_cost,
-    revenue: check.economics.estimated_revenue,
-    exclusions: check.economics.exclusions,
+    margin: check.economics.estimated_incremental_margin,
+    cost: check.economics.estimated_incremental_cost,
+    revenue: check.economics.estimated_incremental_revenue,
+    exclusions: check.economics.excludes,
   });
 }
 ```
