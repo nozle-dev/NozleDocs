@@ -1,0 +1,69 @@
+---
+title: Import Credit Settlement
+api: "POST /customers/{customer_id}/credit-settlement-imports"
+description: Import a one-time historical credit settlement without an invoice
+---
+
+Use this endpoint for a historical or migration credit balance that does not
+belong to the current subscription allowance. It creates one auditable manual
+grant and does not create an invoice, payment, usage event, or subscription.
+
+**Base URL:** `https://api.nozle.app/api/v1`
+
+**Auth:** secret key with `credit_system:write` when API permissions are enabled.
+`Idempotency-Key` is required.
+
+```http
+POST /customers/workspace_123/credit-settlement-imports
+Authorization: Bearer sk_nozle_...
+Idempotency-Key: legacy-topups-workspace-123-v1
+Content-Type: application/json
+
+{
+  "credit_system_code": "ai_credits",
+  "amount": "1100",
+  "expires_at": null,
+  "source_system": "wrrk",
+  "external_reference": "perpetual-topups-2026-09-03:aigtm",
+  "source_external_ids": ["source-org-a", "source-org-b"],
+  "dry_run": true
+}
+```
+
+Use `expires_at: null` for a perpetual settlement. A supplied expiry must be an
+RFC 3339 timestamp later than the database grant time.
+
+`source_external_ids` records the stable source-system identifiers represented
+by the grant. This allows multiple legacy records for the same customer to be
+settled once while retaining their provenance.
+
+## Response
+
+```json
+{
+  "credit_settlement_import": {
+    "operation_id": "operation_uuid",
+    "balance_source_id": "source_uuid",
+    "external_customer_id": "workspace_123",
+    "credit_system_code": "ai_credits",
+    "amount": "1100.000000000000",
+    "valid_from": "2026-09-08T10:00:00Z",
+    "expires_at": null,
+    "source_system": "wrrk",
+    "external_reference": "perpetual-topups-2026-09-03:aigtm",
+    "source_external_ids": ["source-org-a", "source-org-b"],
+    "invoice_created": false,
+    "dry_run": false,
+    "replayed": false
+  }
+}
+```
+
+The resulting source is a customer-level `manual_grant`. It is spendable but is
+not treated as a paid Nozle top-up, cannot be transferred to an Entity, and has
+no refund or payment-provider semantics.
+
+Always dry-run the complete settlement manifest first. Retry an uncertain
+response with the same idempotency key and identical payload. A changed payload
+returns `409`, as does reuse of the same external reference through another
+idempotency key.
