@@ -22,10 +22,27 @@ Call this endpoint from a trusted backend with a restricted secret key. Derive `
   "used": 1500,
   "limit": 10000,
   "remaining": 8500,
-  "cost_per_use_cents": 2,
-  "revenue_per_use_cents": 5,
-  "margin_per_use_cents": 3,
-  "min_margin_percent": 20
+  "economics": {
+    "status": "estimated",
+    "currency": "USD",
+    "estimated_incremental_cost": "0.05",
+    "estimated_incremental_revenue": "0.10",
+    "estimated_incremental_margin": "0.05",
+    "estimated_margin_percent": "50",
+    "rule_version_ids": ["4d946b17-aafe-4c6d-9863-4b69049fe6ef"],
+    "includes": ["feature_event_cost"],
+    "excludes": ["future_detailed_cost_events", "shared_period_costs", "finalized_invoice_adjustments"],
+    "calculated_at": "2026-09-02T12:00:00Z"
+  },
+  "policy": {
+    "version_id": "b0251ae2-86cd-48f5-a34a-4c423f6d7821",
+    "mode": "warn",
+    "on_unavailable": "warn",
+    "minimum_margin_percent": "20",
+    "maximum_snapshot_age_seconds": 30,
+    "decision": "allow",
+    "reason": "within_policy"
+  }
 }
 ```
 
@@ -38,14 +55,23 @@ Call this endpoint from a trusted backend with a restricted secret key. Derive `
 | `used` | `number` | Current usage count this billing period |
 | `limit` | `number` | Usage cap for this feature |
 | `remaining` | `number` | `limit - used` |
-| `cost_per_use_cents` | `number` | Your cost per unit (from cost model) |
-| `revenue_per_use_cents` | `number` | What you charge per unit (from plan pricing) |
-| `margin_per_use_cents` | `number` | `revenue - cost` per unit |
-| `min_margin_percent` | `number?` | Minimum margin threshold if configured |
+| `economics.status` | `string` | `estimated`, `not_configured`, `unavailable`, or `stale` |
+| `economics.currency` | `string?` | The organization's reporting currency |
+| `economics.estimated_incremental_cost` | `string?` | Exact decimal incremental cost for the proposed Feature Event |
+| `economics.estimated_incremental_revenue` | `string?` | Exact decimal directly attributable usage revenue |
+| `economics.estimated_incremental_margin` | `string?` | Estimated revenue minus estimated cost |
+| `economics.estimated_margin_percent` | `string?` | Margin percentage when estimated revenue is greater than zero |
+| `economics.rule_version_ids` | `string[]?` | Immutable Cost Rule versions used by the estimate |
+| `economics.includes` | `string[]?` | Cost categories included in the estimate |
+| `economics.excludes` | `string[]?` | Costs unavailable before execution, such as future Detailed Cost Events |
+| `economics.calculated_at` | `string` | Time at which the estimate was calculated |
+| `policy` | `object?` | Versioned policy, thresholds, fallback behavior, decision, and reason |
 
 ## Runtime behavior
 
 The service may cache entitlement and usage state. Always treat the returned decision as point-in-time and enforce it immediately before protected work.
+
+The optional `economics` object is also point-in-time, but it is not a financial ledger entry. Calling `/can` never consumes usage, changes a pricing period, or records cost. If a Feature uses `detailed_events_only`, the estimate is `unavailable` because the actual Cost Events do not exist yet. If it uses `add_both`, the known Feature Event Cost is returned and `future_detailed_cost_events` appears in `excludes`. An estimate older than the policy's `maximum_snapshot_age_seconds` is returned as `stale` and follows `on_unavailable`.
 
 ## Denial reasons
 

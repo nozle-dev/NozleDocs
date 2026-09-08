@@ -1,0 +1,44 @@
+---
+title: Cost Intelligence report
+description: Inspect ledger-backed costs, profitability, and sources requiring attention
+---
+
+The Cost Intelligence dashboard combines two deliberately separate financial views:
+
+- Calculated costs come from the immutable PostgreSQL cost ledger and its rebuildable ClickHouse analytics projection.
+- Finalized revenue comes from finalized or closed billing invoices and fees.
+
+Estimated event revenue is used only for real-time decisions such as `/can`. It is never added to finalized billing revenue.
+
+## Report sections
+
+The dashboard provides:
+
+- **Feature profitability:** directly attributable finalized usage revenue minus Feature and linked detailed costs.
+- **Customer profitability:** finalized usage and fixed subscription revenue minus direct and allocated shared costs.
+- **Cost Events:** individual detailed ledger entries with customer, parent Feature Event, quantity, dimensions, and amount.
+- **Shared Costs:** allocated Shared Period Cost ledger entries.
+- **Uncosted:** Feature Events and Cost Events that need a rule, parent, or configuration correction.
+- **Conflicts:** asynchronously detected identifier reuse where the same identifier arrived with a different payload.
+
+Fixed subscription revenue remains at customer and company level in Version One. Nozle does not invent a Feature allocation for it.
+
+## Currency rule
+
+Each organization selects one reporting currency for Cost Intelligence. Cost Rules and Shared Costs must use that currency. Values in other currencies are not combined without an immutable conversion rate.
+
+## Cost report endpoint
+
+`GET /cost-intelligence/report` returns the calculated cost portion of the report. It reads aggregated ledger projections from ClickHouse and the authoritative Uncosted queue from PostgreSQL. The dashboard’s GraphQL layer adds finalized billing revenue afterward.
+
+The optional `from` and `to` query parameters are Coordinated Universal Time timestamps. `from` is inclusive and `to` is exclusive. `limit` applies independently to each breakdown and detail collection and is capped at 500. A linked Cost Event that remains in `pending_parent` for 24 hours is moved to `uncosted` with `parent_resolution_deadline_exceeded` so it remains visible for review instead of waiting forever.
+
+## Recovery
+
+Administrative replay is intentionally narrow:
+
+- An uncosted Feature Event or an uncosted or pending Cost Event can be rated again after configuration is corrected.
+- A PostgreSQL ledger entry can be requeued for ClickHouse projection.
+- A source that already created ledger entries cannot be replayed as new money.
+
+PostgreSQL remains the financial source of truth. ClickHouse can be rebuilt or replayed without changing the ledger.

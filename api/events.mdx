@@ -29,7 +29,7 @@ See [Node.js event tracking](/sdks/node/tracking-events) or [Python event tracki
 
 | Field | Required | Description |
 |---|---|---|
-| `transaction_id` | yes | Stable identifier for the logical event. Preserve it with the same timestamp on retries. |
+| `transaction_id` | no | Organization-wide identifier for the logical event. Nozle generates and returns a version 7 universally unique identifier when omitted. Preserve the identifier and complete payload on retries. |
 | `external_customer_id` | yes | Customer that generated usage. |
 | `external_subscription_id` | recommended | Subscription receiving usage. Required when resolution would be ambiguous. |
 | `code` | yes | Feature code. |
@@ -39,5 +39,5 @@ See [Node.js event tracking](/sdks/node/tracking-events) or [Python event tracki
 For direct HTTP ingestion, send this envelope to the Events API configured for your organization with a secret key. Prefer the SDKs so subscription lookup, UUID generation, timeout handling, and errors remain consistent.
 
 <Note>
-For retry safety, preserve the complete event identity. High-volume event storage deduplicates using both `transaction_id` and `timestamp`.
+For retry safety, preserve the complete event payload and reuse the same `transaction_id`. Within an organization, the first accepted event owns that identifier even if a later request changes the subscription or timestamp.
 </Note>

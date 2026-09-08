@@ -1,0 +1,52 @@
+---
+title: Shared Period Costs
+description: Preview and finalize costs shared across active customers
+---
+
+A Shared Period Cost represents an amount such as a database, virtual machine, support contract, or other cost that cannot be directly attributed to one Feature Event.
+
+Each configured pool has an exact service period, a recognition method, and an allocation period. The source cadence records how the supplier bills the cost; the concrete pool covers only its saved service-period dates.
+
+Recurring pools support daily, weekly, monthly, quarterly, and annual cadences. An hourly clock job creates the next concrete Cost Sheet version ahead of the next service period. Generated occurrences are idempotent, and editing a recurrence affects future periods without rewriting a published historical period.
+
+The dashboard also supports an atomic comma-separated value import of up to 500 rows. Required headers are:
+
+```text
+name,code,amount,currency,recurrence,service_period_start,service_period_end,recognition_method,allocation_period,eligibility_policy
+```
+
+If any row is invalid, the complete import is rolled back.
+
+## Preview an allocation
+
+Previewing is read-only. It calculates the recognized amount and returns every eligible customer and exact allocation without writing financial ledger entries.
+
+```http
+POST /api/v1/cost-intelligence/shared-costs/{shared_cost_pool_id}/preview
+Authorization: Bearer nozle_secret_key
+Content-Type: application/json
+
+{
+  "allocation_period_start": "2026-08-01T00:00:00Z"
+}
+```
+
+The default eligible population includes every free or paid customer with at least one accepted Feature Event or customer-resolved Cost Event during the overlap between the allocation period and service period. A pool may instead use `active_provisioned_customers`, which includes free and paid customers whose active subscription overlaps that period even when they emitted no event.
+
+## Finalize an allocation
+
+After the allocation period closes, finalize it to freeze the customer population and append immutable entries to the PostgreSQL cost ledger.
+
+```http
+POST /api/v1/cost-intelligence/shared-costs/{shared_cost_pool_id}/allocate
+Authorization: Bearer nozle_secret_key
+Content-Type: application/json
+
+{
+  "allocation_period_start": "2026-08-01T00:00:00Z"
+}
+```
+
+The operation is idempotent for the Shared Cost Pool and allocation period. If no customer is eligible, Nozle preserves the recognized amount as visibly unallocated instead of losing or inventing attribution.
+
+Shared-cost preview and finalization are control-plane operations. They do not change the low-latency Feature Event or Cost Event ingestion paths.

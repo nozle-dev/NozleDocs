@@ -1,9 +1,9 @@
 ---
 title: "LLM auto-capture"
-description: "Wrap synchronous or asynchronous OpenAI and Anthropic clients to emit token metadata."
+description: "Wrap synchronous or asynchronous OpenAI and Anthropic clients to emit a Feature Event and optional detailed Cost Events."
 ---
 
-The wrappers patch the supplied provider client's create method and preserve its normal return value. They support synchronous calls, asynchronous calls, synchronous streams, and asynchronous streams.
+The wrappers patch the supplied provider client's create method and preserve its normal return value. They support synchronous calls, asynchronous calls, synchronous streams, and asynchronous streams. When `cost_meter_code` is configured, each call emits categorized Cost Events linked to its Feature Event.
 
 Only model, token counts, latency, and an optional feature tag are sent. Prompt and completion content are not captured.
 
@@ -29,6 +29,7 @@ openai = wrap_openai(
     nozle,
     customer_id="workspace_123",
     metric_code="llm_tokens",
+    cost_meter_code="ai_tokens",
     feature="assistant_reply",
 )
 
@@ -40,14 +41,13 @@ response = openai.chat.completions.create(
 
 ### OpenAI streaming
 
-Request usage metadata so the final stream chunk contains token counts:
+The wrapper automatically requests usage metadata so the final stream chunk contains token counts:
 
 ```python
 stream = openai.chat.completions.create(
     model="example-chat-model",
     messages=[{"role": "user", "content": "Explain vector search"}],
     stream=True,
-    stream_options={"include_usage": True},
 )
 
 for chunk in stream:
@@ -70,6 +70,7 @@ anthropic = wrap_anthropic(
     nozle,
     customer_id="workspace_123",
     metric_code="llm_tokens",
+    cost_meter_code="ai_tokens",
     feature="assistant_reply",
 )
 
@@ -90,12 +91,14 @@ Anthropic streams read input usage from `message_start` and output usage from `m
 | `nozle` | yes | — | Configured `Nozle` client. |
 | `customer_id` | yes | — | Customer passed to `track()`. |
 | `metric_code` | no | `llm_tokens` | Event code. |
+| `cost_meter_code` | no | `None` | Cost Event Meter code. When set, emits categorized token Cost Events linked to the Feature Event. |
 | `feature` | no | `None` | Optional event property. |
 
 ## Tracked properties
 
 ```json
 {
+  "provider": "openai",
   "model": "example-chat-model",
   "input_tokens": 320,
   "output_tokens": 84,
@@ -104,15 +107,20 @@ Anthropic streams read input usage from `message_start` and output usage from `m
 }
 ```
 
-Cost calculation remains server-side through your Feature and cost-model configuration.
+The Feature Event preserves total input and output counts. Detailed Cost Events use canonical properties `{ tokens, provider, model, type }` and one of these non-zero categories:
+
+- OpenAI: `input`, `cached_input`, `output`, and `reasoning`.
+- Anthropic: `input`, `cached_input`, `cache_write`, and `output`.
+
+Cost calculation remains server-side through the `ai_tokens` Cost Event Meter and effective-dated provider/model/category Cost Rules.
 
 ## Failure behavior
 
-The wrappers attempt tracking after a successful provider result. Tracking failures do not replace that result; the SDK emits `NozleTrackingWarning`.
+The wrappers generate the Feature Event `transaction_id` before delivery and use it as `parent_transaction_id` on every detailed Cost Event. Parent and child events may therefore arrive out of order. Tracking failures do not replace a successful provider result; the SDK emits `NozleTrackingWarning`.
 
 For async provider calls, synchronous Nozle tracking runs in a worker thread through `asyncio.to_thread()`.
 
-The wrapper does not expose `subscription_id` or `transaction_id`, so `track()` resolves the customer's single active subscription and creates a transaction UUID. Use manual queued tracking when you require durable delivery or deterministic IDs.
+The wrapper does not expose `subscription_id`, so `track()` resolves the customer's single active subscription. Use manual queued tracking when you need to choose the transaction identifier or coordinate delivery through your own queue.
 
 ```python
 response = provider_call()
