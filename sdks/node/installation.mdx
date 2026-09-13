@@ -8,7 +8,7 @@ description: "Install and configure the server-only @nozle-js/node SDK."
 Entity subscription APIs are introduced in `0.5.0`.
 
 ```bash
-npm install @nozle-js/node
+npm install @nozle-js/node@0.7.0
 ```
 
 ## Create a client
@@ -18,8 +18,8 @@ import { Nozle } from '@nozle-js/node'
 
 export const nozle = new Nozle({
   apiKey: process.env.NOZLE_SECRET_KEY!,
-  baseUrl: 'https://api.nozle.app',
-  eventsUrl: 'https://core.nozle.app',
+  baseUrl: 'https://api.nozle.app/engine',
+  eventsUrl: 'https://api.nozle.app/core',
   timeout: 10_000,
 })
 ```
@@ -29,11 +29,11 @@ export const nozle = new Nozle({
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `apiKey` | `string` | required | Organization credential. Use a restricted `sk_` for server mutations. |
-| `baseUrl` | `string` | `http://localhost:8080` | API origin used for entitlements, credits, entities, usage, and margin. |
-| `eventsUrl` | `string` | `http://localhost:3000` | Core API origin used for customer writes, billing resources, `track()`, credit-system discovery, and Entity subscriptions. Use `https://core.nozle.app` in production. |
+| `baseUrl` | `string` | `https://api.nozle.app/engine` | API origin used for entitlements, credits, entities, usage, and margin. |
+| `eventsUrl` | `string` | `https://api.nozle.app/core` | Core API origin used for customer writes, billing resources, `track()`, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. |
 | `timeout` | `number` | `10000` | Per-request timeout in milliseconds. |
 
-Set both URLs explicitly outside local development. Trailing slashes are removed automatically.
+Version `0.7.0` defaults to these public service bases. Set both URLs explicitly for local or self-hosted deployments. Trailing slashes are removed automatically.
 
 ```mermaid
 flowchart LR
@@ -106,7 +106,7 @@ import { Nozle } from '@nozle-js/node'
 export const nozle = new Nozle({
   apiKey: process.env.NOZLE_SECRET_KEY!,
   baseUrl: process.env.NOZLE_API_URL!,
-  eventsUrl: process.env.NOZLE_EVENTS_URL ?? 'https://core.nozle.app',
+  eventsUrl: process.env.NOZLE_EVENTS_URL ?? 'https://api.nozle.app/core',
 })
 ```
 
