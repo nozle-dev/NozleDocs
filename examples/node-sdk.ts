@@ -2,8 +2,8 @@ import { Nozle } from '@nozle-js/node';
 
 const nozle = new Nozle({
   apiKey: 'sk_example',
-  baseUrl: 'https://api.nozle.app',
-  eventsUrl: 'https://core.nozle.app',
+  baseUrl: 'https://api.nozle.app/engine',
+  eventsUrl: 'https://api.nozle.app/core',
   timeout: 10_000,
 });
 

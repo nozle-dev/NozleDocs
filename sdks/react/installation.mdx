@@ -4,8 +4,10 @@ description: "Install the React SDK and configure public catalog reads with merc
 ---
 
 ```bash
-npm install @nozle-js/react react react-dom @stripe/stripe-js @stripe/react-stripe-js
+npm install @nozle-js/react@0.8.0 react react-dom @stripe/stripe-js @stripe/react-stripe-js
 ```
+
+Version `0.8.0` defaults catalog requests to `https://api.nozle.app/engine`.
 
 The React SDK has two browser-safe responsibilities:
 
@@ -25,7 +27,7 @@ export function BillingPage({ csrfToken }: { csrfToken: string }) {
   return (
     <BillingProvider
       publishableKey={import.meta.env.VITE_NOZLE_PUBLISHABLE_KEY}
-      baseUrl="https://api.nozle.app"
+      baseUrl="https://api.nozle.app/engine"
       createCheckout={async ({ planCode, returnUrl }) => {
         const response = await fetch('/api/billing/checkout', {
           method: 'POST',
@@ -53,7 +55,7 @@ export function BillingPage({ csrfToken }: { csrfToken: string }) {
 |---|---|---|---|
 | `publishableKey` | `string` | required | Browser-safe key beginning with `pk_`. |
 | `createCheckout` | `(input) => Promise<CheckoutResult>` | — | Merchant callback used by checkout components. |
-| `baseUrl` | `string` | `https://api.nozle.app` | Nozle API origin used for public catalog requests. |
+| `baseUrl` | `string` | `https://api.nozle.app/engine` | Nozle API origin used for public catalog requests. |
 | `children` | `ReactNode` | required | Components that consume the billing context. |
 
 `BillingProvider` throws when `publishableKey` does not begin with `pk_`.

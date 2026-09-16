@@ -1,0 +1,45 @@
+---
+title: "API URLs"
+description: "Choose the correct service prefix and configure SDK overrides."
+---
+
+Nozle's public services share `api.nozle.app`. Each service keeps its own authentication
+and API paths behind a service prefix.
+
+| Service | Base URL | Examples |
+| --- | --- | --- |
+| Core billing | `https://api.nozle.app/core` | `/graphql`, `/api/v1/customers`, `/api/v1/events` |
+| Engine | `https://api.nozle.app/engine` | `/api/v1/plans`, `/api/v1/can`, `/api/v1/checkout` |
+| Onboarding AI | `https://api.nozle.app/ai` | `/v1/conversations` |
+
+Append an operation's path once. For example, an Engine catalog request is
+`https://api.nozle.app/engine/api/v1/plans`.
+
+Node `0.7.0` and Python `0.7.0` default to Engine for `baseUrl` / `base_url` and
+Core for `eventsUrl` / `events_url`. React `0.8.0` defaults public catalog requests
+to Engine. Existing option names and explicit overrides continue to work.
+
+```ts
+const nozle = new Nozle({
+  apiKey: process.env.NOZLE_SECRET_KEY!,
+  baseUrl: 'http://localhost:8080',
+  eventsUrl: 'http://localhost:3000',
+})
+```
+
+For self-hosted reverse proxies, both overrides can also include path prefixes.
+Keep server credentials on the server. React uses a publishable catalog key and
+your authenticated merchant backend for checkout. Core dashboard sessions and scoped
+AI tokens are separate credentials, even though their services share a hostname.
+
+Core payment callbacks use
+`https://api.nozle.app/core/webhooks/stripe/{organization_id}?code={stripe_provider_code}`.
+An existing provider registration must be updated separately from application URL settings.
+
+The two socket transports serve different purposes:
+
+- Core subscriptions: `wss://api.nozle.app/core/cable`.
+- Centrifugo browser transport: `wss://api.nozle.app/ws/connection/websocket`.
+
+Keep their existing authentication and reconnect behavior. The public Centrifugo route
+does not expose its administrative or server API. `lite.nozle.app` remains the model gateway.

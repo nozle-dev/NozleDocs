@@ -4,7 +4,7 @@ description: Reverse proxy for OpenAI and Anthropic with automatic token trackin
 ---
 
 
-Base URL: `https://api.nozle.app/api/v1`
+Base URL: `https://api.nozle.app/engine/api/v1`
 
 Reverse proxy routes that forward LLM requests to OpenAI or Anthropic and automatically track token usage. The proxy reads the response to extract `{ model, input_tokens, output_tokens, latency_ms }` and fires an internal `nozle.track()` event — no SDK wrapper needed on your side.
 
@@ -29,7 +29,7 @@ Proxies all requests to `https://api.openai.com/v1/*`. Any OpenAI-compatible end
 | `Authorization` | Customer's OpenAI API key (`Bearer sk-...`) |
 
 ```bash title="cURL"
-curl -X POST https://api.nozle.app/api/v1/proxy/openai/v1/chat/completions \
+curl -X POST https://api.nozle.app/engine/api/v1/proxy/openai/v1/chat/completions \
   -H "X-Nozle-Key: sk_live_your_nozle_key" \
   -H "X-Nozle-Customer: cust_123" \
   -H "Authorization: Bearer sk-customer-openai-key" \
@@ -57,7 +57,7 @@ Proxies all requests to `https://api.anthropic.com/v1/*`.
 | `Authorization` | Customer's Anthropic API key |
 
 ```bash title="cURL"
-curl -X POST https://api.nozle.app/api/v1/proxy/anthropic/v1/messages \
+curl -X POST https://api.nozle.app/engine/api/v1/proxy/anthropic/v1/messages \
   -H "X-Nozle-Key: sk_live_your_nozle_key" \
   -H "X-Nozle-Customer: cust_123" \
   -H "x-api-key: customer-anthropic-key" \

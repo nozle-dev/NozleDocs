@@ -8,7 +8,7 @@ description: "Install and configure the typed, synchronous Nozle Python SDK."
 Entity subscription APIs are introduced in `0.5.0`.
 
 ```bash
-pip install nozle-sdk
+pip install nozle-sdk==0.7.0
 ```
 
 ## Create a client
@@ -20,8 +20,8 @@ from nozle import Nozle
 
 nozle = Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
-    base_url="https://api.nozle.app",
-    events_url="https://core.nozle.app",
+    base_url="https://api.nozle.app/engine",
+    events_url="https://api.nozle.app/core",
     timeout=10,
 )
 ```
@@ -29,11 +29,11 @@ nozle = Nozle(
 | Argument | Type | Default | Description |
 |---|---|---|---|
 | `api_key` | `str` | required | Organization credential. Protected operations require `sk_`. |
-| `base_url` | `str` | `http://localhost:8080` | Entitlement, credit, Entity, usage, and margin API origin. |
-| `events_url` | `str` | `http://localhost:3000` | Core API origin for customer writes, billing resources, metered events, credit-system discovery, and Entity subscriptions. Use `https://core.nozle.app` in production. |
+| `base_url` | `str` | `https://api.nozle.app/engine` | Entitlement, credit, Entity, usage, and margin API origin. |
+| `events_url` | `str` | `https://api.nozle.app/core` | Core API origin for customer writes, billing resources, metered events, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. |
 | `timeout` | `float` | `10` | Per-request timeout in seconds. |
 
-Set both URLs explicitly outside local development. Trailing slashes are removed automatically.
+Version `0.7.0` defaults to these public service bases. Set both URLs explicitly for local or self-hosted deployments. Trailing slashes are removed automatically.
 
 ```mermaid
 flowchart LR
@@ -51,8 +51,8 @@ from nozle import Nozle
 
 with Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
-    base_url="https://api.nozle.app",
-    events_url="https://core.nozle.app",
+    base_url="https://api.nozle.app/engine",
+    events_url="https://api.nozle.app/core",
 ) as nozle:
     health = nozle.ping()
 ```
