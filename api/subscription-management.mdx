@@ -1,0 +1,114 @@
+---
+title: "Subscription self-service"
+description: "Select a subscription, preview a signed quote, recover checkout, and withdraw a pending downgrade."
+---
+
+Base URL: `https://api.nozle.app/engine/api/v1`. All routes below require a secret key and an authenticated merchant backend. The backend derives `customer_id`; the selected **external** `subscription_id` must belong to that customer and organization.
+
+These hosted endpoints are available. Their new SDK wrappers and React controls are merged but await registry releases; see [the billing portal integration](/sdks/react/billing-portal).
+
+## Endpoint map
+
+| Operation | Method and path |
+| --- | --- |
+| Current plan, pending change and eligible plans | `GET /subscriptions/options?customer_id=…&subscription_id=…` |
+| Signed plan-change quote | `POST /subscriptions/preview` |
+| Quoted upgrade | `POST /checkout` |
+| Cancel, Keep or scheduled downgrade | `POST /subscriptions/transitions` |
+| Cancellation/Keep preview | `POST /subscriptions/transitions/preview` |
+| Withdraw a specific pending downgrade | `POST /subscriptions/transitions/withdraw` |
+| Recover checkout | `GET /checkout/{checkout_id}?customer_id=…&subscription_id=…` |
+| Verify Razorpay checkout | `POST /checkout/{checkout_id}/verify?customer_id=…&subscription_id=…` |
+
+These paths are for Engine. Its customer/subscription fields map to Core's external identifiers; Core uses `/subscription_transitions/options` and `/subscription_transitions/withdraw` under its own `/api/v1` base. Do not mix the two path sets.
+
+## Read state and eligible plans
+
+`GET /subscriptions/options` returns:
+
+| Field | Meaning |
+| --- | --- |
+| `subscription` | Internal `id`, `external_id`, `plan_code`, `status`, nullable `ending_at`, and `plan`. |
+| `pending_change` | Pending internal `id`, `plan_code`, `name`, `effective_at` and `plan`, or null. |
+| `eligible_plans` | Plans with `direction` and `timing`, authorized by the configured transition policies. |
+| `checkout` | Latest intent summary `{ id, status, plan_code }`, or null. Use checkout status for payment recovery. |
+
+A plan contains `code`, `name`, `amount_cents`, `currency`, and `interval`. Keep monetary minor-unit values exact. An empty eligible list can reflect missing transition policies, scheduled cancellation, a pending change, external billing authority, or unresolved checkout. Price comparisons and public catalog membership do not establish permission to change plans.
+
+## Preview and confirm a plan change
+
+Send `customer_id`, `subscription_id`, and `plan_code` to `POST /subscriptions/preview`:
+
+```json
+{
+  "customer_id": "customer_123",
+  "subscription_id": "subscription_123",
+  "plan_code": "pro_monthly"
+}
+```
+
+The response includes `quote_id`, `transition_direction`, `timing`, `currency`, `credit_amount_cents`, `debit_amount_cents`, `net_amount_cents`, `amount_due_now_cents`, `amount_due_at_effective_cents`, `effective_at`, and nullable `renewal_at`.
+
+Quotes expire after five minutes. Show the returned amounts and dates for confirmation, and forward the opaque `quote_id` unchanged. State, policy or amount changes invalidate the quote with HTTP 409. Refresh and obtain a new confirmation instead of silently applying a different price.
+
+For an upgrade, send that quote with an `Idempotency-Key` header to [Create checkout](/api/create-checkout):
+
+```json
+{
+  "customer_id": "customer_123",
+  "subscription_id": "subscription_123",
+  "plan_code": "pro_monthly",
+  "quote_id": "opaque-signed-quote",
+  "return_url": "https://app.example.com/settings/billing"
+}
+```
+
+Use explicit subscription selection. A customer with multiple active subscriptions cannot use an ambiguous unselected preview/checkout. Replays of an already accepted quoted request reuse the original result even after quote expiry; preserve the same request and idempotency key when recovering an uncertain response.
+
+## Schedule a downgrade
+
+After confirming a downgrade quote, send `POST /subscriptions/transitions` with an `Idempotency-Key` and:
+
+```json
+{
+  "customer_id": "customer_123",
+  "subscription_id": "subscription_123",
+  "operation": "downgrade",
+  "target_plan_code": "starter_monthly",
+  "timing": "end_of_period",
+  "billing_anchor": "keep_anchor",
+  "quote_id": "opaque-signed-quote"
+}
+```
+
+The existing transition result is nested under `subscription_transition`. Reload options to display the current plan separately from the pending plan and its effective date. The self-service flow uses end-of-period timing and preserves the billing anchor.
+
+## Cancel and Keep
+
+Preview `operation: "cancel"` with `timing: "end_of_period"` through `/subscriptions/transitions/preview`. Send the same parameters to `/subscriptions/transitions` with `expected_effective_at` set to the exact preview's `subscription_transition.effective_at`, plus an `Idempotency-Key` header. A stale date returns HTTP 409 before cancellation.
+
+Keep uses `operation: "uncancel"`, the customer/subscription identifiers and an `Idempotency-Key`. It accepts no settlement overrides. Keep is available only before the ending is due; it does not restart a terminated subscription. Cancellation removes a pending downgrade, and Keep does not recreate it.
+
+## Withdraw a pending downgrade
+
+Read and retain `pending_change.id` from options when the customer opens the confirmation. Send `POST /subscriptions/transitions/withdraw` with an `Idempotency-Key` and:
+
+```json
+{
+  "customer_id": "customer_123",
+  "subscription_id": "subscription_123",
+  "pending_subscription_id": "46c9e633-1314-4842-997a-97f801a58029"
+}
+```
+
+`pending_subscription_id` is the pending internal UUID, not the active subscription's external ID. The response contains `subscription`, `withdrawn_pending_subscription_id` and `replayed`. A stale owned pending ID returns 409; an unknown or unowned resource returns 404. The active subscription remains in place.
+
+## Payment status and recovery
+
+Use both `customer_id` and `subscription_id` when recovering or verifying a customer checkout. Razorpay verification forwards the genuine browser fields `razorpay_order_id`, `razorpay_payment_id` and `razorpay_signature`. Provider secrets stay on the server; only the scoped checkout's public key reaches Razorpay's browser UI.
+
+Status returns `checkout_id`, `provider`, `status`, `fulfillment_status`, `amount_cents`, `currency`, optional `invoice_id`, and optional resumable `checkout`. Payment status is `awaiting_payment`, `processing`, `succeeded`, `failed`, `expired`, or `needs_review`; fulfillment is `pending`, `processing`, or `succeeded`.
+
+A successful browser callback is not proof of fulfillment. Wait for authoritative activation and reload the selected subscription. Razorpay upgrades require a captured payment. Retry a recoverable open checkout using its existing ID; treat expired checkouts and `needs_review` as distinct outcomes. Unknown payment outcomes require your support/reconciliation route before another collection.
+
+Idempotency keys must be nonempty and at most 255 UTF-8 bytes. Keep one key and the same payload for retries of one confirmed action; use a new key for a newly confirmed action. Persist merchant replay context across process restarts. Map ownership failures, stale confirmations and payment-review states without exposing raw upstream error bodies.

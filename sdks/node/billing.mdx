@@ -27,49 +27,23 @@ const result = await nozle.checkout(
 )
 ```
 
-`checkout()` requires an `sk_` key and may return:
+`checkout()` requires an `sk_` key. Handle every result discriminator explicitly:
 
-```ts
-type CheckoutResult =
-  | {
-      type: 'stripe'
-      url?: string
-      client_secret?: string
-      clientSecret?: string
-      invoice_id?: string
-      amount_cents?: number
-      currency?: string
-    }
-  | {
-      type: 'completed' | 'scheduled'
-      status: string
-      subscription_id?: string
-      plan_code?: string
-    }
-```
+| `type` | Handling |
+| --- | --- |
+| `stripe` | Open its hosted `url` or pass its embedded `client_secret`/`clientSecret` to the matching Stripe UI. |
+| `razorpay` | Pass the order, amount, currency and public `key_id` to Razorpay Checkout, then verify and recover status through your backend. |
+| `hosted` | Navigate to the returned `payment_url`. |
+| `processing` | Recover using `checkout_id`; the payment outcome is not final. |
+| `completed` | Refresh authoritative subscription state. |
+| `scheduled` | Refresh and display the pending plan/effective date. |
 
-Handle every result shape explicitly:
-
-```ts
-if (result.type === 'stripe') {
-  if (result.url) return redirect(result.url)
-  if (result.client_secret || result.clientSecret) {
-    return { clientSecret: result.client_secret ?? result.clientSecret }
-  }
-  throw new Error('Stripe checkout returned no URL or client secret')
-}
-
-if (result.type === 'completed') {
-  return { status: result.status, refreshBilling: true }
-}
-
-return { status: result.status, scheduled: true }
-```
+Use the exported `CheckoutResult` union instead of a reduced local type. Do not treat every non-Stripe response as a scheduled downgrade. React's checkout components handle these result variants; see [checkout components](/sdks/react/components#checkout-components).
 
 Validate the exact HTTPS return origin on your server before passing it to Nozle.
 
 <Warning>
-Stripe webhook processing is authoritative. A checkout result, browser redirect, or client callback does not by itself prove that a paid subscription is active.
+Nozle payment fulfillment is authoritative. A browser callback or redirect does not prove activation; Razorpay upgrades require capture and Stripe requires backend settlement.
 </Warning>
 
 ## Direct subscription
@@ -94,6 +68,111 @@ const result = await nozle.cancelSubscription(
 ```
 
 The policy defaults to `end_of_period` and also accepts `immediate`.
+
+## Subscription self-service
+
+<Info>
+The following subscription-management additions are merged but await a package release. Published `@nozle-js/node@0.8.0` does not include them. The matching hosted endpoints are available; use the [merged Node merchant example](https://github.com/nozle-dev/nozle-js/tree/9dc89add8d0935678230acd327bdc79291100e64/examples/billing-portal) to evaluate the source build.
+</Info>
+
+These methods power [the React billing portal](/sdks/react/billing-portal). Use a customer ID derived from your authenticated application session and validate the selected external subscription ID. A Core subscription UUID is not interchangeable with that external ID.
+
+### Load eligible plans and preview a quote
+
+```ts
+const options = await nozle.subscriptionOptions(customerId, subscriptionId)
+const quote = await nozle.previewSubscriptionChange(customerId, subscriptionId, targetPlanCode)
+```
+
+`options` includes the current `subscription`, `pending_change`, policy-authorized `eligible_plans`, and an optional latest `checkout` summary. Plans contain `code`, `name`, `amount_cents`, `currency`, and `interval`; eligible plans add `direction` and `timing`. A pending change has its own internal `id` and `effective_at`.
+
+The quote includes `quote_id`, `transition_direction`, `timing`, `currency`, `credit_amount_cents`, `debit_amount_cents`, `net_amount_cents`, `amount_due_now_cents`, `amount_due_at_effective_cents`, `effective_at`, and `renewal_at`. Present these exact amounts and dates before confirmation. Monetary values are integer minor units and may be strings; preserve their precision. Do not choose a target solely from the public catalog or by comparing prices.
+
+### Confirm a paid upgrade
+
+After the customer confirms, use the saved quote and a stable action key:
+
+```ts
+const checkout = await nozle.checkout(customerId, targetPlanCode, returnUrl, {
+  subscriptionId,
+  quoteId: quote.quote_id,
+  idempotencyKey: confirmedActionKey,
+})
+```
+
+`quoteId` requires an explicit `subscriptionId`. A quote expires after five minutes or becomes invalid when its bound state changes. HTTP 409 requires a fresh preview and confirmation. For an uncertain response, retry the same confirmed request with the same key; an accepted request can replay after its quote expires.
+
+### Schedule or withdraw a downgrade
+
+For a confirmed quote whose `transition_direction` is `downgrade`:
+
+```ts
+const scheduled = await nozle.applySubscriptionTransition({
+  customerId,
+  subscriptionId,
+  operation: 'downgrade',
+  targetPlanCode,
+  timing: 'end_of_period',
+  billingAnchor: 'keep_anchor',
+  quoteId: quote.quote_id,
+}, confirmedActionKey)
+```
+
+Reload options to show the pending plan separately from the active plan. To withdraw it, retain the exact `pending_change.id` that the customer confirmed removing:
+
+```ts
+await nozle.withdrawPendingSubscriptionChange(
+  customerId,
+  subscriptionId,
+  confirmedPendingSubscriptionId,
+  withdrawalActionKey,
+)
+```
+
+The result contains `subscription`, `withdrawn_pending_subscription_id`, and `replayed`. A stale pending ID cannot remove a newer replacement; the active plan is preserved.
+
+### Cancel at period end and Keep
+
+Preview cancellation through the existing transition API:
+
+```ts
+const cancellation = await nozle.previewSubscriptionTransition({
+  customerId, subscriptionId, operation: 'cancel', timing: 'end_of_period',
+})
+```
+
+After displaying and confirming the ending date, apply it with its exact timestamp:
+
+```ts
+await nozle.applySubscriptionTransition({
+  customerId, subscriptionId, operation: 'cancel', timing: 'end_of_period',
+  expectedEffectiveAt: cancellation.subscription_transition.effective_at,
+}, cancellationActionKey)
+```
+
+Keep reuses the existing `uncancel` operation with a separate confirmed action key:
+
+```ts
+await nozle.applySubscriptionTransition({
+  customerId, subscriptionId, operation: 'uncancel',
+}, keepActionKey)
+```
+
+Keep accepts no settlement overrides and is available only before the ending is due. Cancellation clears a pending downgrade; Keep does not recreate it. Do not reformat the preview timestamp before passing `expectedEffectiveAt`.
+
+### Scope payment recovery and verification
+
+```ts
+const scope = { customerId, subscriptionId }
+const payment = await nozle.checkoutStatus(checkoutId, scope)
+const verified = await nozle.verifyCheckout(checkoutId, razorpayVerification, scope)
+```
+
+`razorpayVerification` is the genuine browser callback containing `razorpay_order_id`, `razorpay_payment_id`, and `razorpay_signature`. Supply both scope fields when recovering a customer's payment. Existing unscoped calls remain compatible, but do not provide the selected-customer/subscription constraint.
+
+The status distinguishes `awaiting_payment`, `processing`, `succeeded`, `failed`, `expired`, and `needs_review`, with separate `fulfillment_status`. Reload the selected subscription before reporting activation. Reuse recoverable checkout IDs; do not start another collection for an uncertain payment.
+
+The [merchant example](https://github.com/nozle-dev/nozle-js/tree/9dc89add8d0935678230acd327bdc79291100e64/examples/billing-portal) maps SDK responses to React's camelCase action types and persists retry context. Replace its demo login/file store with your application authentication and transactional storage for production workers. See [the HTTP contract](/api/subscription-management).
 
 ## Entity subscriptions
 

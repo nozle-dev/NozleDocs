@@ -12,7 +12,7 @@ Use this endpoint only from an authenticated merchant backend. Derive the custom
 **Auth:** secret key only. Publishable keys are always rejected.
 
 <ParamField path="id" type="string" required>
-  The subscription ID to cancel.
+  The external subscription ID to cancel, not the Core internal UUID.
 </ParamField>
 
 <ParamField query="customer_id" type="string" required>
@@ -23,9 +23,11 @@ Use this endpoint only from an authenticated merchant backend. Derive the custom
   `end_of_period` keeps the subscription active until its next renewal boundary. `immediate` terminates it now. The raw HTTP API defaults to `immediate` for backward compatibility; the Node.js and Python SDK methods default to `end_of_period`.
 </ParamField>
 
+For customer-facing Cancel/Keep with a confirmed ending date, use [the transition preview/apply flow](/api/subscription-management#cancel-and-keep). It supports the atomic `expected_effective_at` guard and the `uncancel` operation.
+
 ### Response
 
-For `end_of_period`, the subscription remains `active` and `ending_at` contains the next renewal boundary. The billing engine terminates it at that boundary and prevents another renewal invoice. Repeating the request does not extend an earlier scheduled ending.
+For `end_of_period`, the subscription remains `active` and `ending_at` contains the next renewal boundary. Engine access checks deny access at that boundary; the termination worker updates the subscription row according to its schedule and handles renewal termination. Repeating the request does not extend an earlier scheduled ending.
 
 For `immediate`, the response contains the terminated subscription.
 

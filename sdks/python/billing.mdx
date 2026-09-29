@@ -31,23 +31,18 @@ result = nozle.checkout(
 )
 ```
 
-`checkout()` requires `sk_` and returns one of three typed result variants:
+`checkout()` requires an `sk_` key and returns a typed dictionary. Handle each `type` explicitly:
 
-- `StripeCheckoutResult` with a hosted `url` or embedded `client_secret`;
-- `CompletedCheckoutResult`; or
-- `ScheduledCheckoutResult`.
+| `type` | Handling |
+| --- | --- |
+| `stripe` | Hosted `url` or embedded `client_secret`/`clientSecret`. |
+| `razorpay` | Razorpay order, amount, currency and public `key_id`; verify the genuine callback through your backend. |
+| `hosted` | Hosted `payment_url`. |
+| `processing` | Recover the outcome with `checkout_id`. |
+| `completed` | Refresh authoritative subscription state. |
+| `scheduled` | Refresh and display the pending change/effective date. |
 
-```python
-if result["type"] == "stripe":
-    if "url" in result:
-        redirect_to = result["url"]
-    else:
-        client_secret = result.get("client_secret") or result.get("clientSecret")
-elif result["type"] == "completed":
-    refresh_billing_state()
-else:
-    show_scheduled_change(result["status"])
-```
+Do not handle all non-Stripe responses as scheduled changes. See [the React checkout components](/sdks/react/components#checkout-components) for the browser integration.
 
 Validate the exact HTTPS return origin before passing a browser-provided URL to this method.
 
@@ -56,7 +51,7 @@ Validate the exact HTTPS return origin before passing a browser-provided URL to 
 `success_url=` remains a deprecated alias for `return_url=`. The SDK emits `DeprecationWarning`, sends only `return_url`, and rejects conflicting values with `NozleValidationError`.
 
 <Warning>
-Stripe webhooks remain authoritative. Checkout return values and browser redirects are interface signals, not proof that a paid subscription is active.
+Nozle payment fulfillment is authoritative. Browser callbacks and redirects do not prove activation; Razorpay upgrades require capture and Stripe requires backend settlement.
 </Warning>
 
 ## Direct subscription
@@ -81,6 +76,133 @@ result = nozle.cancel_subscription(
 ```
 
 The policy defaults to `end_of_period` and also accepts `immediate`.
+
+## Subscription self-service
+
+<Info>
+The following subscription-management additions are merged but await a package release. Published `nozle-sdk==0.8.0` does not include them. The matching hosted endpoints are available; use the [merged Python merchant example](https://github.com/nozle-dev/nozle-python/tree/5a3ac66a4508bfa616e68b7d352d7dec83f93f74/examples/billing_portal) to evaluate the source build.
+</Info>
+
+These methods power [the React billing portal](/sdks/react/billing-portal). Derive `customer_id` from the authenticated application user and validate the selected external `subscription_id`. Do not substitute the Core internal UUID for that external identifier.
+
+### Load eligible plans and preview a quote
+
+```python
+options = nozle.subscription_options(customer_id, subscription_id)
+quote = nozle.preview_subscription_change(customer_id, subscription_id, target_plan_code)
+```
+
+`SubscriptionOptions` is a typed dictionary with `subscription`, `pending_change`, `eligible_plans`, and optional `checkout`. Plans contain `code`, `name`, `amount_cents`, `currency`, and `interval`; eligible plans add `direction` and `timing`. A pending change has its own internal `id` and `effective_at`.
+
+`SubscriptionChangePreview` contains `quote_id`, `transition_direction`, `timing`, `currency`, `credit_amount_cents`, `debit_amount_cents`, `net_amount_cents`, `amount_due_now_cents`, `amount_due_at_effective_cents`, `effective_at`, and `renewal_at`. Show these exact amounts and dates before confirmation. Minor-unit amounts may be integers or strings; preserve their precision. Eligibility comes from configured transition policies, not a client-side price comparison.
+
+### Confirm a paid upgrade
+
+After the customer confirms, use the saved quote and a stable action key:
+
+```python
+checkout = nozle.checkout(
+    customer_id,
+    target_plan_code,
+    return_url=return_url,
+    subscription_id=subscription_id,
+    quote_id=quote["quote_id"],
+    idempotency_key=confirmed_action_key,
+)
+```
+
+`quote_id` requires `subscription_id`. Quotes expire after five minutes or become invalid when their bound state changes. On HTTP 409, request a new preview and confirmation. For an uncertain response, retry the same confirmed request and key; an accepted request can replay after quote expiry.
+
+### Schedule or withdraw a downgrade
+
+For a confirmed quote with `transition_direction == "downgrade"`:
+
+```python
+scheduled = nozle.apply_subscription_transition(
+    {
+        "customer_id": customer_id,
+        "subscription_id": subscription_id,
+        "operation": "downgrade",
+        "target_plan_code": target_plan_code,
+        "timing": "end_of_period",
+        "billing_anchor": "keep_anchor",
+        "quote_id": quote["quote_id"],
+    },
+    idempotency_key=confirmed_action_key,
+)
+```
+
+Reload options to display the pending change separately from the current plan. Retain the exact `pending_change["id"]` shown in the customer's withdrawal confirmation:
+
+```python
+withdrawn = nozle.withdraw_pending_subscription_change(
+    customer_id,
+    subscription_id,
+    confirmed_pending_subscription_id,
+    idempotency_key=withdrawal_action_key,
+)
+```
+
+The result contains `subscription`, `withdrawn_pending_subscription_id`, and `replayed`. Withdrawal preserves the active plan; a stale pending UUID conflicts instead of removing a replacement.
+
+### Cancel at period end and Keep
+
+Preview through the existing transition method:
+
+```python
+cancellation = nozle.preview_subscription_transition({
+    "customer_id": customer_id,
+    "subscription_id": subscription_id,
+    "operation": "cancel",
+    "timing": "end_of_period",
+})
+```
+
+After displaying and confirming the ending date, forward the exact timestamp:
+
+```python
+nozle.apply_subscription_transition(
+    {
+        "customer_id": customer_id,
+        "subscription_id": subscription_id,
+        "operation": "cancel",
+        "timing": "end_of_period",
+        "expected_effective_at": cancellation["subscription_transition"]["effective_at"],
+    },
+    idempotency_key=cancellation_action_key,
+)
+```
+
+Keep uses `uncancel` with a separate confirmed action key and no settlement overrides:
+
+```python
+nozle.apply_subscription_transition(
+    {"customer_id": customer_id, "subscription_id": subscription_id, "operation": "uncancel"},
+    idempotency_key=keep_action_key,
+)
+```
+
+Keep is available only before the ending is due. Cancellation clears a pending downgrade; Keep does not recreate it. Preserve the preview's full timestamp, including timezone and fractional seconds.
+
+### Scope payment recovery and verification
+
+```python
+payment = nozle.checkout_status(
+    checkout_id, customer_id=customer_id, subscription_id=subscription_id,
+)
+verified = nozle.verify_checkout(
+    checkout_id,
+    razorpay_verification,
+    customer_id=customer_id,
+    subscription_id=subscription_id,
+)
+```
+
+Forward the genuine Razorpay callback's `razorpay_order_id`, `razorpay_payment_id`, and `razorpay_signature`. The optional scope fields must be supplied together. Existing calls without them remain compatible; include both for customer-specific recovery.
+
+Status distinguishes `awaiting_payment`, `processing`, `succeeded`, `failed`, `expired`, and `needs_review`, with a separate `fulfillment_status`. Reload the selected subscription before reporting activation. Keep the existing checkout for recoverable retries and use your support route for uncertain payments before another collection.
+
+The [merchant example](https://github.com/nozle-dev/nozle-python/tree/5a3ac66a4508bfa616e68b7d352d7dec83f93f74/examples/billing_portal) maps these dictionaries to React's camelCase action types and persists retry context. Replace its demo login/file store with your application's authentication and transactional storage for production workers. See [the HTTP contract](/api/subscription-management).
 
 ## Entity subscriptions
 

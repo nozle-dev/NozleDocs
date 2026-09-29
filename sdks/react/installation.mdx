@@ -4,21 +4,25 @@ description: "Install the React SDK and configure public catalog reads with merc
 ---
 
 ```bash
-npm install @nozle-js/react@0.8.0 react react-dom @stripe/stripe-js @stripe/react-stripe-js
+npm install @nozle-js/react@0.9.0 react react-dom @stripe/stripe-js @stripe/react-stripe-js
 ```
 
-Version `0.8.0` defaults catalog requests to `https://api.nozle.app/engine`.
+Published version `0.9.0` defaults catalog requests to `https://api.nozle.app/engine`.
 
 The React SDK has two browser-safe responsibilities:
 
 - read the public plan catalog with a publishable `pk_` key; and
 - render checkout and billing UI using data or callbacks supplied by your application.
 
-It does not accept a secret key, choose a Nozle customer, or call customer billing APIs directly.
+It does not accept a secret key or choose a Nozle customer. The merged native billing portal adds customer-scoped GraphQL reads using a session issued by your backend; it never uses your secret key in the browser.
+
+<Info>
+`BillingPortal`, `CancellationControl`, `PlanChangeControl`, and their new self-service adapters are merged but not included in the published `0.9.0` package. See [Billing portal and self-service](/sdks/react/billing-portal) for source-build evaluation and release availability.
+</Info>
 
 ## Configure `BillingProvider`
 
-Wrap billing UI in `BillingProvider`. Your `createCheckout` callback calls an authenticated merchant endpoint; that endpoint derives the customer from the logged-in user or team and calls Nozle with a restricted `sk_`.
+Wrap public catalog and provider-context checkout UI in `BillingProvider`. `BillingPortal` and its management controls use their own callbacks and do not require this provider. Your `createCheckout` callback calls an authenticated merchant endpoint; that endpoint derives the customer from the logged-in user or team and calls Nozle with a restricted `sk_`.
 
 ```tsx
 import { BillingProvider, PricingTable } from '@nozle-js/react'
@@ -76,14 +80,15 @@ See [Merchant backend billing](/guides/getting-started/merchant-backend-bff) for
 
 All interactive exports are client components. In Next.js App Router, render the provider and interactive SDK components from a file containing `"use client"`.
 
-Customer billing status, invoices, subscriptions, cancellation, credits, usage, and entitlements must come from your authenticated backend. Pass that returned state into components such as `FeatureGate`, `UsageMeter`, and `PlanBadge`.
+Customer state for presentational components comes from your authenticated backend. Pass it into `FeatureGate`, `UsageMeter`, and `PlanBadge`. The native portal instead obtains a customer-scoped session from that backend for its Core GraphQL requests; management actions still go through your authenticated merchant endpoints.
 
 <Warning>
-Never expose an `sk_`, master key, customer session, or internal credential in a browser bundle. CORS and `Origin` headers are not authentication.
+Never embed an `sk_`, master key, portal session token, or internal credential in a static browser bundle. Return scoped portal tokens only at runtime to the authenticated customer. CORS and `Origin` headers are not authentication.
 </Warning>
 
 ## Next steps
 
+- Add the [native billing portal](/sdks/react/billing-portal).
 - Browse [components](/sdks/react/components).
 - Use the [provider hooks](/sdks/react/hooks).
 - Add [feature gates](/sdks/react/gates).
