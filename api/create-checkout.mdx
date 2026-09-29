@@ -10,7 +10,7 @@ Create a payment-gated plan checkout from a trusted merchant backend.
 **Auth:** secret key only. Publishable keys are always rejected.
 
 <Info>
-The merchant backend derives `customer_id` from its authenticated user or team. Do not trust a browser-provided customer ID. The response contains a hosted URL or Stripe Checkout `client_secret`, or reports an immediately completed or scheduled transition.
+The merchant backend derives `customer_id` from its authenticated user or team. Do not trust a browser-provided customer ID. The response can contain Stripe or Razorpay checkout, a hosted payment URL, a processing state, or a completed/scheduled transition.
 </Info>
 
 ## Modes
@@ -27,9 +27,21 @@ Use this when a customer is selecting a plan.
   The plan code to subscribe the customer to (e.g. `pro`).
 </ParamField>
 
-Plan checkout is payment-gated. Free-to-paid checkout uses an incomplete subscription. Paid-to-paid upgrades keep the old subscription active in a durable pending intent and apply the billing change only after Stripe confirms payment.
+Plan checkout is payment-gated. Free-to-paid checkout uses an incomplete subscription. Paid-to-paid upgrades keep the old subscription active in a durable pending intent and apply the billing change only after the payment provider confirms the required payment and Nozle fulfills the change.
 
-If prepaid credits fully cover a paid plan change, Nozle applies it without Stripe and returns `type: "completed"`. Free plans may also complete immediately. A downgrade or other cycle-end transition returns `type: "scheduled"`; browser callers still use this same endpoint.
+If prepaid credits fully cover a paid plan change, Nozle applies it without an external payment and returns `type: "completed"`. Free plans may also complete immediately. A downgrade or other cycle-end transition may return `type: "scheduled"`. The selected self-service downgrade flow uses a signed quote with the end-of-period transition endpoint described below.
+
+## Selected subscription and signed quote
+
+<ParamField body="subscription_id" type="string">
+  External subscription ID. Select it explicitly for self-service. An unselected checkout for a customer with multiple active subscriptions is rejected as ambiguous.
+</ParamField>
+
+<ParamField body="quote_id" type="string">
+  Opaque signed quote from `POST /subscriptions/preview`. Requires `subscription_id`; forward it unchanged after the customer confirms the amounts and dates.
+</ParamField>
+
+Use an `Idempotency-Key` header for the confirmed action and retain it across uncertain retries. Invalidated or expired new quotes require a fresh preview/confirmation; replay of an already accepted action reuses its recorded checkout. See [Subscription self-service](/api/subscription-management) for quote, downgrade and recovery contracts.
 
 ## Return URL
 
@@ -56,11 +68,11 @@ Plan checkout:
 ## Response
 
 <ResponseField name="type" type="string" required>
-  `stripe`, `completed`, or `scheduled`.
+  `stripe`, `razorpay`, `hosted`, `processing`, `completed`, or `scheduled`.
 </ResponseField>
 
 <ResponseField name="client_secret" type="string">
-  Stripe Checkout Session client secret. Pass this to `stripe.initEmbeddedCheckout()`.
+  Client secret for the returned embedded Stripe payment flow. Use the matching SDK checkout UI; prefer the hosted `url` when supplied.
 </ResponseField>
 
 <ResponseField name="url" type="string">
@@ -82,6 +94,12 @@ Plan checkout:
 <ResponseField name="currency" type="string">
   Invoice currency.
 </ResponseField>
+
+### Razorpay and recovery fields
+
+A `razorpay` result supplies `checkout_id`, `order_id`, public `key_id`, `amount_cents`, and `currency`, with optional expiry/customer/recurring metadata. Verify the genuine Razorpay callback on your backend. Activation requires captured payment and completed fulfillment.
+
+A `processing` result supplies a `checkout_id` to recover rather than starting another checkout. A `hosted` result supplies `payment_url`. Both scoped verification and status recovery are described in [Subscription self-service](/api/subscription-management#payment-status-and-recovery).
 
 ### Credit-funded response
 

@@ -3,7 +3,7 @@ title: "Merchant backend billing"
 description: "Keep customer billing behind your authenticated backend while using a publishable key only for the public catalog."
 ---
 
-Nozle uses a two-credential model:
+Nozle API keys have two roles:
 
 | Credential | Location | Allowed operations |
 |---|---|---|
@@ -19,7 +19,7 @@ Merchant browser
   -> authenticated merchant POST /api/billing/checkout
   -> merchant backend derives the Nozle customer from the logged-in team
   -> merchant backend calls Nozle with its restricted sk_
-  -> Nozle returns the Stripe checkout result
+  -> Nozle returns the provider checkout result
 ```
 
 ### Backend route
@@ -90,7 +90,13 @@ export function BillingPage({ csrfToken }: { csrfToken: string }) {
 }
 ```
 
-Use equivalent authenticated backend endpoints for billing status, invoices, cancellation, top-ups, entitlements, and credits. Return only the fields your browser needs.
+Use equivalent authenticated backend endpoints for caller-supplied billing state, entitlements and credits. Return only the fields your browser needs.
+
+## Native portal and subscription management
+
+The [React billing portal](/sdks/react/billing-portal) obtains a customer-scoped portal session from your backend for Core GraphQL reads. It uses separate authenticated merchant callbacks for Cancel/Keep, quoted upgrades, scheduled downgrades and withdrawal. These exports and new SDK methods are merged but await package releases; the portal guide links the source builds.
+
+Derive the customer from your application session. Accept a selected external subscription ID only after validating its ownership; select eligible targets from subscription options, then confirm a signed quote. Forward the exact quote, cancellation date guard and idempotency key to Nozle. Scope payment verification and recovery to both that customer and subscription. See [the HTTP flow](/api/subscription-management) and the [Node](/sdks/node/billing#subscription-self-service) / [Python](/sdks/python/billing#subscription-self-service) adapters.
 
 ## Mixed Entity seat purchase
 
@@ -106,10 +112,10 @@ Use one bulk request rather than one checkout call per seat. The bulk request cr
 
 The browser may decide requested quantities, but the backend owns generated Entity IDs, plan allowlists, customer mapping, billing mode, and return-origin validation.
 
-For cancellation, call `cancelSubscription(customerId, subscriptionId)` from the Node.js SDK or `cancel_subscription(customer_id, subscription_id)` from Python. Both default to `end_of_period`; the raw API keeps its historical `immediate` default. Do not accept either Nozle identifier directly from the browser—resolve both from merchant-owned records.
+For cancellation, call `cancelSubscription(customerId, subscriptionId)` from the Node.js SDK or `cancel_subscription(customer_id, subscription_id)` from Python. Both default to `end_of_period`; the raw API keeps its historical `immediate` default. Resolve the customer from merchant-owned records and validate ownership of the selected external subscription ID. Use the guarded transition flow above for customer-facing Cancel/Keep.
 
 ## Payment authority
 
-Stripe webhook processing is authoritative. A redirect back to the merchant application never activates a paid plan. Nozle activates payment-gated changes only after verified, idempotently processed Stripe success; failed payments and 3DS remain in the payment flow.
+Nozle payment fulfillment is authoritative. A redirect or browser callback alone does not activate a paid plan. Stripe requires backend settlement; Razorpay requires capture. Recover authoritative checkout and subscription state after payment, failures or reloads before reporting activation.
 
 Billable and credit-consuming events also stay server-side through `@nozle-js/node` with the restricted `sk_`. CORS and `Origin` headers are browser controls, not authentication.

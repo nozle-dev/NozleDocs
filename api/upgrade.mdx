@@ -30,7 +30,7 @@ Paid upgrades return:
 }
 ```
 
-Browser plan changes must use `POST /checkout` for upgrades and downgrades. Checkout previews the exact prorated invoice, preserves the current paid plan until payment succeeds, and returns `type: "scheduled"` when a lower plan takes effect at the next billing boundary.
+For customer self-service, use a signed preview and `POST /checkout` for a selected upgrade, or the end-of-period transition API for a scheduled downgrade. The current paid plan stays active until required payment is fulfilled. See [Subscription self-service](/api/subscription-management) for the complete flow.
 
 <Note>
   Also available to trusted backends as `POST /subscriptions/change` (alias). Do not expose either route to browser code.

@@ -13,29 +13,37 @@ Use checkout for payment-gated plans. Direct subscription creation is available 
 const subscription = await nozle.subscribe('customer_123', 'free')
 ```
 
-## Payment-aware plan changes
+## Customer self-service
 
-Use checkout for paid upgrades. The current paid plan remains active until verified payment succeeds. A lower-value change may return a scheduled result for the next billing boundary.
+Use [the native React billing portal](/sdks/react/billing-portal), or add `CancellationControl` and `PlanChangeControl` to your own billing page. Your authenticated Node.js or Python backend supplies their action adapters.
 
-```ts
-const checkout = await nozle.checkout(
-  'customer_123',
-  'scale_monthly',
-  'https://app.example.com/settings/billing',
-)
-```
+| Customer action | Behavior |
+| --- | --- |
+| Cancel | Confirm the exact ending date; access continues until that saved boundary. |
+| Keep | Remove a cancellation before it takes effect. |
+| Upgrade | Review a signed quote and complete required payment before activating the target plan. |
+| Downgrade | Schedule an eligible plan for renewal, preserving the current plan until then. |
+| Withdraw downgrade | Remove the exact pending change while preserving the active subscription. |
 
-The React `UpgradeButton` opens a caller-supplied preview and delegates checkout to your `BillingProvider.createCheckout` callback:
+The matching hosted API is available. These new SDK methods and React exports are merged but await registry releases; the [portal guide](/sdks/react/billing-portal) identifies the published versions and source examples.
 
-```tsx
-<UpgradeButton
-  planCode="scale_monthly"
-  preview={preview}
-  onStripeClientSecret={setClientSecret}
-  onUpgraded={refreshBillingState}
-  onDowngradeScheduled={refreshBillingState}
-/>
-```
+## Select, preview and confirm
+
+A customer may have multiple subscriptions. Use its **external subscription ID** on every management call. Check the configured plan-transition policy through subscription options; do not infer eligibility from price or catalog membership.
+
+The Node `subscriptionOptions` / Python `subscription_options` methods return current, pending and eligible plans. `previewSubscriptionChange` / `preview_subscription_change` returns an opaque signed quote with exact minor-unit amounts, currency, effective date and renewal date.
+
+After customer confirmation, pass the quote and a stable idempotency key to checkout for upgrades. For scheduled downgrades, use the existing transition API with end-of-period timing and `keep_anchor`. A quote is valid for five minutes and binds the subscription state, plan versions, policy and amounts. A changed quote returns HTTP 409 and requires a fresh confirmation.
+
+Preserve the same key, quote and payload when retrying one confirmed action after an uncertain response. Replaying an accepted action can succeed after quote expiry. Save merchant retry context durably; do not generate another collection attempt merely because a browser callback was lost.
+
+## Payment and reload behavior
+
+The current paid plan remains active until required payment is fulfilled. Razorpay requires capture; Stripe requires backend settlement. A browser callback or redirect alone does not establish activation. Reload authoritative state after checkout, failures and page reloads, and resume a recoverable checkout using its existing ID. Treat processing, expiry and support review as separate states.
+
+Scheduled downgrades keep a distinct pending plan/effective date. Withdrawal uses its exact internal pending UUID, whereas ordinary management calls use the active subscription's external ID. A stale withdrawal cannot remove a replacement pending change.
+
+See [Node billing](/sdks/node/billing#subscription-self-service), [Python billing](/sdks/python/billing#subscription-self-service), and [the HTTP contract](/api/subscription-management) for signatures and examples.
 
 ## Simple cancellation
 
@@ -51,7 +59,7 @@ result = nozle.cancel_subscription("customer_123", "subscription_123")
 print(result["subscription"].get("ending_at"))
 ```
 
-Pass `immediate` explicitly only after the merchant confirms that access should end now.
+Pass `immediate` explicitly only after the merchant confirms that access should end now. For customer-facing Cancel/Keep, use the transition preview/apply flow and forward the exact `expectedEffectiveAt` / `expected_effective_at` timestamp. Keep does not restart an ended subscription. Cancellation removes a pending downgrade; Keep does not recreate it.
 
 ## Settlement transitions
 
@@ -89,6 +97,10 @@ Preview first, present the monetary effect to the merchant, and apply with a sta
 <Warning>
 Payment webhooks and the applied transition result are authoritative. Do not unlock paid access from a browser callback alone.
 </Warning>
+
+## Enforce access in your application
+
+The portal changes billing state; your application enforces feature access using Nozle entitlement checks. The hosted Engine reads the current subscription and database clock for `/can`, denying access at its saved ending even if the termination job has not yet updated the row. Keep is visible after commit without waiting for the old subscription-cache refresh.
 
 ## Independent plans per Entity
 
