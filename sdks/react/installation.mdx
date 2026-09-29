@@ -4,20 +4,20 @@ description: "Install the React SDK and configure public catalog reads with merc
 ---
 
 ```bash
-npm install @nozle-js/react@0.9.0 react react-dom @stripe/stripe-js @stripe/react-stripe-js
+npm install @nozle-js/react@0.10.0 react react-dom @stripe/stripe-js @stripe/react-stripe-js
 ```
 
-Published version `0.9.0` defaults catalog requests to `https://api.nozle.app/engine`.
+Published version `0.10.0` defaults catalog requests to `https://api.nozle.app/engine`.
 
 The React SDK has two browser-safe responsibilities:
 
 - read the public plan catalog with a publishable `pk_` key; and
 - render checkout and billing UI using data or callbacks supplied by your application.
 
-It does not accept a secret key or choose a Nozle customer. The merged native billing portal adds customer-scoped GraphQL reads using a session issued by your backend; it never uses your secret key in the browser.
+It does not accept a secret key or choose a Nozle customer. The native billing portal uses customer-scoped GraphQL reads using a session issued by your backend; it never uses your secret key in the browser.
 
 <Info>
-`BillingPortal`, `CancellationControl`, `PlanChangeControl`, and their new self-service adapters are merged but not included in the published `0.9.0` package. See [Billing portal and self-service](/sdks/react/billing-portal) for source-build evaluation and release availability.
+`BillingPortal`, `CancellationControl`, `PlanChangeControl`, and their self-service adapters are included in `0.10.0`. Use Node `0.9.0` or Python `0.9.0` on your merchant backend. See [Billing portal and self-service](/sdks/react/billing-portal) for setup.
 </Info>
 
 ## Configure `BillingProvider`

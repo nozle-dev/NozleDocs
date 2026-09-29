@@ -80,7 +80,7 @@ The policy defaults to `end_of_period` and also accepts `immediate`.
 ## Subscription self-service
 
 <Info>
-The following subscription-management additions are merged but await a package release. Published `nozle-sdk==0.8.0` does not include them. The matching hosted endpoints are available; use the [merged Python merchant example](https://github.com/nozle-dev/nozle-python/tree/5a3ac66a4508bfa616e68b7d352d7dec83f93f74/examples/billing_portal) to evaluate the source build.
+The following subscription-management methods are available in `nozle-sdk==0.9.0`. The matching hosted endpoints are available; see the [Python merchant example](https://github.com/nozle-dev/nozle-python/tree/v0.9.0/examples/billing_portal) for a complete integration.
 </Info>
 
 These methods power [the React billing portal](/sdks/react/billing-portal). Derive `customer_id` from the authenticated application user and validate the selected external `subscription_id`. Do not substitute the Core internal UUID for that external identifier.
@@ -202,7 +202,7 @@ Forward the genuine Razorpay callback's `razorpay_order_id`, `razorpay_payment_i
 
 Status distinguishes `awaiting_payment`, `processing`, `succeeded`, `failed`, `expired`, and `needs_review`, with a separate `fulfillment_status`. Reload the selected subscription before reporting activation. Keep the existing checkout for recoverable retries and use your support route for uncertain payments before another collection.
 
-The [merchant example](https://github.com/nozle-dev/nozle-python/tree/5a3ac66a4508bfa616e68b7d352d7dec83f93f74/examples/billing_portal) maps these dictionaries to React's camelCase action types and persists retry context. Replace its demo login/file store with your application's authentication and transactional storage for production workers. See [the HTTP contract](/api/subscription-management).
+The [merchant example](https://github.com/nozle-dev/nozle-python/tree/v0.9.0/examples/billing_portal) maps these dictionaries to React's camelCase action types and persists retry context. Replace its demo login/file store with your application's authentication and transactional storage for production workers. See [the HTTP contract](/api/subscription-management).
 
 ## Entity subscriptions
 
