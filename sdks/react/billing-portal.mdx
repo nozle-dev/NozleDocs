@@ -6,8 +6,26 @@ description: "Add subscription cancellation, paid upgrades, scheduled downgrades
 `BillingPortal` displays subscriptions, usage, invoice history/PDFs, billing details, and wallets. Add `cancellationActions` for Cancel/Keep and `planChangeActions` for upgrades, scheduled downgrades, and withdrawal of a pending change. These controls also work independently on a custom billing page.
 
 <Info>
-These exports and subscription-management additions are merged into the SDK repositories but await a package release. The published React `0.9.0`, Node `0.8.0`, and Python `0.8.0` packages do not include these additions. Use the merged source examples below to evaluate them. The matching hosted backend endpoints are available.
+Available in **`@nozle-js/react@0.10.0`**, **`@nozle-js/node@0.9.0`**, and **`nozle-sdk==0.9.0`**. Earlier React `0.9.0` and server SDK `0.8.0` releases do not include these additions. The matching hosted backend endpoints are available.
 </Info>
+
+## Install
+
+```bash
+npm install @nozle-js/react@0.10.0 react react-dom @stripe/stripe-js @stripe/react-stripe-js
+```
+
+On your Node.js merchant backend:
+
+```bash
+npm install @nozle-js/node@0.9.0
+```
+
+Or on your Python merchant backend:
+
+```bash
+pip install nozle-sdk==0.9.0
+```
 
 ## How requests flow
 
@@ -182,10 +200,10 @@ export function SubscriptionControls(props: {
 
 ## Runnable backend integrations
 
-- [Node merchant server and React app](https://github.com/nozle-dev/nozle-js/tree/9dc89add8d0935678230acd327bdc79291100e64/examples/billing-portal)
-- [Python merchant server](https://github.com/nozle-dev/nozle-python/tree/5a3ac66a4508bfa616e68b7d352d7dec83f93f74/examples/billing_portal)
+- [Node merchant server and React app](https://github.com/nozle-dev/nozle-js/tree/node-v0.9.0/examples/billing-portal)
+- [Python merchant server](https://github.com/nozle-dev/nozle-python/tree/v0.9.0/examples/billing_portal)
 - [Node method reference](/sdks/node/billing#subscription-self-service) and [Python method reference](/sdks/python/billing#subscription-self-service)
 
-Build the React package from the linked source revision and install that build for evaluation; installing the current registry version does not provide these exports. Follow the examples' READMEs for TLS and environment setup. Their demo login and single-process file replay store must be replaced with your application's authentication and transactional shared storage before serving production customers. Browser sessions use Secure, HttpOnly cookies over HTTPS.
+Install React `0.10.0` with Node `0.9.0` or Python `0.9.0` for your integration. The linked examples use the source checkout; build it as their READMEs describe when running those demos. Follow the examples' READMEs for TLS and environment setup. Their demo login and single-process file replay store must be replaced with your application's authentication and transactional shared storage before serving production customers. Browser sessions use Secure, HttpOnly cookies over HTTPS.
 
 The portal changes billing state. Enforce feature access on your application's server using Nozle entitlement checks. The hosted Engine observes cancellation at the saved ending boundary and Keep after commit, without waiting for its old subscription-cache refresh.

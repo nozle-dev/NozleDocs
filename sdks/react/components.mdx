@@ -17,7 +17,7 @@ The React SDK separates public catalog and checkout orchestration from customer 
 | `CancellationControl` | Standalone end-of-period cancellation and Keep confirmation. |
 | `PlanChangeControl` | Standalone plan selection, signed quote review, paid checkout, scheduled downgrade and exact withdrawal. |
 
-These exports are merged but await the next package release; published React `0.9.0` does not include them. See [Billing portal and self-service](/sdks/react/billing-portal) for setup, props, callback contracts, standalone examples and source-build instructions. The portal does not require `BillingProvider` or Tailwind.
+These exports are available in React `0.10.0`. See [Billing portal and self-service](/sdks/react/billing-portal) for setup, props, callback contracts, standalone examples and installation instructions. The portal does not require `BillingProvider` or Tailwind.
 
 ## Pricing components
 
@@ -181,7 +181,7 @@ For a provider checkout result, use the alternative `checkout` prop. Supply merc
 />
 ```
 
-The merged self-service implementation supports these callbacks directly on `Checkout`, without requiring `BillingProvider`. The current registry release does not include that extension; see [availability and the complete adapter](/sdks/react/billing-portal).
+React `0.10.0` supports these callbacks directly on `Checkout`, without requiring `BillingProvider`; see [the complete adapter](/sdks/react/billing-portal).
 
 The `useCheckout` export from this component must be called inside the component's Stripe Elements context. It returns `confirmPayment`, `isProcessing`, and `error`. Do not confuse it with `useCheckoutSession`, which creates checkout through your merchant callback.
 
@@ -213,7 +213,7 @@ Opens `UpgradeModal` and starts a plan change through the provider callback.
 />
 ```
 
-The component also accepts `returnUrl`, `className`, `style`, `onCheckoutStarted`, and `onError`. The merged self-service implementation adds `subscriptionId`, `quoteId`, and `idempotencyKey`, forwarded to the merchant checkout callback. These additions await the next package release.
+The component also accepts `returnUrl`, `className`, `style`, `onCheckoutStarted`, and `onError`. React `0.10.0` adds `subscriptionId`, `quoteId`, and `idempotencyKey`, forwarded to the merchant checkout callback.
 
 ### `UpgradeModal`
 
@@ -231,9 +231,9 @@ Use the modal directly when your application owns its open state.
 />
 ```
 
-`preview` is caller-supplied and contains `credit`, `debit`, `net`, and `nextBillingDate`. Those legacy amount fields use **major units**. The merged implementation adds `currency` (default `USD`) and locale-aware formatting. Do not pass SDK minor-unit quote fields directly into this legacy shape; `PlanChangeControl` renders the exact minor-unit quote instead.
+`preview` is caller-supplied and contains `credit`, `debit`, `net`, and `nextBillingDate`. Those legacy amount fields use **major units**. React `0.10.0` adds `currency` (default `USD`) and locale-aware formatting. Do not pass SDK minor-unit quote fields directly into this legacy shape; `PlanChangeControl` renders the exact minor-unit quote instead.
 
-The merged implementation also adds `onSubmit` for an authenticated custom action without `BillingProvider`, plus `title`, `confirmLabel`, `confirmDisabled`, `busy`, `children`, `locale`, and stylesheet `nonce`. For provider-backed submission it accepts `subscriptionId`, `quoteId`, and `idempotencyKey`. These additions await the next package release. The modal itself does not fetch a customer quote.
+React `0.10.0` also adds `onSubmit` for an authenticated custom action without `BillingProvider`, plus `title`, `confirmLabel`, `confirmDisabled`, `busy`, `children`, `locale`, and stylesheet `nonce`. For provider-backed submission it accepts `subscriptionId`, `quoteId`, and `idempotencyKey`. The modal itself does not fetch a customer quote.
 
 ## Billing display components
 
