@@ -6,7 +6,7 @@ description: "Add subscription cancellation, paid upgrades, scheduled downgrades
 `BillingPortal` displays subscriptions, usage, invoice history/PDFs, billing details, and wallets. Add `cancellationActions` for Cancel/Keep and `planChangeActions` for upgrades, scheduled downgrades, and withdrawal of a pending change. These controls also work independently on a custom billing page.
 
 <Info>
-Available in **`@nozle-js/react@0.10.0`**, **`@nozle-js/node@0.9.0`**, **`nozle-sdk==0.9.0`**, and **`github.com/nozle-dev/nozle-go`**. Earlier React `0.9.0` and Node/Python server SDK `0.8.0` releases do not include these additions. The matching hosted backend endpoints are available.
+Available in **`@nozle-js/react@0.10.0`**, **`@nozle-js/node@0.9.0`**, **`nozle-sdk==0.9.0`**, and **`github.com/nozle-dev/nozle-go@v0.9.0`**. Earlier React `0.9.0` and Node/Python server SDK `0.8.0` releases do not include these additions. The matching hosted backend endpoints are available.
 </Info>
 
 ## Install
@@ -30,7 +30,7 @@ pip install nozle-sdk==0.9.0
 Or on your Go merchant backend:
 
 ```bash
-go get github.com/nozle-dev/nozle-go
+go get github.com/nozle-dev/nozle-go@v0.9.0
 ```
 
 ## How requests flow
@@ -210,6 +210,6 @@ export function SubscriptionControls(props: {
 - [Python merchant server](https://github.com/nozle-dev/nozle-python/tree/v0.9.0/examples/billing_portal)
 - [Node method reference](/sdks/node/billing#subscription-self-service), [Python method reference](/sdks/python/billing#subscription-self-service), and [Go method reference](/sdks/go/billing)
 
-Install React `0.10.0` with Node `0.9.0`, Python `0.9.0`, or the Go SDK for your integration. The linked Node and Python examples use the source checkout; build it as their READMEs describe when running those demos. Follow the examples' READMEs for TLS and environment setup. Their demo login and single-process file replay store must be replaced with your application's authentication and transactional shared storage before serving production customers. Browser sessions use Secure, HttpOnly cookies over HTTPS.
+Install React `0.10.0` with Node `0.9.0`, Python `0.9.0`, or Go `v0.9.0` for your integration. The linked Node and Python examples use the source checkout; build it as their READMEs describe when running those demos. Follow the examples' READMEs for TLS and environment setup. Their demo login and single-process file replay store must be replaced with your application's authentication and transactional shared storage before serving production customers. Browser sessions use Secure, HttpOnly cookies over HTTPS.
 
 The portal changes billing state. Enforce feature access on your application's server using Nozle entitlement checks. The hosted Engine observes cancellation at the saved ending boundary and Keep after commit, without waiting for its old subscription-cache refresh.
