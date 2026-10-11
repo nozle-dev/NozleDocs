@@ -41,6 +41,8 @@ If `cost_event_id` is omitted, Nozle generates and returns a version 7 universal
 
 The Node.js and Python OpenAI and Anthropic wrappers can create the parent Feature Event and its detailed Cost Events together. Set `costMeterCode` in Node.js or `cost_meter_code` in Python. The wrapper generates the parent `transaction_id` before delivery, so child Cost Events may safely arrive before the Feature Event.
 
+The [Go SDK](/sdks/go/llm-usage) records the same provider usage after a completed provider call with `CaptureOpenAIUsage` or `CaptureAnthropicUsage`. Pass provider usage metadata; the Go SDK does not depend on a provider client library.
+
 Each non-zero category is emitted separately with canonical properties:
 
 ```json
