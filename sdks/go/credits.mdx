@@ -1,0 +1,57 @@
+---
+title: "Product credits"
+description: "Discover credit systems, read exact balances, transfer Entity credits, and atomically consume usage."
+---
+
+Product-credit quantities are `nozle.Decimal` strings. Keep their exact decimal representation throughout your application.
+
+## List credit systems and read balances
+
+```go
+systems, err := client.ListCreditSystems(ctx)
+balance, err := client.GetEntityCreditBalance(ctx, "workspace_123", "user_42", "ai_credits")
+transfer, err := client.AllocateCredits(ctx, "workspace_123", "user_42", "ai_credits", nozle.Decimal("100.000000000001"), "allocate-user-42-v1")
+_ = systems
+_ = balance
+_ = transfer
+_ = err
+```
+
+`ListCreditSystems` follows every active Core page. Customer and Entity balance and operation methods expose sources, exact amounts, and cursors. `DeallocateCredits` returns eligible credits to the customer; transfer amounts must be positive strings with at most 12 decimal places.
+
+Use `GetCreditBalance` and `ListCreditBalances` for customer balances. `GetEntityCreditBalance` includes `EntityAvailable`, `SharedAvailable`, `EffectiveAvailable`, and `PoolPolicy`. Pool policy can be `entity_only`, `entity_then_customer`, or `customer_only`.
+
+## Operation history and transfers
+
+`ListCreditOperations` and `ListEntityCreditOperations` take `PageOptions{CreditSystemCode, Limit, Cursor}`. Limits are 1–100. Read `NextCursor` to fetch the next page. Operations include exact amounts, status, reason, rate snapshot, occurrence time, and source allocations. `AllocateCredits` and `DeallocateCredits` require stable idempotency keys of at most 255 UTF-8 bytes.
+
+```go
+page, err := client.ListCreditOperations(ctx, "workspace_123", nozle.PageOptions{
+  CreditSystemCode: "ai_credits", Limit: 25,
+})
+_ = page
+_ = err
+returned, err := client.DeallocateCredits(ctx, "workspace_123", "user_42", "ai_credits", nozle.Decimal("25"), "deallocate-user-42-v1")
+_ = returned
+_ = err
+```
+
+## Advisory check and atomic tracking
+
+```go
+check, err := client.CheckUsage(ctx, nozle.UsageParams{CustomerID: "workspace_123", EntityID: "user_42", FeatureCode: "agent_execution", CreditSystemCode: "ai_credits"})
+result, err := client.TrackUsage(ctx, nozle.UsageParams{CustomerID: "workspace_123", EntityID: "user_42", FeatureCode: "agent_execution", CreditSystemCode: "ai_credits"}, "agent-run-0183f")
+_ = check
+_ = result
+_ = err
+```
+
+`CheckUsage` is advisory. `TrackUsage` atomically evaluates and deducts credits, records the operation, and requires an idempotency key.
+
+Set `UsageParams.Properties` for conversion or attribution metadata. `UsageResult` includes `Allowed`, exact `CreditsRequired`, `Available`, `ProjectedRemaining`, and deduction details. A check never reserves credits; inspect `Allowed` on the tracking result before granting the operation.
+
+## Legacy wallet adapter
+
+For applications still using the legacy wallet, `CheckAndDeduct` calls Engine's legacy wallet adapter with a customer ID, feature, and numeric credit amount. This endpoint has no idempotency key. Use `CheckUsage` and `TrackUsage` for product credits, which preserve exact decimal values.
+
+Keep reads and mutations behind authenticated backend routes. Derive customer and Entity IDs from trusted identity data.

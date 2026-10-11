@@ -1,10 +1,10 @@
 ---
 title: "Entity Subscriptions"
 description: "Give individual customer Entities independent plans, billing periods, and subscription lifecycles."
-api: "POST https://api.nozle.app/engine/api/v1/customers/{customer_id}/entity-subscriptions/checkout"
+api: "POST https://api.nozle.app/core/api/v1/customers/{customer_id}/entity-subscriptions/checkout"
 ---
 
-Base URL: `https://api.nozle.app/engine/api/v1`.
+Base URL: `https://api.nozle.app/core/api/v1`.
 
 Entity subscriptions let one customer pay for multiple independently managed subscriptions. Each Entity keeps a stable subscription identity while using the standard Nozle plan, invoice, checkout, renewal, and reporting lifecycle.
 
@@ -86,7 +86,7 @@ Content-Type: application/json
 
 Use bulk Entity checkout when a customer purchases a mixed pool of plans in one payment. The merchant backend supplies one item per Entity; Nozle creates one invoice and one Stripe checkout for the complete basket.
 
-Use the Node SDK from your trusted backend. It wraps the API request, validates the basket, and returns the checkout contract:
+Use a server SDK from your trusted backend. These SDK methods validate the basket and return the checkout contract. In Node.js:
 
 ```ts
 import { Nozle } from '@nozle-js/node'
@@ -133,6 +133,17 @@ checkout = nozle.entity_subscriptions.checkout_many(
 )
 ```
 
+The Go SDK exposes the grouped checkout result with typed Entity items:
+
+```go
+checkout, err := client.CheckoutEntitySubscriptions(ctx, "workspace_123", []nozle.EntitySubscriptionCheckoutItem{
+  {ExternalEntityID: "seat_pro_001", PlanCode: "pro_monthly"},
+  {ExternalEntityID: "seat_max_001", PlanCode: "max_monthly"},
+}, "https://app.example.com/settings/billing", "anniversary", "workspace-123-seat-purchase-v1")
+if err != nil { return err }
+_ = checkout
+```
+
 On the frontend, pass a Stripe result to the React checkout component:
 
 ```tsx
@@ -148,7 +159,7 @@ if (checkout.type === 'stripe' && checkout.client_secret) {
 }
 ```
 
-The endpoint below remains available for backends that do not use the Node SDK.
+The endpoint below remains available for backends that call HTTP directly.
 
 ```http
 POST /customers/workspace_123/entity-subscriptions/checkout

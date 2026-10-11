@@ -1,0 +1,27 @@
+---
+title: "Errors and retries"
+description: "Handle local validation, authentication, transport, and structured API errors."
+---
+
+The Go SDK exposes `ValidationError`, `AuthenticationError`, `TransportError`, and `APIError`. An `APIError` includes the HTTP status, method, path, operation, and redacted response details.
+
+| Error | Meaning |
+|---|---|
+| `ValidationError` | Local contract validation failed before network I/O. |
+| `AuthenticationError` | Unsupported key type; embeds validation details. |
+| `TransportError` | No HTTP response due to a connection or timeout failure. |
+| `APIError` | Non-success response or invalid JSON success payload. |
+
+```go
+_, err := client.Ping(ctx)
+var apiErr *nozle.APIError
+if errors.As(err, &apiErr) {
+  log.Printf("Nozle %s returned %d", apiErr.Operation, apiErr.StatusCode)
+}
+```
+
+Check `AuthenticationError` separately when handling key type errors. `errors.As` can inspect the wrapped transport cause. API details redact known secret, token, authorization, and key fields.
+
+## Retry behavior
+
+The SDK does not retry requests automatically. Reuse the same event transaction ID or mutation idempotency key and payload after an uncertain outcome. Decide whether to retry reads within your request budget. Automatic LLM capture preserves the provider result and reports telemetry failures through `OnError`; manual capture returns them. Queue failed telemetry when durable delivery matters.

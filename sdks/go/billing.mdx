@@ -1,0 +1,155 @@
+---
+title: "Billing and subscriptions"
+description: "List plans, create payment-aware checkouts, and manage customer or Entity subscriptions from a trusted backend."
+---
+
+## List plans and create checkout
+
+`Plans` accepts `pk_` or `sk_`; other billing methods require a server-side `sk_`. `Plan` includes code, name, amount in cents, currency, and interval. Upsert the customer with `UpsertCustomer` before billing.
+
+```go
+plans, err := client.Plans(ctx)
+checkout, err := client.Checkout(ctx, nozle.CheckoutParams{
+  CustomerID: "workspace_123", PlanCode: "pro_monthly",
+  ReturnURL: "https://app.example.com/billing",
+  IdempotencyKey: "checkout-workspace-123-pro-v1",
+})
+_ = plans
+_ = checkout
+_ = err
+```
+
+Validate the exact HTTPS return origin before using a browser-supplied URL. Handle each checkout type explicitly: `stripe` (URL or client secret), `razorpay` (order and public key), `hosted` (payment URL), `processing` (recover by checkout ID), `completed` (reload subscription), and `scheduled` (display pending change). Browser redirects and callbacks do not prove activation.
+
+## Direct subscription and cancellation
+
+`Subscribe` and `CancelSubscription` expose the returned nested `Subscription` and fill the convenience `SubscriptionID` and `Status` fields.
+
+```go
+subscription, err := client.Subscribe(ctx, nozle.SubscribeParams{CustomerID: "workspace_123", PlanCode: "free"})
+if err != nil { return err }
+cancelled, err := client.CancelSubscription(ctx, "workspace_123", subscription.SubscriptionID, "end_of_period")
+_ = cancelled
+_ = err
+```
+
+Use direct subscription only when payment is not required. Cancellation accepts `end_of_period` or `immediate`.
+
+## Subscription self-service
+
+Derive the customer from the authenticated application user and validate ownership of the selected **external** subscription ID. Do not pass Core's internal UUID. These methods support [the React billing portal](/sdks/react/billing-portal).
+
+### Load options and preview a quote
+
+`CheckoutResult.Type` distinguishes `stripe`, `razorpay`, `hosted`, `processing`, `completed`, and `scheduled`. Payment fulfillment is authoritative on the server. Use `CheckoutStatus` and `VerifyCheckout` with a `CheckoutScope` containing both customer and external subscription IDs when recovering payment.
+
+For a signed plan-change quote, call `SubscriptionOptions`, then `PreviewSubscriptionChange`. Pass its `QuoteID` and the external `SubscriptionID` to `Checkout`. A quote can expire; ask the customer to confirm a fresh one after a 409.
+
+```go
+options, err := client.SubscriptionOptions(ctx, "workspace_123", "subscription_123")
+quote, err := client.PreviewSubscriptionChange(ctx, "workspace_123", "subscription_123", "growth_monthly")
+_ = options
+_ = quote
+_ = err
+```
+
+`SubscriptionOptions` contains the current subscription, pending change, eligible plans, and checkout as JSON values. `SubscriptionChangePreview` contains the signed quote, direction, timing, `EffectiveAt`, `RenewalAt`, and exact `json.Number` amounts including `AmountDueNowCents` and `AmountDueAtEffectiveCents`. Show server-provided eligibility, amounts, and dates before confirmation.
+
+### Confirm a paid upgrade
+
+```go
+quote, err := client.PreviewSubscriptionChange(ctx, "workspace_123", "subscription_123", "growth_monthly")
+if err != nil { return err }
+checkout, err := client.Checkout(ctx, nozle.CheckoutParams{
+  CustomerID: "workspace_123", SubscriptionID: "subscription_123",
+  PlanCode: "growth_monthly", QuoteID: quote.QuoteID,
+  ReturnURL: "https://app.example.com/settings/billing",
+  IdempotencyKey: "upgrade-subscription-123-growth-v1",
+})
+_ = checkout
+_ = err
+```
+
+Quotes expire after five minutes or when their bound state changes. On HTTP 409, request a fresh preview and confirmation. Retry an uncertain accepted request with the same payload and key.
+
+### Schedule or withdraw a downgrade
+
+`PreviewSubscriptionTransition` and `ApplySubscriptionTransition` support `cancel`, `downgrade`, and `uncancel`. Apply requires a caller-supplied idempotency key. `WithdrawPendingSubscriptionChange` requires the exact pending change ID. `CancelSubscription` provides the simpler immediate or end-of-period cancellation path.
+
+```go
+quote, err := client.PreviewSubscriptionChange(ctx, "workspace_123", "subscription_123", "growth_monthly")
+if err != nil { return err }
+scheduled, err := client.ApplySubscriptionTransition(ctx, nozle.SubscriptionTransitionParams{
+  CustomerID: "workspace_123", SubscriptionID: "subscription_123",
+  Operation: "downgrade", TargetPlanCode: "growth_monthly",
+  Timing: "end_of_period", BillingAnchor: "keep_anchor", QuoteID: quote.QuoteID,
+}, "downgrade-subscription-123-growth-v1")
+_ = scheduled
+_ = err
+withdrawn, err := client.WithdrawPendingSubscriptionChange(ctx,
+  "workspace_123", "subscription_123", "confirmed-pending-change-id", "withdraw-subscription-123-v1")
+_ = withdrawn
+_ = err
+```
+
+Reload options after scheduling. A stale pending ID conflicts instead of removing a replacement.
+
+### Cancel at period end and Keep
+
+```go
+params := nozle.SubscriptionTransitionParams{
+  CustomerID: "workspace_123", SubscriptionID: "subscription_123",
+  Operation: "cancel", Timing: "end_of_period",
+}
+preview, err := client.PreviewSubscriptionTransition(ctx, params)
+if err != nil { return err }
+params.ExpectedEffectiveAt = preview.SubscriptionTransition.EffectiveAt
+_, err = client.ApplySubscriptionTransition(ctx, params, "cancel-subscription-123-v1")
+if err != nil { return err }
+_, err = client.ApplySubscriptionTransition(ctx, nozle.SubscriptionTransitionParams{
+  CustomerID: "workspace_123", SubscriptionID: "subscription_123", Operation: "uncancel",
+}, "keep-subscription-123-v1")
+_ = err
+```
+
+Preserve the preview's full timestamp. Keep is available only before the ending is due. Cancellation clears a pending downgrade; Keep does not restore it.
+
+### Scope payment recovery and verification
+
+```go
+scope := nozle.CheckoutScope{CustomerID: "workspace_123", SubscriptionID: "subscription_123"}
+status, err := client.CheckoutStatus(ctx, "checkout_123", scope)
+_ = status
+_ = err
+verified, err := client.VerifyCheckout(ctx, "checkout_123", nozle.RazorpayVerification{
+  RazorpayOrderID: "order_from_callback", RazorpayPaymentID: "payment_from_callback",
+  RazorpaySignature: "signature_from_callback",
+}, scope)
+_ = verified
+_ = err
+```
+
+Forward the genuine Razorpay callback. Scope recovery to both customer and external subscription IDs. Reload the subscription before reporting activation.
+
+## Entity subscriptions
+
+Entity subscription methods include `EnsureEntitySubscription`, `GetEntitySubscription`, `ListEntitySubscriptions`, `CheckoutEntitySubscription`, `ChangeEntitySubscriptionPlan`, `CancelEntitySubscription`, and `RemoveEntitySubscription`. `CheckoutEntitySubscriptions` purchases a mixed Entity seat pool in one payment.
+
+`CheckoutEntitySubscriptions` returns `EntitySubscriptionCheckoutManyResult` with the grouped payment status and individual Entity items. `CancelEntitySubscription` returns `EntitySubscriptionCancelResult` with the Entity subscription and transition settlement details.
+
+```go
+_, err := client.EnsureEntitySubscription(ctx, "workspace_123", "user_42")
+if err != nil { return err }
+seatCheckout, err := client.CheckoutEntitySubscription(ctx, "workspace_123", "user_42", nozle.EntitySubscriptionChange{
+  PlanCode: "pro_monthly", BillingTime: "anniversary",
+  ReturnURL: "https://app.example.com/settings/billing", IdempotencyKey: "checkout-user-42-pro-v1",
+})
+_ = seatCheckout
+_ = err
+```
+
+See [Entity subscriptions](/api/entity-subscriptions) for lifecycle and payment behavior.
+
+## Settlement transitions
+
+For configured settlement policies, preview and apply with `SubscriptionTransitionParams`. Apply keys are limited to 255 UTF-8 bytes. See [Subscriptions](/guides/billing/subscriptions) for valid combinations.

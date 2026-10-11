@@ -1,0 +1,45 @@
+---
+title: "Customers and Entities"
+description: "Upsert customers and manage idempotent Entity lifecycle operations."
+---
+
+Customers represent billable accounts; Entities represent child users, agents, projects, or environments. `UpsertCustomer` sends the merchant secret key to Core, which derives the owning organization from that key.
+
+## Upsert a customer and Entity
+
+```go
+customer, err := client.UpsertCustomer(ctx, nozle.Customer{ExternalID: "workspace_123", Name: "Acme"})
+entity, err := client.UpsertEntity(ctx, customer.ExternalID, "user_42", nozle.EntityInput{
+  Status: "active", Name: "Asha", Metadata: map[string]any{"role": "agent"},
+}, "entity-user-42-v1")
+_ = entity
+_ = err
+```
+
+Use `GetEntity`, `ListEntities`, `ActivateEntity`, `SuspendEntity`, and `BulkUpsertEntities` for the Entity lifecycle. List pages accept `PageOptions` with status, limit (1–100), and cursor. Bulk upsert accepts 1–500 distinct IDs. Mutations use caller-supplied idempotency keys of at most 255 UTF-8 bytes. Entity lifecycle changes do not emit seat billing events automatically.
+
+## Read and update Entities
+
+```go
+page, err := client.ListEntities(ctx, "workspace_123", nozle.PageOptions{Status: "active", Limit: 50})
+_ = page
+_ = err
+result, err := client.SuspendEntity(ctx, "workspace_123", "user_42", "suspend-user-42-v1")
+_ = result
+_ = err
+```
+
+Entity status accepts `active`, `suspended`, or `deleted`. Status helpers read the Entity first and preserve its name and metadata. Retry an uncertain mutation with the same key and payload.
+
+## Bulk upsert and seat billing
+
+```go
+bulk, err := client.BulkUpsertEntities(ctx, "workspace_123", []nozle.EntityInput{
+  {ExternalID: "user_42", Name: "Asha", Status: "active"},
+  {ExternalID: "user_43", Name: "Ravi", Status: "suspended"},
+}, "workspace-123-users-import-7")
+_ = bulk
+_ = err
+```
+
+Track seat additions and removals separately when your catalog bills seats. Use the same Entity ID for per-Entity credits and usage attribution.

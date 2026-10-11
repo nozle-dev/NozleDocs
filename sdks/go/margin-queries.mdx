@@ -1,0 +1,28 @@
+---
+title: "Margin queries"
+description: "Query summary, customer, metric, plan, model, and trend margin data."
+---
+
+```go
+filters := url.Values{"from_date": {"2026-07-01"}, "to_date": {"2026-07-31"}}
+summary, err := client.MarginSummary(ctx, filters)
+trend, err := client.MarginTrend(ctx, "day", filters)
+_ = summary
+_ = trend
+_ = err
+```
+
+`MarginByCustomer`, `MarginByMetric`, `MarginByPlan`, and `MarginByModel` call their corresponding Engine `/api/v1/margin/*` endpoints. Results are `json.RawMessage`; decode into a shape appropriate for your deployed report schema. Trend granularity accepts `hour`, `day`, `week`, or `month`.
+
+## Methods
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `MarginSummary` | `/margin/summary` | Aggregate margin. |
+| `MarginByCustomer` | `/margin/customers` | Group by customer. |
+| `MarginByMetric` | `/margin/metrics` | Group by Feature. |
+| `MarginByPlan` | `/margin/plans` | Group by plan. |
+| `MarginByModel` | `/margin/models` | Group by model. |
+| `MarginTrend` | `/margin/trend` | Time series. |
+
+All methods take `url.Values` for deployed API query parameters; `MarginTrend` also requires a granularity. Check the raw JSON shape before depending on report fields. Margin simulation is a separate [REST API](/api/margin-simulate).
