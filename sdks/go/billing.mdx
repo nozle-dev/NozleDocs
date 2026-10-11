@@ -32,3 +32,5 @@ _ = err
 `PreviewSubscriptionTransition` and `ApplySubscriptionTransition` support `cancel`, `downgrade`, and `uncancel`. Apply requires a caller-supplied idempotency key. `WithdrawPendingSubscriptionChange` requires the exact pending change ID. `CancelSubscription` provides the simpler immediate or end-of-period cancellation path.
 
 Entity subscription methods include `EnsureEntitySubscription`, `GetEntitySubscription`, `ListEntitySubscriptions`, `CheckoutEntitySubscription`, `ChangeEntitySubscriptionPlan`, `CancelEntitySubscription`, and `RemoveEntitySubscription`. `CheckoutEntitySubscriptions` purchases a mixed Entity seat pool in one payment.
+
+`CheckoutEntitySubscriptions` returns `EntitySubscriptionCheckoutManyResult` with the grouped payment status and individual Entity items. `CancelEntitySubscription` returns `EntitySubscriptionCancelResult` with the Entity subscription and transition settlement details.

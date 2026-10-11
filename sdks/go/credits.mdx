@@ -26,3 +26,5 @@ _ = err
 ```
 
 `CheckUsage` is advisory. `TrackUsage` atomically evaluates and deducts credits, records the operation, and requires an idempotency key.
+
+For applications still using the legacy wallet, `CheckAndDeduct` calls Engine's legacy wallet adapter with a customer ID, feature, and numeric credit amount. This endpoint has no idempotency key. Use `CheckUsage` and `TrackUsage` for product credits, which preserve exact decimal values.
