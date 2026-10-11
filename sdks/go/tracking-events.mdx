@@ -13,6 +13,6 @@ err := client.Track(ctx, nozle.TrackParams{
 _ = err
 ```
 
-`Track` posts `{ "event": { ... } }` to Core `/api/v1/events`. If `SubscriptionID` is omitted, the SDK looks up active subscriptions and requires exactly one. Supply it explicitly when a customer has multiple active subscriptions. Reuse the same transaction ID and timestamp when retrying a logical event. `Meter` posts a batch of 1–100 events to Core `/api/v1/events/batch`; each batch event needs an explicit subscription ID.
+`Track` posts `{ "event": { ... } }` to Core `/api/v1/events`. Pass `Timestamp` as RFC3339 or Unix seconds; the SDK sends Unix seconds with millisecond precision, as required by Core. If `SubscriptionID` is omitted, the SDK looks up active subscriptions and requires exactly one. Supply it explicitly when a customer has multiple active subscriptions. Reuse the same transaction ID and timestamp when retrying a logical event. `Meter` posts a batch of 1–100 events to Core `/api/v1/events/batch`; each batch event needs an explicit subscription ID.
 
 `TrackCostEvent` records a Cost Event in Engine. Set `CostMeterCode` and either `ParentTransactionID` or `ExternalCustomerID`. Supply a stable `CostEventID` for retries.

@@ -15,6 +15,8 @@ _ = checkout
 _ = err
 ```
 
+`Subscribe` and `CancelSubscription` expose the returned nested `Subscription` and fill the convenience `SubscriptionID` and `Status` fields.
+
 `CheckoutResult.Type` distinguishes `stripe`, `razorpay`, `hosted`, `processing`, `completed`, and `scheduled`. Payment fulfillment is authoritative on the server. Use `CheckoutStatus` and `VerifyCheckout` with a `CheckoutScope` containing both customer and external subscription IDs when recovering payment.
 
 For a signed plan-change quote, call `SubscriptionOptions`, then `PreviewSubscriptionChange`. Pass its `QuoteID` and the external `SubscriptionID` to `Checkout`. A quote can expire; ask the customer to confirm a fresh one after a 409.
