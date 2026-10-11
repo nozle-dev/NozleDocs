@@ -10,15 +10,18 @@ go get github.com/nozle-dev/nozle-go
 ```
 
 ```go
-import nozle "github.com/nozle-dev/nozle-go"
+import (
+  "os"
+  nozle "github.com/nozle-dev/nozle-go"
+)
 
-client := nozle.New("sk_your_secret_key")
+client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"))
 ```
 
 The default Engine and Core URLs are `https://api.nozle.app/engine` and `https://api.nozle.app/core`. For a local deployment:
 
 ```go
-client := nozle.New("sk_local", nozle.WithBaseURL("http://localhost:8080"), nozle.WithEventsURL("http://localhost:3000"))
+client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"), nozle.WithBaseURL("http://localhost:8888/engine"), nozle.WithEventsURL("http://localhost:8888/core"))
 ```
 
 `WithTimeout` changes the 10-second request timeout. `WithHTTPClient` injects an `*http.Client`. All methods accept `context.Context`. Reuse one client and keep `sk_` credentials on your server.
