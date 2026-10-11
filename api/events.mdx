@@ -3,10 +3,10 @@ title: Events
 description: Send metered usage events from a trusted backend
 ---
 
-Use the Node.js, Python, or Go SDK for event ingestion. Each `track()` or `Track()` call sends one event; batching is explicit.
+Use the Node.js or Python SDK for event ingestion. The SDK sends one event per `track()` call; it does not batch automatically.
 
 <Info>
-See [Node.js event tracking](/sdks/node/tracking-events), [Python event tracking](/sdks/python/tracking-events), or [Go event tracking](/sdks/go/tracking-events) for subscription resolution and idempotency behavior.
+See [Node.js event tracking](/sdks/node/tracking-events) or [Python event tracking](/sdks/python/tracking-events) for subscription resolution and idempotency behavior.
 </Info>
 
 ## Event envelope
@@ -22,7 +22,7 @@ See [Node.js event tracking](/sdks/node/tracking-events), [Python event tracking
       "model": "example-model",
       "tokens": 1500
     },
-    "timestamp": 1785839400
+    "timestamp": "2026-08-04T10:30:00Z"
   }
 }
 ```
@@ -34,7 +34,7 @@ See [Node.js event tracking](/sdks/node/tracking-events), [Python event tracking
 | `external_subscription_id` | recommended | Subscription receiving usage. Required when resolution would be ambiguous. |
 | `code` | yes | Feature code. |
 | `properties` | no | Aggregation and attribution metadata. |
-| `timestamp` | no | Unix seconds for direct Core HTTP requests. The SDKs normalize their supported timestamp inputs to the Core wire format. |
+| `timestamp` | no | ISO 8601 occurrence time. |
 
 For direct HTTP ingestion, send this envelope to the Events API configured for your organization with a secret key. Prefer the SDKs so subscription lookup, UUID generation, timeout handling, and errors remain consistent.
 

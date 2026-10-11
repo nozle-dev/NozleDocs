@@ -15,26 +15,16 @@ and API paths behind a service prefix.
 Append an operation's path once. For example, an Engine catalog request is
 `https://api.nozle.app/engine/api/v1/plans`.
 
-The current Node, Python, and [Go](/sdks/go/installation) server SDKs default to Engine for
-extension calls and Core for billing resources and events. React defaults public catalog
-requests to Engine. Existing URL overrides continue to work. The Go module can be installed
-after its public repository is published.
+Node `0.7.0` and Python `0.7.0` default to Engine for `baseUrl` / `base_url` and
+Core for `eventsUrl` / `events_url`. React `0.8.0` defaults public catalog requests
+to Engine. Existing option names and explicit overrides continue to work.
 
 ```ts
 const nozle = new Nozle({
   apiKey: process.env.NOZLE_SECRET_KEY!,
-  baseUrl: 'http://localhost:8888/engine',
-  eventsUrl: 'http://localhost:8888/core',
+  baseUrl: 'http://localhost:8080',
+  eventsUrl: 'http://localhost:3000',
 })
-```
-
-Go uses the same local reverse proxy paths:
-
-```go
-client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"),
-  nozle.WithBaseURL("http://localhost:8888/engine"),
-  nozle.WithEventsURL("http://localhost:8888/core"),
-)
 ```
 
 For self-hosted reverse proxies, both overrides can also include path prefixes.

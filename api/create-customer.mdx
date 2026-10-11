@@ -1,50 +1,36 @@
 ---
 title: "Create Customer"
-api: "POST https://api.nozle.app/core/api/v1/customers"
+api: "POST https://api.nozle.app/engine/api/v1/customers"
 ---
 
-Base URL: `https://api.nozle.app/core/api/v1`.
+Base URL: `https://api.nozle.app/engine/api/v1`.
 
 Upsert a customer record. If a customer with the given `external_id` already exists, their name and email are updated; otherwise a new customer is created.
 
 **Auth:** `sk_` (secret key) only.
 
-Send customer attributes under the `customer` key:
-
-```json
-{
-  "customer": {
-    "external_id": "workspace_123",
-    "name": "Example workspace",
-    "email": "billing@example.com"
-  }
-}
-```
-
-<ParamField body="customer.external_id" type="string" required>
+<ParamField body="external_id" type="string" required>
   Your unique identifier for this customer. Used for upsert matching.
 </ParamField>
 
-<ParamField body="customer.name" type="string">
+<ParamField body="name" type="string">
   Customer display name.
 </ParamField>
 
-<ParamField body="customer.email" type="string">
+<ParamField body="email" type="string">
   Customer email address.
 </ParamField>
 
 ### Response
 
-The response wraps the customer in a `customer` object.
-
-<ResponseField name="customer.external_id" type="string" required>
+<ResponseField name="external_id" type="string" required>
   The customer's external identifier.
 </ResponseField>
 
-<ResponseField name="customer.name" type="string">
+<ResponseField name="name" type="string">
   Customer display name.
 </ResponseField>
 
-<ResponseField name="customer.email" type="string">
+<ResponseField name="email" type="string">
   Customer email address.
 </ResponseField>
