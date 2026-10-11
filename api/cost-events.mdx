@@ -39,9 +39,9 @@ If `cost_event_id` is omitted, Nozle generates and returns a version 7 universal
 
 ## Provider usage capture
 
-The Node.js and Python OpenAI and Anthropic wrappers call the provider, read usage from the completed response or stream, and then create the parent Feature Event and optional detailed Cost Events. Set `costMeterCode` in Node.js or `cost_meter_code` in Python. The wrapper generates the parent `transaction_id` before delivery, so child Cost Events may safely arrive before the Feature Event.
+The [Node.js](/sdks/node/llm-auto-capture), [Python](/sdks/python/llm-auto-capture), and [Go](/sdks/go/llm-usage) SDKs capture OpenAI and Anthropic usage automatically from completed responses and streams. Each records a parent Feature Event and optional detailed Cost Events. Set `costMeterCode` in Node.js, `cost_meter_code` in Python, or `CostMeterCode` in Go. The parent `transaction_id` is generated before delivery, so child Cost Events may safely arrive before the Feature Event.
 
-The [Go SDK](/sdks/go/llm-usage) **does not call OpenAI or Anthropic**. Your application calls the provider using its own Go client, then passes the returned usage counts to `CaptureOpenAIUsage` or `CaptureAnthropicUsage`. Those methods record the same Feature Event fields and Cost Event categories. This explicit step lets Go capture usage without depending on a particular provider client library.
+Node.js and Python wrap the provider client methods. Go wraps the HTTP client passed to the official provider SDK using `WrapOpenAIHTTPClient` or `WrapAnthropicHTTPClient`. Go's `CaptureOpenAIUsage` and `CaptureAnthropicUsage` methods also support manual or queued delivery.
 
 Each non-zero category is emitted separately with canonical properties:
 

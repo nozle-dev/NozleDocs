@@ -1,6 +1,6 @@
 ---
 title: "Errors and retries"
-description: "Handle validation, transport, and HTTP failures."
+description: "Handle local validation, authentication, transport, and structured API errors."
 ---
 
 The Go SDK exposes `ValidationError`, `AuthenticationError`, `TransportError`, and `APIError`. An `APIError` includes the HTTP status, method, path, operation, and redacted response details.
@@ -24,4 +24,4 @@ Check `AuthenticationError` separately when handling key type errors. `errors.As
 
 ## Retry behavior
 
-The SDK does not retry requests automatically. Reuse the same event transaction ID or mutation idempotency key and payload after an uncertain outcome. Decide whether to retry reads within your request budget. For LLM capture, a telemetry error is returned after the provider result; queue it when durable delivery matters.
+The SDK does not retry requests automatically. Reuse the same event transaction ID or mutation idempotency key and payload after an uncertain outcome. Decide whether to retry reads within your request budget. Automatic LLM capture preserves the provider result and reports telemetry failures through `OnError`; manual capture returns them. Queue failed telemetry when durable delivery matters.
