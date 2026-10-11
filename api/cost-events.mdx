@@ -37,9 +37,11 @@ The endpoint requires a secret key. It returns `202 Accepted` after Kafka durabl
 
 If `cost_event_id` is omitted, Nozle generates and returns a version 7 universally unique identifier. Reuse the same identifier and payload when retrying a Cost Event.
 
-## Provider wrapper flow
+## Provider usage capture
 
-The Node.js and Python OpenAI and Anthropic wrappers can create the parent Feature Event and its detailed Cost Events together. Set `costMeterCode` in Node.js or `cost_meter_code` in Python. The wrapper generates the parent `transaction_id` before delivery, so child Cost Events may safely arrive before the Feature Event.
+The Node.js and Python OpenAI and Anthropic wrappers call the provider, read usage from the completed response or stream, and then create the parent Feature Event and optional detailed Cost Events. Set `costMeterCode` in Node.js or `cost_meter_code` in Python. The wrapper generates the parent `transaction_id` before delivery, so child Cost Events may safely arrive before the Feature Event.
+
+The [Go SDK](/sdks/go/llm-usage) **does not call OpenAI or Anthropic**. Your application calls the provider using its own Go client, then passes the returned usage counts to `CaptureOpenAIUsage` or `CaptureAnthropicUsage`. Those methods record the same Feature Event fields and Cost Event categories. This explicit step lets Go capture usage without depending on a particular provider client library.
 
 Each non-zero category is emitted separately with canonical properties:
 

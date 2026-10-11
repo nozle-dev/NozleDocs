@@ -1,0 +1,88 @@
+---
+title: "LLM usage capture"
+description: "Record OpenAI and Anthropic usage after a provider call."
+---
+
+Your application calls OpenAI or Anthropic using its own Go client. The Nozle Go SDK makes no provider request: after your application receives usage counts, pass them to Nozle for tracking. The SDK does not patch provider clients or add provider dependencies. For a stream, call capture after the final usage-bearing response or chunk arrives. Only model, token counts, latency, and an optional feature tag are sent; prompt and completion content are not captured.
+
+## OpenAI
+
+Map `prompt_tokens` or `input_tokens` to `PromptTokens`, and `completion_tokens` or `output_tokens` to `CompletionTokens`. Use the provider's cached-input and reasoning detail counts when available.
+
+```go
+err := client.CaptureOpenAIUsage(ctx, nozle.ProviderCapture{
+  CustomerID: "workspace_123",
+  SubscriptionID: "workspace_123_subscription",
+  FeatureCode: "llm_tokens",
+  CostMeterCode: "ai_tokens",
+  Feature: "assistant_reply",
+  Model: "example-chat-model",
+  RequestID: "provider-request-123",
+  TransactionID: nozle.CreateTransactionID(),
+}, nozle.OpenAIUsage{
+  PromptTokens: 320,
+  CachedInputTokens: 20,
+  CompletionTokens: 84,
+  ReasoningTokens: 4,
+})
+if err != nil { /* report or queue telemetry failure */ }
+```
+
+The Go SDK clamps negative counts to zero and caps cached input and reasoning at their respective totals. `PromptTokens` and `CompletionTokens` remain the total Feature Event counts; detailed Cost Events split those totals by category.
+
+## Anthropic
+
+Map `input_tokens` to `InputTokens`, `cache_read_input_tokens` to `CachedInputTokens`, `cache_creation_input_tokens` to `CacheWriteTokens`, and `output_tokens` to `OutputTokens`. For streams, collect input usage from `message_start` and output usage from `message_delta`, then capture after the stream completes.
+
+```go
+err := client.CaptureAnthropicUsage(ctx, nozle.ProviderCapture{
+  CustomerID: "workspace_123",
+  SubscriptionID: "workspace_123_subscription",
+  FeatureCode: "llm_tokens",
+  CostMeterCode: "ai_tokens",
+  Feature: "assistant_reply",
+  Model: "example-anthropic-model",
+  RequestID: "provider-request-456",
+  TransactionID: nozle.CreateTransactionID(),
+}, nozle.AnthropicUsage{
+  InputTokens: 240,
+  CachedInputTokens: 40,
+  CacheWriteTokens: 12,
+  OutputTokens: 90,
+})
+if err != nil { /* report or queue telemetry failure */ }
+```
+
+Anthropic's Feature Event `input_tokens` includes regular input, cached input, and cache-write input. Negative token counts are clamped to zero.
+
+## Tracked properties
+
+Each capture call creates one Core Feature Event with these properties:
+
+```json
+{
+  "provider": "openai",
+  "model": "example-chat-model",
+  "input_tokens": 320,
+  "output_tokens": 84,
+  "latency_ms": 742,
+  "feature": "assistant_reply"
+}
+```
+
+Set `Latency` on `ProviderCapture` to send a measured duration; otherwise `latency_ms` is zero. `FeatureCode` defaults to `llm_tokens`. Supplying `SubscriptionID` avoids a lookup when a customer has more than one active subscription.
+
+When `CostMeterCode` is set, each non-zero token category creates a linked Engine Cost Event with properties `{ tokens, provider, model, type }`:
+
+- OpenAI: `input`, `cached_input`, `output`, and `reasoning`.
+- Anthropic: `input`, `cached_input`, `cache_write`, and `output`.
+
+Configure the Cost Event Meter and effective-dated provider/model/category Cost Rules to rate those events. The parent Feature Event uses `TransactionID`; category Cost Event IDs derive from that same ID, so use a stable transaction ID when retrying the same capture. If omitted, Go generates a UUIDv7 transaction ID.
+
+## Delivery and errors
+
+Go sends the Feature Event first, then attempts each non-zero Cost Event category. If one Cost Event fails, it attempts the remaining categories and returns the telemetry errors. If the Feature Event fails, capture returns that error before sending Cost Events. The methods make no automatic retries.
+
+Call capture after the provider result has completed. A Nozle error is returned to your code; decide whether to log it, enqueue telemetry for retry, or surface it separately. Do not replace an otherwise successful provider response unless your application explicitly requires telemetry success.
+
+Node and Python provide automatic provider wrappers, including stream handling. Go exposes explicit after-call capture so it works with any Go provider client. The Feature Event fields and Cost Event categories match the published SDKs; delivery and error handling follow the Go method contract above.

@@ -29,10 +29,11 @@ await nozle.track(
 ```
 
 ```python title="Python"
+import os
 from nozle import Nozle
 
 nozle = Nozle(
-    api_key="sk_example",
+    api_key=os.environ["NOZLE_SECRET_KEY"],
     base_url="https://api.nozle.app/engine",
     events_url="https://api.nozle.app/core",
 )
@@ -46,6 +47,21 @@ nozle.track(
     timestamp="2026-08-04T10:30:00Z",
 )
 ```
+
+```go title="Go"
+client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"))
+err := client.Track(ctx, nozle.TrackParams{
+  CustomerID: "customer_123",
+  SubscriptionID: "subscription_123",
+  Event: "api_calls",
+  TransactionID: "request_0183f",
+  Timestamp: "2026-08-04T10:30:00Z",
+  Metadata: map[string]any{"model": "example-model", "tokens": 1500},
+})
+if err != nil { return err }
+```
+
+The Go client defaults to `https://api.nozle.app/engine` and `https://api.nozle.app/core`. Its `Track` method converts RFC3339 timestamps to the Unix-seconds form required by Core.
 
 ## 2. Ingest and deduplicate
 
@@ -61,11 +77,11 @@ Aggregated usage becomes invoice charges according to the plan's pricing model. 
 
 ## Product-credit events
 
-For actions that must be authorized and deducted from product credits, call `usage.track()` instead of sending a plain event. Nozle records the credit operation and queues the matching billing event in one durable workflow.
+For actions that must be authorized and deducted from product credits, call `usage.track()` in Node.js, `usage.track()` in Python, or `TrackUsage()` in Go instead of sending a plain event. Nozle records the credit operation and queues the matching billing event in one durable workflow.
 
 ## Operational guidance
 
 - Publish from a durable worker for high-volume or business-critical telemetry.
 - Reuse the same transaction ID and timestamp on retries.
-- Supply `subscriptionId` explicitly when a customer can have multiple active subscriptions.
+- Supply a subscription ID explicitly when a customer can have multiple active subscriptions (`subscriptionId` in Node.js, `subscription_id` in Python, or `SubscriptionID` in Go).
 - Do not expect a plain event to reserve credits or synchronously update an invoice.

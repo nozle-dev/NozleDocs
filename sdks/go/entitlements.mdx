@@ -1,0 +1,35 @@
+---
+title: "Entitlements"
+description: "Check customer feature access."
+---
+
+```go
+result, err := client.Can(ctx, "workspace_123", "agent_execution")
+if err == nil && result.Allowed {
+  // Run the permitted operation.
+}
+```
+
+`Can` reads Engine `/api/v1/can`; `CanWithMetadata` adds a JSON metadata filter. For credit-backed features, `CheckUsage` provides an advisory projection and `TrackUsage` enforces and records the deduction atomically.
+
+## Metadata
+
+```go
+result, err := client.CanWithMetadata(ctx, "workspace_123", "model_access", map[string]any{
+  "model": "example-large-model", "region": "us-east",
+})
+_ = result
+_ = err
+```
+
+Metadata can include quantities required by a Cost Rule.
+
+## `CanResult`
+
+| Field | Meaning |
+|---|---|
+| `Allowed`, `Reason` | Access decision and reason. |
+| `Used`, `Limit`, `Remaining`, `Overage` | Usage and allowance state. |
+| `Economics` | Optional point-in-time estimate with exact `nozle.Decimal` values, Cost Rule versions, and exclusions. |
+
+Check immediately before protected server work. React gates are not an authorization boundary. `Can` does not reserve product credits.

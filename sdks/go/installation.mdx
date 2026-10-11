@@ -1,0 +1,65 @@
+---
+title: "Installation"
+description: "Configure the server-side Nozle Go SDK."
+---
+
+The Go SDK requires Go 1.22 or later. Install it after the public repository is published:
+
+```bash
+go get github.com/nozle-dev/nozle-go
+```
+
+## Create a client
+
+```go
+import (
+  "os"
+  nozle "github.com/nozle-dev/nozle-go"
+)
+
+client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"))
+```
+
+The default Engine and Core URLs are `https://api.nozle.app/engine` and `https://api.nozle.app/core`. For a local deployment:
+
+```go
+client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"), nozle.WithBaseURL("http://localhost:8888/engine"), nozle.WithEventsURL("http://localhost:8888/core"))
+```
+
+| Option | Default | Purpose |
+|---|---|---|
+| API key | required | Organization credential; protected operations require `sk_`. |
+| `WithBaseURL` | `https://api.nozle.app/engine` | Entitlements, checkout, credits, Entities, usage, and margin. |
+| `WithEventsURL` | `https://api.nozle.app/core` | Customers, billing resources, metered events, credit-system discovery, and Entity subscriptions. |
+| `WithTimeout` | 10 seconds | Per-request timeout. |
+| `WithHTTPClient` | default HTTP client | Inject an `*http.Client`. |
+
+All methods accept `context.Context`. Reuse one client and keep `sk_` credentials on your server.
+
+## Authentication and transport
+
+`Plans` accepts `pk_` or `sk_`; all other operations require `sk_`. Wrong key types fail locally. A transport failure returns `TransportError`; a non-success HTTP response returns a structured `APIError`. See [Errors and retries](/sdks/go/errors).
+
+The SDK makes one HTTP attempt per request. It never retries mutations automatically. For uncertain idempotent operations, retry with the same key and payload.
+
+## API surface
+
+| Area | Methods |
+|---|---|
+| API | `Ping`, `Plans`, `Track`, `Can` |
+| Billing | `Checkout`, `Subscribe`, `CancelSubscription`, transition preview/apply, scoped checkout recovery |
+| Customers and Entities | `UpsertCustomer`, Entity reads and lifecycle, Entity subscriptions |
+| Credits and usage | Credit-system discovery, balances, history, transfers, `CheckUsage`, `TrackUsage` |
+| Margin | Summary, customer, metric, plan, model, and trend queries |
+| LLMs | `CaptureOpenAIUsage`, `CaptureAnthropicUsage` after a provider call |
+
+## Next steps
+
+- [Billing and subscriptions](/sdks/go/billing)
+- [Customers and Entities](/sdks/go/customers-entities)
+- [Product credits](/sdks/go/credits)
+- [Tracking events](/sdks/go/tracking-events)
+- [Entitlements](/sdks/go/entitlements)
+- [Margin queries](/sdks/go/margin-queries)
+- [LLM usage capture](/sdks/go/llm-usage)
+- [Errors](/sdks/go/errors)
