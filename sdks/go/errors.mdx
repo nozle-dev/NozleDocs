@@ -1,0 +1,15 @@
+---
+title: "Errors and retries"
+description: "Handle validation, transport, and HTTP failures."
+---
+
+The Go SDK exposes `ValidationError`, `AuthenticationError`, `TransportError`, and `APIError`. An `APIError` includes the HTTP status, method, path, operation, and redacted response details.
+
+```go
+var apiErr *nozle.APIError
+if errors.As(err, &apiErr) {
+  log.Printf("Nozle %s returned %d", apiErr.Operation, apiErr.StatusCode)
+}
+```
+
+The SDK does not retry requests automatically. Reuse the same event transaction ID or mutation idempotency key and payload after an uncertain outcome.
