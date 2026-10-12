@@ -1,11 +1,11 @@
 ---
 title: Production integration checklist
-description: Confirm supported features, event retries, credit readiness and payment behavior before accepting customer traffic
+description: Configure event delivery, credit consumption, cost rating and payments for your integration
 ---
 
 Before launch, run your integration against a dedicated test customer in your workspace. Keep test events and payment-provider test mode separate from real customer activity.
 
-## Supported configuration
+## Configure your integration
 
 - Use Node `0.9.1`, Python `0.9.1`, Go `v0.9.0`, and React `0.10.1` or later. React `0.10.1` fixes catalog error handling.
 - Create the Feature, plan, customer and active subscription before sending events. Use the same Feature code in `track()` and `can()`, and pass an explicit subscription ID when more than one subscription is active.
@@ -19,15 +19,9 @@ Persist a transaction ID, timestamp and payload for each business event. Retry a
 
 For atomic product-credit consumption, use [Track and Consume Credits](/api/usage-track) with a stable idempotency key. Initial subscription credit grants are asynchronous; wait for the expected balance before admitting credit-backed work.
 
-## Features that need enablement or additional setup
+## Configure cost rating
 
-| Feature | Requirement |
-|---|---|
-| Entity credit allocation and deallocation | Explicit deployment enablement; disabled transfers return `403 credit_transfer_not_enabled`. |
-| Advanced MRR, retention and usage analytics | A configured analytics service. The hosted dashboard currently reports these as unavailable; gross revenue and other supported aggregates are separate. |
-| Dunning | Confirm availability and configure it before relying on automated collections. It is currently unavailable in the hosted launch configuration. |
-| Cost rating | Configure and publish the applicable Cost Rules and composition. Accepted telemetry with `uncosted` status is not a priced or settled cost. |
-| Go legacy `Consume` and `LLM` | Their legacy hosted routes return `404`. Use current product-credit APIs and provider capture wrappers instead. |
+Configure and publish the Cost Rules and composition for the usage you want to price. Inspect the resulting rated amounts in a test transaction. An event with `uncosted` status has been recorded but does not yet have a rated cost; review its reason before using it in financial reporting.
 
 ## Payments, callbacks and operational checks
 
