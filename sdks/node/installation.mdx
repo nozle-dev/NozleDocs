@@ -3,7 +3,7 @@ title: "Installation"
 description: "Install and configure the server-only @nozle-js/node SDK."
 ---
 
-`@nozle-js/node` requires Node.js 18 or later and uses the built-in Fetch API.
+`@nozle-js/node` requires Node.js 18 or later and uses the built-in Fetch API. It ships ESM and CommonJS (`import` and `require` both work).
 
 Entity subscription APIs are introduced in `0.5.0`.
 
@@ -37,7 +37,7 @@ export const nozle = new Nozle({
 | `eventsUrl` | `string` | `https://api.nozle.app/core` | Core API origin used for customer writes, billing resources, `track()`, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. |
 | `timeout` | `number` | `10000` | Per-request timeout in milliseconds. |
 
-Version `0.7.0` defaults to these public service bases. Set both URLs explicitly for local or self-hosted deployments. Trailing slashes are removed automatically.
+The client defaults to these public service bases. Set both URLs explicitly for local or self-hosted deployments. Trailing slashes are removed automatically.
 
 ```mermaid
 flowchart LR
@@ -69,12 +69,19 @@ console.log(health.version)
 | `nozle.ping()` | Check API health. |
 | `nozle.plans()` | List plans. |
 | `nozle.checkout()` | Create a payment-aware checkout result. |
+| `nozle.checkoutStatus()` | Read the status of a checkout. |
+| `nozle.verifyCheckout()` | Post Razorpay payment fields to the API for verification. The SDK does not check the signature locally. |
+| `nozle.checkoutInvoice()` | Create a checkout for an existing invoice. |
 | `nozle.subscribe()` | Create a direct subscription where your workflow permits it. |
 | `nozle.cancelSubscription()` | Cancel immediately or at the renewal boundary. |
+| `nozle.subscriptionOptions()` | Read a subscription with its plan, pending change, and eligible plans. |
+| `nozle.previewSubscriptionChange()` | Preview a plan change. |
+| `nozle.withdrawPendingSubscriptionChange()` | Withdraw a pending plan change. |
 | `nozle.previewSubscriptionTransition()` | Preview cancellation, downgrade, or uncancel settlement. |
 | `nozle.applySubscriptionTransition()` | Apply an idempotent settlement transition. |
 | `nozle.track()` | Send a metered event through the Events API. |
 | `nozle.can()` | Check feature access, usage, and margin state. |
+| `nozle.checkAndDeduct()` | Legacy wallet path. Returns `404 wallet_not_found` when the customer has no wallet. |
 
 ### Namespaces
 
@@ -83,9 +90,10 @@ console.log(health.version)
 | `customers` | `upsert()` |
 | `creditSystems` | `list()` |
 | `entities` | `get()`, `list()`, `upsert()`, `activate()`, `suspend()`, `bulkUpsert()` |
-| `entitySubscriptions` | `ensure()`, `get()`, `list()`, `checkout()`, `changePlan()`, `cancel()`, `remove()` |
+| `entitySubscriptions` | `ensure()`, `get()`, `list()`, `checkout()`, `checkoutMany()`, `changePlan()`, `cancel()`, `remove()` |
 | `credits` | Customer and Entity balance/history reads, `allocate()`, `deallocate()` |
 | `usage` | Advisory `check()` and atomic, idempotent `track()` |
+| `costEvents` | `track()`, `createCostEventId()` |
 | `margin` | `summary()`, `byCustomer()`, `byMetric()`, `byPlan()`, `byModel()`, `trend()` |
 
 The package also exports `wrapOpenAI()` and `wrapAnthropic()` for token metadata capture.
@@ -96,8 +104,8 @@ The package also exports `wrapOpenAI()` and `wrapAnthropic()` for token metadata
 - Entity mutations, credit transfers, and `usage.track()` reject publishable `pk_` keys.
 - Mutation idempotency keys are caller-supplied and limited to 255 bytes.
 - Product-credit amounts are exact decimal strings, not JavaScript numbers.
-- Failed HTTP responses reject with an `Error` containing the operation and HTTP status.
-- Every request uses `AbortSignal.timeout(timeout)`.
+- Failed HTTP responses reject with an `Error` containing the operation and HTTP status. See [errors and retries](/sdks/node/errors).
+- Every request uses `AbortSignal.timeout(timeout)`. The SDK does not retry.
 
 ## Production pattern
 
@@ -124,3 +132,4 @@ Do not accept authoritative `customerId`, Entity IDs, plan codes, return origins
 - [Product credits](/sdks/node/credits)
 - [Entitlements](/sdks/node/entitlements)
 - [LLM auto-capture](/sdks/node/llm-auto-capture)
+- [Errors and retries](/sdks/node/errors)

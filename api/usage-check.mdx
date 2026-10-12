@@ -18,6 +18,10 @@ Base URL: `https://api.nozle.app/engine/api/v1`.
 }
 ```
 
+`occurred_at` is required and must be an RFC 3339 string with a time zone offset or `Z`. Unix seconds (as a string or a number), a date without a time, and a time without an offset return `400 invalid_request` with `occurred_at must be an RFC3339 timestamp`. The SDKs send the current time when you omit it.
+
+A customer with more than one active subscription returns `422 active_subscription_ambiguous`. A time with no effective Credit System rate returns `422 credit_usage_configuration_invalid` (`no effective credit rate`).
+
 The response includes `advisory: true`, exact `metric_amount`,
 `credits_required`, the available balance, and the projected source
 selection:

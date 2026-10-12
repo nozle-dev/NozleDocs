@@ -20,6 +20,8 @@ import (
 client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"))
 ```
 
+`New` panics with `nozle: apiKey must not be empty` when the key is blank or only whitespace. Check the environment variable before calling it.
+
 The default Engine and Core URLs are `https://api.nozle.app/engine` and `https://api.nozle.app/core`. For a local deployment:
 
 ```go
@@ -29,10 +31,11 @@ client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"), nozle.WithBaseURL("http://loc
 | Option | Default | Purpose |
 |---|---|---|
 | API key | required | Organization credential; protected operations require `sk_`. |
-| `WithBaseURL` | `https://api.nozle.app/engine` | Entitlements, checkout, credits, Entities, usage, and margin. |
-| `WithEventsURL` | `https://api.nozle.app/core` | Customers, billing resources, metered events, credit-system discovery, and Entity subscriptions. |
-| `WithTimeout` | 10 seconds | Per-request timeout. |
-| `WithHTTPClient` | default HTTP client | Inject an `*http.Client`. |
+| `WithBaseURL` | `https://api.nozle.app/engine` | `TrackUsage`, `CheckUsage`, `Can`, `TrackCostEvent`, `Ping`, `Plans`, `Checkout`, `CheckoutStatus`, `Subscribe`, `CancelSubscription`, subscription options, previews, transitions and withdrawal, credit balances, Entity get and upsert, and margin. |
+| `WithEventsURL` | `https://api.nozle.app/core` | `Track` (and its subscription lookup), `Meter`, customer upsert, credit-system list, and Entity subscription calls: ensure, get, list, checkout, bulk checkout (`CheckoutEntitySubscriptions`), and change plan. |
+| `WithTimeout` | 10 seconds | One budget for the whole call, including any retries inside a custom HTTP client. |
+| `WithHTTPClient` | default HTTP client | Inject an `*http.Client`, for example one that retries. |
+| `WithDebug` | off | Log `[nozle] METHOD url` for each request. |
 
 All methods accept `context.Context`. Reuse one client and keep `sk_` credentials on your server.
 
@@ -40,7 +43,33 @@ All methods accept `context.Context`. Reuse one client and keep `sk_` credential
 
 `Plans` accepts `pk_` or `sk_`; all other operations require `sk_`. Wrong key types fail locally. A transport failure returns `TransportError`; a non-success HTTP response returns a structured `APIError`. See [Errors and retries](/sdks/go/errors).
 
-The SDK makes one HTTP attempt per request. It never retries mutations automatically. For uncertain idempotent operations, retry with the same key and payload.
+The SDK makes one HTTP attempt per request and does not retry. To add retries, pass an `*http.Client` whose transport retries. The SDK sets `GetBody` on each request, so the body can be replayed, and the `Idempotency-Key` header is sent again with every attempt:
+
+```go
+type retryTransport struct{ next http.RoundTripper }
+
+func (t retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+  for attempt := 0; ; attempt++ {
+    resp, err := t.next.RoundTrip(req)
+    if attempt == 2 || req.Context().Err() != nil || (err == nil && resp.StatusCode != 429 && resp.StatusCode < 500) {
+      return resp, err
+    }
+    if resp != nil { resp.Body.Close() }
+    if req.GetBody != nil {
+      body, bodyErr := req.GetBody()
+      if bodyErr != nil { return nil, bodyErr }
+      req = req.Clone(req.Context())
+      req.Body = body
+    }
+  }
+}
+
+client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"), nozle.WithHTTPClient(&http.Client{
+  Transport: retryTransport{next: http.DefaultTransport},
+}))
+```
+
+`WithTimeout` still bounds all attempts together. Retry only after a network error, a 429, or a 5xx, and only operations that carry an idempotency key or a stable transaction ID.
 
 ## API surface
 
@@ -52,6 +81,8 @@ The SDK makes one HTTP attempt per request. It never retries mutations automatic
 | Credits and usage | Credit-system discovery, balances, history, transfers, `CheckUsage`, `TrackUsage` |
 | Margin | Summary, customer, metric, plan, model, and trend queries |
 | LLMs | Automatic `WrapOpenAIHTTPClient`, `WrapAnthropicHTTPClient`; manual `CaptureOpenAIUsage`, `CaptureAnthropicUsage` |
+
+`Ping` returns a `PingResult`. On production only `OK` and `Engine` are filled; `OrgID`, `KeyType`, `Env`, and `Version` are empty.
 
 ## Next steps
 

@@ -13,7 +13,7 @@ Accept: application/json
 Authorization: Bearer sk_nozle_your_secret_key
 ```
 
-Timestamps use ISO 8601 UTC strings. Monetary amounts use integer minor units, such as cents, unless an endpoint explicitly documents a decimal string.
+Response timestamps use ISO 8601 UTC strings. Request timestamps follow each endpoint: [Feature Events](/api/events) and [Cost Events](/api/cost-events) take a number of Unix seconds, and [credit usage](/api/usage-track) takes an RFC 3339 string with a time zone offset. Monetary amounts use integer minor units, such as cents, unless an endpoint explicitly documents a decimal string.
 
 ## Pagination
 
@@ -40,6 +40,8 @@ Prefer stable external identifiers from your own system when an endpoint accepts
 For metered events and credit operations, generate a unique transaction or idempotency identifier and reuse it when retrying the same logical operation. Do not generate a new identifier after a timeout unless you intend to create a second operation.
 
 Retry transient network failures and HTTP `429` or `5xx` responses with exponential backoff and jitter. Do not automatically retry validation or authorization failures.
+
+The Node.js, Python, and Go SDKs do not retry. Retry in your own code, only after a network error, a `429`, or a `5xx`, and send the same idempotency key with the same request, including its timestamp.
 
 ## Errors
 

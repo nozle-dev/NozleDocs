@@ -3,7 +3,7 @@ title: "LLM auto-capture"
 description: "Wrap synchronous or asynchronous OpenAI and Anthropic clients to emit a Feature Event and optional detailed Cost Events."
 ---
 
-The wrappers patch the supplied provider client's create method and preserve its normal return value. They support synchronous calls, asynchronous calls, synchronous streams, and asynchronous streams. When `cost_meter_code` is configured, each call emits categorized Cost Events linked to its Feature Event.
+The wrappers patch `chat.completions.create` (OpenAI) and `messages.create` (Anthropic) in place and preserve their normal return value. The OpenAI Responses API (`responses.create`) is not wrapped. They support synchronous calls, asynchronous calls, synchronous streams, and asynchronous streams. When `cost_meter_code` is configured, each call emits categorized Cost Events linked to its Feature Event.
 
 Only model, token counts, latency, and an optional feature tag are sent. Prompt and completion content are not captured.
 
@@ -42,7 +42,7 @@ response = openai.chat.completions.create(
 
 ### OpenAI streaming
 
-The wrapper automatically requests usage metadata so the final stream chunk contains token counts:
+The wrapper sets `stream_options.include_usage` to `true` so the final stream chunk contains token counts. Only `include_usage` is overwritten; other `stream_options` keys you pass are kept.
 
 ```python
 stream = openai.chat.completions.create(
@@ -119,7 +119,9 @@ Cost calculation remains server-side through the `ai_tokens` Cost Event Meter an
 
 The wrappers generate the Feature Event `transaction_id` before delivery and use it as `parent_transaction_id` on every detailed Cost Event. Parent and child events may therefore arrive out of order. Tracking failures do not replace a successful provider result; the SDK emits `NozleTrackingWarning`.
 
-For async provider calls, synchronous Nozle tracking runs in a worker thread through `asyncio.to_thread()`.
+The warning names only the exception type, not the cause, for example `Nozle tracking failed after a successful LLM response (NozleAPIError)`. A customer with several active subscriptions makes every wrapped call emit it. Under `python -W error`, the SDK swallows the warning instead of raising it.
+
+The synchronous wrapper tracks inline: each wrapped call waits for one tracking request (about 255 ms observed). With `cost_meter_code`, it sends several requests per call. For async provider calls, synchronous Nozle tracking runs in a worker thread through `asyncio.to_thread()`.
 
 The wrapper does not expose `subscription_id`, so `track()` resolves the customer's single active subscription. Use manual queued tracking when you need to choose the transaction identifier or coordinate delivery through your own queue.
 
@@ -138,3 +140,37 @@ nozle.track(
     transaction_id=f"llm:{response.id}:usage",
 )
 ```
+
+## Manual cost events
+
+Use `nozle.cost_events.track()` for providers without a wrapper and for cost-only tracking. A Cost Event never bills the customer.
+
+```python
+nozle.cost_events.track(
+    cost_meter_code="ai_tokens",
+    external_customer_id="workspace_123",        # or parent_transaction_id=<Feature Event id>
+    cost_event_id=f"turn:{turn.id}:input",       # stable per unit, reused on retry
+    properties={"tokens": 900, "provider": "openai", "model": "configured-model-a", "type": "input"},
+    timestamp=turn.created_at.timestamp(),       # a float, Unix seconds
+)
+```
+
+| Argument | Description |
+|---|---|
+| `cost_meter_code` | Required. Cost Event Meter code. |
+| `parent_transaction_id` | Feature Event `transaction_id` to link to. |
+| `external_customer_id` | Customer ID. Pass this or `parent_transaction_id`. |
+| `cost_event_id` | Stable event ID. Generated when omitted. |
+| `request_id` | Optional provider request ID. |
+| `operation_key` | Optional operation label. |
+| `properties` | JSON-compatible properties, for example `{tokens, provider, model, type}`. |
+| `timestamp` | Optional `float` of Unix seconds. An ISO string returns `400 invalid request body`. |
+
+- Requires an `sk_` key.
+- Without `parent_transaction_id` or `external_customer_id`, it raises `NozleValidationError` before any request.
+- Returns `{"status": "accepted", "cost_event_id": ...}` after a `202`.
+- The same `cost_event_id` sent twice returns `202` both times. Processing de-duplicates it.
+
+<Warning>
+An unknown `cost_meter_code` is accepted with `202` and never reported. Check the code against your Cost Event Meters; a typo loses the cost silently.
+</Warning>

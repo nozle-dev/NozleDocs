@@ -51,6 +51,8 @@ Catch `NozleAuthenticationError` before `NozleValidationError` if the branches n
 - `status_code`; and
 - `response_details`.
 
+`status_code` is not always an HTTP error status. When `track()` resolves the subscription itself and the customer has no active subscription, or more than one, it raises `NozleAPIError` with `status_code` 200. The message gives the cause: `no active subscription for customer '…'` or `has 2 active subscriptions; specify subscription_id`. Do not treat 200 as success. See [subscription resolution](/sdks/python/tracking-events#subscription-resolution).
+
 The transport redacts known secret, token, authorization, and key fields and replaces the active API key if it appears in a string response.
 
 ## Retry behavior
@@ -65,6 +67,8 @@ The SDK configures zero automatic HTTP retries. This avoids replaying mutations 
 ## LLM wrapper warnings
 
 LLM wrappers preserve successful provider responses when Nozle tracking fails. They emit `NozleTrackingWarning` instead of replacing the provider result.
+
+The warning text names only the exception type, not the cause, for example `Nozle tracking failed after a successful LLM response (NozleAPIError)`. Under `python -W error`, the SDK swallows the warning instead of raising it.
 
 ```python
 import warnings

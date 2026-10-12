@@ -38,7 +38,7 @@ const response = await openai.chat.completions.create({
 
 ### OpenAI streaming
 
-The wrapper automatically requests usage metadata for streaming calls and reads the final usage-bearing chunk:
+The wrapper sets `stream_options.include_usage` to `true` for streaming calls and reads the final usage-bearing chunk. It overwrites only `include_usage`: other `stream_options` keys are kept, and your own object is not mutated.
 
 ```ts
 const stream = await openai.chat.completions.create({
@@ -52,7 +52,9 @@ for await (const chunk of stream) {
 }
 ```
 
-Tracking is attempted after the stream finishes.
+Tracking is attempted after the stream finishes. If you stop reading a stream early (`break` or `return()`) after a chunk, the wrapper sends no Feature Event and no Cost Events, for OpenAI and Anthropic.
+
+Only `chat.completions.create` is wrapped for OpenAI. The Responses API is not wrapped.
 
 ## Anthropic
 
@@ -84,7 +86,7 @@ For Anthropic streams, the wrapper reads input usage from `message_start` and ou
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `customerId` | `string` | yes | Customer passed to `nozle.track()`. |
+| `customerId` | `string` | yes | Customer passed to `nozle.track()`. Fixed at wrap time and used for every call; a per-call `user` is ignored. |
 | `metricCode` | `string` | no | Event code; defaults to `llm_tokens`. |
 | `costMeterCode` | `string` | no | Cost Event Meter code. When set, emits categorized token Cost Events linked to the Feature Event. |
 | `feature` | `string` | no | Included as a `feature` event property. |
@@ -113,6 +115,10 @@ Cost calculation remains server-side. Configure the `ai_tokens` Cost Event Meter
 
 The wrapper generates the Feature Event `transaction_id` before delivery and uses it as `parent_transaction_id` on every detailed Cost Event. Parent and child events may therefore arrive out of order. Tracking runs without delaying the provider response, and a tracking failure never replaces a successful provider result.
 
+<Warning>
+Tracking failures are silent: no log line and no unhandled rejection. This includes a customer with no active subscription. The provider result is still returned and the Cost Events are still sent, so the Feature Event is lost without a signal.
+</Warning>
+
 For workflows requiring durable delivery, explicit transaction IDs, or strict error handling, track manually through your queue instead of relying on the wrapper.
 
 ```ts
@@ -132,3 +138,30 @@ await nozle.track(
   },
 )
 ```
+
+## Manual cost events
+
+Use `nozle.costEvents.track()` for providers without a wrapper and for cost-only tracking. A Cost Event never bills the customer.
+
+```ts
+await nozle.costEvents.track({
+  costMeterCode: 'ai_tokens',
+  externalCustomerId: 'workspace_123',      // or parentTransactionId
+  costEventId: `turn:${turn.id}:input`,     // stable per unit, reused on retry
+  properties: { tokens: 900, provider: 'openai', model: 'example-chat-model', type: 'input' },
+  timestamp: turn.createdAt.getTime() / 1000, // a number of Unix seconds
+})
+```
+
+- Requires a secret `sk_` key.
+- Requires `parentTransactionId` or `externalCustomerId`. Without either, it throws before sending.
+- `timestamp` is a number of Unix seconds. An ISO string returns `400 Bad Request`.
+- Returns `{ status: 'accepted', cost_event_id }`.
+- `nozle.costEvents.createCostEventId()` returns a UUIDv7. The SDK generates one when `costEventId` is omitted.
+- Posts to the Engine host (`baseUrl`).
+- The same `costEventId` sent again is accepted with `202` and de-duplicated during processing.
+- Send one event per non-zero token type: `input`, `cached_input`, `cache_write`, `output`, or `reasoning`.
+
+<Warning>
+An unknown `costMeterCode` is accepted with `202` and never reported. Check the code against your Cost Event Meters.
+</Warning>

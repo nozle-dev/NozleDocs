@@ -30,8 +30,10 @@ track(
     transactionId?: string
     timestamp?: string
   },
-): Promise<void>
+): Promise<string>
 ```
+
+`track()` returns the `transactionId` that was sent. Keep it: it is the `parentTransactionId` for a Cost Event and the value to reuse on a retry.
 
 | Argument | Description |
 |---|---|
@@ -39,18 +41,28 @@ track(
 | `event` | Event code matching the Feature code. |
 | `metadata` | Properties used by metric aggregation or cost attribution. |
 | `subscriptionId` | Explicit external subscription target. |
-| `transactionId` | Stable event ID used for idempotency. A UUID is generated when omitted. |
-| `timestamp` | Optional ISO 8601 event time. |
+| `transactionId` | Stable event ID used for idempotency. When omitted, the SDK generates a UUIDv7 and returns it. |
+| `timestamp` | Optional event time. Use an RFC 3339 string with `Z` or an offset, or Unix seconds as a numeric string. Omit it and the server uses the time it received the event. |
 
 ## Subscription resolution
 
 When `subscriptionId` is omitted, the SDK queries `eventsUrl/api/v1/subscriptions` for active subscriptions belonging to the customer:
 
 - exactly one active subscription: its external ID is cached and used;
-- no active subscriptions: `track()` rejects;
-- multiple active subscriptions: `track()` rejects and requires an explicit `subscriptionId`.
+- no active subscriptions: `track()` rejects with `No active subscription for customer '<id>'`;
+- multiple active subscriptions: `track()` rejects with `Customer '<id>' has <n> active subscriptions — pass subscriptionId explicitly`.
 
 Pass `subscriptionId` explicitly for customers with multiple active subscriptions and for latency-sensitive event paths that should avoid the initial lookup.
+
+<Warning>
+The cache lasts for the life of the `Nozle` instance and is never refreshed. After a cancellation, a plan change, or a second `subscribe`, the same instance keeps sending events to the old subscription ID, and the Events API accepts them. Pass `subscriptionId` whenever you change a customer's subscription, or create a new client.
+</Warning>
+
+`subscribe` to a second plan adds a subscription; it does not replace the first. To move a customer to another plan, change or cancel the old subscription, then pass the new subscription ID to `track()`.
+
+## Timestamp format
+
+`timestamp` accepts an RFC 3339 string with `Z` or an offset, such as `2026-08-04T10:30:00Z`, or Unix seconds as a numeric string. A date only (`2026-08-04`) or a time without an offset (`2026-08-04T10:30:00`) throws `track timestamp must be RFC3339 or Unix seconds` before any request is sent. The SDK sends the value as Unix seconds with three decimals.
 
 ## Request payload
 
@@ -65,14 +77,14 @@ Pass `subscriptionId` explicitly for customers with multiple active subscription
       "model": "example-model",
       "tokens": 1500
     },
-    "timestamp": "2026-08-04T10:30:00Z"
+    "timestamp": "1785839400.000"
   }
 }
 ```
 
 ## Idempotency
 
-Generate a deterministic transaction ID and capture the event timestamp from the business operation whenever possible. Retry the same logical event with both values unchanged.
+Generate a deterministic transaction ID and capture the event timestamp from the business operation whenever possible. Retry the same logical event with both values unchanged. See [errors and retries](/sdks/node/errors).
 
 ```ts
 const transactionId = `generation:${generationId}:completed`

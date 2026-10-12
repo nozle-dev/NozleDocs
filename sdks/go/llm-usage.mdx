@@ -67,9 +67,12 @@ Import `github.com/anthropics/anthropic-sdk-go` as `anthropic` and its `/option`
 | `CostMeterCode` | Optional Cost Event Meter for categorized token costs. |
 | `Feature` | Optional Feature Event property. |
 | `DeliveryTimeout` | Timeout for background telemetry; defaults to 15 seconds. |
-| `OnError` | Receives telemetry errors without replacing a successful provider response. |
+| `OnError` | Called with the Nozle delivery error when sending a captured event fails. It does not change the provider response. |
+| `OnResult` | `func(error)`, called after every delivery attempt: with `nil` on success, with the error on failure. |
 
-The wrapper copies the supplied `*http.Client`; it does not mutate the original. It observes OpenAI chat-completion and Anthropic message routes. Usage delivery runs after the provider response or stream completes, without delaying the provider result. Use `OnError` to log or queue failures. The wrapper does not automatically retry telemetry.
+The wrapper copies the supplied `*http.Client`; it does not mutate the original. It captures only request paths ending in `/chat/completions` (OpenAI) and `/messages` (Anthropic); other routes, such as `/v1/responses`, pass through without an event. Usage delivery runs in a goroutine after the provider response or stream completes, without delaying the provider result. Use `OnError` to log or queue failures. The wrapper does not automatically retry telemetry.
+
+The callbacks fire only when there was usage to deliver. A provider non-2xx response, a body that is not valid JSON, a response without `usage`, or a stream closed before its final usage produces no event and calls neither `OnError` nor `OnResult`. Because delivery is in the background, a process that exits right after the provider call loses the event; wait for `OnResult` before exiting a short-lived program. A `DeliveryTimeout` that is too short fails delivery: with 1 ms, both callbacks receive a context deadline error.
 
 ## Manual capture
 
@@ -151,7 +154,7 @@ Configure the Cost Event Meter and effective-dated provider/model/category Cost 
 
 ## Delivery and errors
 
-Go sends the Feature Event first, then attempts each non-zero Cost Event category. If one Cost Event fails, it attempts the remaining categories. Automatic capture reports telemetry errors through `OnError`; manual capture returns them. If the Feature Event fails, Cost Events are not sent. Neither path retries automatically.
+Go sends the Feature Event first, then attempts each non-zero Cost Event category. If one Cost Event fails, it attempts the remaining categories. Automatic capture reports delivery errors through `OnError` and `OnResult` (see the cases above where neither fires); manual capture returns them. If the Feature Event fails, Cost Events are not sent. Neither path retries automatically.
 
 For strict or durable telemetry delivery, use manual capture through your queue with a stable transaction ID. The automatic wrapper preserves successful provider responses when Nozle tracking fails.
 

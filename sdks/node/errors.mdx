@@ -1,0 +1,62 @@
+---
+title: "Errors and retries"
+description: "Read failed requests, branch on the HTTP status, and retry Node SDK calls safely."
+---
+
+Every failed request throws a plain `Error`. The SDK has no error subclasses.
+
+| Error | Meaning |
+|---|---|
+| `<operation> failed: <HTTP status> <status text>` | Nozle returned a non-2xx response, for example `usage.track failed: 409 Conflict`. |
+| Descriptive message | Local validation failed before any request, for example a wrong key type, a bad timestamp, or a missing argument. |
+
+The error has no `status` property and no response body. Errors with the same status look the same: `paid_plan_required`, `invalid_or_untrusted`, and `plan_already_active` all surface as the same `422` message for the operation.
+
+<Info>
+`checkoutInvoice()` errors are labelled `checkout`, for example `checkout failed: 404 Not Found`.
+</Info>
+
+## Read the status
+
+To branch on the status, read it from the message in one helper:
+
+```ts
+function nozleStatus(error: unknown): number | undefined {
+  if (!(error instanceof Error)) return undefined
+  const match = / failed: (\d{3}) /.exec(error.message)
+  return match ? Number(match[1]) : undefined
+}
+
+try {
+  await nozle.usage.track(
+    {
+      customerId: 'workspace_123',
+      featureCode: 'agent_execution',
+      creditSystemCode: 'ai_credits',
+      timestamp,
+    },
+    { idempotencyKey: 'agent-execution-0183f' },
+  )
+} catch (error) {
+  const status = nozleStatus(error)
+
+  if (status === undefined) {
+    // Local validation error or network failure.
+  } else if (status === 409) {
+    // The key was used with a different request. Do not retry.
+  }
+}
+```
+
+## Retry behavior
+
+The SDK does not retry. Every call is one request with `AbortSignal.timeout(timeout)`; the default `timeout` is 10 seconds.
+
+- Retry only after a network error, a `429`, or a `5xx`.
+- Retry with the same idempotency key and the same request, including the `timestamp`.
+- For `track()`, retry the same event with the same `transactionId` and `timestamp`.
+- Do not generate a new idempotency key after an uncertain outcome.
+
+## Idempotency
+
+`usage.track()` needs an `idempotencyKey`. A retry with an identical request returns the original result, including a denial, and does not charge again. The same key with a different request returns `409`. If you omit `timestamp`, the SDK uses the current time, so a retry is a different request. See [product credits](/sdks/node/credits#atomic-usage-tracking) and [usage tracking](/guides/credits/usage-tracking).

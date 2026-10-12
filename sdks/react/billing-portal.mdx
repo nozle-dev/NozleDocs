@@ -6,13 +6,13 @@ description: "Add subscription cancellation, paid upgrades, scheduled downgrades
 `BillingPortal` displays subscriptions, usage, invoice history/PDFs, billing details, and wallets. Add `cancellationActions` for Cancel/Keep and `planChangeActions` for upgrades, scheduled downgrades, and withdrawal of a pending change. These controls also work independently on a custom billing page.
 
 <Info>
-Available in **`@nozle-js/react@0.10.0`**, **`@nozle-js/node@0.9.1`**, **`nozle-sdk==0.9.1`**, and **`github.com/nozle-dev/nozle-go@v0.9.0`**. Earlier React `0.9.0` and Node/Python server SDK `0.8.0` releases do not include these additions. The matching hosted backend endpoints are available.
+Available in **`@nozle-js/react@0.10.1`**, **`@nozle-js/node@0.9.1`**, **`nozle-sdk==0.9.1`**, and **`github.com/nozle-dev/nozle-go@v0.9.0`**. Earlier React `0.9.0` and Node/Python server SDK `0.8.0` releases do not include these additions. The matching hosted backend endpoints are available.
 </Info>
 
 ## Install
 
 ```bash
-npm install @nozle-js/react@0.10.0 react react-dom @stripe/stripe-js @stripe/react-stripe-js
+npm install @nozle-js/react@0.10.1 react react-dom @stripe/stripe-js @stripe/react-stripe-js
 ```
 
 On your Node.js merchant backend:
@@ -133,6 +133,17 @@ On the authenticated merchant backend, call Core's `GET /api/v1/customers/{exter
 | `onError` | Receives a redacted `BillingPortalError`. |
 | `className`, `style`, `nonce` | Container styling and CSP nonce for scoped styles. |
 
+### `BillingPortalError` codes
+
+`BillingPortalError.code` is one of:
+
+| Code | Raised for |
+| --- | --- |
+| `unauthorized` | A 401 or 403 response, or a GraphQL error with `extensions.code: "unauthorized"`. |
+| `request` | A 500 response, a network error, or a malformed or empty response. |
+| `session` | A rejected `createSession`, a missing session or token, an `http` `apiUrl` that is not localhost, an `sk_` or `pk_` token, or credentials in the URL. These checks run before any request. `http://localhost` is allowed. |
+| `changed` | Only in the plan-change flow: "Your subscription changed. Review its latest details before confirming again." |
+
 Customize with `--nozle-portal-accent`, `--nozle-portal-background`, `--nozle-portal-text`, `--nozle-portal-muted`, `--nozle-portal-muted-background`, and `--nozle-portal-border`.
 
 ## Cancel and Keep
@@ -210,6 +221,6 @@ export function SubscriptionControls(props: {
 - [Python merchant server](https://github.com/nozle-dev/nozle-python/tree/v0.9.1/examples/billing_portal)
 - [Node method reference](/sdks/node/billing#subscription-self-service), [Python method reference](/sdks/python/billing#subscription-self-service), and [Go method reference](/sdks/go/billing)
 
-Install React `0.10.0` with Node `0.9.1`, Python `0.9.1`, or Go `v0.9.0` for your integration. The linked Node and Python examples use the source checkout; build it as their READMEs describe when running those demos. Follow the examples' READMEs for TLS and environment setup. Their demo login and single-process file replay store must be replaced with your application's authentication and transactional shared storage before serving production customers. Browser sessions use Secure, HttpOnly cookies over HTTPS.
+Install React `0.10.1` with Node `0.9.1`, Python `0.9.1`, or Go `v0.9.0` for your integration. The linked Node and Python examples use the source checkout; build it as their READMEs describe when running those demos. Follow the examples' READMEs for TLS and environment setup. Their demo login and single-process file replay store must be replaced with your application's authentication and transactional shared storage before serving production customers. Browser sessions use Secure, HttpOnly cookies over HTTPS.
 
 The portal changes billing state. Enforce feature access on your application's server using Nozle entitlement checks. The hosted Engine observes cancellation at the saved ending boundary and Keep after commit, without waiting for its old subscription-cache refresh.

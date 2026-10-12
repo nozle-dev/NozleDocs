@@ -3,15 +3,17 @@ title: Payments
 description: Payment processing, retries, and dunning
 ---
 
-Nozle uses Stripe as the payment processor. Payments are initiated during checkout and processed automatically for recurring subscriptions.
+Nozle collects payments through the provider connected to your organization: Stripe or Razorpay. Payments are initiated during checkout and processed automatically for recurring subscriptions.
 
 **Payment flow:**
 
-1. Customer enters payment details during Stripe checkout
-2. Stripe processes the payment
-3. Stripe sends `payment_intent.succeeded`, `payment_intent.payment_failed`, or `payment_intent.canceled` to Nozle
+1. Customer pays in the provider's UI: Stripe Embedded Checkout, or the Razorpay checkout modal or payment link
+2. The provider processes the payment
+3. The provider sends a signed webhook to Nozle. Stripe sends `payment_intent.succeeded`, `payment_intent.payment_failed` or `payment_intent.canceled`. Razorpay sends `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid` or `payment_link.paid`. For a Razorpay order, your backend also calls verify with the handler's signature
 4. Nozle updates invoice payment status
 5. If the invoice belongs to a payment-gated plan checkout, Nozle activates or cancels the incomplete subscription
+
+See [Checkout](/guides/billing/checkout) for the webhook setup and the Stripe and Razorpay flows.
 
 **Payment methods:**
 

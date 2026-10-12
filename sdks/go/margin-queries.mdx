@@ -25,4 +25,4 @@ _ = err
 | `MarginByModel` | `/margin/models` | Group by model. |
 | `MarginTrend` | `/margin/trend` | Time series. |
 
-All methods take `url.Values` for deployed API query parameters; `MarginTrend` also requires a granularity. Check the raw JSON shape before depending on report fields. Margin simulation is a separate [REST API](/api/margin-simulate).
+All methods take `url.Values` for deployed API query parameters. `MarginTrend` also takes a granularity: an empty string is sent as `day`, and any other value outside `hour`, `day`, `week`, and `month` (for example `year`) returns `nozle: margin.trend: invalid granularity` without a request. Check the raw JSON shape before depending on report fields. Margin simulation is a separate [REST API](/api/margin-simulate).

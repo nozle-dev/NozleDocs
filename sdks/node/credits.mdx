@@ -143,11 +143,16 @@ console.log(check.projected_remaining)
 console.log(check.projected_deductions)
 ```
 
+`occurredAt` is the event time as an RFC 3339 string with an offset. It defaults to now.
+
 `usage.check()` does not reserve or mutate credits. Another request can spend the projected sources before a later consume request.
 
 ## Atomic usage tracking
 
 ```ts
+// Store one time per unit of work and reuse it on every retry.
+const timestamp = execution.startedAt.toISOString()
+
 const result = await nozle.usage.track(
   {
     customerId: 'workspace_123',
@@ -155,7 +160,7 @@ const result = await nozle.usage.track(
     featureCode: 'agent_execution',
     creditSystemCode: 'ai_credits',
     properties: { model: 'example-model' },
-    timestamp: new Date().toISOString(),
+    timestamp,
   },
   { idempotencyKey: 'agent-execution-0183f' },
 )
@@ -166,6 +171,10 @@ if (!result.allowed) {
 ```
 
 `usage.track()` atomically evaluates the metric conversion, selects eligible sources, deducts credits, and records the operation. The optional Entity ID enables Entity attribution and configured pool policy.
+
+<Warning>
+**Retrying.** Pass the same `idempotencyKey` and the same `timestamp` on every retry of one unit of work. If you omit `timestamp`, the SDK uses the current time, the retry no longer matches the first request, and the API returns `409 idempotency_key_reused`. With a fixed `timestamp`, a retry replays the original result, including a denial, and does not charge again. A `timestamp` from before the credit rate became effective returns `422 no effective credit rate`. See [errors and retries](/sdks/node/errors).
+</Warning>
 
 ## Legacy wallet adapter
 

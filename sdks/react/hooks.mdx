@@ -11,13 +11,16 @@ For customer subscription self-service, use the [billing portal action adapters]
 
 Fetches `GET /api/v1/plans` through the `BillingProvider` catalog client.
 
+Each `usePlans` call makes its own request; there is no shared cache, so two components that call it make two requests. The hook refetches when `publishableKey` or `baseUrl` changes. While it refetches, `plans` is `[]` and `isLoading` is `true`. `usePlans` does not fetch during server rendering; it renders the initial loading state.
+
 ```tsx
 import { usePlans } from '@nozle-js/react'
 
 function PlanList() {
-  const { plans, isLoading } = usePlans()
+  const { plans, isLoading, error } = usePlans()
 
   if (isLoading) return <p>Loading plans…</p>
+  if (error) return <p role="alert">Plans could not be loaded: {error.message}</p>
 
   return plans.map((plan) => (
     <div key={plan.code}>
@@ -33,8 +36,22 @@ function PlanList() {
 |---|---|---|
 | `plans` | `CatalogPlan[]` | Public plans returned by Nozle. |
 | `isLoading` | `boolean` | `true` until the catalog request settles. |
+| `error` | `Error \| null` | Set when the request fails: `HTTP <status>` (for example `HTTP 500`) or the thrown message, such as `Failed to fetch`. `plans` is `[]`. |
 
-`CatalogPlan` contains `code`, `name`, `amount_cents`, `amount_currency`, and `interval`.
+The catalog returns each public plan in full. Besides `code`, `name`, `amount_cents`, `amount_currency`, and `interval`, a plan includes `charges` (charge models and amounts), `entitlements`, `credit_grant_rules`, `credit_pool_policies`, `usage_thresholds`, and `taxes`. A pricing page can read usage rates and limits from those fields.
+
+The TypeScript type declares only the five fields above. To read the other fields, cast or extend the type:
+
+```ts
+import type { CatalogPlan } from '@nozle-js/react'
+
+type FullPlan = CatalogPlan & {
+  charges?: unknown[]
+  entitlements?: unknown[]
+}
+
+const fullPlans = plans as FullPlan[]
+```
 
 ## `useCheckoutSession`
 
@@ -71,7 +88,9 @@ function BuyProButton() {
 }
 ```
 
-If checkout returns a hosted URL, the hook navigates to it and returns `null`. It returns a string only for an embedded Stripe client secret. Completed and scheduled results are available through `checkout`.
+`fetchClientSecret` passes only `planCode` and `returnUrl` to `createCheckout`. It sends no idempotency key; use `CheckoutButton` when you need one.
+
+The hook returns a string only for a Stripe client secret. For a `hosted` result (or a result with a `url`), it navigates to the URL and returns `null`. For `completed`, `scheduled`, `razorpay`, and `processing` results it returns `null` without opening Razorpay or polling; read the result from `checkout` and handle it yourself, for example with `Checkout`'s `checkout` prop. Any other result throws `Checkout response did not include a supported result type`.
 
 ### Return value
 
@@ -87,7 +106,7 @@ If checkout returns a hosted URL, the hook navigates to it and returns `null`. I
 Returns the required billing context and throws outside `BillingProvider`.
 
 ```tsx
-const { client, createCheckout } = useBillingContext()
+const { client, createCheckout, verifyCheckout, getCheckoutStatus } = useBillingContext()
 ```
 
 Use this only when building a custom catalog or checkout component. Prefer `usePlans` and `useCheckoutSession` for common flows.
@@ -118,6 +137,8 @@ interface NozleClient {
 interface BillingContextValue {
   client: NozleClient
   createCheckout?: CreateCheckout
+  verifyCheckout?: VerifyCheckout
+  getCheckoutStatus?: GetCheckoutStatus
 }
 ```
 
@@ -125,13 +146,27 @@ Prefer `useBillingContext` or `useOptionalBillingContext` in application compone
 
 ## Checkout result types
 
-`createCheckout` may resolve to:
+`createCheckout` returns the result your merchant backend received from Nozle. It may be:
 
-- Stripe hosted checkout: `{ type: 'stripe', url }`;
-- embedded Stripe: `{ type: 'stripe', clientSecret }`;
-- Razorpay: `{ type: 'razorpay', orderId }`;
-- immediate completion: `{ type: 'completed', ... }`;
-- scheduled change: `{ type: 'scheduled', ... }`; or
-- legacy hosted checkout: `{ url }`.
+| Result | Shape | Component behavior |
+|---|---|---|
+| Stripe | `{ type: 'stripe', client_secret }` (also `clientSecret`) | Nozle returns an embedded Checkout Session client secret (`cs_`), never a Stripe URL. `CheckoutButton` passes it to `onStripeClientSecret`. |
+| Razorpay | `{ type: 'razorpay', checkout_id, key_id, order_id, amount_cents, currency }` | Loads `https://checkout.razorpay.com/v1/checkout.js`, calls `verifyCheckout`, then polls `getCheckoutStatus`. |
+| Hosted | `{ type: 'hosted', payment_url }` | Redirects with `location.assign`. The URL must use HTTPS. |
+| Processing | `{ type: 'processing', checkout_id, status }` | Polls `getCheckoutStatus`, which is required. |
+| Completed | `{ type: 'completed', ... }` | Calls `onComplete`. |
+| Scheduled | `{ type: 'scheduled', ... }` | Calls `onScheduled`. |
+
+Razorpay fields are snake case. A `{ type: 'razorpay', orderId }` result fails: `useCheckoutSession` returns `null`, and `CheckoutButton` shows `Razorpay checkout requires server-issued checkout_id, key_id and order_id`.
+
+Polling calls `getCheckoutStatus` up to 30 times, one second apart, until both `status` and `fulfillment_status` are `succeeded`.
+
+| Error | Cause |
+|---|---|
+| `Checkout URL must use HTTPS` | A `hosted` `payment_url` (or `url`) is not HTTPS. |
+| `Checkout response did not include a supported result type` | `useCheckoutSession` received an unknown result. |
+| `onStripeClientSecret is required for embedded Stripe checkout` | `CheckoutButton` received a Stripe client secret without the callback. |
+
+The components also accept `{ type: 'stripe', url }` and a legacy `{ url }`, and redirect to them. The Nozle server does not return either; it returns a client secret.
 
 Stripe webhooks remain authoritative. A browser redirect or completion callback does not activate a paid plan by itself.

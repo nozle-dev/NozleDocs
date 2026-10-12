@@ -93,7 +93,7 @@ client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"))
 <Step>
 ## Track your first event
 
-Send a billable event with metadata. Nozle automatically resolves the customer's active subscription.
+Send a billable event with metadata. If you do not pass a subscription ID, the SDK looks up the customer's active subscription. Node.js and Python look it up once and keep it for the life of the client, so pass the subscription ID after you change or cancel a subscription. Go looks it up on every call, which adds one request. Tracking fails when the customer has no active subscription or more than one.
 
 <Tabs items={['Node.js', 'Python', 'Go']}>
 <Tab value="Node.js">

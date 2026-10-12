@@ -123,6 +123,7 @@ check = nozle.usage.check(
     entity_id="user_42",
     credit_system_code="ai_credits",
     properties={"model": "example-model"},
+    occurred_at="2026-10-12T16:00:00.000Z",
 )
 
 print(check["advisory"])
@@ -131,7 +132,7 @@ print(check.get("projected_remaining"))
 print(check.get("projected_deductions"))
 ```
 
-`usage.check()` does not reserve or mutate credits.
+`usage.check()` does not reserve or mutate credits. `occurred_at` is optional: pass RFC 3339 with an offset or `Z`. It defaults to the current time. `usage.check()` takes `occurred_at`, not `timestamp`; `timestamp=` raises `TypeError`.
 
 ## Atomic usage tracking
 
@@ -143,6 +144,7 @@ result = nozle.usage.track(
     credit_system_code="ai_credits",
     properties={"model": "example-model"},
     idempotency_key="agent-execution-0183f",
+    timestamp="2026-10-12T16:00:00.000Z",
 )
 
 if not result["allowed"]:
@@ -150,6 +152,12 @@ if not result["allowed"]:
 ```
 
 `usage.track()` atomically evaluates the metric conversion, selects eligible sources, deducts credits, and records the operation. Entity IDs enable per-Entity attribution and configured pool policy.
+
+`timestamp` is optional and defaults to the current time. It accepts only RFC 3339 with an offset or `Z`. Unix seconds, a date only, and an offset-less value return `400 timestamp must be an RFC3339 timestamp`.
+
+<Warning>
+**Retrying `usage.track`.** Pass the same `idempotency_key` **and the same `timestamp`** on every retry. If you omit `timestamp`, the SDK uses the current time, the request no longer matches the first one, and the API returns `409 idempotency_key_reused`. Store one time per unit of work (RFC 3339 with an offset, for example `2026-10-12T16:00:00.000Z`) and reuse it. A matching replay returns the original `operation_id`, and the balance changes once. The event time must fall after the credit rate became effective. A `409` means the first call was committed: do not retry.
+</Warning>
 
 ## Legacy wallet adapter
 
