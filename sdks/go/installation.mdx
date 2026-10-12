@@ -64,6 +64,8 @@ The SDK makes one HTTP attempt per request. It never retries mutations automatic
 - [LLM usage capture](/sdks/go/llm-usage)
 - [Errors](/sdks/go/errors)
 
-## Legacy methods
+## Choosing credit and provider methods
 
-The v0.9.0 module still exports `Consume` and `LLM`, but their legacy hosted routes are unavailable and return `404`. Use `TrackUsage` for atomic product-credit consumption, and the documented [provider wrappers or manual capture](/sdks/go/llm-usage) for provider telemetry. A separate `Can` plus `Track` is not an atomic reservation; telemetry capture does not provide synchronous provider pricing.
+Use `TrackUsage` for atomic product-credit consumption, and the documented [provider wrappers or manual capture](/sdks/go/llm-usage) for provider telemetry. A separate `Can` plus `Track` is not an atomic reservation; telemetry capture does not provide synchronous provider pricing.
+
+The v0.9.0 module retains legacy `Consume` and `LLM` exports. Their legacy hosted routes return `404`; use the current methods above when integrating the hosted service.

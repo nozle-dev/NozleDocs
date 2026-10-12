@@ -6,10 +6,6 @@ description: Allocate and return provenance-preserving paid top-up credits
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-<Warning>
-Hosted credit transfers require explicit enablement. When disabled, allocation and deallocation return HTTP `403` with `credit_transfer_not_enabled`. Confirm enablement for your deployment and validate a transfer before exposing this feature to customers.
-</Warning>
-
 **Auth:** secret key with `entity:write` when API permissions are enabled. Publishable keys are rejected.
 
 Allocate paid customer top-up value:
@@ -42,6 +38,10 @@ Content-Type: application/json
 
 Amounts must be positive decimal strings with at most 12 fractional digits. Allocation can draw only from active paid customer top-ups. Deallocation returns unused value to each exact parent source; expiry, priority, payment provenance, and conservation remain enforced by PostgreSQL.
 
-The API is available to authenticated secret-key callers and does not require a deployment allowlist. Tenant isolation, Entity status, Credit System configuration, source eligibility, and available balance are validated for every transfer.
+Tenant isolation, Entity status, Credit System configuration, source eligibility, and available balance are validated for every transfer.
 
 Retry an uncertain response with the same idempotency key and identical payload. Reusing a key with a different customer, Entity, Credit System, direction, or amount returns a conflict.
+
+## Error handling
+
+If a request returns HTTP `403` with `credit_transfer_not_enabled`, contact support with the request ID to check the transfer configuration. Do not retry it as a transient network failure or report the transfer as successful.
