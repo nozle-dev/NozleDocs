@@ -84,7 +84,7 @@ Content-Type: application/json
 
 ## Purchase multiple Entity plans together
 
-Use bulk Entity checkout when a customer purchases a mixed pool of plans in one payment. The merchant backend supplies one item per Entity; Nozle creates one invoice and one Stripe checkout for the complete basket.
+Use bulk Entity checkout when a customer purchases a mixed pool of plans in one payment. The merchant backend supplies one item per Entity; Nozle creates one invoice and one Stripe or Razorpay checkout for the complete basket.
 
 Use a server SDK from your trusted backend. These SDK methods validate the basket and return the checkout contract. In Node.js:
 
@@ -236,9 +236,10 @@ Without a connected payment provider the request returns `405 payment_provider_r
 
 Nozle supports these result types:
 
-- `stripe`: mount the returned client secret in Stripe Checkout;
-- `processing`: Stripe completed, but the verified payment event is still being processed; and
-- `completed`: the invoice is already settled, so no Stripe session is required.
+- `stripe`: mount the returned `cs_` client secret with Stripe Embedded Checkout;
+- `razorpay`: the result also has `checkout_id`, `key_id`, and `order_id`; open the Razorpay modal and verify as described in [Checkout](/guides/billing/checkout#razorpay);
+- `processing`: the payment completed, or the Razorpay order is not ready, and the verified payment event is still being processed; and
+- `completed`: the invoice is already settled, so no provider session is required.
 
 `status` is the batch status: `pending`, `open`, `completed`, `failed`, or `expired`. An unpaid checkout expires after 23 hours (`expires_at`).
 
@@ -274,7 +275,7 @@ Content-Type: application/json
 }
 ```
 
-The plan transition policy for the current and target plans determines whether the change is immediate, payment-gated, or scheduled for the renewal boundary. Without a policy for the pair the request returns `405 plan_transition_policy_required` (a change from a free plan to a paid plan uses the organization's free-to-paid policy instead). Change-plan takes no `billing_time`. Changing one Entity never changes another Entity's subscription.
+The [plan transition policy](/api/plan-transition-policies) for the current and target plans determines whether the change is immediate, payment-gated, or scheduled for the renewal boundary. Without a policy for the pair the request returns `405 plan_transition_policy_required` (a change from a free plan to a paid plan uses the organization's free-to-paid policy instead). Change-plan takes no `billing_time`. Changing one Entity never changes another Entity's subscription.
 
 The result is a checkout result with `external_entity_id` and `external_subscription_id` added. A scheduled change:
 
@@ -320,5 +321,5 @@ Authorization: Bearer sk_...
 Removal is allowed only when the identity has no active, pending, or incomplete subscription. An identity with billing history returns `403 entity_subscription_has_billing_history`, and one with no subscription returns `404 entity_subscription_not_found`. Historical billing records remain immutable.
 
 <Warning>
-Stripe webhooks are authoritative for paid activation. Do not grant paid access from a browser redirect or checkout callback alone.
+Payment provider webhooks (Stripe, or Razorpay together with your verify call) are authoritative for paid activation. Do not grant paid access from a browser redirect or checkout callback alone.
 </Warning>

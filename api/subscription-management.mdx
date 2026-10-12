@@ -30,7 +30,7 @@ These paths are for Engine. Its customer/subscription fields map to Core's exter
 | --- | --- |
 | `subscription` | Internal `id`, `external_id`, `plan_code`, `status`, nullable `ending_at`, and `plan`. |
 | `pending_change` | Pending internal `id`, `plan_code`, `name`, `effective_at` and `plan`, or null. |
-| `eligible_plans` | Plans with `direction` and `timing`, authorized by the configured transition policies. From a free plan, paid plans also appear through the organization's free-to-paid policy. A downgrade appears only when its policy uses `end_of_period` timing and `keep_anchor`. |
+| `eligible_plans` | Plans with `direction` and `timing`, authorized by the configured [transition policies](/api/plan-transition-policies). From a free plan, paid plans also appear through the organization's free-to-paid policy. A downgrade appears only when its policy uses `end_of_period` timing and `keep_anchor`. |
 | `checkout` | Latest intent summary `{ id, status, plan_code }`, or null. Use checkout status for payment recovery. |
 
 A plan contains `code`, `name`, `amount_cents`, `currency`, and `interval`. Keep monetary minor-unit values exact. An empty eligible list can reflect missing transition policies, scheduled cancellation, a pending change, external billing authority, or unresolved checkout. Price comparisons and public catalog membership do not establish permission to change plans.
@@ -49,7 +49,7 @@ Send `customer_id`, `subscription_id`, and `plan_code` to `POST /subscriptions/p
 
 The response includes `quote_id`, `transition_direction`, `timing`, `currency`, `credit_amount_cents`, `debit_amount_cents`, `net_amount_cents`, `amount_due_now_cents`, `amount_due_at_effective_cents`, `effective_at`, and nullable `renewal_at`.
 
-Previewing a change between two plans with no transition policy returns `405 plan_transition_policy_required` (except from a free plan to a paid plan). The response also echoes the policy it applied: `transition_policy`, `billing_anchor`, `proration_behavior`, `credit_action`, `refund_mode`, and `final_invoice_action`.
+Previewing a change between two plans with no [transition policy](/api/plan-transition-policies) returns `405 plan_transition_policy_required` (except from a free plan to a paid plan). The response also echoes the policy it applied: `transition_policy`, `billing_anchor`, `proration_behavior`, `credit_action`, `refund_mode`, and `final_invoice_action`.
 
 Quotes expire after five minutes. Show the returned amounts and dates for confirmation, and forward the opaque `quote_id` unchanged. State, policy or amount changes invalidate the quote with HTTP 409. Refresh and obtain a new confirmation instead of silently applying a different price.
 

@@ -23,9 +23,9 @@ Validate the exact HTTPS return origin before using a browser-supplied URL. Brow
 
 | `Type` | API fields | Handling |
 | --- | --- | --- |
-| `stripe` | `client_secret`, `invoice_id`, `amount_cents`, `currency` | Mount Stripe Checkout with `ClientSecret`. |
-| `razorpay` | `checkout_id`, `key_id`, `order_id`, `amount_cents`, `currency` | Open Razorpay Checkout, then verify through your backend. |
-| `hosted` | `payment_url` | Navigate to `PaymentURL`. |
+| `stripe` | `client_secret` (`cs_...`), `invoice_id`, `amount_cents`, `currency` | Mount Stripe embedded Checkout with `ClientSecret`. Nozle never returns a Stripe URL, so `URL` stays empty. See [the Stripe flow](/guides/billing/checkout#stripe). |
+| `razorpay` | `checkout_id`, `key_id`, `order_id`, `amount_cents`, `currency`, `expires_at`, `invoice_id`; with a mandate also `customer_id`, `recurring: true`, `mandate_max_amount_cents` | Open Razorpay Checkout, then verify through your backend. See [the Razorpay flow](/guides/billing/checkout#razorpay). |
+| `hosted` | `payment_url` | Navigate to the Razorpay payment link in `PaymentURL`. |
 | `processing` | `checkout_id`, `status` | The order is not ready or has expired. Recover with `CheckoutStatus`. |
 | `completed` | `status: "succeeded"`, `subscription_id`, `plan_code`, `invoice_id` (may be `null`), `amount_cents`, `currency`, `payment_source` (`credits` or `none`) | Reload the subscription. |
 | `scheduled` | `status: "pending"`, `subscription_id`, `plan_code`, `transition_direction`, `transition_policy`, `effective_at` | Display the pending change and its effective date. |
@@ -48,13 +48,13 @@ _ = err
 
 Use direct subscription only when payment is not required: `Subscribe` accepts a paid plan without collecting payment. Cancellation accepts `end_of_period` or `immediate`.
 
-`Subscribe` to another plan adds a second active subscription. It does not replace the first, and plan credit grants are granted again. To move a customer, call `Checkout` with `SubscriptionID` (needs a transition policy), or cancel and then subscribe. Pass the new subscription ID as `SubscriptionID` to `Track`.
+`Subscribe` to another plan adds a second active subscription. It does not replace the first, and plan credit grants are granted again. To move a customer, call `Checkout` with `SubscriptionID` (needs a [transition policy](/api/plan-transition-policies)), or cancel and then subscribe. Pass the new subscription ID as `SubscriptionID` to `Track`.
 
 ## Subscription self-service
 
 Derive the customer from the authenticated application user and validate ownership of the selected **external** subscription ID. Do not pass Core's internal UUID. These methods support [the React billing portal](/sdks/react/billing-portal).
 
-Changing an existing subscription's plan needs a transition policy for that source and target plan pair. Without one, preview, checkout, and transitions return `405 plan_transition_policy_required`. Exception: from a \$0 plan to a paid plan, the organization's free-to-paid default applies without a pair policy.
+Changing an existing subscription's plan needs a [transition policy](/api/plan-transition-policies) for that source and target plan pair. Without one, preview, checkout, and transitions return `405 plan_transition_policy_required`. Exception: from a \$0 plan to a paid plan, the organization's free-to-paid default applies without a pair policy.
 
 ### Load options and preview a quote
 
@@ -174,7 +174,7 @@ _ = cancelled
 _ = err
 ```
 
-`BillingTime` accepts only `calendar` or `anniversary`. Single Entity checkout also accepts free, trial, and pay-in-arrears plans; it returns `completed` with `payment_source: "none"`. `ChangeEntitySubscriptionPlan` needs a transition policy for the plan pair and does not send `BillingTime`. It returns `scheduled` or `completed`, plus `ExternalEntityID` and `ExternalSubscriptionID`. `CancelEntitySubscription` on a pay-in-arrears plan without `CreditAction` returns `422` with `credit_action: not_supported_for_pay_in_arrears`. `RemoveEntitySubscription` on an Entity with billing history returns `403 entity_subscription_has_billing_history`.
+`BillingTime` accepts only `calendar` or `anniversary`. Single Entity checkout also accepts free, trial, and pay-in-arrears plans; it returns `completed` with `payment_source: "none"`. `ChangeEntitySubscriptionPlan` needs a [transition policy](/api/plan-transition-policies) for the plan pair and does not send `BillingTime`. It returns `scheduled` or `completed`, plus `ExternalEntityID` and `ExternalSubscriptionID`. `CancelEntitySubscription` on a pay-in-arrears plan without `CreditAction` returns `422` with `credit_action: not_supported_for_pay_in_arrears`. `RemoveEntitySubscription` on an Entity with billing history returns `403 entity_subscription_has_billing_history`.
 
 ### Buy several Entity plans together
 
