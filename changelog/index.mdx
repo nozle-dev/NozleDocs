@@ -7,15 +7,20 @@ description: Product and developer-platform updates from Nozle
 
 ### React SDK 0.10.1
 
-- Released [`@nozle-js/react` 0.10.1](https://www.npmjs.com/package/@nozle-js/react/v/0.10.1) on npm.
-- `usePlans` now returns an `error` and contains catalog request failures instead of leaving an unhandled promise rejection. It also clears `plans` and returns to loading when the client changes.
-- Install with `npm install @nozle-js/react@0.10.1`. No other component or hook changed.
+- Released [`@nozle-js/react` 0.10.1](https://github.com/nozle-dev/nozle-js/releases/tag/react-v0.10.1).
+- Fixed `usePlans` error handling for failed catalog requests, stale results and superseded responses. Upgrade with `npm install @nozle-js/react@0.10.1`.
+
+### Production integration guidance
+
+- Completed the quickstart prerequisites and aligned tracking and entitlement Feature codes.
+- Clarified asynchronous processing and initial credit grants, unavailable or gated features, and retry behavior. See the [production integration checklist](/guides/getting-started/production-readiness).
+- Compile TypeScript examples against the published SDK packages instead of hand-maintained substitute declarations.
 
 ### Server SDK 0.9.1
 
 - Released [`@nozle-js/node` 0.9.1](https://github.com/nozle-dev/nozle-js/releases/tag/node-v0.9.1) on npm and [`nozle-sdk` 0.9.1](https://github.com/nozle-dev/nozle-python/releases/tag/v0.9.1) on PyPI.
 - Fixed RFC 3339 Feature Event timestamp serialization to Unix seconds in both SDKs, including OpenAI and Anthropic wrapper events. Numeric timestamps remain supported; malformed timestamps fail before delivery.
-- Install with `npm install @nozle-js/node@0.9.1` or `pip install nozle-sdk==0.9.1`. React remains at `0.10.0` and Go remains at `v0.9.0`.
+- Install with `npm install @nozle-js/node@0.9.1` or `pip install nozle-sdk==0.9.1`. React was at `0.10.0` at that release; use the `0.10.1` patch above. Go remains at `v0.9.0`.
 
 ### Go SDK 0.9.0
 

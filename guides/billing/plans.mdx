@@ -1,37 +1,37 @@
 ---
 title: Plans
-description: Creating and managing pricing plans
+description: Define your customers' pricing and feature entitlements
 ---
 
-Plans are configured in the Nozle dashboard and served through the `GET /api/v1/plans` endpoint.
+Plans describe what **your customers** buy from your product. Create them in your Nozle workspace; a new workspace does not automatically contain the example plan codes used in these docs. Your own Nozle platform subscription is separate from this customer plan catalog.
 
-**Default plan tiers:**
+## Create a first plan
 
-| Plan | Monthly Price | Event Limit | MRR Limit |
-|------|--------------|-------------|-----------|
-| Starter | $50/mo | 50,000 | $5,000 |
-| Growth | $100/mo | 10,000,000 | $100,000 |
-| Scale | $500/mo | 100,000,000 | $1,000,000 |
-| Enterprise | Custom | Custom | Custom |
+1. Open [the dashboard](https://app.nozle.dev) and create a metered Feature with a stable code, such as `api_calls`. For the quickstart, use count aggregation so each unique event contributes one unit.
+2. Create a plan with a unique code such as `quickstart_free`, a monthly interval and a zero subscription price. Add the Feature entitlement with a usage limit of 10,000.
+3. Create a customer with an external ID from your application, then activate a subscription to this plan. A plan alone does not grant a customer access.
+4. Submit events with the matching Feature code and check the customer's usage after asynchronous processing. See the [quickstart](/guides/getting-started/quickstart).
 
-**Plan features by tier:**
-- Starter: core billing + entitlements
-- Growth: + revenue_analytics, remove_branding_watermark, auto_dunning, progressive_billing, lifetime_usage
-- Scale: + all integrations (netsuite, xero, hubspot, salesforce, okta, avalara), api_permissions, custom_roles, forecasted_usage, security_logs, from_email, issue_receipts, manual_payments, multi_entities_pro
+For a paid plan, configure currency, subscription amount, billing interval and any usage charges explicitly. A Feature entitlement controls access; it does not by itself define a monetary usage charge. Configure your payment provider and [checkout flow](/guides/billing/checkout) before accepting payment.
 
-**Fetching plans in your app:**
+For a sum-based meter, choose a numeric aggregation property such as `tokens` and send that property on every event. Keep the documented event code, aggregation and entitlement aligned.
 
-React: usePlans() hook
+## Read your catalog
+
+The Engine `GET /api/v1/plans` endpoint returns your organization's configured public catalog. Nozle platform prices and feature availability are not returned as your customer plans.
+
 ```tsx
-const { plans, isLoading } = usePlans();
+const { plans, isLoading, error } = usePlans();
 ```
 
-Node:
-```typescript
+Use React `0.10.1` or later and handle `error` before rendering a pricing table. Configure `BillingProvider` with a publishable key as shown in [React setup](/sdks/react/installation).
+
+```ts
 const plans = await nozle.plans();
 ```
 
-Python:
 ```python
 plans = nozle.plans()
 ```
+
+See [subscriptions](/guides/billing/subscriptions) for activation and lifecycle changes, and the [production integration checklist](/guides/getting-started/production-readiness) for features requiring additional setup.

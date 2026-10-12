@@ -8,13 +8,13 @@ description: Track your first billable event and connect secure checkout
 <Step>
 ## Create your Nozle account
 
-Sign up at [app.nozle.app](https://app.nozle.app) and create your first workspace.
+Sign up at [app.nozle.dev](https://app.nozle.dev/signup) and create your first workspace.
 </Step>
 
 <Step>
 ## Get your API keys
 
-From the dashboard, navigate to **Settings > API Keys**. You will see two keys:
+From the dashboard, navigate to **Settings > API Keys**. Create the key types your integration needs:
 
 | Key prefix | Purpose | Use in |
 |------------|---------|--------|
@@ -91,6 +91,16 @@ client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"))
 </Step>
 
 <Step>
+## Create the feature, plan, customer and subscription
+
+Before sending an event, create a **metered Feature** with code `api_calls` in the dashboard. Add it to a **free plan** with code `quickstart_free`, using count aggregation and a limit of 10,000. Create a customer with external ID `customer_123` and activate a subscription to that plan. See [plans](/guides/billing/plans) and [subscriptions](/guides/billing/subscriptions) for the configuration steps.
+
+Use the same Feature code, customer ID and subscription in the calls below. A placeholder customer without an active subscription cannot complete this quickstart. If the customer has multiple active subscriptions, pass the target external subscription ID explicitly using the SDK's [event options](/sdks/node/tracking-events).
+
+This free count-based example does not charge a payment method or configure cost rating. The optional `tokens` metadata does not change the count: each unique event increments usage by one.
+</Step>
+
+<Step>
 ## Track your first event
 
 Send a billable event with metadata. If you do not pass a subscription ID, the SDK looks up the customer's active subscription. Node.js and Python look it up once and keep it for the life of the client, so pass the subscription ID after you change or cancel a subscription. Go looks it up on every call, which adds one request. Tracking fails when the customer has no active subscription or more than one.
@@ -98,7 +108,7 @@ Send a billable event with metadata. If you do not pass a subscription ID, the S
 <Tabs items={['Node.js', 'Python', 'Go']}>
 <Tab value="Node.js">
 ```ts
-await nozle.track('customer_123', 'api_call', {
+await nozle.track('customer_123', 'api_calls', {
   model: 'example-model',
   tokens: 1500,
 });
@@ -106,7 +116,7 @@ await nozle.track('customer_123', 'api_call', {
 </Tab>
 <Tab value="Python">
 ```python
-nozle.track("customer_123", "api_call", {
+nozle.track("customer_123", "api_calls", {
     "model": "example-model",
     "tokens": 1500,
 })
@@ -116,7 +126,7 @@ nozle.track("customer_123", "api_call", {
 ```go
 err := client.Track(ctx, nozle.TrackParams{
   CustomerID: "customer_123",
-  Event: "api_call",
+  Event: "api_calls",
   Metadata: map[string]any{"model": "example-model", "tokens": 1500},
 })
 if err != nil { return err }
@@ -124,7 +134,7 @@ if err != nil { return err }
 </Tab>
 </Tabs>
 
-Events are matched against your feature definitions in the dashboard. The `tokens` property can drive usage-based charges, while the event name (`api_call`) increments count-based meters.
+Events are matched against your Feature definitions. For this count-based example, wait for asynchronous processing, then expect `used: 1`, `limit: 10000` and `remaining: 9999`. To meter token quantities instead, configure a separate sum-based Feature with `tokens` as its aggregation property.
 </Step>
 
 <Step>
@@ -138,9 +148,9 @@ Before executing an expensive operation, check whether the customer still has ca
 const result = await nozle.can('customer_123', 'api_calls');
 // {
 //   allowed: true,
-//   remaining: 8500,
+//   remaining: 9999,
 //   limit: 10000,
-//   used: 1500
+//   used: 1
 // }
 
 if (!result.allowed) {
@@ -153,9 +163,9 @@ if (!result.allowed) {
 result = nozle.can("customer_123", "api_calls")
 # {
 #   "allowed": True,
-#   "remaining": 8500,
+#   "remaining": 9999,
 #   "limit": 10000,
-#   "used": 1500
+#   "used": 1
 # }
 
 if not result["allowed"]:
@@ -171,7 +181,7 @@ if !result.Allowed { return errors.New("usage limit reached — upgrade your pla
 </Tab>
 </Tabs>
 
-The response includes `remaining`, `limit`, and `used` fields so you can show usage progress in your UI.
+The response includes `remaining`, `limit`, and `used` fields so you can show usage progress in your UI. Event processing is asynchronous; an immediate read may still show the earlier count. `can()` is a point-in-time check and does not reserve quota. Handle dependency errors as unavailable decisions, and read the [production integration checklist](/guides/getting-started/production-readiness) before accepting customer traffic.
 </Step>
 
 <Step>
