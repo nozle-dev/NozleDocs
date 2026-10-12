@@ -33,7 +33,7 @@ If prepaid credits fully cover a paid plan change, Nozle applies it without an e
 
 Checkout is only for plans that need an up-front payment. For a customer with no subscription, a free plan, a plan with a trial, or a plan billed in arrears returns `422 checkout_not_required`: start it with [`subscribe`](/api/subscribe) instead. Entity checkout is the exception and completes these plans with `payment_source: "none"`.
 
-Changing the plan of an existing subscription needs a [plan transition policy](/api/plan-transition-policies) for that pair of plans, except from a free plan to a paid plan. The selected self-service downgrade flow uses a signed quote with the end-of-period transition endpoint described below.
+Changing the plan of an existing subscription needs a plan transition policy for that pair of plans, except from a free plan to a paid plan. The selected self-service downgrade flow uses a signed quote with the end-of-period transition endpoint described below.
 
 ## Selected subscription and signed quote
 
@@ -76,7 +76,11 @@ Plan checkout:
 </ResponseField>
 
 <ResponseField name="client_secret" type="string">
-  Stripe results only: the `cs_` secret of an embedded Stripe Checkout Session. Mount it with Stripe Embedded Checkout (the React `Checkout` component does this). Nozle never returns a Stripe-hosted URL.
+  Client secret for the returned embedded Stripe payment flow. Use the matching SDK checkout UI; prefer the hosted `url` when supplied.
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  Hosted checkout URL. Navigate the current page to this URL.
 </ResponseField>
 
 <ResponseField name="clientSecret" type="string">
@@ -101,9 +105,9 @@ Plan checkout:
 
 ### Razorpay and recovery fields
 
-A `razorpay` result supplies `checkout_id`, `order_id`, public `key_id`, `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. A mandate checkout (`register_mandate: true`) adds `customer_id`, `recurring: true`, and `mandate_max_amount_cents`. Open the Razorpay modal, then verify the handler's signature on your backend. Activation requires captured payment and completed fulfillment. See [the Razorpay flow](/guides/billing/checkout#razorpay).
+A `razorpay` result supplies `checkout_id`, `order_id`, public `key_id`, `amount_cents`, and `currency`, with optional expiry/customer/recurring metadata. Verify the genuine Razorpay callback on your backend. Activation requires captured payment and completed fulfillment.
 
-A `processing` result supplies `checkout_id` and `status`: the Razorpay order is not ready yet, or has expired. Recover it rather than starting another checkout. A `hosted` result supplies `payment_url`, a Razorpay payment link to redirect to. Both scoped verification and status recovery are described in [Subscription self-service](/api/subscription-management#payment-status-and-recovery).
+A `processing` result supplies a `checkout_id` to recover rather than starting another checkout. A `hosted` result supplies `payment_url`. Both scoped verification and status recovery are described in [Subscription self-service](/api/subscription-management#payment-status-and-recovery).
 
 ### Credit-funded response
 
@@ -140,26 +144,6 @@ A `completed` result has `payment_source` `credits` when the change was funded w
 
 `subscription_id` is the pending subscription; there is no separate `pending_subscription_id` field. A new checkout while a change is pending replaces that change and returns a new pending ID.
 
-## Errors
-
-| Status | Code | Cause |
-| --- | --- | --- |
-| `400` | `invalid_return_url` | `return_url` origin is not allowlisted. Checked before anything else. |
-| `400` | — | `subscription_id` combined with `invoice_id` or `external_entity_id`, or neither `plan_code` with `customer_id` nor `invoice_id` given. |
-| `404` | `plan_not_found`, `customer_not_found` | Unknown plan or customer. |
-| `405` | `plan_transition_policy_required` | The customer has an active subscription and the pair of plans has no [transition policy](/api/plan-transition-policies). |
-| `405` | `plan_upgrade_invoice_missing` | An upgrade to a plan billed in arrears: nothing is due up front. |
-| `405` | `plan_already_active`, `subscription_not_active`, `target_plan_is_not_a_downgrade` | See [transition policies](/api/plan-transition-policies). |
-| `409` | `subscription_selection_required` | The customer has several active subscriptions and no `subscription_id` was given. |
-| `409` | `plan_upgrade_checkout_in_progress`, `billing_anchor_checkout_in_progress`, `entity_subscription_checkout_in_progress` | Another checkout for the same subscription is open. Recover it. |
-| `409` | `idempotency_key_reused` | The key was used with a different request. |
-| `409` | `plan_change_quote_changed`, `subscription_change_pending` | The quote no longer matches the subscription. Preview again. |
-| `422` | `checkout_not_required` | The plan needs no up-front payment (free, trial, or billed in arrears) and the customer has no subscription. Use `subscribe`. |
-| `422` | `payment_provider_required` | No Stripe or Razorpay connection for the customer. |
-| `422` | `stripe_customer_required` | A paid Stripe upgrade for a customer that does not exist in Stripe. |
-| `422` | `plan_already_active` | The customer, or Entity, is already on this plan. |
-| `422` | `subscription_and_idempotency_key_required` | `quote_id` sent without `subscription_id` or an `Idempotency-Key`. |
-
 ## Webhook requirement
 
 Stripe must be able to reach your Nozle public API URL. When a Stripe provider is connected, Nozle registers the Stripe webhook endpoint for that tenant's Stripe account:
@@ -173,5 +157,3 @@ Checkout relies on these Stripe events:
 - `payment_intent.succeeded`
 - `payment_intent.payment_failed`
 - `payment_intent.canceled`
-
-Razorpay webhooks are configured by you in the Razorpay dashboard. See [Checkout](/guides/billing/checkout#razorpay) for the URL, headers, and events.
