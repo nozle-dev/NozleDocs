@@ -7,6 +7,10 @@ Plan credit grant rules attach an amount and cadence to one Credit System. Caden
 
 For each entitlement period, Nozle creates a distinct balance source with a deterministic reference. It never resets one shared mutable balance row.
 
+## Grant readiness
+
+Initial grants are asynchronous. The hosted scheduler checks for grants once per minute; an active subscription can temporarily have no spendable credit balance. Poll the expected Credit System balance with bounded backoff before allowing credit-backed work. Subscription activation alone is not confirmation that its credits are available.
+
 ## Lifecycle policy
 
 - **Activation:** grant the configured target.

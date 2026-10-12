@@ -1,0 +1,36 @@
+---
+title: Production integration checklist
+description: Confirm supported features, event retries, credit readiness and payment behavior before accepting customer traffic
+---
+
+Before launch, run your integration against a dedicated test customer in your workspace. Keep test events and payment-provider test mode separate from real customer activity.
+
+## Supported configuration
+
+- Use Node `0.9.1`, Python `0.9.1`, Go `v0.9.0`, and React `0.10.1` or later. React `0.10.1` fixes catalog error handling.
+- Create the Feature, plan, customer and active subscription before sending events. Use the same Feature code in `track()` and `can()`, and pass an explicit subscription ID when more than one subscription is active.
+- Keep secret keys on your server. A publishable key permits public catalog reads; it does not authorize customer billing operations. Derive customer identity in your authenticated backend.
+
+## Events and decisions
+
+Persist a transaction ID, timestamp and payload for each business event. Retry an uncertain submission with all three unchanged; a new ID creates a new event. Successful HTTP acceptance is separate from asynchronous usage and margin processing. Confirm the expected usage before declaring your integration test complete.
+
+`can()` is a point-in-time decision, not an atomic quota reservation. Usage read failures return a structured HTTP `503` without an access decision. Do not interpret dependency errors as permission or zero usage. Retry within a bounded request budget and retain the request ID for support. Entitlement configuration changes can take approximately one minute to refresh.
+
+For atomic product-credit consumption, use [Track and Consume Credits](/api/usage-track) with a stable idempotency key. Initial subscription credit grants are asynchronous; wait for the expected balance before admitting credit-backed work.
+
+## Features that need enablement or additional setup
+
+| Feature | Requirement |
+|---|---|
+| Entity credit allocation and deallocation | Explicit deployment enablement; disabled transfers return `403 credit_transfer_not_enabled`. |
+| Advanced MRR, retention and usage analytics | A configured analytics service. The hosted dashboard currently reports these as unavailable; gross revenue and other supported aggregates are separate. |
+| Dunning | Confirm availability and configure it before relying on automated collections. It is currently unavailable in the hosted launch configuration. |
+| Cost rating | Configure and publish the applicable Cost Rules and composition. Accepted telemetry with `uncosted` status is not a priced or settled cost. |
+| Go legacy `Consume` and `LLM` | Their legacy hosted routes return `404`. Use current product-credit APIs and provider capture wrappers instead. |
+
+## Payments, callbacks and operational checks
+
+Configure your payment provider and signed webhooks, then verify the flows your product exposes: successful checkout, decline and retry, subscription changes, cancellation, renewal, refunds and authentication challenges. A free subscription or a rendered billing component does not test payment settlement.
+
+Validate your webhook receiver's signature checks, retries and idempotency. Test email delivery and recovery, any SSO provider you enable, and your backup/restore process. Monitor request errors, processing lag and reconciliation differences. Measure your own workload before committing to a capacity or latency SLA; request acceptance throughput alone does not establish processing capacity.
