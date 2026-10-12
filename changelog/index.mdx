@@ -5,6 +5,22 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Core API field and header renames
+
+Core API JSON fields and webhook and request headers drop the legacy `lago_` and `X-Lago-` naming.
+
+| Old | New |
+| --- | --- |
+| `lago_id` | `nozle_id` |
+| `lago_<name>` (for example `lago_customer_id`, `lago_invoice_ids`) | `<name>` (`customer_id`, `invoice_ids`) |
+| `X-Lago-Signature` | `X-Nozle-Signature` |
+| `X-Lago-Signature-Algorithm` | `X-Nozle-Signature-Algorithm` |
+| `X-Lago-Unique-Key` | `X-Nozle-Unique-Key` |
+| `x-lago-organization` (request) | `x-nozle-organization` |
+| `x-lago-token` (response) | `x-nozle-token` |
+
+Transition period: Core still sends the `X-Lago-*` webhook headers next to the `X-Nozle-*` ones, and accepts `x-lago-organization` next to `x-nozle-organization`. Move your code to the new names now, because the old headers will be removed after the transition.
+
 ### React SDK 0.10.1
 
 - Released [`@nozle-js/react` 0.10.1](https://github.com/nozle-dev/nozle-js/releases/tag/react-v0.10.1).

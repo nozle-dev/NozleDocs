@@ -4002,7 +4002,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
   /invoices/{id}:
     parameters:
-      - $ref: '#/components/parameters/lago_invoice_id'
+      - $ref: '#/components/parameters/invoice_id'
     put:
       tags:
         - Invoices
@@ -4054,7 +4054,7 @@ paths:
         - Invoices
       summary: Download an invoice PDF
       parameters:
-        - $ref: '#/components/parameters/lago_invoice_id'
+        - $ref: '#/components/parameters/invoice_id'
       description: This endpoint is used for downloading a specific invoice PDF document.
       operationId: downloadInvoice
       responses:
@@ -4075,7 +4075,7 @@ paths:
       summary: Finalize a draft invoice
       description: This endpoint is used for finalizing a draft invoice.
       parameters:
-        - $ref: '#/components/parameters/lago_invoice_id'
+        - $ref: '#/components/parameters/invoice_id'
       operationId: finalizeInvoice
       responses:
         '200':
@@ -4095,7 +4095,7 @@ paths:
       summary: Mark an invoice payment dispute as lost
       description: This endpoint is used for setting invoice's payment dispute as lost.
       parameters:
-        - $ref: '#/components/parameters/lago_invoice_id'
+        - $ref: '#/components/parameters/invoice_id'
       operationId: loseDisputeInvoice
       responses:
         '200':
@@ -4117,7 +4117,7 @@ paths:
       summary: Refresh a draft invoice
       description: This endpoint is used for refreshing a draft invoice.
       parameters:
-        - $ref: '#/components/parameters/lago_invoice_id'
+        - $ref: '#/components/parameters/invoice_id'
       operationId: refreshInvoice
       responses:
         '200':
@@ -4137,7 +4137,7 @@ paths:
       summary: Retry generation of a failed invoice
       description: This endpoint is used for retrying to generate a failed invoice.
       parameters:
-        - $ref: '#/components/parameters/lago_invoice_id'
+        - $ref: '#/components/parameters/invoice_id'
       operationId: retryInvoice
       responses:
         '200':
@@ -4157,7 +4157,7 @@ paths:
       summary: Generate a payment URL
       description: This endpoint generates a checkout link for a specific invoice.
       parameters:
-        - $ref: '#/components/parameters/lago_invoice_id'
+        - $ref: '#/components/parameters/invoice_id'
       operationId: invoicePaymentUrl
       responses:
         '200':
@@ -4204,7 +4204,7 @@ paths:
       summary: Retry an invoice payment
       description: This endpoint resends an invoice for collection and retry a payment.
       parameters:
-        - $ref: '#/components/parameters/lago_invoice_id'
+        - $ref: '#/components/parameters/invoice_id'
       operationId: retryPayment
       requestBody:
         description: Payment method to use for the retry (optional)
@@ -4235,7 +4235,7 @@ paths:
         • When no body parameters are provided, the invoice can be voided only if it is in a `finalized` status and its payment status is NOT `succeeded`.
         • When `generate_credit_note` is provided (optionally with `refund_amount` and/or `credit_amount`), this validation is bypassed: the invoice is forcibly voided and a credit note is generated. If the specified refund/credit amounts do not cover the full invoice total, the remainder is issued on a second credit note that is created and immediately voided.
       parameters:
-        - $ref: '#/components/parameters/lago_invoice_id'
+        - $ref: '#/components/parameters/invoice_id'
       requestBody:
         description: Void invoice payload
         content:
@@ -6229,14 +6229,14 @@ paths:
                 $ref: '#/components/schemas/TaxesPaginated'
               example:
                 taxes:
-                  - lago_id: 41190609-391a-4368-9549-d4348a85a8cd
+                  - nozle_id: 41190609-391a-4368-9549-d4348a85a8cd
                     name: TVA
                     code: french_standard_vat
                     description: French standard VAT
                     rate: 20
                     applied_to_organization: true
                     created_at: '2023-07-06T14:35:58Z'
-                  - lago_id: 2e034a10-6652-4daf-a600-b085184f93ad
+                  - nozle_id: 2e034a10-6652-4daf-a600-b085184f93ad
                     name: TVA
                     code: french_reduced_vat
                     description: French reduce VAT
@@ -9379,7 +9379,7 @@ components:
       schema:
         type: string
         example: wallet-code
-    lago_invoice_id:
+    invoice_id:
       name: id
       in: path
       description: Unique identifier assigned to the invoice within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the invoice's record within the Nozle system.
@@ -9454,7 +9454,7 @@ components:
         type: string
         example: sub_1234567890
     webhook_signature:
-      name: X-Lago-Signature
+      name: X-Nozle-Signature
       in: header
       description: Signature of the webhook payload
       required: true
@@ -9462,7 +9462,7 @@ components:
         type: string
         example: "Ap¶5É¿\x9D\x9FÎ£6ÐfV£Ä\x15\x15ºõÔõÔ[D\x8BæAâÿüÚ"
     webhook_signature_algorithm:
-      name: X-Lago-Signature-Algorithm
+      name: X-Nozle-Signature-Algorithm
       in: header
       description: Algorithm used to generate the signature
       required: true
@@ -9473,7 +9473,7 @@ components:
           - hmac
         example: hmac
     webhook_unique_key:
-      name: X-Lago-Unique-Key
+      name: X-Nozle-Unique-Key
       in: header
       description: Unique id of the webhook. It can be used for idempotency
       required: true
@@ -10020,7 +10020,7 @@ components:
       type: object
       description: Billing entity object
       required:
-        - lago_id
+        - nozle_id
         - code
         - name
         - default_currency
@@ -10033,7 +10033,7 @@ components:
         - created_at
         - updated_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -10423,14 +10423,14 @@ components:
     TaxObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - name
         - code
         - rate
         - applied_to_organization
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the tax, created by Nozle.
@@ -10466,11 +10466,11 @@ components:
     InvoiceCustomSectionObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - name
         - code
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier for the invoice custom section in the Nozle application, generated by Nozle to ensure record uniqueness within the system.
@@ -10746,7 +10746,7 @@ components:
             - 'null'
           format: object
           example:
-            lago_id: dad68bc7-c01a-4ad8-a87b-13e78693a5bc
+            nozle_id: dad68bc7-c01a-4ad8-a87b-13e78693a5bc
             plan_id: b9155544-e261-4e92-b54e-f65d7609294c
           description: This field represents the final state of the object that the action was applied.
         activity_object_changes:
@@ -10847,7 +10847,7 @@ components:
     AddOnObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - name
         - invoice_display_name
         - code
@@ -10856,7 +10856,7 @@ components:
         - description
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the add-on, created by Nozle.
@@ -11034,7 +11034,7 @@ components:
         request_response:
           type: string
           format: object
-          example: '{ "lago_id": "b9155544-e261-4e92-b54e-f65d7609294c", ... }'
+          example: '{ "nozle_id": "b9155544-e261-4e92-b54e-f65d7609294c", ... }'
     ApiLogsPaginated:
       type: object
       required:
@@ -11192,7 +11192,7 @@ components:
         - month
         - amount_cents
         - currency
-        - lago_invoice_ids
+        - invoice_ids
       properties:
         month:
           type: string
@@ -11206,7 +11206,7 @@ components:
           $ref: '#/components/schemas/Currency'
           description: The currency of revenue analytics. Format must be ISO 4217.
           example: USD
-        lago_invoice_ids:
+        invoice_ids:
           type: array
           items:
             type: string
@@ -11422,22 +11422,22 @@ components:
     AppliedCouponObject:
       type: object
       required:
-        - lago_id
-        - lago_coupon_id
+        - nozle_id
+        - coupon_id
         - coupon_code
         - coupon_name
         - external_customer_id
-        - lago_customer_id
+        - customer_id
         - status
         - frequency
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the applied coupon, created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_coupon_id:
+        coupon_id:
           type: string
           format: uuid
           description: Unique identifier of the coupon, created by Nozle.
@@ -11464,7 +11464,7 @@ components:
           format: date-time
           description: The date and time when the parent coupon was deleted. If null, the coupon still exists. It is expressed in UTC format according to the ISO 8601 datetime standard.
           example: '2022-04-29T08:59:51Z'
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           description: Unique identifier of the customer, created by Nozle.
@@ -11550,14 +11550,14 @@ components:
     CreditObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - item
         - amount_cents
         - amount_currency
         - invoice
         - before_taxes
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the credit within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the credit's item record within the Nozle system.
@@ -11578,12 +11578,12 @@ components:
           type: object
           description: The item attached to the credit.
           required:
-            - lago_item_id
+            - item_id
             - type
             - code
             - name
           properties:
-            lago_item_id:
+            item_id:
               type: string
               format: uuid
               description: Unique identifier assigned to the credit item within the Nozle application.
@@ -11607,10 +11607,10 @@ components:
         invoice:
           type: object
           required:
-            - lago_id
+            - nozle_id
             - payment_status
           properties:
-            lago_id:
+            nozle_id:
               type: string
               format: uuid
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -11781,13 +11781,13 @@ components:
     FeatureObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - code
         - name
         - feature_type
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -12133,7 +12133,7 @@ components:
     CouponObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - name
         - code
         - expiration
@@ -12144,7 +12144,7 @@ components:
         - limited_plans
         - limited_features
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the coupon, created by Nozle.
@@ -12584,8 +12584,8 @@ components:
     BaseAppliedTax:
       type: object
       required:
-        - lago_id
-        - lago_tax_id
+        - nozle_id
+        - tax_id
         - tax_name
         - tax_code
         - tax_rate
@@ -12594,12 +12594,12 @@ components:
         - amount_currency
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the applied tax, created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_tax_id:
+        tax_id:
           type:
             - string
             - 'null'
@@ -12642,7 +12642,7 @@ components:
         - $ref: '#/components/schemas/BaseAppliedTax'
       type: object
       properties:
-        lago_fee_id:
+        fee_id:
           type: string
           format: uuid
           description: Unique identifier of the fee, created by Nozle.
@@ -12650,7 +12650,7 @@ components:
     PricingUnitDetailsObject:
       type: object
       required:
-        - lago_pricing_unit_id
+        - pricing_unit_id
         - pricing_unit_code
         - short_name
         - amount_cents
@@ -12659,7 +12659,7 @@ components:
         - precise_unit_amount
         - conversion_rate
       properties:
-        lago_pricing_unit_id:
+        pricing_unit_id:
           type: string
           format: uuid
           description: Unique identifier of the pricing unit, created by Nozle.
@@ -12726,63 +12726,63 @@ components:
         - sub_total_excluding_taxes_precise_amount_cents
         - payment_status
       properties:
-        lago_id:
+        nozle_id:
           type:
             - string
             - 'null'
           format: uuid
           description: Unique identifier assigned to the fee within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the fee's record within the Nozle system.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_charge_id:
+        charge_id:
           type:
             - string
             - 'null'
           format: uuid
           description: Unique identifier assigned to the charge that the fee belongs to
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_charge_filter_id:
+        charge_filter_id:
           type:
             - string
             - 'null'
           format: uuid
           description: Unique identifier assigned to the charge filter that the fee belongs to
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_fixed_charge_id:
+        fixed_charge_id:
           type:
             - string
             - 'null'
           format: uuid
           description: Unique identifier assigned to the fixed charge that the fee belongs to
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_invoice_id:
+        invoice_id:
           type:
             - string
             - 'null'
           format: uuid
           description: Unique identifier assigned to the invoice that the fee belongs to
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_true_up_fee_id:
+        true_up_fee_id:
           type:
             - string
             - 'null'
           format: uuid
           description: Unique identifier assigned to the true-up fee when a minimum has been set to the charge. This identifier helps to distinguish and manage the true-up fee associated with the charge, which may be applicable when a minimum threshold or limit is set for the charge amount.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_true_up_parent_fee_id:
+        true_up_parent_fee_id:
           type:
             - string
             - 'null'
           format: uuid
           description: Unique identifier assigned to the parent fee on which the true-up fee is assigned. This identifier establishes the relationship between the parent fee and the associated true-up fee.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_subscription_id:
+        subscription_id:
           type:
             - string
             - 'null'
           format: uuid
           description: Unique identifier assigned to the subscription, created by Nozle. This field is specifically displayed when the fee type is charge or subscription.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_customer_id:
+        customer_id:
           type:
             - string
             - 'null'
@@ -12952,7 +12952,7 @@ components:
             - type
             - code
             - name
-            - lago_item_id
+            - item_id
             - item_type
           properties:
             type:
@@ -13020,7 +13020,7 @@ components:
                 type: array
                 items:
                   type: string
-            lago_item_id:
+            item_id:
               type: string
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
               description: Unique identifier of the fee item, created by Nozle. It can be the identifier of the `add-on`, the `charge`, the `credit`, the `subscription` or the `commitment`.
@@ -13055,12 +13055,12 @@ components:
     CreditNoteItemObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - amount_cents
         - amount_currency
         - fee
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: The credit note's item unique identifier, created by Nozle.
@@ -13081,7 +13081,7 @@ components:
         - $ref: '#/components/schemas/BaseAppliedTax'
       type: object
       properties:
-        lago_credit_note_id:
+        credit_note_id:
           type: string
           format: uuid
           description: Unique identifier of the credit note, created by Nozle.
@@ -13605,13 +13605,13 @@ components:
       type: object
       description: Set of key-value pairs that you can attach to a customer. This can be useful for storing additional information about the customer in a structured format
       required:
-        - lago_id
+        - nozle_id
         - key
         - value
         - display_in_invoice
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -13636,14 +13636,14 @@ components:
     CustomerBaseObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - sequential_id
         - slug
         - external_id
         - applicable_timezone
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -13849,11 +13849,11 @@ components:
     CreditNoteErrorDetailsObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - error_code
         - details
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: The credit note error details unique identifier, created by Nozle.
@@ -13873,11 +13873,11 @@ components:
     CreditNoteObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - sequential_id
         - billing_entity_code
         - number
-        - lago_invoice_id
+        - invoice_id
         - invoice_number
         - issuing_date
         - reason
@@ -13894,7 +13894,7 @@ components:
         - created_at
         - updated_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: The credit note unique identifier, created by Nozle.
@@ -13911,7 +13911,7 @@ components:
           type: string
           description: The credit note unique number.
           example: LAG-1234-CN2
-        lago_invoice_id:
+        invoice_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the invoice that the credit note belongs to
@@ -14251,7 +14251,7 @@ components:
         estimated_credit_note:
           type: object
           required:
-            - lago_invoice_id
+            - invoice_id
             - invoice_number
             - currency
             - taxes_amount_cents
@@ -14265,7 +14265,7 @@ components:
             - taxes_rate
             - items
           properties:
-            lago_invoice_id:
+            invoice_id:
               type: string
               format: uuid
               description: Unique identifier assigned to the invoice that the credit note belongs to
@@ -14320,13 +14320,13 @@ components:
                 type: object
                 required:
                   - amount_cents
-                  - lago_fee_id
+                  - fee_id
                 properties:
                   amount_cents:
                     type: integer
                     description: The credit note's item amount, expressed in cents.
                     example: 100
-                  lago_fee_id:
+                  fee_id:
                     type:
                       - string
                       - 'null'
@@ -14339,7 +14339,7 @@ components:
               items:
                 type: object
                 properties:
-                  lago_tax_id:
+                  tax_id:
                     type: string
                     format: uuid
                     description: Unique identifier of the tax, created by Nozle.
@@ -14398,13 +14398,13 @@ components:
     IntegrationCustomer:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - type
         - external_customer_id
         - integration_code
       description: Configuration specific to the accounting and tax integrations. This object contains settings and parameters necessary for syncing documents and payments.
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -14463,11 +14463,11 @@ components:
     ErrorDetailObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - error_code
         - details
       properties:
-        lago_id:
+        nozle_id:
           type:
             - string
             - 'null'
@@ -14775,7 +14775,7 @@ components:
     InvoiceBaseObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - billing_entity_code
         - number
         - issuing_date
@@ -14796,7 +14796,7 @@ components:
         - created_at
         - updated_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the fee within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the fee's record within the Nozle system.
@@ -14963,7 +14963,7 @@ components:
     InvoiceMetadataObject:
       type: object
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the invoice metadata within the Nozle application.
@@ -14986,7 +14986,7 @@ components:
         - $ref: '#/components/schemas/BaseAppliedTax'
       type: object
       properties:
-        lago_invoice_id:
+        invoice_id:
           type: string
           format: uuid
           description: Unique identifier of the invoice, created by Nozle.
@@ -14998,19 +14998,19 @@ components:
     InvoiceAppliedInvoiceCustomSectionObject:
       type: object
       required:
-        - lago_id
-        - lago_invoice_id
+        - nozle_id
+        - invoice_id
         - code
         - details
         - display_name
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the applied invoice custom section in the Nozle application.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_invoice_id:
+        invoice_id:
           type: string
           format: uuid
           description: Unique identifier of the invoice this custom section is applied to.
@@ -15035,14 +15035,14 @@ components:
     UsageThresholdObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - threshold_display_name
         - amount_cents
         - recurring
         - created_at
         - updated_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the usage threshold created by Nozle.
@@ -15129,11 +15129,11 @@ components:
     PaymentObject:
       type: object
       required:
-        - lago_id
-        - lago_customer_id
+        - nozle_id
+        - customer_id
         - external_customer_id
         - invoice_ids
-        - lago_payable_id
+        - payable_id
         - payable_type
         - amount_cents
         - amount_currency
@@ -15149,12 +15149,12 @@ components:
         - next_action
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: The unique identifier of the payment, created by Nozle.
           example: 4cf085a7-c196-4f07-a543-97c50ec6e8b2
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           description: Unique identifier of the customer, created by Nozle.
@@ -15176,7 +15176,7 @@ components:
           items:
             type: string
             example: HOO-202D-005-001
-        lago_payable_id:
+        payable_id:
           type: string
           format: uuid
           description: The unique identifier of the paid resource, created by Nozle.
@@ -15186,7 +15186,7 @@ components:
           enum:
             - Invoice
             - PaymentRequest
-          description: The type of the paid resource, associated with the `lago_payable_id`.
+          description: The type of the paid resource, associated with the `payable_id`.
           example: Invoice
         amount_cents:
           type: integer
@@ -15286,7 +15286,7 @@ components:
     PaymentRequestObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - email
         - amount_cents
         - amount_currency
@@ -15295,7 +15295,7 @@ components:
         - customer
         - Invoices
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the payment request, created by Nozle.
@@ -15352,11 +15352,11 @@ components:
     AppliedInvoiceCustomSectionObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - created_at
         - invoice_custom_section
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the applied invoice custom section in the Nozle application.
@@ -15393,14 +15393,14 @@ components:
     SubscriptionActivationRuleObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - type
         - timeout_hours
         - status
         - created_at
         - updated_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -15464,8 +15464,8 @@ components:
         - ending_at
         - external_customer_id
         - external_id
-        - lago_customer_id
-        - lago_id
+        - customer_id
+        - nozle_id
         - name
         - next_plan_code
         - on_termination_credit_note
@@ -15478,7 +15478,7 @@ components:
         - terminated_at
         - trial_ended_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -15487,7 +15487,7 @@ components:
           type: string
           example: 5eb02857-a71e-4ea2-bcf9-57d3a41bc6ba
           description: The subscription external unique identifier (provided by your own application).
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -15720,7 +15720,7 @@ components:
         - ignore_paid_top_up_limits
         - interval
         - invoice_requires_successful_payment
-        - lago_id
+        - nozle_id
         - method
         - paid_credits
         - started_at
@@ -15731,7 +15731,7 @@ components:
         - transaction_name
         - trigger
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -15856,8 +15856,8 @@ components:
     WalletObject:
       type: object
       required:
-        - lago_id
-        - lago_customer_id
+        - nozle_id
+        - customer_id
         - external_customer_id
         - status
         - currency
@@ -15873,12 +15873,12 @@ components:
         - credits_ongoing_balance
         - credits_ongoing_usage_balance
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the wallet within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the wallet's record within the Nozle system.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the customer within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the customer's record within the Nozle system.
@@ -16391,7 +16391,7 @@ components:
                 type: object
                 description: Object that represents rule for wallet recurring transactions.
                 properties:
-                  lago_id:
+                  nozle_id:
                     type: string
                     format: uuid
                     example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -16566,8 +16566,8 @@ components:
     WalletAlertObject:
       type: object
       required:
-        - lago_id
-        - lago_organization_id
+        - nozle_id
+        - organization_id
         - external_subscription_id
         - feature
         - alert_type
@@ -16578,19 +16578,19 @@ components:
         - thresholds
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the alert, created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_organization_id:
+        organization_id:
           type: string
           format: uuid
           description: Unique identifier of the organization, created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
         external_subscription_id:
           type: 'null'
-        lago_wallet_id:
+        wallet_id:
           type: string
           description: Unique identifier of the wallet, created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -16936,10 +16936,10 @@ components:
           type: object
           description: Object listing all the properties for a specific charge item.
           required:
-            - lago_id
+            - nozle_id
             - charge_model
           properties:
-            lago_id:
+            nozle_id:
               type: string
               format: uuid
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -16964,12 +16964,12 @@ components:
           type: object
           description: The related feature object.
           required:
-            - lago_id
+            - nozle_id
             - name
             - code
             - aggregation_type
           properties:
-            lago_id:
+            nozle_id:
               type: string
               format: uuid
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -17025,7 +17025,7 @@ components:
           format: date
           description: The date of creation of the invoice.
           example: '2022-08-01'
-        lago_invoice_id:
+        invoice_id:
           type:
             - string
             - 'null'
@@ -17209,10 +17209,10 @@ components:
           type: object
           description: Object listing all the properties for a specific charge item.
           required:
-            - lago_id
+            - nozle_id
             - charge_model
           properties:
-            lago_id:
+            nozle_id:
               type: string
               format: uuid
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -17235,12 +17235,12 @@ components:
           type: object
           description: The related feature object.
           required:
-            - lago_id
+            - nozle_id
             - name
             - code
             - aggregation_type
           properties:
-            lago_id:
+            nozle_id:
               type: string
               format: uuid
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -17299,7 +17299,7 @@ components:
           format: date
           description: The date of creation of the invoice.
           example: '2022-08-01'
-        lago_invoice_id:
+        invoice_id:
           type:
             - string
             - 'null'
@@ -17353,11 +17353,11 @@ components:
     CustomerCheckoutUrl:
       type: object
       required:
-        - lago_customer_id
+        - customer_id
         - external_customer_id
         - payment_provider
       properties:
-        lago_customer_id:
+        customer_id:
           type: string
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
           description: Unique identifier assigned to the customer within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the customer's record within the Nozle system
@@ -17380,13 +17380,13 @@ components:
     PaymentMethodObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - is_default
         - payment_provider_type
         - provider_method_id
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: The unique identifier of the payment method, created by Nozle.
@@ -17450,13 +17450,13 @@ components:
       type: object
       required:
         - transaction_id
-        - lago_customer_id
+        - customer_id
         - code
         - timestamp
-        - lago_subscription_id
+        - subscription_id
         - external_subscription_id
       properties:
-        lago_id:
+        nozle_id:
           type:
             - string
             - 'null'
@@ -17468,7 +17468,7 @@ components:
           maxLength: 255
           example: transaction_1234567890
           description: This field represents a unique identifier for the event. It is crucial for ensuring idempotency, meaning that each event can be uniquely identified and processed without causing any unintended side effects.
-        lago_customer_id:
+        customer_id:
           type:
             - string
             - 'null'
@@ -17509,7 +17509,7 @@ components:
               - type: number
           example:
             gb: 10
-        lago_subscription_id:
+        subscription_id:
           type:
             - string
             - 'null'
@@ -18009,7 +18009,7 @@ components:
             - $ref: '#/components/schemas/EventObject'
             - type: object
               properties:
-                lago_customer_id:
+                customer_id:
                   type: 'null'
                   description: The value will always be null in this response as the event processing is done asynchronously
                   example: null
@@ -18034,7 +18034,7 @@ components:
               - $ref: '#/components/schemas/EventObject'
               - type: object
                 properties:
-                  lago_customer_id:
+                  customer_id:
                     type: 'null'
                     description: The value will always be null in this response as the event processing is done asynchronously
                     example: null
@@ -18113,32 +18113,32 @@ components:
         - precise_unit_amount
         - payment_status
       properties:
-        lago_id:
+        nozle_id:
           type: 'null'
-        lago_charge_id:
+        charge_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the charge that the fee belongs to
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_charge_filter_id:
+        charge_filter_id:
           type:
             - string
             - 'null'
           format: uuid
           description: Unique identifier assigned to the charge filter that the fee belongs to
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_invoice_id:
+        invoice_id:
           type: 'null'
-        lago_true_up_fee_id:
+        true_up_fee_id:
           type: 'null'
-        lago_true_up_parent_fee_id:
+        true_up_parent_fee_id:
           type: 'null'
-        lago_subscription_id:
+        subscription_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the subscription, created by Nozle. This field is specifically displayed when the fee type is charge or subscription.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the customer, created by Nozle. This field is specifically displayed when the fee type is charge or subscription.
@@ -18240,7 +18240,7 @@ components:
             - type
             - code
             - name
-            - lago_item_id
+            - item_id
             - item_type
           properties:
             type:
@@ -18280,7 +18280,7 @@ components:
                 type: array
                 items:
                   type: string
-            lago_item_id:
+            item_id:
               type: string
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
               description: Unique identifier of the fee item, created by Nozle. It will be the identifier of the `feature`.
@@ -18443,16 +18443,16 @@ components:
     BillingPeriodObject:
       type: object
       required:
-        - lago_subscription_id
+        - subscription_id
         - external_subscription_id
-        - lago_plan_id
+        - plan_id
         - subscription_from_datetime
         - subscription_to_datetime
         - charges_from_datetime
         - charges_to_datetime
         - invoicing_reason
       properties:
-        lago_subscription_id:
+        subscription_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the subscription, created by Nozle.
@@ -18461,7 +18461,7 @@ components:
           type: string
           description: Unique identifier assigned to the subscription in your application.
           example: external_id
-        lago_plan_id:
+        plan_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the plan, created by Nozle.
@@ -18570,11 +18570,11 @@ components:
         invoice_payment_details:
           type: object
           properties:
-            lago_customer_id:
+            customer_id:
               type: string
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
               description: Unique identifier assigned to the customer within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the customer's record within the Nozle system
-            lago_invoice_id:
+            invoice_id:
               type: string
               example: 1e501a90-1a90-1a90-1a90-1a901a901a80
               description: Unique identifier assigned to the invoice within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the invoice's record within the Nozle system
@@ -18908,7 +18908,7 @@ components:
     OrganizationObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - name
         - created_at
         - document_numbering
@@ -18916,7 +18916,7 @@ components:
         - email_settings
         - billing_configuration
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -19063,12 +19063,12 @@ components:
     PaymentReceiptObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - created_at
         - number
         - payment
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the payment receipt, created by Nozle.
@@ -19113,7 +19113,7 @@ components:
           required:
             - email
             - external_customer_id
-            - lago_invoice_ids
+            - invoice_ids
           properties:
             external_customer_id:
               type: string
@@ -19124,7 +19124,7 @@ components:
               format: email
               example: dinesh@piedpiper.test
               description: The customer's email address used for sending dunning notifications
-            lago_invoice_ids:
+            invoice_ids:
               type: array
               description: A list of Nozle IDs for the customer's overdue invoices to start the dunning process
               items:
@@ -19182,11 +19182,11 @@ components:
         - object
         - 'null'
       required:
-        - lago_id
+        - nozle_id
         - amount_cents
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the minimum commitment, created by Nozle.
@@ -19476,8 +19476,8 @@ components:
     ChargeObject:
       type: object
       required:
-        - lago_id
-        - lago_feature_id
+        - nozle_id
+        - feature_id
         - feature_code
         - created_at
         - charge_model
@@ -19489,12 +19489,12 @@ components:
         - properties
         - filters
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of charge, created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_feature_id:
+        feature_id:
           type: string
           format: uuid
           description: Unique identifier of the feature created by Nozle.
@@ -19593,7 +19593,7 @@ components:
             - 'null'
           description: Specifies whether the charge accepts a target wallet for prepaid credits deduction.
           example: false
-        lago_parent_id:
+        parent_id:
           type:
             - string
             - 'null'
@@ -19681,8 +19681,8 @@ components:
     FixedChargeObject:
       type: object
       required:
-        - lago_id
-        - lago_add_on_id
+        - nozle_id
+        - add_on_id
         - code
         - invoice_display_name
         - add_on_code
@@ -19693,12 +19693,12 @@ components:
         - properties
         - units
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the fixed charge, created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_add_on_id:
+        add_on_id:
           type: string
           format: uuid
           description: Unique identifier of the add-on associated with this fixed charge.
@@ -19751,7 +19751,7 @@ components:
 
             When retrieved through a subscription-scoped endpoint (e.g. `GET /subscriptions/{external_id}/fixed_charges`), this reflects the per-subscription unit override when one exists, and falls back to the plan-level units otherwise. Plan-scoped endpoints always return the plan-level units.
           example: 1
-        lago_parent_id:
+        parent_id:
           type:
             - string
             - 'null'
@@ -19843,7 +19843,7 @@ components:
     PlanObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - name
         - created_at
         - code
@@ -19851,7 +19851,7 @@ components:
         - amount_cents
         - amount_currency
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the plan created by Nozle.
@@ -19923,8 +19923,8 @@ components:
             $ref: '#/components/schemas/ChargeObject'
           description: Additional usage-based charges for this plan.
           example:
-            - lago_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
-              lago_feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
+            - nozle_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
+              feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
               feature_code: requests
               created_at: '2023-06-27T19:43:42Z'
               charge_model: package
@@ -19939,8 +19939,8 @@ components:
                 free_units: 100
                 package_size: 1000
               filters: []
-            - lago_id: 1a901a90-1a90-1a90-1a90-1a901a901a92
-              lago_feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a92
+            - nozle_id: 1a901a90-1a90-1a90-1a90-1a901a901a92
+              feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a92
               feature_code: cpu
               created_at: '2023-06-27T19:43:42Z'
               charge_model: graduated
@@ -19961,8 +19961,8 @@ components:
                     flat_amount: '0'
                     per_unit_amount: '0.4'
               filters: []
-            - lago_id: 1a901a90-1a90-1a90-1a90-1a901a901a93
-              lago_feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a93
+            - nozle_id: 1a901a90-1a90-1a90-1a90-1a901a901a93
+              feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a93
               feature_code: seats
               created_at: '2023-06-27T19:43:42Z'
               charge_model: standard
@@ -19992,8 +19992,8 @@ components:
                   values:
                     region:
                       - Africa
-            - lago_id: 1a901a90-1a90-1a90-1a90-1a901a901a94
-              lago_feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a94
+            - nozle_id: 1a901a90-1a90-1a90-1a90-1a901a901a94
+              feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a94
               feature_code: storage
               created_at: '2023-06-27T19:43:42Z'
               charge_model: volume
@@ -20014,8 +20014,8 @@ components:
                     flat_amount: '0'
                     per_unit_amount: '0.5'
               filters: []
-            - lago_id: 1a901a90-1a90-1a90-1a90-1a901a901a95
-              lago_feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a95
+            - nozle_id: 1a901a90-1a90-1a90-1a90-1a901a901a95
+              feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a95
               feature_code: payments
               created_at: '2023-06-27T19:43:42Z'
               charge_model: percentage
@@ -20037,8 +20037,8 @@ components:
           items:
             $ref: '#/components/schemas/FixedChargeObject'
           example:
-            - lago_id: 1a901a90-1a90-1a90-1a90-1a901a901a90
-              lago_add_on_id: 2b802b80-2b80-2b80-2b80-2b802b802b80
+            - nozle_id: 1a901a90-1a90-1a90-1a90-1a901a901a90
+              add_on_id: 2b802b80-2b80-2b80-2b80-2b802b802b80
               code: setup_fee
               invoice_display_name: Setup Fee
               add_on_code: setup
@@ -20049,17 +20049,17 @@ components:
               properties:
                 amount: '500'
               units: 1
-              lago_parent_id: null
+              parent_id: null
               taxes:
-                - lago_id: 3c703c70-3c70-3c70-3c70-3c703c703c70
+                - nozle_id: 3c703c70-3c70-3c70-3c70-3c703c703c70
                   name: VAT
                   code: vat_20
                   rate: 20
                   description: Standard VAT rate
                   applied_to_organization: true
                   created_at: '2026-01-01T00:00:00Z'
-            - lago_id: 4d604d60-4d60-4d60-4d60-4d604d604d60
-              lago_add_on_id: 5e505e50-5e50-5e50-5e50-5e505e505e50
+            - nozle_id: 4d604d60-4d60-4d60-4d60-4d604d604d60
+              add_on_id: 5e505e50-5e50-5e50-5e50-5e505e505e50
               code: support_tier
               invoice_display_name: Support Tier
               add_on_code: premium_support
@@ -20078,10 +20078,10 @@ components:
                     per_unit_amount: '1'
                     flat_amount: '300'
               units: 1
-              lago_parent_id: null
+              parent_id: null
               taxes: []
-            - lago_id: 6f406f40-6f40-6f40-6f40-6f406f406f40
-              lago_add_on_id: 7a307a30-7a30-7a30-7a30-7a307a307a30
+            - nozle_id: 6f406f40-6f40-6f40-6f40-6f406f406f40
+              add_on_id: 7a307a30-7a30-7a30-7a30-7a307a307a30
               code: storage
               invoice_display_name: Storage Allocation
               add_on_code: cloud_storage
@@ -20100,7 +20100,7 @@ components:
                     per_unit_amount: '1'
                     flat_amount: '0'
               units: 50
-              lago_parent_id: null
+              parent_id: null
               taxes: []
         taxes:
           type: array
@@ -21084,13 +21084,13 @@ components:
       type: object
       description: Charge filter values used to apply differentiated pricing based on additional event properties.
       required:
-        - lago_id
+        - nozle_id
         - charge_code
         - invoice_display_name
         - properties
         - values
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the charge filter, created by Nozle.
@@ -21697,8 +21697,8 @@ components:
     LifetimeUsageObject:
       type: object
       required:
-        - lago_id
-        - lago_subscription_id
+        - nozle_id
+        - subscription_id
         - external_subscription_id
         - external_historical_usage_amount_cents
         - invoiced_usage_amount_cents
@@ -21706,12 +21706,12 @@ components:
         - from_datetime
         - to_datetime
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
           description: Unique identifier assigned to the lifetime usage record within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the lifetime usage record within the Nozle system
-        lago_subscription_id:
+        subscription_id:
           type: string
           format: uuid
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
@@ -21773,8 +21773,8 @@ components:
     AlertObject:
       type: object
       required:
-        - lago_id
-        - lago_organization_id
+        - nozle_id
+        - organization_id
         - external_subscription_id
         - feature
         - alert_type
@@ -21785,12 +21785,12 @@ components:
         - thresholds
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the alert, created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_organization_id:
+        organization_id:
           type: string
           format: uuid
           description: Unique identifier of the organization, created by Nozle.
@@ -21801,7 +21801,7 @@ components:
             - 'null'
           description: The subscription external unique identifier (provided by your own application).
           example: sub_1234567890
-        lago_wallet_id:
+        wallet_id:
           type: 'null'
         wallet_code:
           type: 'null'
@@ -22241,11 +22241,11 @@ components:
     WalletTransactionObject:
       type: object
       required:
-        - lago_id
-        - lago_wallet_id
-        - lago_invoice_id
-        - lago_credit_note_id
-        - lago_voided_invoice_id
+        - nozle_id
+        - wallet_id
+        - invoice_id
+        - credit_note_id
+        - voided_invoice_id
         - status
         - source
         - transaction_status
@@ -22263,31 +22263,31 @@ components:
         - name
         - payment_method
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the wallet transaction within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the wallet transaction's record within the Nozle system.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_wallet_id:
+        wallet_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the wallet within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the wallet's record within the Nozle system.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_invoice_id:
+        invoice_id:
           type:
             - string
             - 'null'
           format: uuid
           description: Unique identifier assigned to the invoice associated with this wallet transaction. This ID is exclusively created by Nozle and serves as a unique identifier for the invoice's record within the Nozle system.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_credit_note_id:
+        credit_note_id:
           type:
             - string
             - 'null'
           format: uuid
           description: Unique identifier of the credit note associated with this wallet transaction. This ID is exclusively created by Nozle and serves as a unique identifier for the invoice's record within the Nozle system.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_voided_invoice_id:
+        voided_invoice_id:
           type:
             - string
             - 'null'
@@ -22419,8 +22419,8 @@ components:
     WalletTransactionPaymentUrl:
       type: object
       required:
-        - lago_wallet_transaction_id
-        - lago_customer_id
+        - wallet_transaction_id
+        - customer_id
         - external_customer_id
         - payment_provider
       description: .
@@ -22428,11 +22428,11 @@ components:
         wallet_transaction_payment_details:
           type: object
           properties:
-            lago_customer_id:
+            customer_id:
               type: string
               example: 1a901a90-1a90-1a90-1a90-1a901a901a90
               description: Unique identifier assigned to the customer within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the customer's record within the Nozle system
-            lago_wallet_transaction_id:
+            wallet_transaction_id:
               type: string
               example: 1e501a90-1a90-1a90-1a90-1a901a901a80
               description: Unique identifier assigned to the wallet transaction within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the wallet transaction's record within the Nozle system
@@ -22451,13 +22451,13 @@ components:
     WalletTransactionConsumptionObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - amount_cents
         - credit_amount
         - created_at
         - wallet_transaction
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the wallet transaction consumption within the Nozle application.
@@ -22499,13 +22499,13 @@ components:
     WalletTransactionFundingObject:
       type: object
       required:
-        - lago_id
+        - nozle_id
         - amount_cents
         - credit_amount
         - created_at
         - wallet_transaction
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the wallet transaction funding within the Nozle application.
@@ -22556,17 +22556,17 @@ components:
     WebhookEndpointObject:
       type: object
       required:
-        - lago_id
-        - lago_organization_id
+        - nozle_id
+        - organization_id
         - webhook_url
         - created_at
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the wallet within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the webhook endpoint's record within the Nozle system.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_organization_id:
+        organization_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the organization attached to the webhook endpoint within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the organization's record within the Nozle system.
@@ -22653,10 +22653,10 @@ components:
     TriggeredAlertObject:
       type: object
       required:
-        - lago_id
-        - lago_organization_id
-        - lago_alert_id
-        - lago_subscription_id
+        - nozle_id
+        - organization_id
+        - alert_id
+        - subscription_id
         - external_subscription_id
         - external_customer_id
         - feature_code
@@ -22668,22 +22668,22 @@ components:
         - triggered_at
         - crossed_thresholds
       properties:
-        lago_id:
+        nozle_id:
           type: string
           format: uuid
           description: Unique identifier of the alert, created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_organization_id:
+        organization_id:
           type: string
           format: uuid
           description: Unique identifier of the organization, created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_alert_id:
+        alert_id:
           type: string
           format: uuid
           description: Unique identifier of the alert, created by Nozle.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_subscription_id:
+        subscription_id:
           type: string
           format: uuid
           description: Unique identifier of the subscription, created by Nozle.
@@ -22744,13 +22744,13 @@ components:
     CustomerIntegratrionErrorObject:
       type: object
       required:
-        - lago_customer_id
+        - customer_id
         - external_customer_id
         - accounting_provider
         - accounting_provider_code
         - provider_error
       properties:
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the customer within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the customer's record within the Nozle system.
@@ -22782,13 +22782,13 @@ components:
     CustomerPaymentProviderErrorObject:
       type: object
       required:
-        - lago_customer_id
+        - customer_id
         - external_customer_id
         - payment_provider
         - payment_provider_code
         - provider_error
       properties:
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the customer within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the customer's record within the Nozle system.
@@ -22818,13 +22818,13 @@ components:
     CustomerTaxProviderErrorObject:
       type: object
       required:
-        - lago_customer_id
+        - customer_id
         - external_customer_id
         - tax_provider
         - tax_provider_code
         - provider_error
       properties:
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the customer within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the customer's record within the Nozle system.
@@ -22868,17 +22868,17 @@ components:
     CreditNotePaymentProviderRefundError:
       type: object
       required:
-        - lago_credit_note_id
-        - lago_customer_id
+        - credit_note_id
+        - customer_id
         - external_customer_id
         - payment_provider
       properties:
-        lago_credit_note_id:
+        credit_note_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the credit note within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the credit note record within the Nozle system.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the customer within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the customer's record within the Nozle system.
@@ -22994,7 +22994,7 @@ components:
       type: object
       required:
         - tax_provider_code
-        - lago_charge_id
+        - charge_id
         - event_transaction_id
         - provider_error
       properties:
@@ -23002,7 +23002,7 @@ components:
           type: string
           description: Code of the tax provider
           example: Stripe Prod
-        lago_charge_id:
+        charge_id:
           type:
             - string
             - 'null'
@@ -23033,17 +23033,17 @@ components:
     InvoicePaymentFailureObject:
       type: object
       required:
-        - lago_invoice_id
-        - lago_customer_id
+        - invoice_id
+        - customer_id
         - external_customer_id
         - payment_provider
       properties:
-        lago_invoice_id:
+        invoice_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the invoice within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the invoice's record within the Nozle system.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the customer within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the customer's record within the Nozle system.
@@ -23077,12 +23077,12 @@ components:
     IntegrationProviderErrorObject:
       type: object
       required:
-        - lago_integration_id
+        - integration_id
         - provider
         - provider_code
         - provider_error
       properties:
-        lago_integration_id:
+        integration_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the integration within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the integration's record within the Nozle system.
@@ -23103,13 +23103,13 @@ components:
     PaymentProviderErrorObject:
       type: object
       required:
-        - lago_payment_provider_id
+        - payment_provider_id
         - payment_provider_name
         - payment_provider_code
         - provider_error
         - source
       properties:
-        lago_payment_provider_id:
+        payment_provider_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the payment provider within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the payment provider's record within the Nozle system.
@@ -23142,18 +23142,18 @@ components:
     PaymentRequestPaymentFailureObject:
       type: object
       required:
-        - lago_payment_request_id
-        - lago_invoice_ids
-        - lago_customer_id
+        - payment_request_id
+        - invoice_ids
+        - customer_id
         - external_customer_id
         - payment_provider
       properties:
-        lago_payment_request_id:
+        payment_request_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the payment request within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the payment request record within the Nozle system.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_invoice_ids:
+        invoice_ids:
           type: array
           items:
             type: string
@@ -23161,7 +23161,7 @@ components:
           description: List of unique identifiers assigned to the invoices within the Nozle application. These IDs are exclusively created by Nozle and serve as unique identifiers for the invoices records within the Nozle system.
           example:
             - 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the customer within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the customer's record within the Nozle system.
@@ -23234,17 +23234,17 @@ components:
     WalletTransactionPaymentFailureObject:
       type: object
       required:
-        - lago_wallet_transaction_id
-        - lago_customer_id
+        - wallet_transaction_id
+        - customer_id
         - external_customer_id
         - payment_provider
       properties:
-        lago_wallet_transaction_id:
+        wallet_transaction_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the wallet transaction within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the wallet transaction's record within the Nozle system.
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           description: Unique identifier assigned to the customer within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the customer's record within the Nozle system.
