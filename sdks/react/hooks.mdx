@@ -34,24 +34,11 @@ function PlanList() {
 
 | Field | Type | Description |
 |---|---|---|
-| `plans` | `CatalogPlan[]` | Public plans returned by Nozle. |
+| `plans` | `CatalogPlan[]` | Plans returned by the Nozle catalog. |
 | `isLoading` | `boolean` | `true` until the catalog request settles. |
 | `error` | `Error \| null` | Set when the request fails: `HTTP <status>` (for example `HTTP 500`) or the thrown message, such as `Failed to fetch`. `plans` is `[]`. |
 
-The catalog returns each public plan in full. Besides `code`, `name`, `amount_cents`, `amount_currency`, and `interval`, a plan includes `charges` (charge models and amounts), `entitlements`, `credit_grant_rules`, `credit_pool_policies`, `usage_thresholds`, and `taxes`. A pricing page can read usage rates and limits from those fields.
-
-The TypeScript type declares only the five fields above. To read the other fields, cast or extend the type:
-
-```ts
-import type { CatalogPlan } from '@nozle-js/react'
-
-type FullPlan = CatalogPlan & {
-  charges?: unknown[]
-  entitlements?: unknown[]
-}
-
-const fullPlans = plans as FullPlan[]
-```
+`CatalogPlan` contains `code`, `name`, `amount_cents`, `amount_currency`, and `interval`.
 
 ## `useCheckoutSession`
 
