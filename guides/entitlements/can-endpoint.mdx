@@ -95,3 +95,9 @@ nozle.can('cust_123', 'api_calls')
 ```
 
 **React:** fetch the result through your authenticated backend and pass it to `FeatureGate`, `UsageGate`, or your own UI.
+
+## Availability and freshness
+
+If usage cannot be read reliably, the hosted API returns HTTP `503` with a structured error and request ID, without an access decision. Treat it as unavailable; do not convert the failure into `allowed: true` or zero usage. Use bounded retries within your request budget and retain the request ID for support.
+
+Entitlement configuration refresh is approximately once per minute. A plan or quota edit may take that interval to appear in `can()` results. Usage projections are asynchronous, and a separate `can()` followed by `track()` does not reserve quota atomically. Use [Track and Consume Credits](/api/usage-track) for atomic product-credit consumption.

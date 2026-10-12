@@ -13,7 +13,7 @@ Start with the [quickstart](https://docs.nozle.dev/guides/getting-started/quicks
 | [`sdks/`](sdks/node/installation.mdx) | Installation and workflow guides for React, Node.js, Python, and Go |
 | [`integrations/`](integrations/stripe.mdx) | Provider integration guides |
 | [`changelog/`](changelog/index.mdx) | Published product and SDK release notes |
-| [`examples/`](examples/node-sdk.ts) | Source examples compiled by documentation CI; these are excluded from the published site |
+| [`examples/`](examples/node-sdk.ts) | Source examples compiled against the pinned published SDK packages by documentation CI; these are excluded from the published site |
 | [`docs.json`](docs.json) | Mintlify site configuration, navigation, and API reference mapping |
 
 SDK setup guides: [React](sdks/react/installation.mdx) · [Node.js](sdks/node/installation.mdx) · [Python](sdks/python/installation.mdx) · [Go](sdks/go/installation.mdx).
