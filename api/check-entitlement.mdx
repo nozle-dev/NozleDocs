@@ -21,20 +21,32 @@ Check whether a customer is entitled to use a feature under their current plan. 
   Whether the customer can use this feature
 </ResponseField>
 
-<ResponseField name="reason" type="string" required>
-  Why the request was allowed or denied (e.g. `within_limit`, `limit_exceeded`, `no_subscription`)
+<ResponseField name="reason" type="string">
+  Present only when access is denied; omitted when `allowed` is `true`. One of `feature_not_found`, `no_subscription`, `no_entitlement`, `usage_limit_exceeded`, or `economic_policy_denied`.
 </ResponseField>
 
-<ResponseField name="used" type="number">
-  Units consumed in the current billing period
+<ResponseField name="feature_type" type="string">
+  Type of the feature. Not returned when the feature or the subscription is missing.
 </ResponseField>
 
-<ResponseField name="limit" type="number">
-  Maximum units allowed by the plan
+<ResponseField name="configuration" type="object">
+  Configuration values granted by the plan for a non-metered feature. Omitted when there are none.
 </ResponseField>
 
-<ResponseField name="remaining" type="number">
-  Units still available
+<ResponseField name="used" type="number" required>
+  Units consumed in the current billing period. `0` for a denial that is decided before usage is read, and for features that are not metered.
+</ResponseField>
+
+<ResponseField name="limit" type="number | null" required>
+  Maximum units allowed by the plan. `null` when the plan sets no cap or the feature is not metered.
+</ResponseField>
+
+<ResponseField name="remaining" type="number | null" required>
+  Units still available. `null` when `limit` is `null`.
+</ResponseField>
+
+<ResponseField name="overage" type="boolean">
+  `true` when usage has reached a soft limit. The request is still allowed. Omitted otherwise.
 </ResponseField>
 
 <ResponseField name="economics" type="object">
@@ -42,6 +54,18 @@ Check whether a customer is entitled to use a feature under their current plan. 
 </ResponseField>
 
 The `economics.status` value is `estimated`, `not_configured`, `unavailable`, or `stale`. `includes` identifies what was calculated and `excludes` explains costs that cannot be known before the operation runs. When a margin policy applies, the separate `policy` object reports its version, thresholds, stale-data fallback, decision, and reason.
+
+## Denial reasons
+
+| `reason` | Meaning |
+|----------|---------|
+| `feature_not_found` | No feature with this code exists in the organization. |
+| `no_subscription` | The customer has no active subscription (none started, ended, or cancelled), or the customer does not exist. |
+| `no_entitlement` | The customer's plan does not include the feature. |
+| `usage_limit_exceeded` | A hard limit is reached. A soft limit never denies; it sets `overage` to `true`. |
+| `economic_policy_denied` | A margin policy in `deny` mode rejected the estimated cost or margin. The `policy` object has the detail. |
+
+A denial is an HTTP `200` response with `allowed: false`. `400` means `customer_id` or `feature` is missing, `403` means a publishable key or a customer scope mismatch.
 
 <Info>
 When `allowed` is `false`, the `reason` field tells you why -- use it to show contextual upgrade prompts in your UI. The entitlement decision is authoritative for access at that instant. The economics object is an estimate only and does not create usage, alter a pricing period, or write a financial ledger entry.
