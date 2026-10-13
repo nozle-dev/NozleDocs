@@ -55,7 +55,7 @@ When `subscriptionId` is omitted, the SDK queries `eventsUrl/api/v1/subscription
 Pass `subscriptionId` explicitly for customers with multiple active subscriptions and for latency-sensitive event paths that should avoid the initial lookup.
 
 <Warning>
-The cache lasts for the life of the `Nozle` instance and is never refreshed. After a cancellation, a plan change, or a second `subscribe`, the same instance keeps sending events to the old subscription ID, and the Events API accepts them. Pass `subscriptionId` whenever you change a customer's subscription, or create a new client.
+The cache lasts for the life of the `Nozle` instance. From `0.10.0` the entry is dropped after `subscribe()`, `cancelSubscription()`, `applySubscriptionTransition()`, `checkout()`, a scoped `checkoutStatus()` or `verifyCheckout()`, and `checkoutInvoice()` clears every entry, so the next `track()` looks the subscription up again. Earlier versions never refreshed it. A change made outside this instance, or a `track()` between a paid `checkout()` and its payment, can still use the old subscription ID, and the Events API accepts it. Pass `subscriptionId` in those cases, or call `checkoutStatus()` with a scope after payment.
 </Warning>
 
 `subscribe` to a second plan adds a subscription; it does not replace the first. To move a customer to another plan, change or cancel the old subscription, then pass the new subscription ID to `track()`.

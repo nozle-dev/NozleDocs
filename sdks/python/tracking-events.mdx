@@ -44,11 +44,11 @@ A naive `datetime` without a timezone is rejected. `datetime.now().isoformat()` 
 
 When `subscription_id` is omitted, the SDK queries the Events API for active subscriptions:
 
-- one active subscription is cached and used for the life of the client;
+- one active subscription is cached and reused until the client changes that customer's subscriptions (see below);
 - no active subscription raises `NozleAPIError` (`no active subscription for customer '…'`); and
 - multiple active subscriptions raise `NozleAPIError` (`has 2 active subscriptions; specify subscription_id`) and require an explicit ID.
 
-The cache is never refreshed. After a cancel, a plan change, or a second `subscribe`, the client keeps sending events to the first subscription ID. A second `subscribe` adds a subscription; it does not replace the first. Pass `subscription_id` or create a new client.
+From `0.10.0`, `subscribe()`, `checkout()`, `cancel_subscription()` and `apply_subscription_transition()` clear that customer's cached subscription, even when the call fails, so the next `track()` looks it up again. Earlier versions never refreshed the cache. `checkout_many` and the Entity calls do not clear it, because they act on Entity subscriptions. A change made outside this client instance still needs an explicit `subscription_id`. A second `subscribe` adds a subscription; it does not replace the first, and with two active subscriptions `track()` raises until you pass `subscription_id`.
 
 <Warning>
 The lookup errors carry `status_code` 200. The SDK detects the failure, not an HTTP error. Do not treat 200 as success when you check `status_code`.
