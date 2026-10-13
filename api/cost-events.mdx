@@ -32,7 +32,7 @@ The supported Version One categories are `input`, `cached_input`, `cache_write`,
 }
 ```
 
-`timestamp` is a number of Unix seconds (fractions allowed). An ISO 8601 string returns `400 invalid request body`. Omit it to use the time Nozle receives the event.
+`timestamp` is Unix seconds (a JSON number such as `1788345001` or `1788345001.5`, or a numeric string such as `"1788345001"`) or an RFC 3339 string with a time zone offset or `Z`. Omit it to use the time Nozle receives the event. A date without a time, a time without an offset, or another JSON type returns `400 invalid_request` with `timestamp must be Unix seconds (a number or a numeric string) or an RFC 3339 timestamp with an offset or Z`; zero or negative seconds return `422` with `timestamp must be greater than zero`. Strings are accepted from the Engine release that includes this change; before it, only a number is accepted and any string returns `400 invalid request body`. An RFC 3339 value is stored as Unix seconds.
 
 At least one attribution field is required:
 

@@ -18002,9 +18002,12 @@ components:
             model: configured-model-a
             type: input
         timestamp:
-          type: number
-          format: double
-          description: Unix timestamp in seconds. Nozle uses the reception time when omitted.
+          oneOf:
+            - type: number
+              format: double
+            - type: string
+          description: |
+            Event time. A number of Unix seconds (fractions allowed), a numeric string, or an RFC 3339 string with a time zone offset or `Z`. Nozle uses the reception time when omitted. A date without a time, a time without an offset, and zero or negative seconds are rejected. Strings are accepted from the Engine release that includes this change; before it, only a number is accepted.
           example: 1788345001
     CostEventAccepted:
       type: object
