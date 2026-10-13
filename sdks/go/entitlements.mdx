@@ -29,7 +29,8 @@ Metadata can include quantities required by a Cost Rule.
 | Field | Meaning |
 |---|---|
 | `Allowed`, `Reason` | Access decision and reason. |
-| `Used`, `Limit`, `Remaining`, `Overage` | Usage and allowance state. |
+| `Used`, `Overage` | Usage so far, and whether it is past the limit. |
+| `Limit`, `Remaining` | `*int`. `nil` when the feature is unlimited (the API sends `null`), never `0`: a `0` allowance means none left. Check `Limit != nil` before reading either. |
 | `Economics` | Optional point-in-time estimate with exact `nozle.Decimal` values, Cost Rule versions, and exclusions. |
 
 Check immediately before protected server work. React gates are not an authorization boundary. `Can` does not reserve product credits.
