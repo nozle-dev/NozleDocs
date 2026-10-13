@@ -163,10 +163,10 @@ Prefer `useBillingContext` or `useOptionalBillingContext` in application compone
 
 | Result | Shape | Component behavior |
 |---|---|---|
-| Stripe | `{ type: 'stripe', client_secret }` (also `clientSecret`) | Nozle returns an embedded Checkout Session client secret (`cs_`), never a Stripe URL. `CheckoutButton` passes it to `onStripeClientSecret`. |
+| Stripe | `{ type: 'stripe', client_secret }` (also `clientSecret`) | Plan and invoice checkout return an embedded Checkout Session client secret (`cs_`), never a Stripe URL. `CheckoutButton` passes it to `onStripeClientSecret`. |
 | Razorpay | `{ type: 'razorpay', checkout_id, key_id, order_id, amount_cents, currency }` | Loads `https://checkout.razorpay.com/v1/checkout.js`, calls `verifyCheckout`, then polls `getCheckoutStatus`. |
-| Hosted | `{ type: 'hosted', payment_url }` | Redirects with `location.assign`. The URL must use HTTPS. |
-| Processing | `{ type: 'processing', checkout_id, status }` | Polls `getCheckoutStatus`, which is required. |
+| Hosted | `{ type: 'hosted', payment_url }` | Redirects with `location.assign`. The URL must use HTTPS. `POST /checkout` never returns it for Razorpay, so your `createCheckout` only sees it if your backend forwards a payment link. |
+| Processing | `{ type: 'processing', checkout_id, status }` | Polls `getCheckoutStatus`, which is required. Razorpay returns it while an order is not ready or after it expired, and Stripe returns it for a replayed quoted upgrade whose webhook is still pending. |
 | Completed | `{ type: 'completed', ... }` | Calls `onComplete`. |
 | Scheduled | `{ type: 'scheduled', ... }` | Calls `onScheduled`. |
 
@@ -180,6 +180,6 @@ Polling calls `getCheckoutStatus` up to 30 times, one second apart, until both `
 | `Checkout response did not include a supported result type` | `useCheckoutSession` received an unknown result. |
 | `onStripeClientSecret is required for embedded Stripe checkout` | `CheckoutButton` received a Stripe client secret without the callback. |
 
-The components also accept `{ type: 'stripe', url }` and a legacy `{ url }`, and redirect to them. The Nozle server does not return either; it returns a client secret.
+The components also accept `{ type: 'stripe', url }` and a legacy `{ url }`, and redirect to them. Plan and invoice checkout do not return either; they return a client secret.
 
 Stripe webhooks remain authoritative. A browser redirect or completion callback does not activate a paid plan by itself.
