@@ -45,7 +45,7 @@ The endpoint returns `202 Accepted` with `{"status": "accepted", "cost_event_id"
 If `cost_event_id` is omitted, Nozle generates and returns a version 7 universally unique identifier. Reuse the same identifier and payload when retrying a Cost Event. Posting the same `cost_event_id` again also returns `202`; the duplicate is removed when the event is processed.
 
 <Warning>
-The endpoint does not check `cost_meter_code` when it accepts the event. An unknown meter code still returns `202` and the cost never appears in reports. Copy the code exactly from the Cost Model.
+The endpoint does not check `cost_meter_code` when it accepts the event. An unknown meter code still returns `202`. Processing then marks the event `uncosted` with the failure code `unknown_cost_event_meter` ("No active Cost Event Meter matches the event code"), and it appears in the Uncosted queue of the [cost intelligence report](/api/cost-intelligence-report). It adds no cost to the totals until you correct the meter and rate it again. Copy the code exactly from the Cost Model.
 </Warning>
 
 ## Provider usage capture
