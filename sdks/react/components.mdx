@@ -48,7 +48,7 @@ import { PricingTable } from '@nozle-js/react'
 When `plans` is omitted, `PricingTable` reads `GET /api/v1/plans` through `BillingProvider` itself. Supplying `plans` makes the component fully caller-driven and allows it to render outside a provider when `onSelect` is also supplied. With neither `plans` nor a provider, it shows `BillingProvider with a publishableKey is required to load plans`.
 
 <Warning>
-If its own catalog request fails, `PricingTable` renders an empty grid with no message, and a thrown fetch error becomes an unhandled promise rejection. `onCheckoutError` does not receive catalog failures. To show a message, load plans with `usePlans`, render its `error` yourself, and pass `plans` to `PricingTable`.
+If its own catalog request fails, `PricingTable` renders `Plans could not be loaded: <reason>` (`HTTP <status>` or the thrown message) in a `role="alert"` message, from React `0.10.2`. Earlier versions rendered an empty grid and left an unhandled promise rejection. `onCheckoutError` does not receive catalog failures. To render your own message, load plans with `usePlans`, use its `error`, and pass `plans` to `PricingTable`.
 </Warning>
 
 `PricingTable` passes only `planCode` and `returnUrl` to `createCheckout`, with no idempotency key. Only `CheckoutButton` sends an idempotency key.

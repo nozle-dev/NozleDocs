@@ -103,7 +103,7 @@ This free count-based example does not charge a payment method or configure cost
 <Step>
 ## Track your first event
 
-Send a billable event with metadata. If you do not pass a subscription ID, the SDK looks up the customer's active subscription. Node.js and Python look it up once and keep it for the life of the client, so pass the subscription ID after you change or cancel a subscription. Go looks it up on every call, which adds one request. Tracking fails when the customer has no active subscription or more than one.
+Send a billable event with metadata. If you do not pass a subscription ID, the SDK looks up the customer's active subscription. Node.js and Python look it up once per customer and keep it. From Node.js `0.10.0` and Python `0.10.0` the client clears that entry after its own `subscribe`, `checkout`, cancel and plan-change calls; earlier versions never refreshed it. A change made outside that client instance, or by a payment that completes later, still needs an explicit subscription ID. Go looks it up on every call, which adds one request. Tracking fails when the customer has no active subscription or more than one.
 
 <Tabs>
 <Tab title="Node.js">
