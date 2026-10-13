@@ -5,7 +5,7 @@ api: "POST https://api.nozle.app/engine/api/v1/margin/simulate"
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-Simulate margin impact of pricing or cost changes before applying them.
+Simulate the margin of one metric at a new unit price before you change it. The simulation replays the metric's recorded usage at the new price and keeps the recorded cost.
 
 **Auth:** `sk_` only
 
@@ -13,14 +13,44 @@ Simulate margin impact of pricing or cost changes before applying them.
 All margin endpoints require a secret key (`sk_`). These endpoints expose cost data that should never be visible to your end users.
 </Warning>
 
-<ParamField body="plan_code" type="string" required>
-  Plan code to simulate changes for
+```http
+POST /margin/simulate
+Authorization: Bearer sk_nozle_...
+Content-Type: application/json
+```
+
+```json
+{
+  "metric_code": "agent_execution",
+  "new_price_dollars": 1
+}
+```
+
+<ParamField body="metric_code" type="string" required>
+  Code of the metric to simulate. A missing or empty value returns `400` with `metric_code required`.
 </ParamField>
 
-<ParamField body="new_price_cents" type="number">
-  New price in cents to simulate
+<ParamField body="new_price_dollars" type="number" required>
+  New price per unit of usage, in dollars (a JSON number, not a string). Send it every time: if you omit it, the server uses `0` and returns a simulation with no revenue. A string returns `400`.
 </ParamField>
 
-<ParamField body="cost_change_percent" type="number">
-  Percentage change in cost to simulate
-</ParamField>
+The simulation covers the same `from` and `to` range as the other margin endpoints, which defaults to the last month. The body takes no other fields; fields such as `plan_code`, `new_price_cents`, `cost_change_percent` and `price_change_percent` are ignored.
+
+### Response
+
+```json
+{
+  "metric_code": "agent_execution",
+  "current_revenue_cents": 14750,
+  "current_cost_cents": 2360,
+  "current_margin_cents": 12390,
+  "new_revenue_cents": 29500,
+  "new_cost_cents": 2360,
+  "new_margin_cents": 27140,
+  "revenue_delta_cents": 14750,
+  "margin_delta_cents": 14750,
+  "event_count": 295
+}
+```
+
+All amounts are integer cents. `new_revenue_cents` is the total recorded quantity multiplied by `new_price_dollars` and 100, truncated to a whole cent. `new_cost_cents` equals `current_cost_cents`: the simulation changes price only. The deltas are `new` minus `current`. A metric with no events in the range returns zeros with `event_count` `0`.

@@ -22,5 +22,25 @@ All margin endpoints require a secret key (`sk_`). These endpoints expose cost d
 </ParamField>
 
 <ParamField query="granularity" type="string">
-  Time bucket size: `hour`, `day`, `week`, or `month` (default: `day`)
+  Time bucket size: `hour`, `day`, `week`, or `month` (default: `day`). The server does not reject other values: `year` or any unknown value returns `200` and is bucketed by day, while the response still echoes the value you sent in `granularity`. Send only the four documented values.
 </ParamField>
+
+### Response
+
+```json
+{
+  "granularity": "week",
+  "trend": [
+    {
+      "period": "2026-10-04",
+      "revenue_cents": 14750,
+      "cost_cents": 2360,
+      "margin_cents": 12390,
+      "margin_percent": 84,
+      "event_count": 295
+    }
+  ]
+}
+```
+
+`period` is the start of the bucket: `YYYY-MM-DD` for `week` and `month`, `YYYY-MM-DD HH:MM:SS` for `hour` and `day`. `margin_percent` is `0` when the bucket has no revenue. When no events fall in the range, `trend` is `null`, not an empty array.

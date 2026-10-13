@@ -51,13 +51,15 @@ const trend = await nozle.margin.trend({
 });
 ```
 
-**Simulate** — what-if pricing analysis:
+**Simulate** — what-if pricing for one metric. `new_price_dollars` is the new price per unit, in dollars; cost stays as recorded. See [Simulate Margin](/api/margin-simulate):
 
 ```bash
 curl -X POST https://api.nozle.app/engine/api/v1/margin/simulate \
   -H "Authorization: Bearer sk_live_..." \
   -H "Content-Type: application/json" \
-  -d '{ "plan_code": "growth", "price_change_percent": 10 }'
+  -d '{ "metric_code": "agent_execution", "new_price_dollars": 1 }'
 ```
 
 All endpoints accept optional `from`/`to` date range parameters (ISO 8601 format).
+
+When no events fall in the range, the list endpoints return `null` for their list (`{"models": null}`, `{"customers": null}`, and so on), not an empty array. Treat `null` as empty.
