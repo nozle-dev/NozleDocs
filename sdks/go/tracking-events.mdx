@@ -15,9 +15,31 @@ err := client.Track(ctx, nozle.TrackParams{
 _ = err
 ```
 
-`Track` posts `{ "event": { ... } }` to Core `/api/v1/events`. Pass `Timestamp` as RFC3339 or Unix seconds; the SDK sends Unix seconds with millisecond precision, as required by Core. If `SubscriptionID` is omitted, the SDK looks up active subscriptions and requires exactly one. Supply it explicitly when a customer has multiple active subscriptions. Reuse the same transaction ID and timestamp when retrying a logical event. `Meter` posts a batch of 1–100 events to Core `/api/v1/events/batch`; each batch event needs an explicit subscription ID.
+`Track` posts `{ "event": { ... } }` to Core `/api/v1/events`. Reuse the same transaction ID and timestamp when retrying a logical event. `Meter` posts a batch of 1–100 events to Core `/api/v1/events/batch`; each batch event needs an explicit subscription ID. A batch of 0 or more than 100 events returns the plain error `nozle: batch size must be 1-100` before any request.
 
-`TrackParams` contains `CustomerID`, `Event`, optional JSON `Metadata`, `SubscriptionID`, `TransactionID`, and `Timestamp`. When the transaction ID is omitted, Go generates a UUIDv7. An explicit subscription avoids the lookup and ambiguity for customers with multiple active subscriptions.
+`TrackParams` contains `CustomerID`, `Event`, optional JSON `Metadata`, `SubscriptionID`, `TransactionID`, and `Timestamp`.
+
+## Transaction IDs
+
+`Track` returns only an `error`, so `id, err := client.Track(...)` does not compile. When `TransactionID` is empty, the SDK generates a UUIDv7 that your code never sees, and a retry cannot reuse it. Create the ID yourself, pass it, and keep it for retries:
+
+```go
+txID := nozle.CreateTransactionID()
+err := client.Track(ctx, nozle.TrackParams{
+  CustomerID: "workspace_123", Event: "api_calls",
+  SubscriptionID: "workspace_123_subscription",
+  TransactionID: txID,
+})
+_ = err
+```
+
+## Subscription resolution
+
+When `SubscriptionID` is empty, the SDK requests the customer's active subscriptions before it sends the event. It does this on every call, with no cache: two `Track` calls make four requests. The customer must have exactly one active subscription; otherwise `Track` returns `nozle: track: exactly one active subscription required; supply SubscriptionID`. Subscribing a customer to a second plan adds a second active subscription rather than replacing the first, so a lookup that worked before can start failing. Resolve the subscription once, store it, and pass `SubscriptionID` on every call.
+
+## Timestamps
+
+`TrackParams.Timestamp` is a string: RFC 3339 with an offset (`2026-07-01T12:00:00Z`) or Unix seconds (`1782907200`). The SDK sends Unix seconds with millisecond precision. A date only or an RFC 3339 value without an offset returns `nozle: event: timestamp must be RFC3339 or Unix seconds`.
 
 ## Batch and cost events
 
@@ -29,7 +51,7 @@ err := client.Meter(ctx, []nozle.MeterEvent{{
 _ = err
 ```
 
-`TrackCostEvent` records a Cost Event in Engine. Set `CostMeterCode` and either `ParentTransactionID` or `ExternalCustomerID`. Supply a stable `CostEventID` for retries.
+`TrackCostEvent` records a Cost Event in Engine. Set `CostMeterCode` and either `ParentTransactionID` or `ExternalCustomerID`. Supply a stable `CostEventID` for retries. `CostEventParams.Timestamp` is a `*float64` of Unix seconds, unlike `UsageParams.Timestamp`, which is a string.
 
 `nozle.CreateTransactionID()` and `nozle.CreateCostEventID()` create UUIDv7 identifiers for those two fields. Create an ID once per logical event and keep it for retries.
 

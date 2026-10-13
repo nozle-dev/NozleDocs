@@ -1,7 +1,12 @@
 ---
 title: Cost Events
+api: "POST https://api.nozle.app/engine/api/v1/cost-events"
 description: Send detailed internal cost usage from a trusted backend
 ---
+
+Base URL: `https://api.nozle.app/engine/api/v1`. The Core host does not serve this route and returns `404`.
+
+**Auth:** secret key only.
 
 Use Cost Events for internal usage that needs more detail than the customer-facing Feature Event, such as artificial intelligence tokens, emails, storage operations, or third-party requests.
 
@@ -27,21 +32,29 @@ The supported Version One categories are `input`, `cached_input`, `cache_write`,
 }
 ```
 
+`timestamp` is Unix seconds (a JSON number such as `1788345001` or `1788345001.5`, or a numeric string such as `"1788345001"`) or an RFC 3339 string with a time zone offset or `Z`. Omit it to use the time Nozle receives the event. A date without a time, a time without an offset, or another JSON type returns `400 invalid_request` with `timestamp must be Unix seconds (a number or a numeric string) or an RFC 3339 timestamp with an offset or Z`; zero or negative seconds return `422` with `timestamp must be greater than zero`. Strings are accepted from the Engine release that includes this change; before it, only a number is accepted and any string returns `400 invalid request body`. An RFC 3339 value is stored as Unix seconds.
+
 At least one attribution field is required:
 
 - `parent_transaction_id` links the cost to an existing or future Feature Event in the same organization.
 - `external_customer_id` records a customer-direct cost that is not linked to a Feature.
 - Both may be provided; asynchronous processing verifies that they resolve to the same customer.
 
-The endpoint requires a secret key. It returns `202 Accepted` after Kafka durably acknowledges the message; cost calculation and analytics happen asynchronously.
+The endpoint returns `202 Accepted` with `{"status": "accepted", "cost_event_id": "..."}` after Kafka durably acknowledges the message; cost calculation and analytics happen asynchronously.
 
-If `cost_event_id` is omitted, Nozle generates and returns a version 7 universally unique identifier. Reuse the same identifier and payload when retrying a Cost Event.
+If `cost_event_id` is omitted, Nozle generates and returns a version 7 universally unique identifier. Reuse the same identifier and payload when retrying a Cost Event. Posting the same `cost_event_id` again also returns `202`; the duplicate is removed when the event is processed.
+
+<Warning>
+The endpoint does not check `cost_meter_code` when it accepts the event. An unknown meter code still returns `202`. Processing then marks the event `uncosted` with the failure code `unknown_cost_event_meter` ("No active Cost Event Meter matches the event code"), and it appears in the Uncosted queue of the [cost intelligence report](/api/cost-intelligence-report). It adds no cost to the totals until you correct the meter and rate it again. Copy the code exactly from the Cost Model.
+</Warning>
 
 ## Provider usage capture
 
 The [Node.js](/sdks/node/llm-auto-capture), [Python](/sdks/python/llm-auto-capture), and [Go](/sdks/go/llm-usage) SDKs capture OpenAI and Anthropic usage automatically from completed responses and streams. Each records a parent Feature Event and optional detailed Cost Events. Set `costMeterCode` in Node.js, `cost_meter_code` in Python, or `CostMeterCode` in Go. The parent `transaction_id` is generated before delivery, so child Cost Events may safely arrive before the Feature Event.
 
 Node.js and Python wrap the provider client methods. Go wraps the HTTP client passed to the official provider SDK using `WrapOpenAIHTTPClient` or `WrapAnthropicHTTPClient`. Go's `CaptureOpenAIUsage` and `CaptureAnthropicUsage` methods also support manual or queued delivery.
+
+For providers without a wrapper, or for cost-only tracking, send Cost Events yourself: [`costEvents.track`](/sdks/node/llm-auto-capture#manual-cost-events) in Node.js, [`cost_events.track`](/sdks/python/llm-auto-capture#manual-cost-events) in Python, or [`TrackCostEvent`](/sdks/go/tracking-events) in Go. A Cost Event never bills the customer.
 
 Each non-zero category is emitted separately with canonical properties:
 

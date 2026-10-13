@@ -17,7 +17,7 @@ The React SDK separates public catalog and checkout orchestration from customer 
 | `CancellationControl` | Standalone end-of-period cancellation and Keep confirmation. |
 | `PlanChangeControl` | Standalone plan selection, signed quote review, paid checkout, scheduled downgrade and exact withdrawal. |
 
-These exports are available in React `0.10.0`. See [Billing portal and self-service](/sdks/react/billing-portal) for setup, props, callback contracts, standalone examples and installation instructions. The portal does not require `BillingProvider` or Tailwind.
+These exports are available in React `0.10.2`. See [Billing portal and self-service](/sdks/react/billing-portal) for setup, props, callback contracts, standalone examples and installation instructions. The portal does not require `BillingProvider` or Tailwind.
 
 ## Pricing components
 
@@ -45,7 +45,13 @@ import { PricingTable } from '@nozle-js/react'
 />
 ```
 
-When `plans` is omitted, `PricingTable` reads `GET /api/v1/plans` through `BillingProvider`. Supplying `plans` makes the component fully caller-driven and allows it to render outside a provider when `onSelect` is also supplied.
+When `plans` is omitted, `PricingTable` reads `GET /api/v1/plans` through `BillingProvider` itself. Supplying `plans` makes the component fully caller-driven and allows it to render outside a provider when `onSelect` is also supplied. With neither `plans` nor a provider, it shows `BillingProvider with a publishableKey is required to load plans`.
+
+<Warning>
+If its own catalog request fails, `PricingTable` renders an empty grid with no message, and a thrown fetch error becomes an unhandled promise rejection. `onCheckoutError` does not receive catalog failures. To show a message, load plans with `usePlans`, render its `error` yourself, and pass `plans` to `PricingTable`.
+</Warning>
+
+`PricingTable` passes only `planCode` and `returnUrl` to `createCheckout`, with no idempotency key. Only `CheckoutButton` sends an idempotency key.
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
@@ -56,7 +62,7 @@ When `plans` is omitted, `PricingTable` reads `GET /api/v1/plans` through `Billi
 | `returnUrl` | `string` | Current URL | Return URL sent to `createCheckout`. |
 | `onStripeClientSecret` | `(secret) => void` | — | Receives embedded Stripe checkout secrets. |
 | `onCheckoutResult` | `(result) => void` | — | Receives every raw checkout result. |
-| `onCheckoutError` | `(error) => void` | — | Receives catalog-selection or checkout errors. |
+| `onCheckoutError` | `(error) => void` | — | Receives checkout errors. Catalog load failures are not passed to it. |
 | `showToggle` | `boolean` | `true` | Shows monthly/annual filtering when yearly plans exist. |
 | `highlightPlan` | `string` | — | Plan code marked “Most Popular.” |
 | `className` | `string` | — | Class applied to the root container. |
@@ -83,7 +89,7 @@ Use `PlanCard` when you already have a custom pricing layout and want an individ
 />
 ```
 
-Prices are expressed in major currency units for this presentational component, not cents.
+Prices are expressed in major currency units for this presentational component, not cents. `PlanCard` declares a `children` prop but does not render it.
 
 ### `PlanComparison`
 
@@ -111,7 +117,7 @@ Renders a side-by-side feature table. Each feature maps plan IDs to a string or 
 
 ### `CheckoutButton`
 
-Starts checkout through `BillingProvider.createCheckout` and handles hosted Stripe, embedded Stripe, Razorpay, completed, and scheduled results.
+Starts checkout through `BillingProvider.createCheckout` with an idempotency key and handles Stripe client-secret, Razorpay, hosted, processing, completed, and scheduled results. See [checkout result types](/sdks/react/hooks#checkout-result-types).
 
 ```tsx
 <CheckoutButton
@@ -136,11 +142,16 @@ Starts checkout through `BillingProvider.createCheckout` and handles hosted Stri
 | `onSuccess` | `(paymentId) => void` | — | Razorpay success callback. |
 | `onComplete` | `(result) => void` | — | Immediate completed-result callback. |
 | `onScheduled` | `(result) => void` | — | Scheduled-change callback. |
+| `registerMandate` | `boolean` | — | Passed to `createCheckout` when set. |
+| `onProcessing` | `(status) => void` | — | Fires while the button polls a `processing` checkout. |
+| `onDismiss` | `() => void` | — | Razorpay only. Fires when the Razorpay modal is dismissed. |
 | `onError` | `(error) => void` | — | Checkout failure callback. |
+
+Each click calls `createCheckout` again, with the same idempotency key for the same plan. For a new subscription whose first payment is still pending, the second call fails with `422 subscription_incomplete`, so a retry button such as the "Payment failed. You can retry checkout." message of the Razorpay flow does not recover it. Reopen the modal on the stored Razorpay checkout, keep the Stripe client secret you already have, or use an invoice checkout from your backend. See [Create checkout](/api/create-checkout#retry-a-new-subscription-checkout).
 
 ### `Checkout`
 
-Renders Stripe Payment Element checkout for a client secret returned by your merchant backend. The provider-result form also handles Razorpay, hosted checkout and processing/recovery results.
+Renders Stripe checkout for a client secret returned by your merchant backend. Nozle returns an embedded Checkout Session secret (`cs_`), which `Checkout` mounts with Stripe Embedded Checkout. Any other secret is mounted with Payment Element. The provider-result form also handles Razorpay, hosted checkout and processing/recovery results.
 
 ```tsx
 <Checkout
@@ -156,17 +167,17 @@ Renders Stripe Payment Element checkout for a client secret returned by your mer
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
-| `clientSecret` | `string` | required | Stripe PaymentIntent or SetupIntent client secret. |
+| `clientSecret` | `string` | required | Stripe client secret. A `cs_` Checkout Session secret uses Embedded Checkout; any other secret uses Payment Element. |
 | `publishableKey` | `string` | required | Stripe publishable key. |
 | `stripeAccount` | `string` | — | Connected account ID. |
 | `returnUrl` | `string` | Current URL fallback | Stripe redirect URL. |
 | `submitLabel` | `string` | `Pay now` | Submit button label. |
-| `onSuccess` | `(paymentIntentId) => void` | — | Successful PaymentIntent callback. |
-| `onComplete` | `() => void` | — | Checkout completion callback. |
+| `onSuccess` | `(paymentIntentId) => void` | — | Successful PaymentIntent callback (Payment Element only). |
+| `onComplete` | `() => void` | — | Embedded Checkout Session completion callback. It does not fire when the session redirects to `returnUrl`, which is how Nozle creates sessions: show success from your return page or by reading billing status. |
 | `onError` | `(error) => void` | — | Stripe or validation failure. |
-| `onReady` | `() => void` | — | Payment Element ready callback. |
+| `onReady` | `() => void` | — | Payment Element ready callback (Payment Element only). |
 | `className` / `style` | React styling props | — | Root styling. |
-| `children` | `ReactNode` | — | Additional content above the submit button. |
+| `children` | `ReactNode` | — | Additional content above the submit button (Payment Element only). |
 
 For a provider checkout result, use the alternative `checkout` prop. Supply merchant callbacks for verification and status recovery; your backend scopes both to the authenticated customer and selected subscription:
 
@@ -181,7 +192,7 @@ For a provider checkout result, use the alternative `checkout` prop. Supply merc
 />
 ```
 
-React `0.10.0` supports these callbacks directly on `Checkout`, without requiring `BillingProvider`; see [the complete adapter](/sdks/react/billing-portal).
+React `0.10.0` and later support these callbacks directly on `Checkout`, without requiring `BillingProvider`; see [the complete adapter](/sdks/react/billing-portal).
 
 The `useCheckout` export from this component must be called inside the component's Stripe Elements context. It returns `confirmPayment`, `isProcessing`, and `error`. Do not confuse it with `useCheckoutSession`, which creates checkout through your merchant callback.
 

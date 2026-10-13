@@ -4,12 +4,14 @@ description: "Install the React SDK and configure public catalog reads with merc
 ---
 
 ```bash
-npm install @nozle-js/react@0.10.1 react react-dom @stripe/stripe-js @stripe/react-stripe-js
+npm install @nozle-js/react@0.10.2 react react-dom @stripe/stripe-js @stripe/react-stripe-js
 ```
 
-Published version `0.10.1` defaults catalog requests to `https://api.nozle.app/engine`.
+Published version `0.10.2` defaults catalog requests to `https://api.nozle.app/engine`.
 
 Use `0.10.1` or later for the `usePlans` error-handling fix: failed catalog requests expose an error and clear stale results.
+
+Peer dependencies are `react` and `react-dom` 18 or later, `@stripe/react-stripe-js` 3 or later, and `@stripe/stripe-js` 5 or later. Install the Stripe packages even if you only use `PricingTable` or `BillingPortal`: without them the import fails with `ERR_MODULE_NOT_FOUND`.
 
 The React SDK has two browser-safe responsibilities:
 
@@ -19,7 +21,7 @@ The React SDK has two browser-safe responsibilities:
 It does not accept a secret key or choose a Nozle customer. The native billing portal uses customer-scoped GraphQL reads using a session issued by your backend; it never uses your secret key in the browser.
 
 <Info>
-`BillingPortal`, `CancellationControl`, `PlanChangeControl`, and their self-service adapters are included in `0.10.0`. Use Node `0.9.1`, Python `0.9.1`, or Go `v0.9.0` on your merchant backend. See [Billing portal and self-service](/sdks/react/billing-portal) for setup.
+`BillingPortal`, `CancellationControl`, `PlanChangeControl`, and their self-service adapters are included in `0.10.2`. Use Node `0.10.0`, Python `0.10.0`, or Go `v0.9.1` on your merchant backend. See [Billing portal and self-service](/sdks/react/billing-portal) for setup.
 </Info>
 
 ## Configure `BillingProvider`
@@ -34,7 +36,7 @@ export function BillingPage({ csrfToken }: { csrfToken: string }) {
     <BillingProvider
       publishableKey={import.meta.env.VITE_NOZLE_PUBLISHABLE_KEY}
       baseUrl="https://api.nozle.app/engine"
-      createCheckout={async ({ planCode, returnUrl }) => {
+      createCheckout={async ({ planCode, returnUrl, idempotencyKey }) => {
         const response = await fetch('/api/billing/checkout', {
           method: 'POST',
           credentials: 'include',
@@ -42,7 +44,7 @@ export function BillingPage({ csrfToken }: { csrfToken: string }) {
             'Content-Type': 'application/json',
             'X-CSRF-Token': csrfToken,
           },
-          body: JSON.stringify({ planCode, returnUrl }),
+          body: JSON.stringify({ planCode, returnUrl, idempotencyKey }),
         })
 
         if (!response.ok) throw new Error('Checkout failed')
@@ -61,10 +63,21 @@ export function BillingPage({ csrfToken }: { csrfToken: string }) {
 |---|---|---|---|
 | `publishableKey` | `string` | required | Browser-safe key beginning with `pk_`. |
 | `createCheckout` | `(input) => Promise<CheckoutResult>` | — | Merchant callback used by checkout components. |
+| `verifyCheckout` | `(checkoutId, verification) => Promise<CheckoutStatus>` | — | Merchant callback that verifies a Razorpay payment. Required for Razorpay results. |
+| `getCheckoutStatus` | `(checkoutId) => Promise<CheckoutStatus>` | — | Merchant callback that returns checkout status. Required for `processing` results, and for Razorpay when verification returns a status that has not yet succeeded. |
 | `baseUrl` | `string` | `https://api.nozle.app/engine` | Nozle API origin used for public catalog requests. |
 | `children` | `ReactNode` | required | Components that consume the billing context. |
 
 `BillingProvider` throws when `publishableKey` does not begin with `pk_`.
+
+### `createCheckout` input
+
+| Caller | Fields passed |
+|---|---|
+| `CheckoutButton` | `idempotencyKey`, `planCode`, `returnUrl`, plus `registerMandate` when set |
+| `useCheckoutSession`, `PricingTable` | `planCode`, `returnUrl` only, with no idempotency key |
+
+`subscriptionId` and `quoteId` are passed only by `UpgradeButton` and `UpgradeModal`.
 
 ## Implement the merchant endpoint
 
@@ -80,7 +93,7 @@ See [Merchant backend billing](/guides/getting-started/merchant-backend-bff) for
 
 ## Framework notes
 
-All interactive exports are client components. In Next.js App Router, render the provider and interactive SDK components from a file containing `"use client"`.
+The published bundle has no `"use client"` directive. In a Next.js App Router server component, import the SDK in your own client component (a file starting with `"use client"`) and render that instead. Both the ESM and CJS builds load in Node, and `renderToString` works for `PricingTable` and `BillingPortal`.
 
 Customer state for presentational components comes from your authenticated backend. Pass it into `FeatureGate`, `UsageMeter`, and `PlanBadge`. The native portal instead obtains a customer-scoped session from that backend for its Core GraphQL requests; management actions still go through your authenticated merchant endpoints.
 

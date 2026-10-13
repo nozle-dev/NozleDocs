@@ -40,7 +40,10 @@ _ = err
 
 ```go
 check, err := client.CheckUsage(ctx, nozle.UsageParams{CustomerID: "workspace_123", EntityID: "user_42", FeatureCode: "agent_execution", CreditSystemCode: "ai_credits"})
-result, err := client.TrackUsage(ctx, nozle.UsageParams{CustomerID: "workspace_123", EntityID: "user_42", FeatureCode: "agent_execution", CreditSystemCode: "ai_credits"}, "agent-run-0183f")
+result, err := client.TrackUsage(ctx, nozle.UsageParams{
+  CustomerID: "workspace_123", EntityID: "user_42", FeatureCode: "agent_execution", CreditSystemCode: "ai_credits",
+  Timestamp: "2026-07-01T12:00:00Z", // fixed per operation; reuse it on retries
+}, "agent-run-0183f")
 _ = check
 _ = result
 _ = err
@@ -48,10 +51,12 @@ _ = err
 
 `CheckUsage` is advisory. `TrackUsage` atomically evaluates and deducts credits, records the operation, and requires an idempotency key.
 
+Set `UsageParams.Timestamp` (a string) once per operation and store it with the idempotency key. A retry with the same key, the same parameters and the same `Timestamp` replays the original result: the same `OperationID` and no second charge. A retry without a `Timestamp` sends a different body, and the API returns `*APIError` with `StatusCode` 409 (`idempotency_key_reused`).
+
 Set `UsageParams.Properties` for conversion or attribution metadata. `UsageResult` includes `Allowed`, exact `CreditsRequired`, `Available`, `ProjectedRemaining`, and deduction details. A check never reserves credits; inspect `Allowed` on the tracking result before granting the operation.
 
 ## Legacy wallet adapter
 
-For applications still using the legacy wallet, `CheckAndDeduct` calls Engine's legacy wallet adapter with a customer ID, feature, and numeric credit amount. This endpoint has no idempotency key. Use `CheckUsage` and `TrackUsage` for product credits, which preserve exact decimal values.
+For applications still using the legacy wallet, `CheckAndDeduct` calls Engine's legacy wallet adapter with a customer ID and a numeric credit amount. `CheckAndDeductParams.Feature` is deprecated: it is ignored, not validated and not sent. This endpoint has no idempotency key. Use `CheckUsage` and `TrackUsage` for product credits, which preserve exact decimal values.
 
 Keep reads and mutations behind authenticated backend routes. Derive customer and Entity IDs from trusted identity data.

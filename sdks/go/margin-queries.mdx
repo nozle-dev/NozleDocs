@@ -14,6 +14,10 @@ _ = err
 
 `MarginByCustomer`, `MarginByMetric`, `MarginByPlan`, and `MarginByModel` call their corresponding Engine `/api/v1/margin/*` endpoints. Results are `json.RawMessage`; decode into a shape appropriate for your deployed report schema. Trend granularity accepts `hour`, `day`, `week`, or `month`.
 
+## Date filters
+
+`from_date` and `to_date` are aliases for the API's `from` and `to` (you can also send `from` and `to`). Each takes a `YYYY-MM-DD` date or an RFC3339 timestamp. A plain date `to_date` includes that whole day; an RFC3339 value is an exclusive instant. If you send only one end, the API derives the other (only `to_date`: the month before it; only `from_date`: until now). An unparseable value, or an end that is not after the start, returns `400` with `{"code": "invalid_date_range", "error": "..."}`.
+
 ## Methods
 
 | Method | Endpoint | Purpose |
@@ -25,4 +29,4 @@ _ = err
 | `MarginByModel` | `/margin/models` | Group by model. |
 | `MarginTrend` | `/margin/trend` | Time series. |
 
-All methods take `url.Values` for deployed API query parameters; `MarginTrend` also requires a granularity. Check the raw JSON shape before depending on report fields. Margin simulation is a separate [REST API](/api/margin-simulate).
+All methods take `url.Values` for deployed API query parameters. `MarginTrend` also takes a granularity: an empty string is sent as `day`, and any other value outside `hour`, `day`, `week`, and `month` (for example `year`) returns `nozle: margin.trend: invalid granularity` without a request. Check the raw JSON shape before depending on report fields. Margin simulation is a separate [REST API](/api/margin-simulate).

@@ -19,7 +19,7 @@ if (!check.allowed) {
 can(
   customerId: string,
   feature: string,
-  metadata?: Record<string, unknown>,
+  metadata?: Record<string, string>,
 ): Promise<CanResult>
 ```
 
@@ -35,12 +35,26 @@ const check = await nozle.can('workspace_123', 'model_access', {
 | Field | Type | Description |
 |---|---|---|
 | `allowed` | `boolean` | Whether the request may proceed. |
-| `reason` | `string?` | Denial or decision reason. |
+| `feature_type` | `string?` | Type of the feature. |
+| `reason` | `string?` | Denial or decision reason. Present only when it applies. |
 | `used` | `number` | Current measured usage. |
 | `limit` | `number?` | Configured usage limit. |
 | `remaining` | `number?` | Remaining allowance. |
-| `overage` | `boolean?` | Whether usage is in overage. |
+| `overage` | `boolean?` | Whether usage is in overage. Present only when it applies. |
+| `policy` | `object?` | Configured policy. Present only when configured. |
+| `configuration` | `Record<string, string>?` | Feature configuration. Present only when configured. |
 | `economics` | `object?` | Point-in-time Cost Sheet estimate with exact decimal strings, Cost Rule version identifiers, and explicit exclusions. |
+
+`economics` contains:
+
+| Field | Description |
+|---|---|
+| `status` | Estimate status, for example `not_configured`. |
+| `estimated_incremental_revenue` | Estimated incremental revenue. |
+| `includes` | What the estimate includes. |
+| `excludes` | What the estimate excludes. |
+| `reason` | Why the estimate has its status, for example `missing_cost_composition`. |
+| `calculated_at` | When the estimate was calculated. |
 
 ## HTTP handler pattern
 

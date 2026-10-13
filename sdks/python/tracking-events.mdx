@@ -34,15 +34,25 @@ nozle.track(
 | `metadata` | JSON-compatible aggregation or attribution properties. |
 | `subscription_id` | Explicit external subscription target. |
 | `transaction_id` | Stable event ID. A UUID is generated when omitted. |
-| `timestamp` | Optional ISO 8601 event timestamp. |
+| `timestamp` | Optional. RFC 3339 with an explicit offset or `Z`, or Unix seconds as a numeric string. Omit it and the server uses the time it received the event. |
+
+<Warning>
+A naive `datetime` without a timezone is rejected. `datetime.now().isoformat()` raises `NozleValidationError: track timestamp must be RFC3339 or Unix seconds` before any request. Use an aware value, for example `datetime.now(timezone.utc).isoformat()`.
+</Warning>
 
 ## Subscription resolution
 
 When `subscription_id` is omitted, the SDK queries the Events API for active subscriptions:
 
-- one active subscription is cached and used;
-- no active subscription raises `NozleAPIError`; and
-- multiple active subscriptions raise `NozleAPIError` and require an explicit ID.
+- one active subscription is cached and used for the life of the client;
+- no active subscription raises `NozleAPIError` (`no active subscription for customer '…'`); and
+- multiple active subscriptions raise `NozleAPIError` (`has 2 active subscriptions; specify subscription_id`) and require an explicit ID.
+
+The cache is never refreshed. After a cancel, a plan change, or a second `subscribe`, the client keeps sending events to the first subscription ID. A second `subscribe` adds a subscription; it does not replace the first. Pass `subscription_id` or create a new client.
+
+<Warning>
+The lookup errors carry `status_code` 200. The SDK detects the failure, not an HTTP error. Do not treat 200 as success when you check `status_code`.
+</Warning>
 
 Supply the subscription explicitly for customers with multiple subscriptions and latency-sensitive paths.
 
@@ -51,8 +61,10 @@ Supply the subscription explicitly for customers with multiple subscriptions and
 Use a deterministic transaction ID and stable event timestamp for each logical event. Reuse both on retries.
 
 ```python
+from datetime import datetime, timezone
+
 transaction_id = f"generation:{generation_id}:completed"
-timestamp = generation_completed_at.isoformat()
+timestamp = datetime.now(timezone.utc).isoformat()  # store it with the event and reuse it on retries
 
 nozle.track(
     customer_id,
@@ -70,6 +82,8 @@ nozle.track(
 ## FastAPI worker pattern
 
 ```python
+from datetime import timezone
+
 from fastapi import FastAPI
 
 app = FastAPI()
@@ -83,7 +97,7 @@ def generation_completed(event: GenerationCompleted) -> dict[str, bool]:
         metadata={"tokens": event.tokens},
         subscription_id=event.subscription_id,
         transaction_id=f"generation:{event.id}:completed",
-        timestamp=event.completed_at.isoformat(),
+        timestamp=event.completed_at.astimezone(timezone.utc).isoformat(),  # timezone-aware, so the SDK accepts it
     )
     return {"accepted": True}
 ```

@@ -11,7 +11,7 @@ Start with the [quickstart](https://docs.nozle.dev/guides/getting-started/quicks
 | [`guides/`](guides/getting-started/introduction.mdx) | Concepts and workflows for billing, credits, entitlements, and margin intelligence |
 | [`api/`](api/introduction.mdx) and [`nozle-openapi.yaml`](nozle-openapi.yaml) | Handwritten API guidance and the checked-in Core OpenAPI contract |
 | [`sdks/`](sdks/node/installation.mdx) | Installation and workflow guides for React, Node.js, Python, and Go |
-| [`integrations/`](integrations/stripe.mdx) | Provider integration guides |
+| [`integrations/`](integrations/index.mdx) | Payment provider integration guides (Stripe and Razorpay) |
 | [`changelog/`](changelog/index.mdx) | Published product and SDK release notes |
 | [`examples/`](examples/node-sdk.ts) | Source examples compiled against the pinned published SDK packages by documentation CI; these are excluded from the published site |
 | [`docs.json`](docs.json) | Mintlify site configuration, navigation, and API reference mapping |

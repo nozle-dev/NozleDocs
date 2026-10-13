@@ -16,8 +16,8 @@ flowchart LR
   API --> Billing[Subscriptions and invoicing]
   API --> Ledger[Credit and usage ledger]
   API --> Margin[Cost and margin analytics]
-  API --> Stripe[Stripe checkout and payments]
-  Stripe -->|verified webhooks| API
+  API --> Provider[Stripe or Razorpay checkout and payments]
+  Provider -->|verified webhooks| API
 ```
 
 ## Trust boundaries
@@ -56,7 +56,7 @@ The API handles:
 
 ## Payment authority
 
-Stripe collects payment details and sends signed events to Nozle. A redirect or browser callback never activates a paid plan by itself. Nozle applies payment-gated changes only after verified webhook processing.
+Your payment provider, [Stripe or Razorpay](/integrations), collects payment details and sends signed events to Nozle. A redirect or browser callback never activates a paid plan by itself. Nozle applies payment-gated changes only after verified payment processing. For Razorpay, that is a captured payment confirmed by signed webhook or by your backend's verify call.
 
 ## Request flows
 
@@ -92,8 +92,8 @@ Your backend
 ### Paid checkout
 
 ```text
-Browser -> merchant backend -> Nozle checkout -> Stripe
-Stripe webhook -> Nozle verifies payment -> subscription change applies
+Browser -> merchant backend -> Nozle checkout -> Stripe or Razorpay
+Provider webhook -> Nozle verifies payment -> subscription change applies
 Browser refreshes billing state from merchant backend
 ```
 

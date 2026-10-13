@@ -16,3 +16,44 @@ This is not a product Credit System balance. New integrations should use [Custom
 <ParamField path="id" type="string" required>
   External customer ID
 </ParamField>
+
+Returns the customer's active wallet, the most recently created one if there are several. A customer with no active wallet returns `404` with `{"error": "no wallet found"}`.
+
+```json
+{
+  "wallet_id": "09b4f6d3-f463-4f4f-ac75-27e36bc2a296",
+  "name": "Prepaid wallet",
+  "balance_cents": 2000,
+  "currency": "USD",
+  "credits_balance": "16.00000",
+  "status": "active"
+}
+```
+
+<ResponseField name="wallet_id" type="string" required>
+  Wallet identifier.
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Wallet name. Empty string when the wallet has none.
+</ResponseField>
+
+<ResponseField name="balance_cents" type="number" required>
+  Wallet balance in the smallest unit of `currency`, as last recorded by Core. [Check & Deduct](/api/check-and-deduct) does not update it, so it can be higher than the real balance after deductions.
+</ResponseField>
+
+<ResponseField name="currency" type="string" required>
+  Currency of the wallet.
+</ResponseField>
+
+<ResponseField name="credits_balance" type="string" required>
+  Credits left, as a decimal string with five decimal places (`"16.00000"`). This is the live value: every Check & Deduct call changes it at once.
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  `active` for the wallet returned here.
+</ResponseField>
+
+<Note>
+After a Check & Deduct call, trust `credits_balance`. For example, a wallet funded with 20 credits shows `balance_cents: 2000` and `credits_balance: "20.00000"`; after deducting 4 credits, `credits_balance` is `"16.00000"` while `balance_cents` is still `2000`.
+</Note>

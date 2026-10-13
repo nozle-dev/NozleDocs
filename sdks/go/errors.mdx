@@ -8,7 +8,7 @@ The Go SDK exposes `ValidationError`, `AuthenticationError`, `TransportError`, a
 | Error | Meaning |
 |---|---|
 | `ValidationError` | Local contract validation failed before network I/O. |
-| `AuthenticationError` | Unsupported key type; embeds validation details. |
+| `AuthenticationError` | Wrong key type, detected before any request (for example a `pk_` key on `TrackUsage`: `nozle: usage.track: secret sk_ key required`). `errors.As` to `*ValidationError` does not match it. |
 | `TransportError` | No HTTP response due to a connection or timeout failure. |
 | `APIError` | Non-success response or invalid JSON success payload. |
 
@@ -20,8 +20,12 @@ if errors.As(err, &apiErr) {
 }
 ```
 
-Check `AuthenticationError` separately when handling key type errors. `errors.As` can inspect the wrapped transport cause. API details redact known secret, token, authorization, and key fields.
+Check `AuthenticationError` separately when handling key type errors; a `*ValidationError` check does not catch it. A key the API rejects is not an `AuthenticationError`: an invalid key on `Ping` returns `*APIError` with `StatusCode` 401. `errors.As` can inspect the wrapped transport cause. API details redact known secret, token, authorization, and key fields.
+
+Not every local failure is typed. `Meter` with 0 or more than 100 events returns the plain error `nozle: batch size must be 1-100` without sending a request; it is not a `*ValidationError`.
+
+`nozle.AsAPIError(err, &apiErr)` is a shortcut for `errors.As` and fills `StatusCode`, `Operation`, `Path`, and `Body`. `nozle.WithDebug(true)` logs one `[nozle] METHOD url` line per request through `log.Printf`; it does not log the key or request and response bodies.
 
 ## Retry behavior
 
-The SDK does not retry requests automatically. Reuse the same event transaction ID or mutation idempotency key and payload after an uncertain outcome. Decide whether to retry reads within your request budget. Automatic LLM capture preserves the provider result and reports telemetry failures through `OnError`; manual capture returns them. Queue failed telemetry when durable delivery matters.
+The SDK does not retry requests automatically. To add retries, inject a retrying `*http.Client` with `WithHTTPClient` (see [Installation](/sdks/go/installation)). Reuse the same event transaction ID or mutation idempotency key and payload after an uncertain outcome. Decide whether to retry reads within your request budget. Automatic LLM capture preserves the provider result and reports telemetry failures through `OnError`; manual capture returns them. Queue failed telemetry when durable delivery matters.
