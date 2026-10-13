@@ -10,8 +10,11 @@ Subscription changes run from a trusted merchant backend. Derive customer and su
 Use checkout for payment-gated plans. Direct subscription creation is available for flows that do not require interactive payment.
 
 ```ts
+await nozle.customers.upsert({ externalId: 'customer_123', name: 'Acme' })
 const subscription = await nozle.subscribe('customer_123', 'free')
 ```
+
+The customer must exist before you subscribe it. An unknown customer returns `404 customer_not_found` and creates nothing.
 
 `subscribe` creates the subscription `sub-<customer_id>-<plan_code>`; calling it again for the same plan returns that subscription and creates nothing. Calling it for a customer who already has a subscription to a different plan adds a second active subscription; it does not replace the first, and plan credit grants are granted again. After that, tracking without an explicit subscription ID fails because the customer has two. To move a customer to another plan, change the existing subscription through checkout with its `subscription_id`, or cancel it with `immediate` timing and then subscribe. Pass the new subscription ID to `track`: the Node.js and Python clients cache the subscription they resolved first.
 

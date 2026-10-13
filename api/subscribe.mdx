@@ -10,7 +10,7 @@ Create a subscription directly without going through a checkout flow. Use this f
 **Auth:** `sk_` (secret key) only.
 
 <ParamField body="customer_id" type="string" required>
-  External customer ID. The customer does not have to exist: if no customer has this ID, the call creates one. See [Customer auto-creation](#customer-auto-creation).
+  External customer ID. The customer must already exist: create it first with [Create Customer](/api/create-customer). An unknown ID returns `404` and creates nothing.
 </ParamField>
 
 <ParamField body="plan_code" type="string" required>
@@ -29,16 +29,15 @@ Create a subscription directly without going through a checkout flow. Use this f
 
 The response also carries Core's full `subscription` object, with the plan, billing period and entitlements.
 
-### Customer auto-creation
+### Errors
 
-When `customer_id` matches no customer in the organization, `subscribe` creates the customer. The new customer has only its external ID, the organization's default billing entity, and the plan's currency. Name, email, country, address and tax ID are empty.
-
-For invoices, payment collection and checkout, create or update the customer first with [Create Customer](/api/create-customer) so name, email, currency and country are set. A later `POST /customers` with the same `external_id` fills in the auto-created customer.
-
-<Warning>
-A mistyped `customer_id` does not return an error. It creates a new, empty customer with its own subscription. Check the ID before you call.
-</Warning>
+| Status | Code | Meaning |
+|--------|------|---------|
+| `400` | | `plan_code` or `customer_id` is missing. |
+| `404` | `customer_not_found` | No customer has this `customer_id`. Create it with `POST /customers`, then call `subscribe` again. No subscription is created. |
+| `404` | `plan_not_found` | No plan has this `plan_code`. |
+| `502` | | The customer could not be verified; retry. |
 
 ### Subscription ID and repeat calls
 
-The subscription external ID is always `sub-<customer_id>-<plan_code>`. Calling `subscribe` again with the same customer and plan returns `200` with the same subscription and creates no second one. Subscribing the same customer to a different plan creates a second active subscription next to the first; it does not replace it. Use [Upgrade](/api/upgrade) to change plans. An unknown `plan_code` returns `404` with `plan_not_found`.
+The subscription external ID is always `sub-<customer_id>-<plan_code>`. Calling `subscribe` again with the same customer and plan returns `200` with the same subscription and creates no second one. Subscribing the same customer to a different plan creates a second active subscription next to the first; it does not replace it. Use [Upgrade](/api/upgrade) to change plans.

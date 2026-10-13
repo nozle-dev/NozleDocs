@@ -64,13 +64,14 @@ Nozle payment fulfillment is authoritative. A browser callback or redirect does 
 ## Direct subscription
 
 ```ts
+await nozle.customers.upsert({ externalId: 'workspace_123', name: 'Acme Workspace' })
 const subscription = await nozle.subscribe('workspace_123', 'free')
 
 console.log(subscription.subscription_id)
 console.log(subscription.status)
 ```
 
-`subscribe()` requires an `sk_` key and returns `SubscribeResult`. It accepts a paid plan without collecting payment. Use checkout for payment-gated plan changes; use direct subscription only where your configured product flow does not require an interactive payment.
+`subscribe()` requires an `sk_` key and returns `SubscribeResult`. The customer must already exist, so call `customers.upsert()` first. An unknown customer returns `404 customer_not_found` and nothing is created. Calling `subscribe()` again for the same customer and plan returns the same subscription. It accepts a paid plan without collecting payment. Use checkout for payment-gated plan changes; use direct subscription only where your configured product flow does not require an interactive payment.
 
 <Warning>
 `subscribe()` to another plan adds a second active subscription. It does not replace the first, and plan credit grants are granted again. To move a customer, call `checkout()` with `subscriptionId` (needs a [transition policy](/api/plan-transition-policies)), or cancel and then subscribe. Pass the new subscription ID to `track()`: cached clients keep the old ID.

@@ -173,11 +173,12 @@ const handleCheckout = async () => {
 For B2B scenarios where payment is already handled outside embedded checkout:
 
 ```typescript
+await nozle.customers.upsert({ externalId: 'customer_123', name: 'Acme' });
 const result = await nozle.subscribe('customer_123', 'growth');
 // { subscription_id: 'sub_...', status: 'active' }
 ```
 
-`subscribe()` requires a secret key (`sk_`). Embedded checkout should be used when Nozle needs to collect payment before activating a paid plan.
+`subscribe()` requires a secret key (`sk_`) and an existing customer: an unknown customer returns `404 customer_not_found`. Embedded checkout should be used when Nozle needs to collect payment before activating a paid plan.
 
 ## Mixed Entity plan checkout
 
