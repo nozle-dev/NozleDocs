@@ -115,7 +115,7 @@ _ = err
 
 Reload options after scheduling. The withdraw result is `{subscription: {id, external_id, plan_code, status}, withdrawn_pending_subscription_id, replayed}`; the same key returns the same body with `replayed: true`.
 
-A new checkout or change while a change is pending replaces it with a new pending ID. Withdrawing the replaced ID returns `409 pending_subscription_changed`. An unknown ID returns `404 pending_subscription_not_found`.
+A new scheduled change while a change is pending replaces it with a new pending ID. A paid upgrade checkout does not replace or withdraw a pending downgrade: withdraw it first, or the upgrade payment ends in `needs_review` with `plan_upgrade_subscription_changed`. Withdrawing the replaced ID returns `409 pending_subscription_changed`. An unknown ID returns `404 pending_subscription_not_found`.
 
 `PreviewSubscriptionTransition` and `ApplySubscriptionTransition` use the `Timing` you pass even when the pair's transition policy says otherwise; `Checkout` always follows the policy. A `downgrade` on a pair whose policy direction is `upgrade` returns `405 target_plan_is_not_a_downgrade`.
 

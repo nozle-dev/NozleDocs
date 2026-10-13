@@ -241,7 +241,7 @@ The SDKs call these Engine endpoints. Create and status need a secret key with `
 | `GET https://api.nozle.app/engine/api/v1/checkout/{plan_upgrade_intent_id}?customer_id=...&subscription_id=...` | Read the status of a paid upgrade |
 | `GET https://api.nozle.app/engine/api/v1/billing/status?customer_id=...` | Read the customer's active plan. See [Billing status](/api/billing-status) |
 
-Both status scope parameters are required together. Without them the call returns `404 checkout_session_not_found`, and with only one it returns `400`. The verify endpoint is for Razorpay orders only. Nozle has no verify step for Stripe.
+Both status scope parameters are required together. Core, called directly at `GET /api/v1/checkout_sessions/{id}`, names them `customer_id` and `external_subscription_id`. Without them the call returns `404 checkout_session_not_found`, and with only one it returns `400`. The verify endpoint is for Razorpay orders only. Nozle has no verify step for Stripe.
 
 ## How Nozle settles a payment
 
@@ -276,7 +276,7 @@ While the upgrade awaits payment, each status call retrieves its Checkout Sessio
 
 `fulfillment_status` is `pending` until the upgrade is applied, then `succeeded`. Show success only when both are `succeeded`, then reload the subscription. The response also carries `checkout_id` (the upgrade ID), `provider` (`stripe`), `amount_cents`, `currency` and `invoice_id`. `invoice_id` is empty until the upgrade is applied. While the status is `awaiting_payment`, a nested `checkout` carries the client secret of the still-open session, so a client can resume after a reload.
 
-`needs_review` means Stripe took a payment that Nozle could not apply. It also appears when Stripe could not confirm whether it created the session. Nozle grants no plan and records no successful payment for it. Check the payment in the Stripe dashboard and refund or reconcile it deliberately.
+`needs_review` means Stripe took a payment that Nozle could not apply. It also appears when Stripe could not confirm whether it created the session. Two causes are easy to hit today. First, a billing entity with an invoice grace period above 0 days leaves the upgrade invoice as a draft, so the upgrade ends in `needs_review` with `plan_upgrade_amount_changed` when the policy credits the unused time, and otherwise stays pending because the payment handler fails with `payment_status_update_on_draft_invoice`. Second, an upgrade checkout created while a downgrade is pending ends in `needs_review` with `plan_upgrade_subscription_changed`. Set the grace period to 0 and withdraw a pending downgrade before you start the upgrade. See [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits). Nozle grants no plan and records no successful payment for it. Check the payment in the Stripe dashboard and refund or reconcile it deliberately.
 
 ## Payment links
 

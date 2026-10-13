@@ -148,8 +148,8 @@ Other `405` responses from plan changes:
 | --- | --- |
 | `plan_transition_policy_required` | No policy for the pair, and the free-to-paid fallback does not apply. |
 | `plan_already_active` | The target is the current plan. |
-| `subscription_not_active` | The subscription is not active. |
+| `subscription_not_active` | A transition call named a subscription that is not active. Checkout with a terminated subscription ID was treated as a new checkout in testing. |
 | `target_plan_is_not_a_downgrade` | A `downgrade` transition was requested on a pair whose policy direction is `upgrade`. |
 | `plan_upgrade_invoice_missing` | An upgrade checkout to a plan that bills in arrears; nothing is invoiced up front to pay. |
 
-A new checkout or plan change while a change is already pending replaces the pending change and returns a new pending subscription ID. Withdrawing the old ID then returns `409 pending_subscription_changed`.
+A new scheduled change while a change is already pending replaces the pending change and returns a new pending subscription ID. Withdrawing the old ID then returns `409 pending_subscription_changed`. A paid upgrade checkout does not replace or withdraw a pending downgrade: it returns a payable session, but the payment ends in `needs_review` with `plan_upgrade_subscription_changed`. Withdraw the pending change first. See [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits).

@@ -144,7 +144,19 @@ A `completed` result has `payment_source` `credits` when the change was funded w
 }
 ```
 
-`subscription_id` is the pending subscription; there is no separate `pending_subscription_id` field. A new checkout while a change is pending replaces that change and returns a new pending ID.
+`subscription_id` is the pending subscription; there is no separate `pending_subscription_id` field. A new scheduled change while a change is pending replaces that change and returns a new pending ID. A paid upgrade checkout does not replace or withdraw a pending downgrade: see [Paid upgrades: current limits](#paid-upgrades-current-limits).
+
+`effective_at` is an RFC 3339 timestamp rendered in the customer's timezone. For a customer in `Asia/Kolkata` it reads `2026-11-01T00:00:00.000000+05:30`, which is the same instant as `2026-10-31T18:30:00Z`. Parse it as a timestamp and do not assume a trailing `Z`. A scheduled change takes effect at that instant: the active subscription is terminated and the pending subscription becomes active, keeping its `billing_time`.
+
+### Paid upgrades: current limits
+
+These limits were observed on a paid upgrade checkout that returns a `stripe` result with `plan_upgrade_intent_id`. Configure around them until Core is fixed.
+
+- **Invoice grace period.** If the billing entity has an invoice grace period above 0 days, the upgrade invoice stays a draft. The customer's payment is still collected, but Nozle cannot apply the upgrade. With `credit_action: "credit"` the upgrade ends in `needs_review` with `plan_upgrade_amount_changed`, because the quoted amount credited the unused time and the draft invoice did not. Without a credit, the payment handler fails with `payment_status_update_on_draft_invoice` and the upgrade stays pending. Set the grace period to 0 for billing entities that sell paid upgrades, or refund and reconcile an affected payment by hand.
+- **Pending downgrade.** An upgrade checkout created while a downgrade is pending returns a payable session. Paying it ends in `needs_review` with `plan_upgrade_subscription_changed`, because the subscription changed under the upgrade. Withdraw the pending downgrade first, with [`POST /subscriptions/transitions/withdraw`](/api/subscription-management#withdraw-a-pending-downgrade), then start the upgrade.
+- **Status.** Poll the upgrade with `GET /checkout/{plan_upgrade_intent_id}?customer_id=…&subscription_id=…` (Engine names). `status` is `awaiting_payment` until payment, then `succeeded` with `fulfillment_status` `succeeded` and an `invoice_id`. `needs_review` means the payment was taken but the upgrade was not applied. See [Subscription self-service](/api/subscription-management#payment-status-and-recovery).
+
+With a grace period of 0 and no pending change, a credited upgrade applies as quoted: the old subscription is terminated, the new one is active, and `billing_time` is unchanged.
 
 ## Errors
 
@@ -155,14 +167,17 @@ A `completed` result has `payment_source` `credits` when the change was funded w
 | `404` | `plan_not_found`, `customer_not_found` | Unknown plan or customer. |
 | `405` | `plan_transition_policy_required` | The customer has an active subscription and the pair of plans has no [transition policy](/api/plan-transition-policies). |
 | `405` | `plan_upgrade_invoice_missing` | An upgrade to a plan billed in arrears: nothing is due up front. |
-| `405` | `plan_already_active`, `subscription_not_active`, `target_plan_is_not_a_downgrade` | See [transition policies](/api/plan-transition-policies). |
+| `405` | `plan_already_active`, `target_plan_is_not_a_downgrade` | See [transition policies](/api/plan-transition-policies). |
+| `405` | `subscription_not_active` | Raised by plan-transition calls on a subscription that is not active. A checkout that names a terminated subscription ID was treated as a new checkout in testing, so do not rely on this code from checkout. |
 | `409` | `subscription_selection_required` | The customer has several active subscriptions and no `subscription_id` was given. |
-| `409` | `plan_upgrade_checkout_in_progress`, `billing_anchor_checkout_in_progress`, `entity_subscription_checkout_in_progress` | Another checkout for the same subscription is open. Recover it. |
+| `409` | `plan_upgrade_checkout_in_progress` | Another upgrade checkout for the same subscription is open. Recover it with checkout status. |
+| `409` | `entity_subscription_checkout_in_progress` | Another Entity checkout for the same subscription is open. |
+| `422` | `validation_errors` | `error_details.checkout` is `billing_anchor_checkout_in_progress`: a bulk Entity checkout found an Entity with an incomplete subscription, or a first paid checkout for the customer still open. It is a `422`, not a `409`. |
 | `409` | `idempotency_key_reused` | The key was used with a different quoted request. Not returned by an invoice checkout on Stripe: that call returns `500` today. |
 | `409` | `plan_change_quote_changed`, `subscription_change_pending` | The quote no longer matches the subscription. Preview again. |
 | `422` | `checkout_not_required` | The plan needs no up-front payment (free, trial, or billed in arrears) and the customer has no subscription. Use `subscribe`. |
 | `422` | `payment_provider_required` | No Stripe or Razorpay connection for the customer. |
-| `422` | `stripe_customer_required` | Nozle could not create the customer in Stripe. See the [Stripe integration](/integrations/stripe#errors). |
+| `422` | `stripe_customer_required` | Nozle could not create the customer in Stripe. A customer that is not in Stripe yet normally gets one at checkout, so this code appears only when that creation fails. See the [Stripe integration](/integrations/stripe#errors). |
 | `422` | `razorpay_requires_inr` | A Razorpay checkout for an invoice that is not in INR. See the [Razorpay integration](/integrations/razorpay#errors). |
 | `422` | `plan_already_active` | The customer, or Entity, is already on this plan. |
 | `422` | `validation_errors` | `error_details.subscription` is `subscription_incomplete`: a new-subscription checkout was retried while its subscription is still incomplete. Recover as described above. |
