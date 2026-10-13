@@ -34,9 +34,9 @@ See [Node.js event tracking](/sdks/node/tracking-events), [Python event tracking
 | `external_subscription_id` | recommended | Subscription receiving usage. Required when resolution would be ambiguous. |
 | `code` | yes | Feature code. |
 | `properties` | no | Aggregation and attribution metadata. |
-| `timestamp` | no | Unix seconds for direct Core HTTP requests. The SDKs normalize their supported timestamp inputs to the Core wire format. |
+| `timestamp` | no | Unix seconds for direct HTTP requests. The SDKs normalize their supported timestamp inputs to this wire format. |
 
-For direct HTTP ingestion, send this envelope to the Events API configured for your organization with a secret key. Prefer the SDKs so subscription lookup, UUID generation, timeout handling, and errors remain consistent.
+For direct HTTP ingestion, send this envelope to `POST https://api.nozle.app/engine/api/v1/events` with a secret key. Send batches of 1–100 events to `POST https://api.nozle.app/engine/api/v1/events/batch` using an `events` array. Event reads and fee estimates use the Core API. Prefer the SDKs so subscription lookup, UUID generation, timeout handling, and errors remain consistent.
 
 <Note>
 For retry safety, preserve the complete event payload and reuse the same `transaction_id`. Within an organization, the first accepted event owns that identifier even if a later request changes the subscription or timestamp.

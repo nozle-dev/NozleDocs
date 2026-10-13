@@ -15,7 +15,7 @@ err := client.Track(ctx, nozle.TrackParams{
 _ = err
 ```
 
-`Track` posts `{ "event": { ... } }` to Core `/api/v1/events`. Reuse the same transaction ID and timestamp when retrying a logical event. `Meter` posts a batch of 1–100 events to Core `/api/v1/events/batch`; each batch event needs an explicit subscription ID. A batch of 0 or more than 100 events returns the plain error `nozle: batch size must be 1-100` before any request.
+`Track` posts `{ "event": { ... } }` to Engine `/api/v1/events`. Reuse the same transaction ID and timestamp when retrying a logical event. `Meter` posts a batch of 1–100 events to Engine `/api/v1/events/batch`; each batch event needs an explicit subscription ID. A batch of 0 or more than 100 events returns the plain error `nozle: batch size must be 1-100` before any request.
 
 `TrackParams` contains `CustomerID`, `Event`, optional JSON `Metadata`, `SubscriptionID`, `TransactionID`, and `Timestamp`.
 
