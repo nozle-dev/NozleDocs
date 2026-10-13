@@ -58,7 +58,7 @@ The guided template creates an `ai_tokens` Cost Event Meter using `tokens` as qu
 
 Rates may be entered manually or loaded from an effective-dated provider price catalogue. Custom rates retain their base catalogue references for audit. A catalogue entry must use the Cost Sheet currency, match the rule dimensions, and be effective on the rule date.
 
-The setup review shows the exact cost of 1,000 tokens for every configured category before publication. Unknown provider, model, or category combinations enter the Uncosted queue rather than becoming zero-cost usage.
+The setup review shows the exact cost of 1,000 tokens for every configured category before publication. Unknown provider, model, or category combinations enter the Uncosted queue rather than becoming zero-cost usage. A Cost Event whose meter code matches no Cost Event Meter is accepted and then lands in the same queue as `uncosted` with `unknown_cost_event_meter`; it is not dropped from the report.
 
 ## Reporting and audit
 

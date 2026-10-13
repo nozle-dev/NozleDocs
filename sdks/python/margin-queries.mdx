@@ -30,6 +30,10 @@ models = nozle.margin.by_model()
 
 All non-`None` keyword arguments are forwarded as string query parameters. Use the parameter names expected by your deployed API.
 
+## Date filters
+
+`from_date` and `to_date` are aliases for the API's `from` and `to`. Each takes a `YYYY-MM-DD` date or an RFC3339 timestamp. A plain date `to_date` includes that whole day; an RFC3339 value is an exclusive instant. If you send only one end, the API derives the other (only `to_date`: the month before it; only `from_date`: until now). An unparseable value, or an end that is not after the start, returns `400` with `{"code": "invalid_date_range", "error": "..."}`.
+
 ## Trend granularity
 
 ```python

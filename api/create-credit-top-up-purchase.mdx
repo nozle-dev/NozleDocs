@@ -16,8 +16,16 @@ Base URL: `https://api.nozle.app/engine/api/v1`.
 }
 ```
 
-The response returns the pending purchase snapshot and hosted `payment_url`. Navigate the same page to that URL.
+The response returns the pending purchase snapshot and hosted `payment_url`. Navigate the same page to that URL. For a customer on [Stripe](/integrations/stripe#credit-top-ups), `payment_url` is a Stripe-hosted `checkout.stripe.com` page that is valid for 24 hours, and the customer must already be linked to a Stripe customer. For a customer on [Razorpay](/integrations/razorpay#credit-top-ups), `payment_url` is an `rzp.io` payment link, `payment_provider` is `razorpay`, and the package must be priced in INR. The purchase object carries `payment_status`. A Razorpay top-up has no checkout ID to poll.
 
 <Warning>
 Creating checkout does not grant credits. Credits are materialized only after Nozle records and validates a confirmed successful payment.
 </Warning>
+
+## Errors
+
+| Status | Code | Cause |
+| --- | --- | --- |
+| `422` | `validation_errors` with `customer_currency_mismatch` in `error_details.currency` | The customer has a currency that differs from the package currency. |
+| `422` | `validation_errors` with `razorpay_requires_inr` | A Razorpay customer and a package that is not priced in INR. |
+| `422` | `validation_errors` with `no_linked_payment_provider` | The customer has no payment provider. |

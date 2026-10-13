@@ -10,7 +10,7 @@ Create a subscription directly without going through a checkout flow. Use this f
 **Auth:** `sk_` (secret key) only.
 
 <ParamField body="customer_id" type="string" required>
-  External customer ID. The customer must already exist.
+  External customer ID. The customer must already exist: create it first with [Create Customer](/api/create-customer). An unknown ID returns `404` and creates nothing.
 </ParamField>
 
 <ParamField body="plan_code" type="string" required>
@@ -20,9 +20,24 @@ Create a subscription directly without going through a checkout flow. Use this f
 ### Response
 
 <ResponseField name="subscription_id" type="string" required>
-  The newly created subscription's ID.
+  The subscription's external ID, `sub-<customer_id>-<plan_code>`. Use it in later subscription calls.
 </ResponseField>
 
 <ResponseField name="status" type="string" required>
   Subscription status (e.g. `active`).
 </ResponseField>
+
+The response also carries Core's full `subscription` object, with the plan, billing period and entitlements.
+
+### Errors
+
+| Status | Code | Meaning |
+|--------|------|---------|
+| `400` | | `plan_code` or `customer_id` is missing. |
+| `404` | `customer_not_found` | No customer has this `customer_id`. Create it with `POST /customers`, then call `subscribe` again. No subscription is created. |
+| `404` | `plan_not_found` | No plan has this `plan_code`. |
+| `502` | | The customer could not be verified; retry. |
+
+### Subscription ID and repeat calls
+
+The subscription external ID is always `sub-<customer_id>-<plan_code>`. Calling `subscribe` again with the same customer and plan returns `200` with the same subscription and creates no second one. Subscribing the same customer to a different plan creates a second active subscription next to the first; it does not replace it. Use [Upgrade](/api/upgrade) to change plans.

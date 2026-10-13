@@ -6,7 +6,7 @@ description: "Install and configure the typed, server-side Nozle Go SDK."
 The Go SDK requires Go 1.22 or later. Install it with:
 
 ```bash
-go get github.com/nozle-dev/nozle-go@v0.9.0
+go get github.com/nozle-dev/nozle-go@v0.9.1
 ```
 
 ## Create a client
@@ -99,4 +99,4 @@ client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"), nozle.WithHTTPClient(&http.Cl
 
 Use `TrackUsage` for atomic product-credit consumption, and the documented [provider wrappers or manual capture](/sdks/go/llm-usage) for provider telemetry. A separate `Can` plus `Track` is not an atomic reservation; telemetry capture does not provide synchronous provider pricing.
 
-The v0.9.0 module retains legacy `Consume` and `LLM` exports. Their legacy hosted routes return `404`; use the current methods above when integrating the hosted service.
+`Consume` and `LLM` were removed in v0.9.1. Their routes did not exist on the hosted service and always returned `404`; use the methods above instead.

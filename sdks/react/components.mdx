@@ -17,7 +17,7 @@ The React SDK separates public catalog and checkout orchestration from customer 
 | `CancellationControl` | Standalone end-of-period cancellation and Keep confirmation. |
 | `PlanChangeControl` | Standalone plan selection, signed quote review, paid checkout, scheduled downgrade and exact withdrawal. |
 
-These exports are available in React `0.10.1`. See [Billing portal and self-service](/sdks/react/billing-portal) for setup, props, callback contracts, standalone examples and installation instructions. The portal does not require `BillingProvider` or Tailwind.
+These exports are available in React `0.10.2`. See [Billing portal and self-service](/sdks/react/billing-portal) for setup, props, callback contracts, standalone examples and installation instructions. The portal does not require `BillingProvider` or Tailwind.
 
 ## Pricing components
 
@@ -147,6 +147,8 @@ Starts checkout through `BillingProvider.createCheckout` with an idempotency key
 | `onDismiss` | `() => void` | — | Razorpay only. Fires when the Razorpay modal is dismissed. |
 | `onError` | `(error) => void` | — | Checkout failure callback. |
 
+Each click calls `createCheckout` again, with the same idempotency key for the same plan. For a new subscription whose first payment is still pending, the second call fails with `422 subscription_incomplete`, so a retry button such as the "Payment failed. You can retry checkout." message of the Razorpay flow does not recover it. Reopen the modal on the stored Razorpay checkout, keep the Stripe client secret you already have, or use an invoice checkout from your backend. See [Create checkout](/api/create-checkout#retry-a-new-subscription-checkout).
+
 ### `Checkout`
 
 Renders Stripe checkout for a client secret returned by your merchant backend. Nozle returns an embedded Checkout Session secret (`cs_`), which `Checkout` mounts with Stripe Embedded Checkout. Any other secret is mounted with Payment Element. The provider-result form also handles Razorpay, hosted checkout and processing/recovery results.
@@ -171,7 +173,7 @@ Renders Stripe checkout for a client secret returned by your merchant backend. N
 | `returnUrl` | `string` | Current URL fallback | Stripe redirect URL. |
 | `submitLabel` | `string` | `Pay now` | Submit button label. |
 | `onSuccess` | `(paymentIntentId) => void` | — | Successful PaymentIntent callback (Payment Element only). |
-| `onComplete` | `() => void` | — | Embedded Checkout Session completion callback. |
+| `onComplete` | `() => void` | — | Embedded Checkout Session completion callback. It does not fire when the session redirects to `returnUrl`, which is how Nozle creates sessions: show success from your return page or by reading billing status. |
 | `onError` | `(error) => void` | — | Stripe or validation failure. |
 | `onReady` | `() => void` | — | Payment Element ready callback (Payment Element only). |
 | `className` / `style` | React styling props | — | Root styling. |

@@ -51,10 +51,13 @@ Call this endpoint from a trusted backend with a restricted secret key. Derive `
 | Field | Type | Description |
 |-------|------|-------------|
 | `allowed` | `boolean` | Whether the customer can use this feature |
-| `reason` | `string?` | Why access was denied (if `!allowed`) |
-| `used` | `number` | Current usage count this billing period |
-| `limit` | `number` | Usage cap for this feature |
-| `remaining` | `number` | `limit - used` |
+| `reason` | `string?` | Why access was denied. Omitted when `allowed` is `true`. See [Denial reasons](#denial-reasons) |
+| `feature_type` | `string?` | Type of the feature. Not returned when the feature or the subscription is missing |
+| `configuration` | `object?` | Configuration values granted by the plan for a non-metered feature |
+| `used` | `number` | Current usage count this billing period. `0` when the denial is decided before usage is read |
+| `limit` | `number \| null` | Usage cap for this feature. `null` when there is no cap |
+| `remaining` | `number \| null` | `limit - used`, never below `0`. `null` when `limit` is `null` |
+| `overage` | `boolean?` | `true` when usage has reached a soft limit; the request is still allowed. Omitted otherwise |
 | `economics.status` | `string` | `estimated`, `not_configured`, `unavailable`, or `stale` |
 | `economics.currency` | `string?` | The organization's reporting currency |
 | `economics.estimated_incremental_cost` | `string?` | Exact decimal incremental cost for the proposed Feature Event |
@@ -75,10 +78,27 @@ The optional `economics` object is also point-in-time, but it is not a financial
 
 ## Denial reasons
 
-- No active subscription
-- Feature not included in plan
-- Usage limit exceeded
-- Subscription expired/cancelled
+A denial is an HTTP `200` response with `allowed: false` and one of these `reason` values:
+
+| `reason` | Meaning |
+|----------|---------|
+| `feature_not_found` | No feature with this code exists in the organization |
+| `no_subscription` | The customer has no active subscription: none started, ended or cancelled, or the customer does not exist |
+| `no_entitlement` | The customer's plan does not include the feature |
+| `usage_limit_exceeded` | A hard limit is reached. A soft limit never denies; it sets `overage` to `true` |
+| `economic_policy_denied` | A margin policy in `deny` mode rejected the estimated cost or margin. The `policy` object has the detail |
+
+For example, an unknown feature code returns:
+
+```json
+{
+  "allowed": false,
+  "reason": "feature_not_found",
+  "used": 0,
+  "limit": null,
+  "remaining": null
+}
+```
 
 ## SDK wrappers
 

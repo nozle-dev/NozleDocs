@@ -163,5 +163,5 @@ await nozle.costEvents.track({
 - Send one event per non-zero token type: `input`, `cached_input`, `cache_write`, `output`, or `reasoning`.
 
 <Warning>
-An unknown `costMeterCode` is accepted with `202` and never reported. Check the code against your Cost Event Meters.
+An unknown `costMeterCode` is accepted with `202`. The event is then marked `uncosted` with `unknown_cost_event_meter` and listed in the Uncosted queue, and its cost is not counted until you fix the meter and rate it again. Check the code against your Cost Event Meters.
 </Warning>

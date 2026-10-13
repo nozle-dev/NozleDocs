@@ -31,13 +31,29 @@ const models = await nozle.margin.byModel(range)
 
 ## Date filters
 
-All methods accept optional `from` and `to` strings. Additional string query parameters are forwarded as provided.
+All methods accept optional `from` and `to` strings: a `YYYY-MM-DD` date or an RFC3339 timestamp. A plain date `to` includes that whole day; an RFC3339 `to` is an exclusive instant. If you send only one end, the API derives the other (only `to`: the month before it; only `from`: until now). Additional string query parameters are forwarded as provided.
 
 ```ts
 const result = await nozle.margin.byCustomer({
   from: '2026-07-01T00:00:00Z',
   to: '2026-08-01T00:00:00Z',
 })
+```
+
+### Invalid ranges
+
+An unparseable date, or an end that is not after the start, makes the API answer `400`. The SDK throws a `NozleApiError` with the usual `margin/summary failed: 400 Bad Request` message and the response code on `err.code`.
+
+```ts
+import { NozleApiError } from '@nozle-js/node'
+
+try {
+  await nozle.margin.summary({ from: '2026-07-31', to: '2026-07-01' })
+} catch (err) {
+  if (err instanceof NozleApiError && err.code === 'invalid_date_range') {
+    // ask for a corrected range
+  }
+}
 ```
 
 ## Trend granularity

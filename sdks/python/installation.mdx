@@ -8,11 +8,11 @@ description: "Install and configure the typed, synchronous Nozle Python SDK."
 Entity subscription APIs are introduced in `0.5.0`.
 
 ```bash
-pip install nozle-sdk==0.9.1
+pip install nozle-sdk==0.10.0
 ```
 
 <Info>
-Version `0.9.1` fixes Feature Event timestamp serialization, including events created by the OpenAI and Anthropic wrappers. Version `0.9.0` introduced subscription options, signed quotes, pending-change withdrawal, and scoped checkout recovery. See [subscription self-service](/sdks/python/billing#subscription-self-service) and the [release notes](/changelog#server-sdk-091).
+Version `0.10.0` adds `NozleAPIError.code` and `has_code()`, richer checkout result types, and no longer requires `feature` in `check_and_deduct()`. Version `0.9.1` fixes Feature Event timestamp serialization, including events created by the OpenAI and Anthropic wrappers. Version `0.9.0` introduced subscription options, signed quotes, pending-change withdrawal, and scoped checkout recovery. See [subscription self-service](/sdks/python/billing#subscription-self-service) and the [release notes](/changelog#razorpay-and-stripe-guides-new-sdk-releases-api-fixes).
 </Info>
 
 ## Create a client
@@ -89,7 +89,7 @@ This is a backend SDK. Never expose an `sk_`, master key, or internal credential
 | Margin | `summary()`, `by_customer()`, `by_metric()`, `by_plan()`, `by_model()`, `trend()` |
 | LLMs | `wrap_openai()`, `wrap_anthropic()` |
 
-`check_and_deduct()` remains available for the legacy wallet path.
+`check_and_deduct(customer_id, credits=5)` remains available for the legacy wallet path. The `feature` argument is deprecated and ignored.
 
 ## Transport behavior
 
