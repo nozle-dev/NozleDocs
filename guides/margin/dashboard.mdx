@@ -60,6 +60,33 @@ curl -X POST https://api.nozle.app/engine/api/v1/margin/simulate \
   -d '{ "metric_code": "agent_execution", "new_price_dollars": 1 }'
 ```
 
-All endpoints accept optional `from`/`to` date range parameters (ISO 8601 format).
+All endpoints accept optional `from` and `to` parameters. Use a `YYYY-MM-DD` date or an RFC3339 timestamp (`2026-07-01T09:30:00Z`). A plain date `to` includes that whole day, while an RFC3339 `to` is an exclusive instant. The Python and Go SDKs send the same values as `from_date` and `to_date`, which the API accepts as aliases.
+
+If you send only one end, the API derives the other: only `to` covers the month before it, and only `from` runs until now. With neither, the range is the last month.
+
+An unparseable value, or an end that is not after the start, returns `400` with `{"code": "invalid_date_range", "error": "..."}`. In the Node SDK the call throws a `NozleApiError` whose `code` is `invalid_date_range`:
+
+<Tabs>
+  <Tab title="Node">
+    ```typescript
+    import { NozleApiError } from '@nozle-js/node';
+
+    try {
+      await nozle.margin.summary({ from: '2026-07-31', to: '2026-07-01' });
+    } catch (err) {
+      if (err instanceof NozleApiError && err.code === 'invalid_date_range') {
+        // fix the range and retry
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="REST">
+    ```bash
+    curl "https://api.nozle.app/engine/api/v1/margin/summary?from=2026-07-31&to=2026-07-01" \
+      -H "Authorization: Bearer sk_live_..."
+    # 400 {"code":"invalid_date_range","error":"the end of the range must be after its start"}
+    ```
+  </Tab>
+</Tabs>
 
 When no events fall in the range, the list endpoints return `null` for their list (`{"models": null}`, `{"customers": null}`, and so on), not an empty array. Treat `null` as empty.

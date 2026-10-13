@@ -34,7 +34,7 @@ Content-Type: application/json
   New price per unit of usage, in dollars (a JSON number, not a string). Send it every time: if you omit it, the server uses `0` and returns a simulation with no revenue. A string returns `400`.
 </ParamField>
 
-The simulation covers the same `from` and `to` range as the other margin endpoints, which defaults to the last month. The body takes no other fields; fields such as `plan_code`, `new_price_cents`, `cost_change_percent` and `price_change_percent` are ignored.
+The simulation covers the date range given by the `from` and `to` query parameters, which default to the last month. They take a `YYYY-MM-DD` date (a plain `to` includes that whole day) or an RFC3339 timestamp (an exclusive instant), with `from_date` and `to_date` as aliases. When you send only one end, the API derives the other: only `to` covers the month before it, and only `from` runs until now (one month after `from` if it is not in the past). An unparseable value, or an end that is not after the start, returns `400` with `{"code": "invalid_date_range", "error": "..."}`. See [Margin Summary](/api/margin-summary) for the full rules. The body takes no other fields; fields such as `plan_code`, `new_price_cents`, `cost_change_percent` and `price_change_percent` are ignored.
 
 ### Response
 

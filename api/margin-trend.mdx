@@ -14,16 +14,39 @@ All margin endpoints require a secret key (`sk_`). These endpoints expose cost d
 </Warning>
 
 <ParamField query="from" type="string">
-  Start date in `YYYY-MM-DD` format (inclusive)
+  Start of the range, inclusive: a date (`YYYY-MM-DD`, which starts at 00:00 UTC that day) or an RFC3339 timestamp such as `2026-07-01T09:30:00Z`. `from_date` is accepted as an alias.
 </ParamField>
 
 <ParamField query="to" type="string">
-  End date in `YYYY-MM-DD` format (inclusive)
+  End of the range: a date (`YYYY-MM-DD`) includes that whole day, so `to=2026-07-31` covers all of July 31. An RFC3339 timestamp is used as given and is exclusive: it is the instant the range stops at. `to_date` is accepted as an alias.
 </ParamField>
 
 <ParamField query="granularity" type="string">
   Time bucket size: `hour`, `day`, `week`, or `month` (default: `day`). The server does not reject other values: `year` or any unknown value returns `200` and is bucketed by day, while the response still echoes the value you sent in `granularity`. Send only the four documented values.
 </ParamField>
+
+### Date range
+
+`from` and `to` take a `YYYY-MM-DD` date or an RFC3339 timestamp, and you can mix the two. The Python and Go SDKs send `from_date` and `to_date`, which the API treats the same way. If you send both `from` and `from_date` (or `to` and `to_date`), `from` and `to` win.
+
+When you leave an end out, the API fills it in:
+
+| You send | Range used |
+|---|---|
+| Neither | The last month, up to now. |
+| Only `to` | The month before `to`. |
+| Only `from` | From `from` until now. If `from` is not in the past, one month after `from`. |
+
+The API answers `400` with code `invalid_date_range` when a value cannot be parsed, or when the end of the range is not after its start. Equal dates are valid (they cover one day); an RFC3339 `to` equal to `from` is not.
+
+```json
+{
+  "code": "invalid_date_range",
+  "error": "the end of the range must be after its start"
+}
+```
+
+An unparseable value returns `"error": "from must be an RFC3339 timestamp or a date (YYYY-MM-DD)"` (or `to`, with the parameter that failed).
 
 ### Response
 
