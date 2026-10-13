@@ -10,7 +10,7 @@ Nozle processes payment webhooks for each connected Stripe account and for each 
 1. You connect a Stripe account to a Nozle organization.
 2. Nozle registers a Stripe webhook endpoint for that Stripe account.
 3. Stripe sends payment events to your public Nozle API URL.
-4. Nozle verifies the `Stripe-Signature` header using the webhook secret returned by Stripe.
+4. Nozle verifies the `Stripe-Signature` header using the webhook secret returned by Stripe. It subscribes to the eight events below only, and it does not de-duplicate Stripe events by event ID: replays are safe because handlers act on the current state.
 5. Nozle updates invoice payment status and resolves any payment-gated subscription activation.
 
 **Key events processed:**
@@ -21,7 +21,7 @@ Nozle processes payment webhooks for each connected Stripe account and for each 
 | payment_intent.payment_failed | Marks the payment failed. A declined card on a payment-gated checkout keeps the invoice open for a retry; any other failure cancels the incomplete subscription |
 | payment_intent.canceled | Treats the payment attempt as failed |
 | setup_intent.succeeded | Stores the customer's new default payment method |
-| payment_method.detached | Clears a removed payment method |
+| payment_method.detached | Received, but it does not clear the stored payment method today (known bug) |
 | customer.updated | Syncs the customer's default payment method |
 | charge.refund.updated | Updates the credit-note refund status |
 | charge.dispute.closed | Marks the invoice's dispute lost when the dispute is lost |
@@ -40,7 +40,7 @@ Nozle registers the Stripe webhook automatically in a background job right after
 https://api.nozle.app/core/webhooks/stripe/{organization_id}?code={stripe_provider_code}
 ```
 
-Your Stripe account must allow webhook endpoint creation, and your public Nozle API URL must be reachable by Stripe. If registration fails, Nozle sends a `payment_provider.error` webhook and does not retry. See the [Stripe integration](/integrations/stripe#webhook-setup) for the events, recovery and limits.
+Your Stripe account must allow webhook endpoint creation, and your public Nozle API URL must be reachable by Stripe. Registration is not retried. Nozle sends a `payment_provider.error` webhook only for an authentication or permission error and for Stripe's limit of 16 test-mode endpoints. When Stripe rejects the URL, for example a non-public host, no webhook is sent and the job stops, so check your Stripe dashboard for the endpoint to confirm registration. See the [Stripe integration](/integrations/stripe#webhook-setup) for the events, recovery and limits.
 
 ## Razorpay
 
@@ -50,7 +50,7 @@ Nozle does not register the Razorpay webhook. You add it in the Razorpay dashboa
 https://api.nozle.app/core/webhooks/razorpay/{payment_provider_id}
 ```
 
-Nozle verifies the `X-Razorpay-Signature` header, an HMAC-SHA256 of the raw request body with the webhook secret, and de-duplicates on the `X-Razorpay-Event-Id` header. An invalid request returns `400`; a valid one returns `200`.
+Nozle verifies the `X-Razorpay-Signature` header, an HMAC-SHA256 of the raw request body with the webhook secret, and de-duplicates on the `X-Razorpay-Event-Id` header. A valid request returns `200`. A request returns `400` when the provider ID is unknown or not a UUID, the signature is not lowercase hexadecimal or does not match, the event ID is missing or longer than 255 bytes, the body is not valid JSON, or an event ID that Nozle already received arrives with a different body (`webhook_event_payload_conflict`).
 
 | Event | What Nozle Does |
 |-------|----------------|

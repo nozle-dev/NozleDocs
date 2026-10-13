@@ -22,7 +22,7 @@ A customer whose provider is not connected cannot pay: checkout returns `payment
 
 ## Stripe
 
-Nozle always creates an embedded Stripe Checkout Session and returns its `cs_` client secret. It never returns a Stripe-hosted URL. Mount the secret with Stripe Embedded Checkout (the React [`Checkout`](/sdks/react/components) component does this for a `cs_` secret).
+Plan and invoice checkout always create an embedded Stripe Checkout Session and return its `cs_` client secret. They never return a Stripe-hosted URL. Credit top-ups are the exception: they return a Stripe-hosted `checkout.stripe.com` `payment_url` that is valid for 24 hours. Mount the secret with Stripe Embedded Checkout (the React [`Checkout`](/sdks/react/components) component does this for a `cs_` secret).
 
 ### Required Stripe webhook setup
 
@@ -40,14 +40,16 @@ Stripe events Nozle handles:
 - `payment_intent.payment_failed`
 - `payment_intent.canceled`
 - `setup_intent.succeeded`
-- `payment_method.detached`
+- `payment_method.detached` (received, but it does not clear the stored payment method today)
 - `customer.updated`
 - `charge.refund.updated`
 - `charge.dispute.closed`
 
-Without this webhook, Stripe may collect payment but Nozle is not told: checkout status does not ask Stripe, so only the webhook settles a Stripe payment. See the [Stripe integration](/integrations/stripe) for setup, flows and limits.
+Nozle subscribes to these eight events only. Without this webhook, Stripe may collect payment but Nozle is not told. Checkout status of a paid upgrade reads the Checkout Session from Stripe and reports `processing` once it is complete, but it never settles a payment, so only the webhook does. See the [Stripe integration](/integrations/stripe) for setup, flows and limits.
 
 A new-subscription Stripe checkout returns no checkout ID to poll. After Embedded Checkout completes, reload the subscription or wait for your `subscription.started` webhook. A paid upgrade returns `plan_upgrade_intent_id`; poll its status with [`GET /checkout/{id}`](/api/subscription-management) and the subscription scope.
+
+Retrying a new-subscription checkout while its subscription is still incomplete returns `422 validation_errors` with `error_details.subscription: ["subscription_incomplete"]`, even with the same `Idempotency-Key`. Recover with an invoice checkout for the `invoice_id` of the first response. See [Retry a new-subscription checkout](/integrations/stripe#retry-a-new-subscription-checkout).
 
 ## Razorpay
 
@@ -61,7 +63,7 @@ Nozle checks the `X-Razorpay-Signature` header against the webhook secret and de
 
 A Razorpay checkout runs in four steps:
 
-1. **Create.** Checkout returns `{"type": "razorpay", "checkout_id", "key_id", "order_id", "amount_cents", "currency", "expires_at", "invoice_id"}`. A paid upgrade has `plan_upgrade_intent_id` instead of `invoice_id`. A mandate checkout (`register_mandate`) also has `customer_id`, `recurring: true` and `mandate_max_amount_cents`. If the order is not ready yet, or has expired, the result is `{"type": "processing", "checkout_id", "status"}` instead.
+1. **Create.** Checkout returns `{"type": "razorpay", "checkout_id", "key_id", "order_id", "amount_cents", "currency", "expires_at", "invoice_id"}`. A paid upgrade has `plan_upgrade_intent_id` instead of `invoice_id`. A mandate checkout (`register_mandate`) also has `customer_id`, `recurring: true` and `mandate_max_amount_cents`. If the order is not ready yet, or has expired, the result is `{"type": "processing", "checkout_id", "status"}` instead. A bulk Entity checkout first answers `{"entity_subscription_checkout": {"type": "processing", "status": "open", "checkout_id": "..."}}`. A `processing` result carries an internal operation status such as `ready`, not the state of the checkout.
 2. **Pay.** Load `https://checkout.razorpay.com/v1/checkout.js` and open `new window.Razorpay({ key: key_id, order_id, handler })`.
 3. **Verify.** Send the three fields from the handler to your backend, which calls `POST /checkout/{checkout_id}/verify` with `razorpay_order_id`, `razorpay_payment_id` and `razorpay_signature`. A missing field returns `400`. Nozle checks that the order matches the checkout and that the signature is the HMAC-SHA256 of `order_id|payment_id` with your key secret; a mismatch returns `422 validation_errors` with `invalid_checkout_signature`. Nozle then fetches the payment from Razorpay and settles only a `captured` payment. The response is the checkout status.
 4. **Poll.** Call `GET /checkout/{checkout_id}` until `status` and `fulfillment_status` are both `succeeded`. Each call reconciles with Razorpay.
@@ -71,9 +73,11 @@ A Razorpay checkout runs in four steps:
 | `status` | `succeeded`, `needs_review`, `failed`, `expired`, `awaiting_payment`, `processing` |
 | `fulfillment_status` | `pending`, `processing`, `succeeded` |
 
-A status call without a customer and subscription scope needs a secret key; an unknown ID returns `404 checkout_session_not_found`. The React [`CheckoutButton`](/sdks/react/components) runs steps 2 to 4 for you when `BillingProvider` has `verifyCheckout` and `getCheckoutStatus` callbacks; it polls 30 times, one second apart.
+The nested `checkout` of the status response is present while the checkout is `awaiting_payment` and also for an `expired` unpaid order. For the expired order it is `{"type": "processing", "status": "ready"}`, so do not reopen the modal for it. A status call without a customer and subscription scope needs a secret key; an unknown ID returns `404 checkout_session_not_found`. The React [`CheckoutButton`](/sdks/react/components) runs steps 2 to 4 for you when `BillingProvider` has `verifyCheckout` and `getCheckoutStatus` callbacks; it polls 30 times, one second apart.
 
-A `{"type": "hosted", "payment_url"}` result is a Razorpay payment link. Redirect the customer to `payment_url`; the `payment_link.paid` webhook settles it.
+To retry a new-subscription checkout, do not call checkout again: while the first order is unpaid it returns `422 validation_errors` with `error_details.subscription: ["subscription_incomplete"]`, even with the same `Idempotency-Key`. Reopen the modal on the same order with the checkout that status returns while `awaiting_payment`, or call an invoice checkout for the `invoice_id` of the first response. The React "Payment failed. You can retry checkout." button calls checkout again, so for a new subscription use the stored checkout instead. See [Retry a new-subscription checkout](/integrations/razorpay#retry-a-new-subscription-checkout).
+
+`POST /checkout` never returns `type: "hosted"` for Razorpay. A Razorpay payment link comes from an invoice payment URL (`POST /invoices/{id}/payment_url`) or a credit top-up purchase, as an `rzp.io` `payment_url` with no checkout ID to poll. Redirect the customer to it; the `payment_link.paid` webhook settles it.
 
 ## API shape
 
@@ -169,6 +173,8 @@ const handleCheckout = async () => {
   onComplete={() => router.refresh()}
 />
 ```
+
+`onComplete` does not fire when the session redirects to the `return_url`, and Nozle sessions redirect. Show success from your return page, or by reading billing status for the customer.
 
 ## Server-side plan changes
 
