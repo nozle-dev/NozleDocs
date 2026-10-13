@@ -33,6 +33,8 @@ These paths are for Engine. Its customer/subscription fields map to Core's exter
 | `eligible_plans` | Plans with `direction` and `timing`, authorized by the configured [transition policies](/api/plan-transition-policies). From a free plan, paid plans also appear through the organization's free-to-paid policy. A downgrade appears only when its policy uses `end_of_period` timing and `keep_anchor`. |
 | `checkout` | Latest intent summary `{ id, status, plan_code }`, or null. Use checkout status for payment recovery. |
 
+`pending_change.effective_at` and the quote's `effective_at` are RFC 3339 timestamps in the customer's timezone, for example `2026-11-01T00:00:00.000000+05:30`. Parse the offset; do not assume `Z`.
+
 A plan contains `code`, `name`, `amount_cents`, `currency`, and `interval`. Keep monetary minor-unit values exact. An empty eligible list can reflect missing transition policies, scheduled cancellation, a pending change, external billing authority, or unresolved checkout. Price comparisons and public catalog membership do not establish permission to change plans.
 
 ## Preview and confirm a plan change
@@ -103,9 +105,9 @@ Read and retain `pending_change.id` from options when the customer opens the con
 }
 ```
 
-`pending_subscription_id` is the pending internal UUID, not the active subscription's external ID. The response contains `subscription`, `withdrawn_pending_subscription_id` and `replayed`. A stale owned pending ID returns `409 pending_subscription_changed`; an unknown or unowned resource returns `404 pending_subscription_not_found`. The same idempotency key returns the original result with `replayed: true`. The active subscription remains in place.
+`pending_subscription_id` is the pending internal UUID, not the active subscription's external ID. Core, called directly at `POST /subscription_transitions/withdraw`, names the other two fields `external_customer_id` and `external_subscription_id`. The response contains `subscription`, `withdrawn_pending_subscription_id` and `replayed`. A stale owned pending ID returns `409 pending_subscription_changed`; an unknown or unowned resource returns `404 pending_subscription_not_found`. The same idempotency key returns the original result with `replayed: true`. The active subscription remains in place.
 
-A new checkout or scheduled transition while a change is pending replaces that change and creates a new pending ID. Re-read `pending_change.id` from options before you withdraw.
+A new scheduled change while a change is pending replaces that change and creates a new pending ID. Re-read `pending_change.id` from options before you withdraw. A paid upgrade checkout does not replace or withdraw it: withdraw the pending downgrade first, or the upgrade payment ends in `needs_review` with `plan_upgrade_subscription_changed`. See [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits).
 
 ## Payment status and recovery
 
@@ -113,6 +115,6 @@ Use both `customer_id` and `subscription_id` when recovering or verifying a cust
 
 Status returns `checkout_id`, `provider`, `status`, `fulfillment_status`, `amount_cents`, `currency`, optional `invoice_id`, and optional resumable `checkout`. Payment status is `awaiting_payment`, `processing`, `succeeded`, `failed`, `expired`, or `needs_review`; fulfillment is `pending`, `processing`, or `succeeded`.
 
-A successful browser callback is not proof of fulfillment. Wait for authoritative activation and reload the selected subscription. Razorpay upgrades require a captured payment. Retry a recoverable open checkout using its existing ID; treat expired checkouts and `needs_review` as distinct outcomes. Unknown payment outcomes require your support/reconciliation route before another collection.
+A successful browser callback is not proof of fulfillment. Wait for authoritative activation and reload the selected subscription. Razorpay upgrades require a captured payment. `needs_review` on a paid upgrade (observed with Stripe) also appears when the billing entity has an invoice grace period above 0 days, or when a downgrade was still pending: the payment is taken but the upgrade is not applied. See [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits). Retry a recoverable open checkout using its existing ID; treat expired checkouts and `needs_review` as distinct outcomes. Unknown payment outcomes require your support/reconciliation route before another collection.
 
 Idempotency keys must be nonempty and at most 255 UTF-8 bytes. Keep one key and the same payload for retries of one confirmed action; use a new key for a newly confirmed action. Persist merchant replay context across process restarts. Map ownership failures, stale confirmations and payment-review states without exposing raw upstream error bodies.

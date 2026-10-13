@@ -126,7 +126,7 @@ If prepaid credits fully cover the invoice, Nozle returns a completed checkout a
 - An Entity checkout adds `external_entity_id` and `external_subscription_id`. Single-Entity and bulk Entity checkouts both return a `razorpay` result.
 - A mandate checkout also returns `customer_id` (a Razorpay customer ID), `recurring: true` and `mandate_max_amount_cents`. The customer needs a name, email and phone number.
 - An order stays open for 24 hours. A paid upgrade stays open for 35 minutes, and a bulk Entity checkout for 23 hours.
-- If the order is not ready yet, or has expired, the result is `{"type": "processing", "checkout_id", "status"}`. Recover it with checkout status rather than starting another checkout. Some checkouts return this shape first, because Nozle submits the order to Razorpay in the background: a bulk Entity checkout answers `{"entity_subscription_checkout": {"type": "processing", "status": "open", "checkout_id": "..."}}`, and its `razorpay` result follows from checkout status once the order is ready.
+- If the order is not ready yet, or has expired, the result is `{"type": "processing", "checkout_id", "status"}`. Recover it with checkout status rather than starting another checkout. Some checkouts return this shape first, because Nozle submits the order to Razorpay in the background: a bulk Entity checkout answers `{"entity_subscription_checkout": {"type": "processing", "status": "open", "client_secret": null, "checkout_id": "..."}}`. Its `razorpay` result follows from checkout status once the order is ready, in the nested `checkout`. Replaying the same bulk request with the same `Idempotency-Key` returns `type: "razorpay"` with `checkout_id`, `key_id` and `order_id` as soon as the order exists.
 - In a `processing` result, `status` is an internal operation status, for example `ready` for an unpaid order that has expired. Read the top-level `status` of checkout status for the state of the checkout.
 
 ### Create, verify and poll
@@ -249,7 +249,7 @@ The SDKs call these Engine endpoints. All three need a secret key with `payment:
 | Call | Purpose |
 |---|---|
 | `POST https://api.nozle.app/engine/api/v1/checkout` | Create the checkout. See [Create checkout](/api/create-checkout) |
-| `POST https://api.nozle.app/engine/api/v1/checkout/{checkout_id}/verify` | Send `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature`. A missing field returns `400` |
+| `POST https://api.nozle.app/engine/api/v1/checkout/{checkout_id}/verify` | Send `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature`. At the Engine a missing field returns `400`. Core, called directly, answers a missing field, a wrong order ID or a tampered signature with `422 invalid_checkout_signature` |
 | `GET https://api.nozle.app/engine/api/v1/checkout/{checkout_id}` | Read the status. Each call fetches the order's payments from Razorpay and settles any captured one |
 
 Add `customer_id` and `subscription_id` query parameters together to scope verify and status to one customer and subscription. An unknown checkout ID returns `404 checkout_session_not_found`.
@@ -360,7 +360,7 @@ Checkout errors that are specific to Razorpay. See [Create checkout](/api/create
 | `404` | `payment_provider_not_found` | The customer's connection code matches no Razorpay connection |
 | `422` | `checkout_amount_changed`, `checkout_payment_provider_changed` | The open checkout no longer matches the invoice or the customer's connection |
 | `422` | `invalid_checkout_signature` | The verify call's order ID or signature did not match the checkout |
-| `422` | `third_party_error` | Razorpay rejected the request. `error_details.third_party` is `Razorpay` |
+| `422` | `third_party_error` | Razorpay rejected the request. `error_details.third_party` is `Razorpay`. A verify call with a correct signature for a payment that does not exist at Razorpay returns it with `error_details.thirdparty_error` set to `Razorpay request failed (HTTP 400)` |
 | `404` | `checkout_session_not_found` | Unknown checkout ID |
 
 ## Limits
