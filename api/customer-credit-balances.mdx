@@ -8,12 +8,14 @@ Base URL: `https://api.nozle.app/engine/api/v1`.
 
 **Auth:** secret key only. Publishable keys are rejected.
 
-List customer Credit System balances and their active or scheduled sources:
+List the customer's Credit System balances and their active or scheduled sources:
 
 ```http
 GET /customers/customer_123/credit-systems
 Authorization: Bearer sk_nozle_...
 ```
+
+The response is `{ "customer_id", "as_of", "balances": [...] }`. Each item of `balances` has the shape shown below. The list holds every active Credit System of the organization, including systems where the customer has no credit: those have `"available": "0"` and `"sources": []`. A Credit System that is no longer active appears only when the customer has sources or operations in it. Items are ordered by `credit_system` code.
 
 Read one system:
 
@@ -22,31 +24,76 @@ GET /customers/customer_123/credit-systems/ai_credits/balance
 Authorization: Bearer sk_nozle_...
 ```
 
+This returns one balance object, for a system of any status. An unknown code returns `404 credit_system_not_found`, and an unknown customer returns `404 customer_not_found`.
+
 ```json
 {
   "customer_id": "customer_123",
   "credit_system": "ai_credits",
+  "credit_system_id": "c15f2949-7df6-4f05-89af-3f1b0bc82189",
   "credit_system_name": "AI Credits",
   "unit_name": "credit",
-  "available": "625.000000000000",
+  "system_status": "active",
+  "available": "625.5",
   "as_of": "2026-07-20T12:00:00.750Z",
   "sources": [
     {
+      "id": "bf659149-0d70-4d2a-8a7b-a4569cc742eb",
+      "entity_id": null,
+      "parent_source_id": null,
+      "scope": "customer",
+      "transferable": false,
+      "returnable": false,
       "type": "subscription_grant",
-      "initial": "500.000000000000",
-      "remaining": "375.000000000000",
+      "reference": "subscription:b85038ab-8ef6-45a8-9643-43b24a891362:period:2026-07-01T00:00:00Z:system:c15f2949-7df6-4f05-89af-3f1b0bc82189:customer:92087f4d-b90c-41ca-8406-5bdbc199810a",
+      "subscription_id": "b85038ab-8ef6-45a8-9643-43b24a891362",
+      "initial": "625.5",
+      "remaining": "625.5",
+      "valid_from": "2026-07-01T00:00:00Z",
       "expires_at": "2026-08-01T00:00:00Z",
-      "available": true
-    },
-    {
-      "type": "top_up",
-      "initial": "250.000000000000",
-      "remaining": "250.000000000000",
-      "expires_at": null,
+      "priority": 100,
+      "status": "active",
       "available": true
     }
   ]
 }
 ```
 
-Decimal amounts are strings. `available` includes only currently active, valid sources. The source list can also include scheduled sources whose `valid_from` is in the future; expired and exhausted sources are omitted.
+Decimal amounts are strings without trailing zeros: `"500"`, not `"500.000000000000"`, and `"625.5"`, not `"625.500000000000"`.
+
+### Balance fields
+
+| Field | Description |
+|-------|-------------|
+| `customer_id` | External customer ID. |
+| `credit_system` | Credit System code. |
+| `credit_system_id` | Credit System identifier. |
+| `credit_system_name` | Display name. |
+| `unit_name` | Name of one credit unit. |
+| `system_status` | Status of the Credit System, for example `active`. |
+| `available` | Sum of `remaining` over sources whose `available` is `true`. |
+| `as_of` | Time the balance was read. Source validity is evaluated at this time. |
+| `sources` | Active or scheduled sources, ordered by earliest `expires_at` first (no expiry last), then `priority`. |
+
+### Source fields
+
+| Field | Description |
+|-------|-------------|
+| `id` | Source identifier. |
+| `entity_id` | External Entity ID the source is scoped to. `null` for a customer-level source. |
+| `parent_source_id` | Source this one was split from, for example when a top-up is allocated to an Entity. `null` otherwise. |
+| `scope` | `customer` for the shared pool. Customer-level reads always return `customer`; Entity sources appear in [Entity Credit Balances](/api/entity-credit-balances). |
+| `transferable` | `true` when the source is an available `top_up` of an active Credit System, so it can be allocated to an Entity. |
+| `returnable` | Whether an Entity allocation can be returned to the customer pool. Always `false` on customer-level sources. |
+| `type` | Source type, for example `subscription_grant` or `top_up`. |
+| `reference` | Stable reference for the grant or payment that created the source. Treat it as an opaque string. |
+| `subscription_id` | Subscription the source belongs to. `null` unless the source is a subscription grant. |
+| `initial` | Amount when the source was created. |
+| `remaining` | Amount not yet consumed. |
+| `valid_from` | Time the source becomes usable. |
+| `expires_at` | Time the source expires, or `null` if it never does. |
+| `priority` | Tie-breaker when sources expire at the same time (or none expires): the lower value is consumed first. Credits are consumed from the earliest `expires_at` first. |
+| `status` | Source status. Only `active` sources are returned. |
+| `available` | `true` when `valid_from` is not after `as_of`. |
+
+`available` on the balance includes only currently active, valid sources. The source list can also include scheduled sources whose `valid_from` is in the future; their `available` is `false` and they do not count. Expired, exhausted, and revoked sources are omitted.
