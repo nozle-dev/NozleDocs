@@ -4536,7 +4536,19 @@ paths:
       tags:
         - Plans
       summary: List all plans
-      description: This endpoint retrieves all existing plans.
+      description: |-
+        This endpoint retrieves all existing plans.
+
+        **Publishable keys.** A publishable `pk_` key may call this endpoint and `GET /plans/{code}`, and nothing else. Any other request with a `pk_` key returns `403` with the code `publishable_key_not_allowed`.
+
+        With a `pk_` key you receive the same body a secret key receives: every plan in full, with `charges`, `taxes`, `minimum_commitment`, `usage_thresholds`, `entitlements`, `credit_grant_rules`, `credit_pool_policies` and `metadata`. The response is not reduced to a display subset.
+
+        - All top-level plans of the organization are returned, newest first. There is no listed or public flag. Plans with a trial (`trial_period`), pay-in-arrears plans (`pay_in_advance: false`) and plans pending deletion (`pending_deletion: true`) are included. Per-customer override plans (`parent_id` set) are not.
+        - Items do not include `fixed_charges`; use `GET /plans/{code}` for those.
+        - `customers_count`, `active_subscriptions_count` and `draft_invoices_count` are always `0`.
+        - The Engine host serves this list at `https://api.nozle.app/engine/api/v1/plans` with the same body. Engine ignores `page` and `per_page` and returns the first page (up to 100 plans). Use this Core endpoint to page through larger catalogs.
+
+        Because a publishable key ships in browsers, anything stored on a plan is readable by anyone who has the key. See [Public plan catalog](/api/list-plans).
       operationId: findAllPlans
       parameters:
         - $ref: '#/components/parameters/page'
@@ -4548,6 +4560,102 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlansPaginated'
+              examples:
+                catalog:
+                  summary: Two plans (trimmed from a live response, ids replaced)
+                  value:
+                    plans:
+                    - nozle_id: 00000000-0000-4000-8000-000000000001
+                      name: Starter INR
+                      invoice_display_name: null
+                      created_at: '2026-01-15T10:00:00Z'
+                      code: starter_inr
+                      interval: monthly
+                      description: null
+                      amount_cents: 49900
+                      amount_currency: INR
+                      trial_period: null
+                      pay_in_advance: true
+                      bill_charges_monthly: null
+                      bill_fixed_charges_monthly: null
+                      customers_count: 0
+                      active_subscriptions_count: 0
+                      draft_invoices_count: 0
+                      parent_id: null
+                      pending_deletion: false
+                      charges: []
+                      entitlements: []
+                      usage_thresholds: []
+                      applicable_usage_thresholds: []
+                      taxes: []
+                      credit_grant_rules: []
+                      credit_pool_policies: []
+                    - nozle_id: 00000000-0000-4000-8000-000000000002
+                      name: Metered credits
+                      invoice_display_name: null
+                      created_at: '2026-01-15T10:00:00Z'
+                      code: payg_credits
+                      interval: monthly
+                      description: null
+                      amount_cents: 0
+                      amount_currency: USD
+                      trial_period: null
+                      pay_in_advance: false
+                      bill_charges_monthly: null
+                      bill_fixed_charges_monthly: null
+                      customers_count: 0
+                      active_subscriptions_count: 0
+                      draft_invoices_count: 0
+                      parent_id: null
+                      pending_deletion: false
+                      charges:
+                      - nozle_id: 00000000-0000-4000-8000-000000000003
+                        feature_id: 00000000-0000-4000-8000-000000000004
+                        code: api_calls
+                        invoice_display_name: null
+                        feature_code: api_calls
+                        created_at: '2026-01-15T10:00:00Z'
+                        charge_model: standard
+                        invoiceable: true
+                        regroup_paid_fees: null
+                        pay_in_advance: false
+                        prorated: false
+                        min_amount_cents: 0
+                        accepts_target_wallet: false
+                        properties:
+                          amount: '0'
+                        applied_pricing_unit: null
+                        parent_id: null
+                        filters: []
+                        taxes: []
+                      entitlements: []
+                      usage_thresholds: []
+                      applicable_usage_thresholds: []
+                      taxes: []
+                      credit_grant_rules:
+                      - nozle_id: 00000000-0000-4000-8000-000000000005
+                        plan_id: 00000000-0000-4000-8000-000000000002
+                        plan_code: payg_credits
+                        credit_system_id: 00000000-0000-4000-8000-000000000006
+                        credit_system_code: ai_credits
+                        amount: '100.0'
+                        interval: lifetime
+                        interval_count: 1
+                        scope: customer
+                        entity_join_policy: null
+                        entity_leave_policy: null
+                        upgrade_policy: grant_difference
+                        downgrade_policy: next_period
+                        status: active
+                        created_at: '2026-01-15T10:00:00Z'
+                        updated_at: '2026-01-15T10:00:00Z'
+                      credit_pool_policies: []
+                    meta:
+                      current_page: 1
+                      next_page: null
+                      prev_page: null
+                      total_pages: 1
+                      total_count: 2
         '401':
           $ref: '#/components/responses/Unauthorized'
   /plans/{code}:
@@ -4591,7 +4699,16 @@ paths:
       tags:
         - Plans
       summary: Retrieve a plan
-      description: This endpoint retrieves a specific plan.
+      description: |-
+        This endpoint retrieves a specific plan by code.
+
+        **Publishable keys.** A publishable `pk_` key may call this endpoint and `GET /plans`, and nothing else. It returns the same body as a secret key: the whole plan, including `charges`, `fixed_charges`, `taxes`, `minimum_commitment`, `usage_thresholds`, `entitlements`, `credit_grant_rules`, `credit_pool_policies` and `metadata`. Anyone who has the key can read all of it.
+
+        This endpoint also returns a plan that is pending deletion (`pending_deletion: true`) and a plan with a trial or pay-in-arrears billing. An unknown code, or the code of a per-customer override plan, returns `404` with the code `plan_not_found`.
+
+        The Engine host does not serve this path. Call it on the Core host.
+
+        See [Public plan catalog](/api/list-plans).
       operationId: findPlan
       responses:
         '200':
@@ -4600,6 +4717,219 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Plan'
+              examples:
+                plan:
+                  summary: A plan with a usage charge, entitlements, a credit grant and metadata (from a live response, ids replaced)
+                  value:
+                    plan:
+                      nozle_id: 00000000-0000-4000-8000-000000000001
+                      name: Pro
+                      invoice_display_name: Acme Pro
+                      created_at: '2026-01-15T10:00:00Z'
+                      code: pro
+                      interval: monthly
+                      description: For teams replacing their sales, communication, and automation stack.
+                      amount_cents: 1499
+                      amount_currency: USD
+                      trial_period: null
+                      pay_in_advance: true
+                      bill_charges_monthly: null
+                      bill_fixed_charges_monthly: null
+                      customers_count: 0
+                      active_subscriptions_count: 0
+                      draft_invoices_count: 0
+                      parent_id: null
+                      pending_deletion: false
+                      charges:
+                      - nozle_id: 00000000-0000-4000-8000-000000000002
+                        feature_id: 00000000-0000-4000-8000-000000000003
+                        code: active_seats
+                        invoice_display_name: Active Acme members
+                        feature_code: active_seats
+                        created_at: '2026-01-15T10:00:00Z'
+                        charge_model: graduated
+                        invoiceable: true
+                        regroup_paid_fees: null
+                        pay_in_advance: false
+                        prorated: false
+                        min_amount_cents: 0
+                        accepts_target_wallet: false
+                        properties:
+                          graduated_ranges:
+                          - to_value: 1
+                            from_value: 0
+                            flat_amount: '0'
+                            per_unit_amount: '0'
+                          - to_value: null
+                            from_value: 2
+                            flat_amount: '0'
+                            per_unit_amount: '14.99'
+                        applied_pricing_unit: null
+                        parent_id: null
+                        filters: []
+                        taxes: []
+                      fixed_charges: []
+                      entitlements:
+                      - feature_id: 00000000-0000-4000-8000-000000000004
+                        feature_type: config
+                        code: included_ai_credits
+                        name: Included AI Credits
+                        description: AI credits included per person with the plan
+                        usage_limit: null
+                        hard_limit: null
+                        min_margin_percent: null
+                        margin_enforcement_mode: null
+                        enforce_plan_margin: null
+                        privileges:
+                        - code: included
+                          name: Included Credits
+                          value_type: integer
+                          value: 500
+                          config: {}
+                      - feature_id: 00000000-0000-4000-8000-000000000005
+                        feature_type: boolean
+                        code: unlimited_team_members
+                        name: Unlimited Team Members
+                        description: No Acme team-member cap
+                        usage_limit: null
+                        hard_limit: null
+                        min_margin_percent: null
+                        margin_enforcement_mode: null
+                        enforce_plan_margin: null
+                        privileges: []
+                      - feature_id: 00000000-0000-4000-8000-000000000006
+                        feature_type: boolean
+                        code: all_channels
+                        name: All Channels
+                        description: Access to all supported communication channels
+                        usage_limit: null
+                        hard_limit: null
+                        min_margin_percent: null
+                        margin_enforcement_mode: null
+                        enforce_plan_margin: null
+                        privileges: []
+                      - feature_id: 00000000-0000-4000-8000-000000000007
+                        feature_type: boolean
+                        code: full_crm
+                        name: Full CRM
+                        description: Access to the complete CRM workspace
+                        usage_limit: null
+                        hard_limit: null
+                        min_margin_percent: null
+                        margin_enforcement_mode: null
+                        enforce_plan_margin: null
+                        privileges: []
+                      - feature_id: 00000000-0000-4000-8000-000000000008
+                        feature_type: boolean
+                        code: meeting_notetaker
+                        name: Meeting Notetaker
+                        description: AI meeting notes and follow-ups
+                        usage_limit: null
+                        hard_limit: null
+                        min_margin_percent: null
+                        margin_enforcement_mode: null
+                        enforce_plan_margin: null
+                        privileges: []
+                      - feature_id: 00000000-0000-4000-8000-000000000009
+                        feature_type: boolean
+                        code: workflow_automation
+                        name: Workflow Automation
+                        description: Automated Acme workflows
+                        usage_limit: null
+                        hard_limit: null
+                        min_margin_percent: null
+                        margin_enforcement_mode: null
+                        enforce_plan_margin: null
+                        privileges: []
+                      - feature_id: 00000000-0000-4000-8000-000000000010
+                        feature_type: boolean
+                        code: lead_discovery
+                        name: Lead Discovery
+                        description: AI-assisted lead discovery
+                        usage_limit: null
+                        hard_limit: null
+                        min_margin_percent: null
+                        margin_enforcement_mode: null
+                        enforce_plan_margin: null
+                        privileges: []
+                      - feature_id: 00000000-0000-4000-8000-000000000011
+                        feature_type: boolean
+                        code: voice_ai
+                        name: Voice AI
+                        description: AI voice calling and campaigns
+                        usage_limit: null
+                        hard_limit: null
+                        min_margin_percent: null
+                        margin_enforcement_mode: null
+                        enforce_plan_margin: null
+                        privileges: []
+                      - feature_id: 00000000-0000-4000-8000-000000000012
+                        feature_type: boolean
+                        code: integrations_200
+                        name: 200 Integrations
+                        description: Access to Acme's workflow integration catalog
+                        usage_limit: null
+                        hard_limit: null
+                        min_margin_percent: null
+                        margin_enforcement_mode: null
+                        enforce_plan_margin: null
+                        privileges: []
+                      - feature_id: 00000000-0000-4000-8000-000000000013
+                        feature_type: config
+                        code: support
+                        name: Support Tier
+                        description: Customer support level
+                        usage_limit: null
+                        hard_limit: null
+                        min_margin_percent: null
+                        margin_enforcement_mode: null
+                        enforce_plan_margin: null
+                        privileges:
+                        - code: tier
+                          name: Tier
+                          value_type: select
+                          value: standard
+                          config:
+                            select_options:
+                            - community
+                            - standard
+                            - priority
+                      usage_thresholds: []
+                      applicable_usage_thresholds: []
+                      taxes: []
+                      credit_grant_rules:
+                      - nozle_id: 00000000-0000-4000-8000-000000000014
+                        plan_id: 00000000-0000-4000-8000-000000000001
+                        plan_code: pro
+                        credit_system_id: 00000000-0000-4000-8000-000000000015
+                        credit_system_code: ai_credits
+                        amount: '500.0'
+                        interval: month
+                        interval_count: 1
+                        scope: entity
+                        entity_join_policy: full_grant
+                        entity_leave_policy: expire_plan_grant
+                        upgrade_policy: grant_difference
+                        downgrade_policy: next_period
+                        status: active
+                        created_at: '2026-01-15T10:00:00Z'
+                        updated_at: '2026-01-15T10:00:00Z'
+                      credit_pool_policies:
+                      - nozle_id: 00000000-0000-4000-8000-000000000016
+                        plan_id: 00000000-0000-4000-8000-000000000001
+                        plan_code: pro
+                        credit_system_id: 00000000-0000-4000-8000-000000000015
+                        credit_system_code: ai_credits
+                        policy: entity_only
+                        status: active
+                        created_at: '2026-01-15T10:00:00Z'
+                        updated_at: '2026-01-15T10:00:00Z'
+                      metadata:
+                        product: acme
+                        billing_model: one_seat_base
+                        credit_cadence: monthly
+                        price_per_person_cents: '1499'
+                        included_credits_per_person: '500'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -10458,6 +10788,36 @@ components:
           deprecated: true
           description: This field is deprecated and will be removed in a future version. When set to true, it applies the tax to the organization's default billing entity. To apply or remove a tax from any billing entity (including the default one), please use the `PUT /billing_entities/:code` endpoint instead.
           example: true
+        add_ons_count:
+          type: integer
+          enum:
+            - 0
+          description: Reserved. Always `0`. Do not rely on it.
+          example: 0
+        customers_count:
+          type: integer
+          enum:
+            - 0
+          description: Reserved. Always `0`. Do not rely on it.
+          example: 0
+        plans_count:
+          type: integer
+          enum:
+            - 0
+          description: Reserved. Always `0`. Do not rely on it.
+          example: 0
+        charges_count:
+          type: integer
+          enum:
+            - 0
+          description: Reserved. Always `0`. Do not rely on it.
+          example: 0
+        commitments_count:
+          type: integer
+          enum:
+            - 0
+          description: Reserved. Always `0`. Do not rely on it.
+          example: 0
         created_at:
           type: string
           format: date-time
@@ -19450,10 +19810,21 @@ components:
       type: object
       description: Values used to apply differentiated pricing based on additional event properties.
       required:
+        - nozle_id
+        - charge_code
         - invoice_display_name
         - properties
         - values
       properties:
+        nozle_id:
+          type: string
+          format: uuid
+          description: Unique identifier of the charge filter.
+          example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+        charge_code:
+          type: string
+          description: Code of the charge the filter belongs to.
+          example: api_requests_charge
         invoice_display_name:
           type:
             - string
@@ -19783,11 +20154,66 @@ components:
     PlanEntitlementObject:
       type: object
       required:
+        - feature_id
+        - feature_type
         - code
         - name
         - description
+        - usage_limit
+        - hard_limit
+        - min_margin_percent
+        - margin_enforcement_mode
+        - enforce_plan_margin
         - privileges
       properties:
+        feature_id:
+          type: string
+          format: uuid
+          description: Unique identifier of the feature.
+          example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+        feature_type:
+          type: string
+          enum:
+            - boolean
+            - config
+            - metered
+          description: '`boolean` is an on/off capability. `config` carries privilege values (for example a support tier). `metered` is counted usage with an optional `usage_limit`.'
+          example: config
+        usage_limit:
+          type:
+            - integer
+            - 'null'
+          description: Usage allowed per period for a metered feature. `null` means no limit is set (and always `null` for boolean and config features).
+          example: null
+        hard_limit:
+          type:
+            - boolean
+            - 'null'
+          description: For a metered feature, `true` blocks usage over `usage_limit`. `null` for boolean and config features.
+          example: null
+        min_margin_percent:
+          type:
+            - number
+            - 'null'
+          description: Minimum margin, as a percentage, the plan must keep on this feature. `null` when no minimum is set.
+          example: null
+        margin_enforcement_mode:
+          type:
+            - string
+            - 'null'
+          enum:
+            - enforce
+            - warn
+            - 'off'
+            - null
+          description: What happens when the margin falls below `min_margin_percent`. `null` for boolean and config features.
+          example: null
+        enforce_plan_margin:
+          type:
+            - boolean
+            - 'null'
+          description: Whether the plan-level margin is enforced for this metered feature. `null` for boolean and config features.
+          example: null
         code:
           type: string
           example: seats
@@ -19832,7 +20258,7 @@ components:
                 select_options:
                   - google
                   - okta
-          description: Privileges associated with this feature. Each privilege must have a value assigned.
+          description: Privileges associated with this feature. Each privilege must have a value assigned. Always an empty array for metered features.
     PlanEntitlement:
       type: object
       required:
@@ -19842,14 +20268,31 @@ components:
           $ref: '#/components/schemas/PlanEntitlementObject'
     PlanObject:
       type: object
+      description: |-
+        A plan. This is the object returned by `GET /plans`, `GET /plans/{code}` and the plan write endpoints.
+
+        With a publishable `pk_` key, `GET /plans` and `GET /plans/{code}` return this whole object, including prices, charges, taxes, minimums, credit grants and `metadata`. Nothing is filtered or redacted. See "Publishable keys" on those operations.
+
+        `charges`, `entitlements`, `usage_thresholds`, `applicable_usage_thresholds`, `taxes`, `credit_grant_rules` and `credit_pool_policies` are always present in a plan returned by the plan endpoints. They are empty arrays when the plan has none.
       required:
         - nozle_id
         - name
+        - invoice_display_name
         - created_at
         - code
         - interval
+        - description
         - amount_cents
         - amount_currency
+        - trial_period
+        - pay_in_advance
+        - bill_charges_monthly
+        - bill_fixed_charges_monthly
+        - customers_count
+        - active_subscriptions_count
+        - draft_invoices_count
+        - parent_id
+        - pending_deletion
       properties:
         nozle_id:
           type: string
@@ -19861,8 +20304,10 @@ components:
           description: The name of the plan.
           example: Startup
         invoice_display_name:
-          type: string
-          description: Specifies the name that will be displayed on an invoice. If no value is set for this field, the name of the plan will be used as the default display name.
+          type:
+            - string
+            - 'null'
+          description: Specifies the name that will be displayed on an invoice. `null` when no value is set; the name of the plan is then used as the display name.
           example: Startup plan
         created_at:
           type: string
@@ -19884,24 +20329,28 @@ components:
             - yearly
           example: monthly
         description:
-          type: string
-          description: The description on the plan.
-          example: ''
+          type:
+            - string
+            - 'null'
+          description: The description on the plan. `null` when none was set.
+          example: For teams that need more than the free tier.
         amount_cents:
           type: integer
-          description: The base cost of the plan, excluding any applicable taxes, that is billed on a recurring basis. This value is defined at 0 if your plan is a pay-as-you-go plan.
+          description: The base cost of the plan per `interval`, excluding any applicable taxes, in the smallest unit of `amount_currency` (cents for USD, so `1499` is 14.99 USD). It is `0` for a free or pure pay-as-you-go plan. Usage-based prices are not included here, they are in `charges`.
           example: 10000
         amount_currency:
           $ref: '#/components/schemas/Currency'
           description: The currency of the plan. It indicates the monetary unit in which the plan's cost, including taxes and usage-based charges, is expressed.
           example: USD
         trial_period:
-          type: number
-          description: The duration in days during which the base cost of the plan is offered for free.
+          type:
+            - number
+            - 'null'
+          description: The duration in days during which the base cost of the plan is offered for free. `null` when the plan has no trial. A plan with a trial is still returned by the public catalog.
           example: 5
         pay_in_advance:
           type: boolean
-          description: This field determines the billing timing for the plan. When set to `true`, the base cost of the plan is due at the beginning of each billing period. Conversely, when set to `false`, the base cost of the plan is due at the end of each billing period.
+          description: This field determines the billing timing for the plan. When set to `true`, the base cost of the plan is due at the beginning of each billing period. Conversely, when set to `false`, the plan is pay-in-arrears and the base cost is due at the end of each billing period. Pay-in-arrears plans are also returned by the public catalog.
           example: true
         bill_charges_monthly:
           type:
@@ -19915,13 +20364,43 @@ components:
             - 'null'
           description: This field, when set to `true`, enables to invoice fixed charges on monthly basis, even if the cadence of the plan is yearly or semiannual. This allows customers to pay fixed charges on a monthly basis. This can be set to true only if the plan's interval is `yearly` or `semiannual`.
           example: null
+        customers_count:
+          type: integer
+          enum:
+            - 0
+          description: Reserved. Always `0` in API responses, for every key type. It is not the number of customers on the plan. Do not rely on it.
+          example: 0
+        active_subscriptions_count:
+          type: integer
+          enum:
+            - 0
+          description: Reserved. Always `0` in API responses, for every key type. It is not the number of active subscriptions. Do not rely on it.
+          example: 0
+        draft_invoices_count:
+          type: integer
+          enum:
+            - 0
+          description: Reserved. Always `0` in API responses, for every key type. It is not the number of draft invoices. Do not rely on it.
+          example: 0
+        parent_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: Identifier of the parent plan when this plan is a per-customer override of another plan. `null` for a regular plan. Override plans are not returned by `GET /plans` or `GET /plans/{code}`, so it is `null` there.
+          example: null
+        pending_deletion:
+          type: boolean
+          description: '`true` when deletion of the plan was requested and is still being processed in the background. The plan is going away and should not be offered to new customers; `GET /plans` still lists it until the deletion finishes. Filter on `pending_deletion` when you build a pricing page.'
+          example: false
         minimum_commitment:
+          description: Minimum commitment of the plan. The key is omitted, not `null`, when the plan has no minimum commitment.
           $ref: '#/components/schemas/MinimumCommitmentObject'
         charges:
           type: array
           items:
             $ref: '#/components/schemas/ChargeObject'
-          description: Additional usage-based charges for this plan.
+          description: Usage-based charges for this plan, one per feature. Empty array when the plan has only a base price.
           example:
             - nozle_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
               feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
@@ -20033,7 +20512,7 @@ components:
               filters: []
         fixed_charges:
           type: array
-          description: List of fixed charges for this plan.
+          description: List of fixed charges for this plan. Returned by single-plan responses (`GET /plans/{code}`, create, update, delete). It is not included in the items of `GET /plans`.
           items:
             $ref: '#/components/schemas/FixedChargeObject'
           example:
@@ -20104,25 +20583,217 @@ components:
               taxes: []
         taxes:
           type: array
-          description: All taxes applied to the plan.
+          description: Taxes applied to the plan itself. Charges, fixed charges and the minimum commitment carry their own `taxes`.
           items:
             $ref: '#/components/schemas/TaxObject'
         usage_thresholds:
           type: array
-          description: List of usage thresholds applied to the plan.
+          description: Usage thresholds that trigger a progressive billing invoice on this plan.
           items:
             $ref: '#/components/schemas/UsageThresholdObject'
+        applicable_usage_thresholds:
+          type: array
+          description: Usage thresholds that apply when this plan is used. Same as `usage_thresholds` for a regular plan; for an override plan it is the parent plan's list. Entries have no `nozle_id` or timestamps.
+          items:
+            $ref: '#/components/schemas/ApplicableUsageThreshold'
         entitlements:
           type: array
-          description: List of all feature entitlements and their privileges available for this plan.
+          description: Feature entitlements of the plan (boolean, config and metered features) with their privilege values. Each item is the entitlement itself; it is not wrapped in an `entitlement` key.
           items:
-            $ref: '#/components/schemas/PlanEntitlement'
+            $ref: '#/components/schemas/PlanEntitlementObject'
+        credit_grant_rules:
+          type: array
+          description: Active credit grant rules. Each rule grants credits of one credit system to subscribers of the plan.
+          items:
+            $ref: '#/components/schemas/PlanCreditGrantRuleObject'
+        credit_pool_policies:
+          type: array
+          description: Active credit pool policies. Each says which credit pool an entity of this plan spends from, for one credit system.
+          items:
+            $ref: '#/components/schemas/PlanCreditPoolPolicyObject'
         metadata:
+          description: Custom key-value pairs set on the plan. The key is omitted when the plan has no metadata. With a publishable key, metadata is readable by anyone who has the key.
           $ref: '#/components/schemas/MetadataObject'
+    PlanCreditGrantRuleObject:
+      type: object
+      required:
+        - nozle_id
+        - plan_id
+        - plan_code
+        - credit_system_id
+        - credit_system_code
+        - amount
+        - interval
+        - interval_count
+        - scope
+        - entity_join_policy
+        - entity_leave_policy
+        - upgrade_policy
+        - downgrade_policy
+        - status
+        - created_at
+        - updated_at
+      properties:
+        nozle_id:
+          type: string
+          format: uuid
+          description: Unique identifier of the credit grant rule.
+          example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+        plan_id:
+          type: string
+          format: uuid
+          description: Identifier of the plan the rule belongs to.
+          example: 1a901a90-1a90-1a90-1a90-1a901a901a91
+        plan_code:
+          type: string
+          description: Code of the plan the rule belongs to.
+          example: pro
+        credit_system_id:
+          type: string
+          format: uuid
+          description: Identifier of the credit system that is granted.
+          example: 1a901a90-1a90-1a90-1a90-1a901a901a92
+        credit_system_code:
+          type: string
+          description: Code of the credit system that is granted.
+          example: ai_credits
+        amount:
+          type: string
+          description: Credits granted each time the rule runs, as an exact decimal string (for example `500.0`). It is in credits, not cents.
+          example: '500.0'
+        interval:
+          type: string
+          enum:
+            - month
+            - year
+            - lifetime
+          description: How often the grant repeats. `lifetime` grants once, when the subscription starts.
+          example: month
+        interval_count:
+          type: integer
+          description: Number of `interval` periods between grants.
+          example: 1
+        scope:
+          type: string
+          enum:
+            - customer
+            - entity
+          description: '`customer` grants to the customer''s shared pool. `entity` grants to each entity of the customer.'
+          example: entity
+        entity_join_policy:
+          type:
+            - string
+            - 'null'
+          enum:
+            - full_grant
+            - prorated
+            - next_period
+            - null
+          description: What an entity that joins mid-period receives. `null` when `scope` is `customer`.
+          example: full_grant
+        entity_leave_policy:
+          type:
+            - string
+            - 'null'
+          enum:
+            - expire_plan_grant
+            - null
+          description: What happens to the plan grant when an entity leaves. `null` when `scope` is `customer`.
+          example: expire_plan_grant
+        upgrade_policy:
+          type: string
+          enum:
+            - grant_difference
+          description: Credits granted on an upgrade to this plan.
+          example: grant_difference
+        downgrade_policy:
+          type: string
+          enum:
+            - next_period
+          description: When a downgrade to this plan changes the grant.
+          example: next_period
+        status:
+          type: string
+          enum:
+            - active
+            - archived
+          description: Plan responses list only `active` rules.
+          example: active
+        created_at:
+          type: string
+          format: date-time
+          description: When the rule was created, in UTC (ISO 8601).
+          example: '2026-01-15T10:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          description: When the rule was last updated, in UTC (ISO 8601).
+          example: '2026-01-15T10:00:00Z'
+    PlanCreditPoolPolicyObject:
+      type: object
+      required:
+        - nozle_id
+        - plan_id
+        - plan_code
+        - credit_system_id
+        - credit_system_code
+        - policy
+        - status
+        - created_at
+        - updated_at
+      properties:
+        nozle_id:
+          type: string
+          format: uuid
+          description: Unique identifier of the credit pool policy.
+          example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+        plan_id:
+          type: string
+          format: uuid
+          description: Identifier of the plan the policy belongs to.
+          example: 1a901a90-1a90-1a90-1a90-1a901a901a91
+        plan_code:
+          type: string
+          description: Code of the plan the policy belongs to.
+          example: pro
+        credit_system_id:
+          type: string
+          format: uuid
+          description: Identifier of the credit system the policy applies to.
+          example: 1a901a90-1a90-1a90-1a90-1a901a901a92
+        credit_system_code:
+          type: string
+          description: Code of the credit system the policy applies to.
+          example: ai_credits
+        policy:
+          type: string
+          enum:
+            - entity_only
+            - entity_then_customer
+            - customer_only
+          description: '`entity_only` spends only entity-owned credits. `entity_then_customer` spends entity credits first, then the shared customer pool. `customer_only` records entity attribution but spends only the shared customer pool.'
+          example: entity_only
+        status:
+          type: string
+          enum:
+            - active
+            - archived
+          description: Plan responses list only `active` policies.
+          example: active
+        created_at:
+          type: string
+          format: date-time
+          description: When the policy was created, in UTC (ISO 8601).
+          example: '2026-01-15T10:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          description: When the policy was last updated, in UTC (ISO 8601).
+          example: '2026-01-15T10:00:00Z'
     PlansPaginated:
       type: object
       required:
-        - Plans
+        - plans
         - meta
       properties:
         plans:

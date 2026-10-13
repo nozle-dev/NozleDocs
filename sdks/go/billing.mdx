@@ -5,7 +5,7 @@ description: "List plans, create payment-aware checkouts, and manage customer or
 
 ## List plans and create checkout
 
-`Plans` accepts `pk_` or `sk_`; other billing methods require a server-side `sk_`. `Plan` includes code, name, amount in cents, currency, and interval. Upsert the customer with `UpsertCustomer` before billing.
+`Plans` accepts `pk_` or `sk_`; other billing methods require a server-side `sk_`. `Plan` includes code, name, amount in cents, currency, and interval; the Go struct drops every other field of the API response. The list itself includes trial, pay-in-arrears and pending-deletion plans, and with a `pk_` key the full plans are readable by anyone who has the key. See the [public plan catalog](/api/list-plans). Upsert the customer with `UpsertCustomer` before billing.
 
 ```go
 plans, err := client.Plans(ctx)
