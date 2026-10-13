@@ -143,7 +143,7 @@ console.log(check.projected_remaining)
 console.log(check.projected_deductions)
 ```
 
-`occurredAt` is the event time as an RFC 3339 string with an offset. It defaults to now.
+`occurredAt` is the event time as an RFC 3339 string with an offset or `Z`, or Unix seconds as a numeric string (the latter from the Engine release that includes the broader timestamp forms). It defaults to now.
 
 `usage.check()` does not reserve or mutate credits. Another request can spend the projected sources before a later consume request.
 
@@ -178,7 +178,7 @@ if (!result.allowed) {
 
 ## Legacy wallet adapter
 
-`nozle.checkAndDeduct({ customerId, feature, credits })` remains available for the legacy wallet path. New product-credit integrations should use `usage.check()` and `usage.track()`.
+`nozle.checkAndDeduct({ customerId, credits })` remains available for the legacy wallet path. The `feature` field is deprecated: it is still accepted but is not sent and has no effect. New product-credit integrations should use `usage.check()` and `usage.track()`.
 
 ## Security
 

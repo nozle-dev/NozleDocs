@@ -18,7 +18,7 @@ Base URL: `https://api.nozle.app/engine/api/v1`.
 }
 ```
 
-`occurred_at` is required and must be an RFC 3339 string with a time zone offset or `Z`. Unix seconds as a string, a date without a time, and a time without an offset return `400 invalid_request` with `occurred_at must be an RFC3339 timestamp`. Unix seconds as a JSON number also return `400 invalid_request`, with an `invalid JSON body` message. A missing value returns `400 invalid_request` with `occurred_at is required`. The SDKs send the current time when you omit it.
+`occurred_at` is required and must be Unix seconds (a JSON number such as `1788345001` or `1788345001.5`, or a numeric string such as `"1788345001"`) or an RFC 3339 string with a time zone offset or `Z`. A date without a time, a time without an offset, zero or negative seconds, and any other JSON type return `400 invalid_request` with `occurred_at must be Unix seconds (a number or a numeric string) or an RFC 3339 timestamp with an offset or Z` (zero or negative seconds: `occurred_at must be greater than zero`). A missing value returns `400 invalid_request` with `occurred_at is required`. Unix seconds are available from the Engine release that includes this change; before it, only RFC 3339 is accepted. The SDKs send the current time when you omit it.
 
 A customer with more than one active subscription returns `422 active_subscription_ambiguous`. A time with no effective Credit System rate returns `422 credit_usage_configuration_invalid` (`no effective credit rate`).
 

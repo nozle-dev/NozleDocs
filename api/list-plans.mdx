@@ -1,34 +1,498 @@
 ---
-title: "List Plans"
+title: "Public plan catalog"
 api: "GET https://api.nozle.app/engine/api/v1/plans"
+description: "What a publishable key can read from the plan catalog: which plans are returned, every field, and what is exposed to the browser."
 ---
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-List all available plans. Useful for building pricing tables and plan selectors in your frontend.
+The plan catalog is the one part of the API a publishable `pk_` key can call. Use it to build pricing pages and plan selectors. The response is the **whole plan** as your organization configured it, not a short display object.
 
-**Auth:** `pk_` (publishable key) or `sk_` (secret key).
+**Auth:** `pk_` (publishable key) or `sk_` (secret key). Both receive the same body.
 
-### Response
+<Warning>
+A publishable key ships in browsers, so everything in a plan is readable by anyone who has the key: base price, usage charges and their rates, taxes, minimum commitments, credit grants, entitlements, `metadata`, and plans you do not sell. There is no way to hide a field or a plan from a `pk_` key. Keep sensitive, negotiated or internal pricing out of the organization whose publishable key you ship. See [Keep sensitive pricing out of the catalog](#keep-sensitive-pricing-out-of-the-catalog).
+</Warning>
 
-Returns an array of plan objects.
+## What a publishable key can call
 
-<ResponseField name="code" type="string" required>
-  Unique plan identifier (e.g. `starter`, `pro`, `enterprise`).
-</ResponseField>
+| Host | Request | With `pk_` |
+|---|---|---|
+| Engine `https://api.nozle.app/engine/api/v1` | `GET /plans` | Allowed. List only. |
+| Core `https://api.nozle.app/core/api/v1` | `GET /plans` | Allowed. Same body as Engine, with pagination. |
+| Core | `GET /plans/{code}` | Allowed. One plan, wrapped as `{ "plan": { ... } }`. Engine does not serve this path. |
+| Either host | Any other path or method | `403`. Core returns `{"status": 403, "error": "Publishable keys may only read the public plan catalog", "code": "publishable_key_not_allowed"}`. Engine returns `403` with an `error` message. |
 
-<ResponseField name="name" type="string" required>
-  Human-readable plan name.
-</ResponseField>
+See [Authentication](/api/authentication) for the full credential model.
 
-<ResponseField name="amount_cents" type="number" required>
-  Plan price in cents (e.g. `2999` for $29.99).
-</ResponseField>
+## Which plans are returned
 
-<ResponseField name="amount_currency" type="string" required>
-  ISO 4217 currency code (e.g. `USD`).
-</ResponseField>
+The list contains **all top-level plans of the organization**. There is no listed, public or draft flag to filter on. In particular, the list includes:
 
-<ResponseField name="interval" type="string" required>
-  Billing interval: `monthly` or `yearly`.
-</ResponseField>
+- trial plans (`trial_period` is a number of days);
+- pay-in-arrears plans (`pay_in_advance` is `false`);
+- free plans and plans with no base price;
+- plans pending deletion (`pending_deletion` is `true`).
+
+It does not include per-customer override plans (plans with a `parent_id`) or plans that are already deleted. Plans are sorted newest first by `created_at`.
+
+`GET /plans/{code}` returns the same plan, and it also returns a plan that is pending deletion. An unknown code returns `404` with `"code": "plan_not_found"`.
+
+### Pagination
+
+Core accepts `page` and `per_page` (default and page size `100`) and returns `meta`. Engine does not forward query parameters: it always returns the first page, so a catalog of more than 100 plans cannot be read completely through Engine. Read larger catalogs through Core.
+
+| `meta` field | Type | Description |
+|---|---|---|
+| `current_page` | integer | Page returned. |
+| `next_page` | integer or `null` | Next page, `null` on the last page. |
+| `prev_page` | integer or `null` | Previous page, `null` on the first page. |
+| `total_pages` | integer | Number of pages. |
+| `total_count` | integer | Number of plans in the catalog. |
+
+## Example
+
+```bash
+curl -s https://api.nozle.app/engine/api/v1/plans \
+  -H "Authorization: Bearer $NOZLE_PUBLISHABLE_KEY"
+```
+
+This is a real response, trimmed to one plan, with identifiers replaced by placeholders and the product name anonymized. The plan has one usage charge, ten entitlements, one credit grant rule, one credit pool policy and `metadata`. Its tax, usage threshold and minimum commitment fields are empty or absent; their shapes are in the field reference below.
+
+```json
+{
+  "plans": [
+    {
+      "nozle_id": "00000000-0000-4000-8000-000000000001",
+      "name": "Pro",
+      "invoice_display_name": "Acme Pro",
+      "created_at": "2026-01-15T10:00:00Z",
+      "code": "pro",
+      "interval": "monthly",
+      "description": "For teams replacing their sales, communication, and automation stack.",
+      "amount_cents": 1499,
+      "amount_currency": "USD",
+      "trial_period": null,
+      "pay_in_advance": true,
+      "bill_charges_monthly": null,
+      "bill_fixed_charges_monthly": null,
+      "customers_count": 0,
+      "active_subscriptions_count": 0,
+      "draft_invoices_count": 0,
+      "parent_id": null,
+      "pending_deletion": false,
+      "charges": [
+        {
+          "nozle_id": "00000000-0000-4000-8000-000000000002",
+          "feature_id": "00000000-0000-4000-8000-000000000003",
+          "code": "active_seats",
+          "invoice_display_name": "Active Acme members",
+          "feature_code": "active_seats",
+          "created_at": "2026-01-15T10:00:00Z",
+          "charge_model": "graduated",
+          "invoiceable": true,
+          "regroup_paid_fees": null,
+          "pay_in_advance": false,
+          "prorated": false,
+          "min_amount_cents": 0,
+          "accepts_target_wallet": false,
+          "properties": {
+            "graduated_ranges": [
+              {
+                "to_value": 1,
+                "from_value": 0,
+                "flat_amount": "0",
+                "per_unit_amount": "0"
+              },
+              {
+                "to_value": null,
+                "from_value": 2,
+                "flat_amount": "0",
+                "per_unit_amount": "14.99"
+              }
+            ]
+          },
+          "applied_pricing_unit": null,
+          "parent_id": null,
+          "filters": [],
+          "taxes": []
+        }
+      ],
+      "entitlements": [
+        {
+          "feature_id": "00000000-0000-4000-8000-000000000004",
+          "feature_type": "config",
+          "code": "included_ai_credits",
+          "name": "Included AI Credits",
+          "description": "AI credits included per person with the plan",
+          "usage_limit": null,
+          "hard_limit": null,
+          "min_margin_percent": null,
+          "margin_enforcement_mode": null,
+          "enforce_plan_margin": null,
+          "privileges": [
+            {
+              "code": "included",
+              "name": "Included Credits",
+              "value_type": "integer",
+              "value": 500,
+              "config": {}
+            }
+          ]
+        },
+        {
+          "feature_id": "00000000-0000-4000-8000-000000000005",
+          "feature_type": "boolean",
+          "code": "unlimited_team_members",
+          "name": "Unlimited Team Members",
+          "description": "No Acme team-member cap",
+          "usage_limit": null,
+          "hard_limit": null,
+          "min_margin_percent": null,
+          "margin_enforcement_mode": null,
+          "enforce_plan_margin": null,
+          "privileges": []
+        },
+        {
+          "feature_id": "00000000-0000-4000-8000-000000000006",
+          "feature_type": "boolean",
+          "code": "all_channels",
+          "name": "All Channels",
+          "description": "Access to all supported communication channels",
+          "usage_limit": null,
+          "hard_limit": null,
+          "min_margin_percent": null,
+          "margin_enforcement_mode": null,
+          "enforce_plan_margin": null,
+          "privileges": []
+        },
+        {
+          "feature_id": "00000000-0000-4000-8000-000000000007",
+          "feature_type": "boolean",
+          "code": "full_crm",
+          "name": "Full CRM",
+          "description": "Access to the complete CRM workspace",
+          "usage_limit": null,
+          "hard_limit": null,
+          "min_margin_percent": null,
+          "margin_enforcement_mode": null,
+          "enforce_plan_margin": null,
+          "privileges": []
+        },
+        {
+          "feature_id": "00000000-0000-4000-8000-000000000008",
+          "feature_type": "boolean",
+          "code": "meeting_notetaker",
+          "name": "Meeting Notetaker",
+          "description": "AI meeting notes and follow-ups",
+          "usage_limit": null,
+          "hard_limit": null,
+          "min_margin_percent": null,
+          "margin_enforcement_mode": null,
+          "enforce_plan_margin": null,
+          "privileges": []
+        },
+        {
+          "feature_id": "00000000-0000-4000-8000-000000000009",
+          "feature_type": "boolean",
+          "code": "workflow_automation",
+          "name": "Workflow Automation",
+          "description": "Automated Acme workflows",
+          "usage_limit": null,
+          "hard_limit": null,
+          "min_margin_percent": null,
+          "margin_enforcement_mode": null,
+          "enforce_plan_margin": null,
+          "privileges": []
+        },
+        {
+          "feature_id": "00000000-0000-4000-8000-000000000010",
+          "feature_type": "boolean",
+          "code": "lead_discovery",
+          "name": "Lead Discovery",
+          "description": "AI-assisted lead discovery",
+          "usage_limit": null,
+          "hard_limit": null,
+          "min_margin_percent": null,
+          "margin_enforcement_mode": null,
+          "enforce_plan_margin": null,
+          "privileges": []
+        },
+        {
+          "feature_id": "00000000-0000-4000-8000-000000000011",
+          "feature_type": "boolean",
+          "code": "voice_ai",
+          "name": "Voice AI",
+          "description": "AI voice calling and campaigns",
+          "usage_limit": null,
+          "hard_limit": null,
+          "min_margin_percent": null,
+          "margin_enforcement_mode": null,
+          "enforce_plan_margin": null,
+          "privileges": []
+        },
+        {
+          "feature_id": "00000000-0000-4000-8000-000000000012",
+          "feature_type": "boolean",
+          "code": "integrations_200",
+          "name": "200 Integrations",
+          "description": "Access to Acme's workflow integration catalog",
+          "usage_limit": null,
+          "hard_limit": null,
+          "min_margin_percent": null,
+          "margin_enforcement_mode": null,
+          "enforce_plan_margin": null,
+          "privileges": []
+        },
+        {
+          "feature_id": "00000000-0000-4000-8000-000000000013",
+          "feature_type": "config",
+          "code": "support",
+          "name": "Support Tier",
+          "description": "Customer support level",
+          "usage_limit": null,
+          "hard_limit": null,
+          "min_margin_percent": null,
+          "margin_enforcement_mode": null,
+          "enforce_plan_margin": null,
+          "privileges": [
+            {
+              "code": "tier",
+              "name": "Tier",
+              "value_type": "select",
+              "value": "standard",
+              "config": {
+                "select_options": [
+                  "community",
+                  "standard",
+                  "priority"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "usage_thresholds": [],
+      "applicable_usage_thresholds": [],
+      "taxes": [],
+      "credit_grant_rules": [
+        {
+          "nozle_id": "00000000-0000-4000-8000-000000000014",
+          "plan_id": "00000000-0000-4000-8000-000000000001",
+          "plan_code": "pro",
+          "credit_system_id": "00000000-0000-4000-8000-000000000015",
+          "credit_system_code": "ai_credits",
+          "amount": "500.0",
+          "interval": "month",
+          "interval_count": 1,
+          "scope": "entity",
+          "entity_join_policy": "full_grant",
+          "entity_leave_policy": "expire_plan_grant",
+          "upgrade_policy": "grant_difference",
+          "downgrade_policy": "next_period",
+          "status": "active",
+          "created_at": "2026-01-15T10:00:00Z",
+          "updated_at": "2026-01-15T10:00:00Z"
+        }
+      ],
+      "credit_pool_policies": [
+        {
+          "nozle_id": "00000000-0000-4000-8000-000000000016",
+          "plan_id": "00000000-0000-4000-8000-000000000001",
+          "plan_code": "pro",
+          "credit_system_id": "00000000-0000-4000-8000-000000000015",
+          "credit_system_code": "ai_credits",
+          "policy": "entity_only",
+          "status": "active",
+          "created_at": "2026-01-15T10:00:00Z",
+          "updated_at": "2026-01-15T10:00:00Z"
+        }
+      ],
+      "metadata": {
+        "product": "acme",
+        "billing_model": "one_seat_base",
+        "credit_cadence": "monthly",
+        "price_per_person_cents": "1499",
+        "included_credits_per_person": "500"
+      }
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "next_page": null,
+    "prev_page": null,
+    "total_pages": 1,
+    "total_count": 1
+  }
+}
+```
+
+`GET /plans/{code}` returns the same plan object under a `plan` key and adds `fixed_charges`, which the list leaves out.
+
+## Fields
+
+Identifiers are named `nozle_id`. Amounts named `*_cents` are integers in cents of the plan currency. Amounts inside a charge's `properties` are decimal strings in currency units (for example `"14.99"` is 14.99 USD), not cents.
+
+### Plan
+
+| Field | Type | Description |
+|---|---|---|
+| `nozle_id` | string (UUID) | Plan identifier. |
+| `code` | string | Unique plan code. Use it to start checkout. |
+| `name` | string | Plan name. |
+| `invoice_display_name` | string or `null` | Name shown on invoices. `null` when not set. |
+| `description` | string or `null` | Plan description. `null` when not set. |
+| `created_at` | string (ISO 8601, UTC) | Creation time. |
+| `interval` | string | Billing interval: `weekly`, `monthly`, `quarterly`, `semiannual` or `yearly`. |
+| `amount_cents` | integer | Base price per `interval`, before tax, in cents of `amount_currency`. `0` for a free or pure usage-based plan. Usage prices are in `charges`. |
+| `amount_currency` | string | ISO 4217 currency code, such as `USD`. |
+| `trial_period` | number or `null` | Free trial length in days. `null` when the plan has no trial. |
+| `pay_in_advance` | boolean | `true` bills the base price at the start of each period. `false` bills it at the end (pay in arrears). |
+| `bill_charges_monthly` | boolean or `null` | `true` invoices usage charges monthly on a yearly or semiannual plan. `null` when not set. |
+| `bill_fixed_charges_monthly` | boolean or `null` | Same, for fixed charges. |
+| `customers_count` | integer | Reserved. Always `0`. Do not rely on it. |
+| `active_subscriptions_count` | integer | Reserved. Always `0`. Do not rely on it. |
+| `draft_invoices_count` | integer | Reserved. Always `0`. Do not rely on it. |
+| `parent_id` | string (UUID) or `null` | Parent plan of a per-customer override. `null` for every plan the catalog returns. |
+| `pending_deletion` | boolean | `true` when deletion was requested and is still being processed. Do not offer these plans. |
+| `charges` | array | Usage charges. Empty array when there are none. |
+| `fixed_charges` | array | Fixed charges. Only in `GET /plans/{code}`, not in the list. |
+| `minimum_commitment` | object | Minimum commitment. The key is absent when the plan has none. |
+| `usage_thresholds` | array | Usage thresholds for progressive billing. Empty array when there are none. |
+| `applicable_usage_thresholds` | array | Thresholds that apply to the plan. Same as `usage_thresholds` for catalog plans, without ids or timestamps. |
+| `taxes` | array | Taxes applied to the plan. Empty array when there are none. |
+| `entitlements` | array | Feature entitlements. |
+| `credit_grant_rules` | array | Active credit grant rules. |
+| `credit_pool_policies` | array | Active credit pool policies. |
+| `metadata` | object | Key-value pairs set on the plan. The key is absent when the plan has no metadata. |
+
+### Charge (`charges[]`)
+
+| Field | Type | Description |
+|---|---|---|
+| `nozle_id` | string (UUID) | Charge identifier. |
+| `code` | string or `null` | Charge code, unique within the plan. |
+| `feature_id`, `feature_code` | string | The metered feature the charge prices. |
+| `invoice_display_name` | string or `null` | Name shown on invoices. |
+| `created_at` | string | Creation time. |
+| `charge_model` | string | `standard`, `graduated`, `package`, `percentage`, `volume`, `graduated_percentage`, `custom` or `dynamic`. |
+| `properties` | object | The prices. Its keys depend on `charge_model`: `amount` (standard); `graduated_ranges` (graduated); `amount`, `package_size`, `free_units` (package); `volume_ranges` (volume); `rate`, `fixed_amount`, `free_units_per_events`, `free_units_per_total_aggregation` (percentage); `graduated_percentage_ranges` (graduated percentage). It is returned as it was saved, so the last range of a tier list can have `"to_value": null` or no `to_value`. |
+| `filters` | array | Prices that differ by event property. Each item has `nozle_id`, `charge_code`, `invoice_display_name`, `properties` (the prices for that filter, same shape as the charge `properties`) and `values`, an object that maps each filter key to the array of values it matches, for example `{ "region": ["eu", "us"] }`. |
+| `taxes` | array | Taxes applied to the charge. |
+| `pay_in_advance` | boolean | `true` invoices the charge immediately. `false` invoices it at the end of the period. |
+| `invoiceable` | boolean | `false` means no invoice is issued for the charge itself. |
+| `regroup_paid_fees` | string or `null` | `invoice` or `null`. |
+| `prorated` | boolean | Whether the charge is prorated in the billing period. |
+| `min_amount_cents` | integer | Minimum spend for the charge per period, in cents. `0` for none. |
+| `accepts_target_wallet` | boolean | Whether the charge accepts a target prepaid wallet. |
+| `applied_pricing_unit` | object or `null` | `{ "code", "conversion_rate" }` when the charge is priced in a pricing unit. |
+| `parent_id` | string (UUID) or `null` | Parent charge of an override. |
+
+### Fixed charge (`fixed_charges[]`)
+
+Only in `GET /plans/{code}`. Fields: `nozle_id`, `add_on_id`, `add_on_code`, `code`, `invoice_display_name`, `created_at`, `charge_model` (`standard`, `graduated` or `volume`), `pay_in_advance`, `prorated`, `properties` (same keys as a charge for that model), `units` (number), `parent_id` and `taxes`.
+
+### Minimum commitment (`minimum_commitment`)
+
+Present only when the plan has one. Fields: `nozle_id`, `plan_code`, `commitment_type`, `invoice_display_name`, `amount_cents` (cents per `interval`), `interval`, `created_at`, `updated_at` and `taxes`. `commitment_type` is always `minimum_commitment`.
+
+### Usage threshold (`usage_thresholds[]`)
+
+| Field | Type | Description |
+|---|---|---|
+| `nozle_id` | string (UUID) | Threshold identifier. |
+| `threshold_display_name` | string or `null` | Display name. |
+| `amount_cents` | integer | Usage amount, in cents, that triggers a progressive billing invoice. |
+| `recurring` | boolean | `true` repeats the invoice each time usage grows by `amount_cents`. |
+| `created_at`, `updated_at` | string | Timestamps. |
+
+### Tax (`taxes[]`)
+
+Fields: `nozle_id`, `name`, `code`, `description` (string or `null`), `rate` (percentage, for example `20`), `applied_to_organization` (deprecated), `created_at`. The count fields `add_ons_count`, `customers_count`, `plans_count`, `charges_count` and `commitments_count` are always `0`.
+
+### Entitlement (`entitlements[]`)
+
+| Field | Type | Description |
+|---|---|---|
+| `feature_id` | string (UUID) | Feature identifier. |
+| `feature_type` | string | `boolean`, `config` or `metered`. |
+| `code`, `name`, `description` | string, string, string or `null` | Feature code and labels. |
+| `usage_limit` | integer or `null` | Usage allowed per period. `null` when no limit is set. |
+| `hard_limit` | boolean or `null` | For metered features, `true` blocks usage over the limit. `null` for other types. |
+| `min_margin_percent` | number or `null` | Minimum margin the plan must keep on the feature. |
+| `margin_enforcement_mode` | string or `null` | `enforce`, `warn` or `off` for metered features. `null` for other types. |
+| `enforce_plan_margin` | boolean or `null` | For metered features, whether the plan margin is enforced. `null` for other types. |
+| `privileges` | array | For `config` features, objects with `code`, `name`, `value_type` (`integer`, `string`, `boolean` or `select`), `value` and `config`. Empty for boolean and metered features. |
+
+### Credit grant rule (`credit_grant_rules[]`)
+
+| Field | Type | Description |
+|---|---|---|
+| `nozle_id`, `plan_id`, `plan_code` | string | Rule and plan identifiers. |
+| `credit_system_id`, `credit_system_code` | string | The credit system that is granted. |
+| `amount` | string | Credits granted per run, as an exact decimal such as `"500.0"`. Credits, not cents. |
+| `interval` | string | `month`, `year` or `lifetime`. |
+| `interval_count` | integer | Periods between grants. |
+| `scope` | string | `customer` or `entity`. |
+| `entity_join_policy` | string or `null` | `full_grant`, `prorated` or `next_period`. `null` for `customer` scope. |
+| `entity_leave_policy` | string or `null` | `expire_plan_grant`. `null` for `customer` scope. |
+| `upgrade_policy` | string | `grant_difference`. |
+| `downgrade_policy` | string | `next_period`. |
+| `status` | string | `active`. Archived rules are not returned. |
+| `created_at`, `updated_at` | string | Timestamps. |
+
+### Credit pool policy (`credit_pool_policies[]`)
+
+Fields: `nozle_id`, `plan_id`, `plan_code`, `credit_system_id`, `credit_system_code`, `policy` (`entity_only`, `entity_then_customer` or `customer_only`; see [pool policies](/guides/credits/entities#pool-policies)), `status` (`active`), `created_at` and `updated_at`.
+
+## React, Node, Python and Go
+
+The browser SDK declares only five fields for each plan, but the API sends the fields above.
+
+| Client | Declared by the SDK | At runtime |
+|---|---|---|
+| React `usePlans` / `CatalogPlan` | `code`, `name`, `amount_cents`, `amount_currency`, `interval` | The full plan objects from this response. `PricingTable` renders only what it knows. |
+| Node `plans()` | Same five fields | The full plan objects. |
+| Python `plans()` | Same five fields | The full plan dictionaries. |
+| Go `Plans()` | Same five fields | Only these five fields; the Go `Plan` struct drops the rest. |
+
+In TypeScript, read an undeclared field by widening the type yourself. See [`usePlans`](/sdks/react/hooks#useplans).
+
+## Filter the catalog on the client
+
+Because every plan is returned, decide in your code which ones to show. The API does not do it for you.
+
+- Skip `pending_deletion: true`. These plans are being removed.
+- Decide what to do with plans where `trial_period` is not `null`. Show them as trial plans, or hide them.
+- Decide what to do with pay-in-arrears plans (`pay_in_advance: false`). Their base price is billed at the end of the period.
+- Skip the plan codes you never sell on a pricing page, such as internal or legacy plans. Keep that list in your application; the catalog has no flag for it.
+
+```tsx
+import { usePlans, type CatalogPlan } from '@nozle-js/react'
+
+// The API returns these fields; the SDK type does not declare them.
+type CatalogPlanDetail = CatalogPlan & {
+  pending_deletion?: boolean
+  trial_period?: number | null
+  pay_in_advance?: boolean
+}
+
+const HIDDEN_PLAN_CODES = new Set(['internal_staff'])
+
+export function usePricingPlans() {
+  const { plans, isLoading, error } = usePlans()
+  const visible = (plans as CatalogPlanDetail[]).filter(
+    (plan) => plan.pending_deletion !== true && !HIDDEN_PLAN_CODES.has(plan.code),
+  )
+  return { plans: visible, isLoading, error }
+}
+```
+
+## Keep sensitive pricing out of the catalog
+
+Hiding a plan in your UI does not hide it from the API. Anyone can copy the publishable key from your page and call the endpoint directly.
+
+- Do not put negotiated, customer-specific or internal pricing in plans of the organization whose `pk_` key you ship. This covers charges, taxes, minimum commitments, credit grants and `metadata`.
+- Do not store secrets, internal notes or account details in a plan `description` or `metadata`.
+- If you need internal plans, keep them in a separate organization, so that its publishable key is never shipped, and use the public-facing organization only for plans you are happy to publish.
+- If you want a pricing page that shows a reduced set of fields, call the catalog from your backend with an `sk_` key, keep only the fields you want, and pass that list to `PricingTable` through its `plans` prop. The browser then never calls the catalog. The publishable key still works for anyone who has it.

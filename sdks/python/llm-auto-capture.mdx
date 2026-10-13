@@ -172,5 +172,5 @@ nozle.cost_events.track(
 - The same `cost_event_id` sent twice returns `202` both times. Processing de-duplicates it.
 
 <Warning>
-An unknown `cost_meter_code` is accepted with `202` and never reported. Check the code against your Cost Event Meters; a typo loses the cost silently.
+An unknown `cost_meter_code` is accepted with `202`. The event is then marked `uncosted` with `unknown_cost_event_meter` and listed in the Uncosted queue, and its cost is not counted until you fix the meter and rate it again. Check the code against your Cost Event Meters.
 </Warning>

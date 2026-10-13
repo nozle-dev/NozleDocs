@@ -5,6 +5,21 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Razorpay and Stripe guides, new SDK releases, API fixes
+
+_October 13, 2026_
+
+- Added a [Razorpay integration guide](/integrations/razorpay) and expanded the [Stripe integration guide](/integrations/stripe) to the same depth: connection setup, webhooks, checkout and retry behavior, refunds, errors and testing.
+- Added the [public plan catalog reference](/api/list-plans).
+- Released [`@nozle-js/node` 0.10.0](https://github.com/nozle-dev/nozle-js/releases/tag/node-v0.10.0) on npm and [`nozle-sdk` 0.10.0](https://github.com/nozle-dev/nozle-python/releases/tag/v0.10.0) on PyPI. Both add typed API errors (`NozleApiError` and `code` in Node, `NozleAPIError.code` and `has_code()` in Python), richer checkout result types, and Stripe and Razorpay README sections. `check-and-deduct` no longer needs `feature`.
+- Released [`@nozle-js/react` 0.10.2](https://github.com/nozle-dev/nozle-js/releases/tag/react-v0.10.2) with the same checkout result types and a Stripe and Razorpay README section.
+- Released [`github.com/nozle-dev/nozle-go` v0.9.1](https://github.com/nozle-dev/nozle-go/releases/tag/v0.9.1) with `APIError.Code()` and `HasCode()`, richer `CheckoutResult` fields, and a Stripe and Razorpay README section. `Consume` and `LLM` are removed, because their routes do not exist on the hosted service.
+- **Breaking:** Node 0.10.0, Python 0.10.0 and Go v0.9.1 read `nozle_id` for credit systems. Ship them together with the server release that sends `nozle_id`; against an older server the credit system ID is empty or the call fails.
+- `POST /subscribe` returns `404 customer_not_found` for an unknown customer instead of creating an empty one. See [Subscribe](/api/subscribe).
+- Margin and analytics date ranges accept `YYYY-MM-DD` or RFC 3339, plus `from_date` and `to_date`. A plain-date `to` includes the whole day, and an invalid or reversed range returns `400 invalid_date_range`.
+- Corrected the documentation for entitlement `reason` values, the required usage `timestamp`, credit balance decimals, the credit operations `limit` range, the margin simulate request, unknown cost meters and trend granularity.
+- Install with `npm install @nozle-js/node@0.10.0 @nozle-js/react@0.10.2`, `pip install nozle-sdk==0.10.0` or `go get github.com/nozle-dev/nozle-go@v0.9.1`.
+
 ### React SDK 0.10.1
 
 - Released [`@nozle-js/react` 0.10.1](https://github.com/nozle-dev/nozle-js/releases/tag/react-v0.10.1).

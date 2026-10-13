@@ -94,7 +94,7 @@ Use equivalent authenticated backend endpoints for caller-supplied billing state
 
 ## Native portal and subscription management
 
-The [React billing portal](/sdks/react/billing-portal) obtains a customer-scoped portal session from your backend for Core GraphQL reads. It uses separate authenticated merchant callbacks for Cancel/Keep, quoted upgrades, scheduled downgrades and withdrawal. These exports and SDK methods are available in React `0.10.1`, Node `0.9.1`, Python `0.9.1`, and Go; the portal guide links the integration examples.
+The [React billing portal](/sdks/react/billing-portal) obtains a customer-scoped portal session from your backend for Core GraphQL reads. It uses separate authenticated merchant callbacks for Cancel/Keep, quoted upgrades, scheduled downgrades and withdrawal. These exports and SDK methods are available in React `0.10.2`, Node `0.10.0`, Python `0.10.0`, and Go `v0.9.1`; the portal guide links the integration examples.
 
 Derive the customer from your application session. Accept a selected external subscription ID only after validating its ownership; select eligible targets from subscription options, then confirm a signed quote. Forward the exact quote, cancellation date guard and idempotency key to Nozle. Scope payment verification and recovery to both that customer and subscription. See [the HTTP flow](/api/subscription-management) and the [Node](/sdks/node/billing#subscription-self-service), [Python](/sdks/python/billing#subscription-self-service), and [Go](/sdks/go/billing) SDK methods.
 
@@ -106,7 +106,7 @@ For a seat-pool UI, accept merchant intent such as `{ proSeats: 2, maxSeats: 1 }
 2. creates or reuses active unassigned Entity placeholders;
 3. assigns one allowed plan code to each placeholder;
 4. sends the complete basket to `POST /customers/{customer_id}/entity-subscriptions/checkout` with one idempotency key; and
-5. returns the embedded Stripe client secret or completed result.
+5. returns the checkout result: an embedded Stripe client secret, a Razorpay order, or a completed result.
 
 Use one bulk request rather than one checkout call per seat. The bulk request creates one invoice, preserves one payment boundary, and aligns later purchases to the customer's established Entity billing anchor.
 

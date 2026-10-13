@@ -10,10 +10,13 @@ Subscription changes run from a trusted merchant backend. Derive customer and su
 Use checkout for payment-gated plans. Direct subscription creation is available for flows that do not require interactive payment.
 
 ```ts
+await nozle.customers.upsert({ externalId: 'customer_123', name: 'Acme' })
 const subscription = await nozle.subscribe('customer_123', 'free')
 ```
 
-`subscribe` always creates a new subscription. Calling it for a customer who already has one adds a second active subscription; it does not replace the first, and plan credit grants are granted again. After that, tracking without an explicit subscription ID fails because the customer has two. To move a customer to another plan, change the existing subscription through checkout with its `subscription_id`, or cancel it with `immediate` timing and then subscribe. Pass the new subscription ID to `track`: the Node.js and Python clients cache the subscription they resolved first.
+The customer must exist before you subscribe it. An unknown customer returns `404 customer_not_found` and creates nothing.
+
+`subscribe` creates the subscription `sub-<customer_id>-<plan_code>`; calling it again for the same plan returns that subscription and creates nothing. Calling it for a customer who already has a subscription to a different plan adds a second active subscription; it does not replace the first, and plan credit grants are granted again. After that, tracking without an explicit subscription ID fails because the customer has two. To move a customer to another plan, change the existing subscription through checkout with its `subscription_id`, or cancel it with `immediate` timing and then subscribe. Pass the new subscription ID to `track`: the Node.js and Python clients cache the subscription they resolved first.
 
 `subscribe` does not collect payment, even for a paid plan. Use checkout when payment must succeed first.
 
@@ -29,11 +32,11 @@ Use [the native React billing portal](/sdks/react/billing-portal), or add `Cance
 | Downgrade | Schedule an eligible plan for renewal, preserving the current plan until then. |
 | Withdraw downgrade | Remove the exact pending change while preserving the active subscription. |
 
-The matching hosted API is available. Use React `0.10.1` with Node `0.9.1`, Python `0.9.1`, or Go; the [portal guide](/sdks/react/billing-portal) provides setup and integration examples.
+The matching hosted API is available. Use React `0.10.2` with Node `0.10.0`, Python `0.10.0`, or Go `v0.9.1`; the [portal guide](/sdks/react/billing-portal) provides setup and integration examples.
 
 ## Select, preview and confirm
 
-A customer may have multiple subscriptions. Use its **external subscription ID** on every management call. Plan changes follow a plan transition policy that you configure for each pair of plans. Without one, preview and checkout return `405 plan_transition_policy_required`; the only fallback is the organization's free-to-paid policy, used from a free plan to a paid plan. Check eligibility through subscription options; do not infer it from price or catalog membership.
+A customer may have multiple subscriptions. Use its **external subscription ID** on every management call. Plan changes follow a [plan transition policy](/api/plan-transition-policies) that you configure for each pair of plans. Without one, preview and checkout return `405 plan_transition_policy_required`; the only fallback is the organization's free-to-paid policy, used from a free plan to a paid plan. Check eligibility through subscription options; do not infer it from price or catalog membership.
 
 The Node `subscriptionOptions`, Python `subscription_options`, and Go `SubscriptionOptions` methods return current, pending and eligible plans. Their `previewSubscriptionChange`, `preview_subscription_change`, and `PreviewSubscriptionChange` methods return an opaque signed quote with exact minor-unit amounts, currency, effective date and renewal date.
 
@@ -126,4 +129,4 @@ Each Entity receives a stable subscription identity and follows the standard che
 
 Nozle revalidates the live Entity before checkout. Suspended, deleted, or recreated Entity identities fail closed. See [Entity Subscriptions](/api/entity-subscriptions).
 
-For seat-pool purchases, bulk Entity checkout combines multiple Pro/Max-style Entity subscriptions into one invoice and one Stripe payment. The first successful paid Entity checkout can establish an anniversary billing anchor for the customer; later Entity purchases align to that anchor and prorate their initial period.
+For seat-pool purchases, bulk Entity checkout combines multiple Pro/Max-style Entity subscriptions into one invoice and one payment. The first successful paid Entity checkout can establish an anniversary billing anchor for the customer; later Entity purchases align to that anchor and prorate their initial period.

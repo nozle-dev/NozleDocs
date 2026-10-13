@@ -9,16 +9,12 @@ Base URL: `https://api.nozle.app/engine/api/v1`.
 Legacy wallet adapter. It does not apply Feature conversion rates or the product-credit source ledger. New integrations must use [Track and Consume Credits](/api/usage-track).
 </Warning>
 
-Atomically check if a customer has sufficient credit balance and deduct in a single database transaction. Uses row-level locking to prevent race conditions under concurrent requests.
+Atomically check whether a customer's wallet has enough credits and deduct them in a single database transaction. The customer's newest active wallet is locked while it is read, so concurrent requests cannot overspend it. A successful deduction also records a wallet transaction.
 
 **Auth:** `sk_` only
 
 <ParamField body="customer_id" type="string" required>
   External customer ID
-</ParamField>
-
-<ParamField body="feature" type="string" required>
-  Feature being consumed
 </ParamField>
 
 <ParamField body="credits" type="number" required>
@@ -30,9 +26,39 @@ Atomically check if a customer has sufficient credit balance and deduct in a sin
 </ResponseField>
 
 <ResponseField name="remaining" type="number" required>
-  Credit balance after deduction (or unchanged balance if denied)
+  The wallet's `credits_balance` after the deduction. When `allowed` is `false` it is the current balance, unchanged.
 </ResponseField>
 
 <Note>
-When `allowed` is `false`, no credits are deducted. The `remaining` field returns the current balance as-is.
+When `allowed` is `false`, no credits are deducted and no wallet transaction is written. The request still returns `200`, so check `allowed` rather than the status code. A request that asks for exactly the remaining balance is allowed and leaves `remaining` at `0`.
+</Note>
+
+<Note>
+Earlier versions of this endpoint took a `feature` field. It was never used. You can still send it: an old value is ignored and has no effect.
+</Note>
+
+## Example
+
+```bash
+curl -X POST https://api.nozle.app/engine/api/v1/check-and-deduct \
+  -H "Authorization: Bearer sk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"customer_id": "cust_123", "credits": 5}'
+```
+
+```json
+{ "allowed": true, "remaining": 95 }
+```
+
+## Errors
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| `200` | `{ "allowed": false, "remaining": 2 }` | The wallet balance is lower than `credits`. Nothing was deducted. |
+| `400` | `{ "error": "customer_id and positive credits are required" }` | `customer_id` is empty or missing, or `credits` is zero, negative or missing. |
+| `400` | `{ "error": "invalid request body" }` | The body is not valid JSON, or a field has the wrong type, for example `credits` sent as a string. |
+| `404` | `{ "code": "wallet_not_found", "error": "No active wallet found for this customer." }` | The customer does not exist, or has no active wallet. |
+
+<Note>
+This endpoint updates `credits_balance` and records a wallet transaction. It does not update the wallet's money balance (`balance_cents`) in Core. See [Credit balance](/api/credit-balance).
 </Note>
