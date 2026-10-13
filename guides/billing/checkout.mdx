@@ -18,7 +18,7 @@ Nozle collects plan payments through the payment provider connected to your orga
 Plan checkout is payment-gated: a paid plan change is not applied until the payment provider confirms payment. If prepaid credits reduce the exact amount due to zero, Nozle applies the change transactionally and returns `type: "completed"` without creating a provider session.
 </Info>
 
-A customer whose provider is not connected cannot pay: checkout returns `payment_provider_required`. A paid Stripe upgrade also needs the customer to exist in Stripe (`422 stripe_customer_required` otherwise).
+A customer whose provider is not connected cannot pay: checkout returns `payment_provider_required`. At checkout Nozle creates the customer in Stripe when it is missing, and returns `422 stripe_customer_required` if it cannot.
 
 ## Stripe
 
@@ -40,10 +40,12 @@ Stripe events Nozle handles:
 - `payment_intent.payment_failed`
 - `payment_intent.canceled`
 - `setup_intent.succeeded`
+- `payment_method.detached`
 - `customer.updated`
+- `charge.refund.updated`
 - `charge.dispute.closed`
 
-Without this webhook, Stripe may collect payment but Nozle will not reliably update invoice or subscription state.
+Without this webhook, Stripe may collect payment but Nozle is not told: checkout status does not ask Stripe, so only the webhook settles a Stripe payment. See the [Stripe integration](/integrations/stripe) for setup, flows and limits.
 
 A new-subscription Stripe checkout returns no checkout ID to poll. After Embedded Checkout completes, reload the subscription or wait for your `subscription.started` webhook. A paid upgrade returns `plan_upgrade_intent_id`; poll its status with [`GET /checkout/{id}`](/api/subscription-management) and the subscription scope.
 

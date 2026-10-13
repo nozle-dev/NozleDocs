@@ -10,8 +10,13 @@ Connect a provider in the dashboard under **Settings > Billing > Integrations**.
 | | [Stripe](/integrations/stripe) | [Razorpay](/integrations/razorpay) |
 |---|---|---|
 | **Credential** | Stripe secret key | Razorpay Key ID and key secret, plus a webhook secret |
-| **Checkout** | Embedded Stripe Checkout Session | Razorpay checkout modal, or a payment link |
-| **Webhook** | Nozle registers it for you | You add it in the Razorpay dashboard |
-| **Payment confirmation** | Signed webhook | Signed webhook, and your backend's verify call for an order |
+| **Currency** | The invoice currency | INR only |
+| **Plan checkout** | Embedded Stripe Checkout Session | Razorpay order in the Razorpay checkout modal |
+| **Payment links** | Hosted Stripe Checkout page | Razorpay payment link |
+| **Webhook** | Nozle registers it right after you connect | You add it in the Razorpay dashboard |
+| **Payment confirmation** | Signed webhook only | Signed webhook, and your backend's verify call for an order |
+| **Checkout status** | Paid upgrades only, by upgrade ID. A new subscription has no checkout ID | Every checkout, by checkout ID |
+| **Renewals** | Automatic charge on the saved card | Automatic only with a UPI AutoPay mandate |
+| **Refunds and disputes** | Credit-note refunds and lost disputes | Credit-note refunds and lost disputes |
 
-Razorpay checkout supports only INR. A customer pays through the provider connection assigned to that customer. See [Checkout](/guides/billing/checkout) for the flow that both providers share, and [Payments](/guides/billing/payments) for how payment events update invoices and subscriptions.
+A customer pays through the provider connection assigned to that customer. At plan checkout, a customer who is not assigned to Razorpay is assigned to a Stripe connection automatically. See [Checkout](/guides/billing/checkout) for the flow that both providers share, and [Payments](/guides/billing/payments) for how payment events update invoices and subscriptions.

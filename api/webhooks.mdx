@@ -17,12 +17,14 @@ Nozle processes payment webhooks for each connected Stripe account and for each 
 
 | Event | What Nozle Does |
 |-------|----------------|
-| payment_intent.succeeded | Marks the invoice paid; activates payment-gated subscriptions |
-| payment_intent.payment_failed | Marks payment failed; cancels payment-gated subscriptions |
+| payment_intent.succeeded | Marks the invoice paid; activates payment-gated subscriptions and applies paid upgrades |
+| payment_intent.payment_failed | Marks the payment failed. A declined card on a payment-gated checkout keeps the invoice open for a retry; any other failure cancels the incomplete subscription |
 | payment_intent.canceled | Treats the payment attempt as failed |
-| setup_intent.succeeded | Stores successful setup intent/payment method data |
-| customer.updated | Syncs customer payment details |
-| charge.dispute.closed | Updates disputed payment state |
+| setup_intent.succeeded | Stores the customer's new default payment method |
+| payment_method.detached | Clears a removed payment method |
+| customer.updated | Syncs the customer's default payment method |
+| charge.refund.updated | Updates the credit-note refund status |
+| charge.dispute.closed | Marks the invoice's dispute lost when the dispute is lost |
 
 **Plan features provisioned on subscription:**
 
@@ -32,13 +34,13 @@ Scale plan: everything in Growth PLUS netsuite, xero, hubspot, salesforce, okta,
 
 **Setup:**
 
-Nozle registers the Stripe webhook automatically when you connect Stripe. The target is:
+Nozle registers the Stripe webhook automatically in a background job right after you connect Stripe. The target is:
 
 ```text
 https://api.nozle.app/core/webhooks/stripe/{organization_id}?code={stripe_provider_code}
 ```
 
-Your Stripe account must allow webhook endpoint creation, and your public Nozle API URL must be reachable by Stripe.
+Your Stripe account must allow webhook endpoint creation, and your public Nozle API URL must be reachable by Stripe. If registration fails, Nozle sends a `payment_provider.error` webhook and does not retry. See the [Stripe integration](/integrations/stripe#webhook-setup) for the events, recovery and limits.
 
 ## Razorpay
 
