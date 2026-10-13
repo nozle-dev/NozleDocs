@@ -6,7 +6,7 @@ description: "Install and configure the typed, server-side Nozle Go SDK."
 The Go SDK requires Go 1.22 or later. Install it with:
 
 ```bash
-go get github.com/nozle-dev/nozle-go@v0.9.1
+go get github.com/nozle-dev/nozle-go@v0.10.0
 ```
 
 ## Create a client
@@ -31,8 +31,8 @@ client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"), nozle.WithBaseURL("http://loc
 | Option | Default | Purpose |
 |---|---|---|
 | API key | required | Organization credential; protected operations require `sk_`. |
-| `WithBaseURL` | `https://api.nozle.app/engine` | `TrackUsage`, `CheckUsage`, `Can`, `TrackCostEvent`, `Ping`, `Plans`, `Checkout`, `CheckoutStatus`, `Subscribe`, `CancelSubscription`, subscription options, previews, transitions and withdrawal, credit balances, Entity get and upsert, and margin. |
-| `WithEventsURL` | `https://api.nozle.app/core` | `Track` (and its subscription lookup), `Meter`, customer upsert, credit-system list, and Entity subscription calls: ensure, get, list, checkout, bulk checkout (`CheckoutEntitySubscriptions`), and change plan. |
+| `WithBaseURL` | `https://api.nozle.app/engine` | `Track`, `Meter`, `TrackUsage`, `CheckUsage`, `Can`, `TrackCostEvent`, `Ping`, `Plans`, `Checkout`, `CheckoutStatus`, `Subscribe`, `CancelSubscription`, subscription options, previews, transitions and withdrawal, credit balances, Entity get and upsert, and margin. |
+| `WithEventsURL` | `https://api.nozle.app/core` | Subscription lookup for `Track`, customer upsert, credit-system list, and Entity subscription calls: ensure, get, list, checkout, bulk checkout (`CheckoutEntitySubscriptions`), and change plan. |
 | `WithTimeout` | 10 seconds | One budget for the whole call, including any retries inside a custom HTTP client. |
 | `WithHTTPClient` | default HTTP client | Inject an `*http.Client`, for example one that retries. |
 | `WithDebug` | off | Log `[nozle] METHOD url` for each request. |

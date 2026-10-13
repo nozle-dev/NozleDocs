@@ -61,11 +61,11 @@ err := client.Track(ctx, nozle.TrackParams{
 if err != nil { return err }
 ```
 
-The Go SDK defaults to `https://api.nozle.app/engine` and `https://api.nozle.app/core`. Its `Track` method converts RFC3339 timestamps to the Unix-seconds form required by Core.
+The Go SDK defaults to `https://api.nozle.app/engine` and `https://api.nozle.app/core`. Its `Track` method converts RFC3339 timestamps to the Unix-seconds form accepted by Engine. Event writes use the Engine base URL; subscription discovery uses Core.
 
 ## 2. Ingest and deduplicate
 
-Nozle accepts the event through the configured Events API. Preserve both the transaction ID and event timestamp when retrying the same logical event. Deployments using the high-volume event store deduplicate on both values.
+Nozle accepts the event through the Go Engine at `https://api.nozle.app/engine/api/v1/events`. Preserve both the transaction ID and event timestamp when retrying the same logical event. Deployments using the high-volume event store deduplicate on both values.
 
 ## 3. Aggregate usage
 

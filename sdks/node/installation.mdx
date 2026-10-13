@@ -8,11 +8,11 @@ description: "Install and configure the server-only @nozle-js/node SDK."
 Entity subscription APIs are introduced in `0.5.0`.
 
 ```bash
-npm install @nozle-js/node@0.10.0
+npm install @nozle-js/node@0.11.0
 ```
 
 <Info>
-Version `0.10.0` adds `NozleApiError` with `status`, `code` and `hasCode()`, richer checkout result types, and no longer sends `feature` from `checkAndDeduct()`. Version `0.9.1` fixes Feature Event timestamp serialization, including events created by the OpenAI and Anthropic wrappers. Version `0.9.0` introduced subscription options, signed quotes, pending-change withdrawal, and scoped checkout recovery. See [subscription self-service](/sdks/node/billing#subscription-self-service) and the [release notes](/changelog#razorpay-and-stripe-guides-new-sdk-releases-api-fixes).
+Version `0.11.0` sends Feature Events through the Go Engine endpoint. Version `0.10.0` adds `NozleApiError` with `status`, `code` and `hasCode()`, richer checkout result types, and no longer sends `feature` from `checkAndDeduct()`. Version `0.9.1` fixes Feature Event timestamp serialization, including events created by the OpenAI and Anthropic wrappers. Version `0.9.0` introduced subscription options, signed quotes, pending-change withdrawal, and scoped checkout recovery. See [subscription self-service](/sdks/node/billing#subscription-self-service) and the [release notes](/changelog#razorpay-and-stripe-guides-new-sdk-releases-api-fixes).
 </Info>
 
 ## Create a client
@@ -33,8 +33,8 @@ export const nozle = new Nozle({
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `apiKey` | `string` | required | Organization credential. Use a restricted `sk_` for server mutations. |
-| `baseUrl` | `string` | `https://api.nozle.app/engine` | API origin used for entitlements, credits, entities, usage, and margin. |
-| `eventsUrl` | `string` | `https://api.nozle.app/core` | Core API origin used for customer writes, billing resources, `track()`, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. |
+| `baseUrl` | `string` | `https://api.nozle.app/engine` | Engine API origin used for `track()`, entitlements, credits, entities, usage, and margin. |
+| `eventsUrl` | `string` | `https://api.nozle.app/core` | Core API origin used for customer writes, billing resources, subscription discovery, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. |
 | `timeout` | `number` | `10000` | Per-request timeout in milliseconds. |
 
 The client defaults to these public service bases. Set both URLs explicitly for local or self-hosted deployments. Trailing slashes are removed automatically.
@@ -42,8 +42,8 @@ The client defaults to these public service bases. Set both URLs explicitly for 
 ```mermaid
 flowchart LR
   App[Your backend] --> SDK[@nozle-js/node]
-  SDK -->|baseUrl| API[Entitlements, credits, usage, margin]
-  SDK -->|eventsUrl| Core[Customers, billing resources, metered events]
+  SDK -->|baseUrl| API[Event ingestion, entitlements, credits, usage, margin]
+  SDK -->|eventsUrl| Core[Customers, billing resources, subscription discovery]
 ```
 
 <Warning>
