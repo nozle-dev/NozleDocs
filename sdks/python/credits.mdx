@@ -161,6 +161,6 @@ if not result["allowed"]:
 
 ## Legacy wallet adapter
 
-`nozle.check_and_deduct(customer_id, feature, credits)` remains available for the legacy wallet path. New product-credit integrations should use `usage.check()` and `usage.track()`.
+`nozle.check_and_deduct(customer_id, credits=5)` remains available for the legacy wallet path. The old `check_and_deduct(customer_id, feature, credits)` form still works: `feature` is deprecated, ignored and never sent. A missing `credits` raises `NozleValidationError`. New product-credit integrations should use `usage.check()` and `usage.track()`.
 
 Keep reads and mutations behind authenticated backend routes and derive customer and Entity IDs from trusted identity data.
