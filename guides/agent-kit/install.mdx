@@ -1,0 +1,143 @@
+---
+title: Install the Agent Kit
+sidebarTitle: Install and update
+description: Install the Nozle Agent Kit in Claude Code, Codex CLI, or OpenCode, log in to your account, and keep the kit up to date.
+keywords: ["agent kit", "install", "update", "uninstall", "login", "OAuth", "Claude Code", "Codex", "OpenCode"]
+---
+
+## Before you start
+
+| You need | Why |
+|---|---|
+| Claude Code, Codex CLI, or OpenCode | The agent that runs the skills |
+| Node.js 18 or later on `PATH` | `nozle-check` and the guard hooks are Node.js scripts |
+| Your application in a git repository, on a clean branch | The guards, `nozle-undo`, and the hand-off use git |
+| An onboarded Nozle organization at [app.nozle.dev](https://app.nozle.dev), with at least one meter and one plan | The agent reads it during the run. An organization that is not onboarded cannot connect an agent |
+| Internet access to GitHub | The install commands fetch `nozle-dev/nozle-agent-kit` |
+
+## Where it works
+
+| App | Works | How to install |
+|---|---|---|
+| Claude Code in the terminal, VS Code, or JetBrains | Yes | The Claude Code commands below. In VS Code, you can also type `/plugins` in the prompt box |
+| Claude desktop app, **Code** tab, local or SSH session | Yes | **+** next to the prompt, then **Plugins**, then **Add plugin**. Add the `nozle-dev/nozle-agent-kit` marketplace |
+| Claude Code on the web, cloud sessions | No | Cloud sessions do not load plugins |
+| Claude chat (claude.ai or the desktop chat) | No | Chat does not edit your repository or run the guard hooks |
+| Codex CLI | Yes | The Codex commands below |
+| Codex app | Yes | Install with the Codex CLI commands below. The app uses the same plugins |
+| OpenCode | Yes | The OpenCode commands below |
+
+## Install
+
+<Tabs>
+<Tab title="Claude Code">
+```bash
+claude plugin marketplace add nozle-dev/nozle-agent-kit
+claude plugin install nozle-agent-kit@nozle
+```
+
+This installs the skills, the helper agents, the guard hooks, and two MCP servers:
+
+- `nozle-docs`: the public Nozle documentation.
+- `nozle-account`: read-only access to your account at `https://api.nozle.app/core/mcp`.
+
+Run `claude plugin details nozle-agent-kit@nozle` to list them.
+</Tab>
+<Tab title="Codex CLI">
+```bash
+codex plugin marketplace add nozle-dev/nozle-agent-kit
+codex plugin add nozle-agent-kit@nozle
+```
+
+This installs the skills and both MCP servers. Run `codex mcp list` to see `nozle-account` and `nozle-docs`.
+
+Codex does not run plugin hooks. Add the guards to each application repository once:
+
+```bash
+cd my-app
+node "$(ls -d "${CODEX_HOME:-$HOME/.codex}"/plugins/cache/nozle/nozle-agent-kit/*/ | sort -V | tail -1)skills/nozle-integrate/scripts/nozle-check.mjs" hosts codex --write
+```
+
+The command picks the newest installed version of the kit and writes `.codex/hooks.json`. Codex runs project hooks only in a trusted folder. Accept the trust prompt the first time you start Codex there, then approve the hooks with `/hooks`.
+
+Start Codex with the question picker on. Without it, the agent asks its questions as a numbered list:
+
+```bash
+codex --enable default_mode_request_user_input
+```
+</Tab>
+<Tab title="OpenCode">
+Run these commands in your application folder:
+
+```bash
+npx skills add nozle-dev/nozle-agent-kit --skill '*' --agent opencode --copy -y
+node .agents/skills/nozle-integrate/scripts/nozle-check.mjs hosts opencode --write
+opencode mcp auth nozle-account
+```
+
+1. The first command copies the skills into the repository.
+2. The second writes `.opencode/plugins/nozle-guard.js` and adds `nozle-docs` and `nozle-account` to `opencode.json`.
+3. The third logs you in to your Nozle account.
+
+<Note>
+OpenCode has no stop or session-start guard. The end-of-turn record check and the context restored after compaction do not run there.
+</Note>
+</Tab>
+<Tab title="Other hosts">
+For Cursor, Windsurf, Gemini CLI, and VS Code Copilot, copy the skills into the repository, then add the guard config. Replace `<skill folder>` with the `nozle-integrate` folder that `npx skills add` created:
+
+```bash
+npx skills add nozle-dev/nozle-agent-kit --skill '*'
+node <skill folder>/scripts/nozle-check.mjs hosts <cursor|windsurf|gemini|copilot> --write
+```
+
+Cline gets the skills and the docs MCP server only.
+</Tab>
+</Tabs>
+
+### Self-hosted Nozle
+
+To connect to your own Core instead of `api.nozle.app`:
+
+- **Claude Code:** set `NOZLE_ACCOUNT_MCP_URL` before you start Claude Code.
+- **Codex:** run `codex mcp add nozle-account --url <your Core URL>/mcp`.
+
+## Log in
+
+The agent starts the login the first time it needs your account. You can also start it yourself:
+
+| Host | Command |
+|---|---|
+| Claude Code | Type `/mcp`, select `plugin:nozle-agent-kit:nozle-account`, and choose **Authenticate** |
+| Codex CLI | `codex mcp login nozle-account` |
+| OpenCode | `opencode mcp auth nozle-account` |
+
+A browser opens the Nozle sign-in page. Sign in, choose the organization, and click **Allow**.
+
+<Tip>
+If your browser runs on another machine, the page after **Allow** does not load. Copy the full address from the address bar and paste it into the agent when it asks.
+</Tip>
+
+- Each agent keeps its own login. If you are already signed in to the dashboard, the next login takes one click.
+- The access token lasts one hour. The agent renews it without asking you.
+- The login ends after 7 days without use, or when you disconnect the agent in the **Connected coding agents** section of the dashboard **Account** page. The agent then gives you the login step and continues from its saved records.
+
+## Update
+
+Every release is listed on the [releases page](https://github.com/nozle-dev/nozle-agent-kit/releases). Your records, such as `nozle.integration.yaml`, stay in your repository across updates.
+
+| Host | Update |
+|---|---|
+| Claude Code | `claude plugin marketplace update nozle`, then `claude plugin update nozle-agent-kit@nozle`. Restart Claude Code |
+| Codex CLI | `codex plugin marketplace upgrade nozle`, then `codex plugin add nozle-agent-kit@nozle`. Run the `hosts codex --write` command again in each app, because the hook path contains the version |
+| OpenCode and other hosts | `npx skills update`, then run the `hosts <host> --write` command again in each app |
+
+## Remove
+
+| Host | Remove |
+|---|---|
+| Claude Code | `claude plugin uninstall nozle-agent-kit@nozle` |
+| Codex CLI | `codex plugin remove nozle-agent-kit@nozle`, then delete `.codex/hooks.json` from your apps |
+| OpenCode and other hosts | `npx skills remove`, then delete `.opencode/plugins/nozle-guard.js` and the two `nozle-*` entries in `opencode.json` |
+
+To log out, choose **Clear authentication** under `/mcp` in Claude Code, or run `codex mcp logout nozle-account` or `opencode mcp logout nozle-account`. You can also revoke an agent in the **Connected coding agents** section of the dashboard **Account** page.
