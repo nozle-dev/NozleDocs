@@ -1,9 +1,9 @@
 ---
 title: Webhooks
-description: Stripe webhook events and signature verification
+description: Stripe and Razorpay webhook events and signature verification
 ---
 
-Nozle processes Stripe payment webhooks for each connected Stripe account.
+Nozle processes payment webhooks for each connected Stripe account and for each connected Razorpay account. The sections below describe Stripe first, then [Razorpay](#razorpay).
 
 **How it works:**
 
@@ -39,3 +39,24 @@ https://api.nozle.app/core/webhooks/stripe/{organization_id}?code={stripe_provid
 ```
 
 Your Stripe account must allow webhook endpoint creation, and your public Nozle API URL must be reachable by Stripe.
+
+## Razorpay
+
+Nozle does not register the Razorpay webhook. You add it in the Razorpay dashboard, with the webhook secret you entered on the Nozle connection. The target is the Webhook URL shown on the connection:
+
+```text
+https://api.nozle.app/core/webhooks/razorpay/{payment_provider_id}
+```
+
+Nozle verifies the `X-Razorpay-Signature` header, an HMAC-SHA256 of the raw request body with the webhook secret, and de-duplicates on the `X-Razorpay-Event-Id` header. An invalid request returns `400`; a valid one returns `200`.
+
+| Event | What Nozle Does |
+|-------|----------------|
+| payment.authorized | Fetches the payment; waits for capture |
+| payment.captured, order.paid, payment_link.paid | Fetches the payment and settles the invoice once it is captured |
+| payment.failed | Fetches the payment; an interactive order stays open for retry |
+| refund.processed, refund.failed | Updates the credit-note refund status |
+| payment.dispute.lost, payment.dispute.closed | Applies a lost dispute; a closed or won dispute is not treated as lost |
+| token.confirmed, token.rejected, token.cancelled, token.paused, token.resumed | Updates the UPI AutoPay mandate |
+
+See the [Razorpay integration](/integrations/razorpay#webhook-setup) for setup and the checkout flow.

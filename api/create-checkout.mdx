@@ -157,6 +157,7 @@ A `completed` result has `payment_source` `credits` when the change was funded w
 | `422` | `checkout_not_required` | The plan needs no up-front payment (free, trial, or billed in arrears) and the customer has no subscription. Use `subscribe`. |
 | `422` | `payment_provider_required` | No Stripe or Razorpay connection for the customer. |
 | `422` | `stripe_customer_required` | A paid Stripe upgrade for a customer that does not exist in Stripe. |
+| `422` | `razorpay_requires_inr` | A Razorpay checkout for an invoice that is not in INR. See the [Razorpay integration](/integrations/razorpay#errors). |
 | `422` | `plan_already_active` | The customer, or Entity, is already on this plan. |
 | `422` | `subscription_and_idempotency_key_required` | `quote_id` sent without `subscription_id` or an `Idempotency-Key`. |
 
@@ -174,4 +175,4 @@ Checkout relies on these Stripe events:
 - `payment_intent.payment_failed`
 - `payment_intent.canceled`
 
-Razorpay webhooks are configured by you in the Razorpay dashboard. See [Checkout](/guides/billing/checkout#razorpay) for the URL, headers, and events.
+Razorpay webhooks are configured by you in the Razorpay dashboard. See the [Razorpay integration](/integrations/razorpay#webhook-setup) for the URL, headers, and events.

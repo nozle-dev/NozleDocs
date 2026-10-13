@@ -106,7 +106,7 @@ For a seat-pool UI, accept merchant intent such as `{ proSeats: 2, maxSeats: 1 }
 2. creates or reuses active unassigned Entity placeholders;
 3. assigns one allowed plan code to each placeholder;
 4. sends the complete basket to `POST /customers/{customer_id}/entity-subscriptions/checkout` with one idempotency key; and
-5. returns the embedded Stripe client secret or completed result.
+5. returns the checkout result: an embedded Stripe client secret, a Razorpay order, or a completed result.
 
 Use one bulk request rather than one checkout call per seat. The bulk request creates one invoice, preserves one payment boundary, and aligns later purchases to the customer's established Entity billing anchor.
 

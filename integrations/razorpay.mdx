@@ -1,0 +1,343 @@
+---
+title: Razorpay
+description: Razorpay integration for INR checkout and payments
+---
+
+Nozle uses Razorpay to collect INR payments through the Razorpay checkout modal or a Razorpay payment link. Each Nozle organization connects its own Razorpay account, so your customers pay into your Razorpay account, not Nozle's. Nozle holds no global Razorpay credentials.
+
+## What you need
+
+- A Razorpay account and an API key. The Key ID starts with `rzp_test_` for test mode or `rzp_live_` for live mode.
+- The key secret for that Key ID.
+- A webhook secret that you choose. You set the same value in Nozle and in Razorpay.
+- Plans, invoices and top-up packages priced in INR. Razorpay checkout supports only INR.
+- UPI AutoPay enabled on your Razorpay account, only if you want recurring mandates.
+- A Nozle public API URL that Razorpay can reach.
+
+## Setup
+
+Connect Razorpay in the Nozle dashboard under **Settings > Billing > Integrations > Razorpay > Connect**. The form asks for:
+
+| Field | What to enter |
+|---|---|
+| **Name** | A label for the connection |
+| **Code** | A stable identifier. You use it when you assign this connection to a customer |
+| **Key ID** | `rzp_test_...` or `rzp_live_...`. It is set once and cannot be edited |
+| **Key secret** | The secret for the Key ID. Stored encrypted. Leave it blank when editing to keep the stored value |
+| **Webhook secret** | The secret you will also enter in Razorpay. Leave it blank when editing to keep the stored value |
+| **Enable recurring payments** | Optional. Lets customers authorize UPI AutoPay mandates |
+| **Mandate maximum (paise)** | Required when recurring payments are on. A whole number of paise, at least `100` |
+
+Nozle reads the mode from the Key ID prefix and shows it on the connection together with the webhook URL. To use a different Key ID, for example to move from test to live, create a new connection. You can add several connections to one organization.
+
+To rotate the webhook secret, edit the connection and enter the new value. Nozle keeps accepting the previous secret for 25 hours, so Razorpay retries signed with the old secret still succeed.
+
+### Assign the connection to customers
+
+A customer pays through Razorpay only when that customer uses a Razorpay connection. Select it in the customer's **Payment provider** setting in the dashboard, which lists connections as name and code. A customer who is not assigned to Razorpay goes through the Stripe path, and checkout returns `payment_provider_required` if no Stripe connection exists either. If the customer's connection code matches no Razorpay connection, checkout returns `404 payment_provider_not_found`.
+
+Nozle links the customer to the connection at checkout. It creates the customer in Razorpay for mandate registration, which needs the customer's name, email and phone number.
+
+## What Nozle handles
+
+| Feature | How it works |
+|---|---|
+| **Checkout** | A Razorpay order for a Nozle invoice, opened in the Razorpay checkout modal |
+| **Payment links** | A hosted Razorpay payment link for invoice payment URLs, credit top-ups and overdue payment requests |
+| **Subscriptions** | Managed in Nozle. Paid plans activate only after the payment is captured |
+| **Credit top-ups** | Paid with a Razorpay payment link. Credits are granted after confirmed payment |
+| **Recurring payments** | Optional UPI AutoPay mandates for subscription renewals |
+| **Refunds and disputes** | Credit-note refunds are sent to Razorpay. Lost disputes update the invoice |
+| **Webhooks** | You configure the webhook in Razorpay. Nozle verifies every request |
+
+## Webhook setup
+
+Nozle does not register the Razorpay webhook for you. Add it in the Razorpay dashboard:
+
+1. Copy the **Webhook URL** shown on the connection in Nozle. It has this form:
+
+```text
+https://api.nozle.app/core/webhooks/razorpay/{payment_provider_id}
+```
+
+2. Use the same webhook secret you entered in Nozle.
+3. Enable these events:
+
+| Events | Used for |
+|---|---|
+| `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`, `payment_link.paid` | Payments. On each one Nozle fetches the payment from Razorpay and settles it only once it is captured |
+| `refund.processed`, `refund.failed` | Refund status |
+| `payment.dispute.lost`, `payment.dispute.closed` | Disputes |
+| `token.confirmed`, `token.rejected`, `token.cancelled`, `token.paused`, `token.resumed` | UPI AutoPay mandates |
+
+Nozle computes an HMAC-SHA256 of the raw request body with the webhook secret and compares it with the `X-Razorpay-Signature` header. A request with a bad signature, a missing `X-Razorpay-Event-Id` header, or an unreadable body is answered with `400`. A valid request is queued and answered with `200`. Nozle de-duplicates on the event ID, so a repeated event never settles twice.
+
+If the webhook is missing or blocked, Razorpay can capture the payment but Nozle is not told. A captured order then settles only when your backend calls verify or status, or when the reconciliation job that runs every five minutes reaches it. Dispute and mandate events are never received.
+
+## Checkout flow
+
+1. Customer selects a plan in your app.
+2. Your backend derives the customer and calls Nozle checkout with an `sk_` key.
+3. Nozle computes the exact invoice or proration, keeping the current plan active.
+4. If money is due, Nozle creates a Razorpay order with automatic capture and returns a `razorpay` result.
+5. The browser opens the Razorpay checkout modal with the order.
+6. Razorpay calls the modal's `handler` with the payment fields.
+7. Your backend sends those fields to Nozle verify. Nozle checks the signature, fetches the payment from Razorpay, and settles it only if it is `captured`.
+8. Your backend polls checkout status until `status` and `fulfillment_status` are both `succeeded`.
+
+The `payment.captured` and `order.paid` webhooks settle the same order independently, so a closed browser tab does not lose a paid checkout.
+
+If prepaid credits fully cover the invoice, Nozle returns a completed checkout and Razorpay is not called. Nozle passes no return URL to Razorpay, but the `returnUrl` you send must still be an allowlisted HTTPS origin, as for any checkout.
+
+### The checkout result
+
+```json
+{
+  "type": "razorpay",
+  "checkout_id": "5b1f1c1e-...",
+  "key_id": "rzp_live_...",
+  "order_id": "order_...",
+  "amount_cents": 99900,
+  "currency": "INR",
+  "expires_at": "2026-10-14T09:30:00.000Z",
+  "invoice_id": "invoice_uuid"
+}
+```
+
+- `key_id` is the public Key ID. The key secret and webhook secret never appear in a response.
+- `amount_cents` is in paise.
+- A paid upgrade returns `plan_upgrade_intent_id` instead of `invoice_id`.
+- A mandate checkout also returns `customer_id`, `recurring: true` and `mandate_max_amount_cents`.
+- An order stays open for 24 hours. A paid upgrade stays open for 35 minutes, and a bulk Entity checkout for 23 hours.
+- If the order is not ready yet, or has expired, the result is `{"type": "processing", "checkout_id", "status"}`. Recover it with checkout status rather than starting another checkout.
+
+### Create, verify and poll
+
+<Tabs items={['Node.js', 'Python', 'Go']}>
+<Tab value="Node.js">
+```ts
+// Merchant backend
+const checkout = await nozle.checkout(
+  customerId,
+  'pro_monthly',
+  'https://app.example.com/settings/billing',
+  { idempotencyKey: `checkout-${customerId}-pro_monthly-v1` },
+)
+// Return `checkout` to the browser.
+
+// After the browser posts the handler's three fields:
+const scope = { customerId, subscriptionId }
+await nozle.verifyCheckout(checkoutId, razorpay, scope)
+const status = await nozle.checkoutStatus(checkoutId, scope)
+```
+</Tab>
+<Tab value="Python">
+```python
+# Merchant backend
+checkout = nozle.checkout(
+    customer_id,
+    "pro_monthly",
+    return_url="https://app.example.com/settings/billing",
+    idempotency_key=f"checkout-{customer_id}-pro_monthly-v1",
+)
+# Return `checkout` to the browser.
+
+# After the browser posts the handler's three fields:
+nozle.verify_checkout(
+    checkout_id, razorpay,
+    customer_id=customer_id, subscription_id=subscription_id,
+)
+status = nozle.checkout_status(
+    checkout_id, customer_id=customer_id, subscription_id=subscription_id,
+)
+```
+</Tab>
+<Tab value="Go">
+```go
+// Merchant backend
+checkout, err := client.Checkout(ctx, nozle.CheckoutParams{
+  CustomerID: customerID, PlanCode: "pro_monthly",
+  ReturnURL: "https://app.example.com/settings/billing",
+  IdempotencyKey: "checkout-" + customerID + "-pro_monthly-v1",
+})
+// Return `checkout` to the browser.
+
+// After the browser posts the handler's three fields:
+scope := nozle.CheckoutScope{CustomerID: customerID, SubscriptionID: subscriptionID}
+_, err = client.VerifyCheckout(ctx, checkoutID, nozle.RazorpayVerification{
+  RazorpayOrderID: orderID, RazorpayPaymentID: paymentID, RazorpaySignature: signature,
+}, scope)
+status, err := client.CheckoutStatus(ctx, checkoutID, scope)
+```
+</Tab>
+</Tabs>
+
+`verifyCheckout()` posts the fields to Nozle. The SDK does not check the signature locally. Verify and status calls need an `sk_` key, so they run only in your backend. Bind each `checkout_id` to the buyer who started it before you call Nozle. Pass both scope fields to tie the call to one customer and subscription.
+
+### Open the modal in the browser
+
+Load `https://checkout.razorpay.com/v1/checkout.js`, then open the modal with the values from the `razorpay` result:
+
+```ts
+type RazorpayModal = new (options: Record<string, unknown>) => { open(): void }
+const Razorpay = (window as unknown as { Razorpay: RazorpayModal }).Razorpay
+new Razorpay({
+  key: checkout.key_id,
+  order_id: checkout.order_id,
+  amount: checkout.amount_cents,
+  currency: checkout.currency,
+  handler: onPaid, // receives razorpay_order_id, razorpay_payment_id, razorpay_signature
+}).open()
+```
+
+For a mandate checkout, also pass `customer_id: checkout.customer_id` and `recurring: '1'`.
+
+### React
+
+With the React SDK, `CheckoutButton` runs this browser flow for you. It loads the Razorpay script, opens the modal, calls your `verifyCheckout` callback, then polls your `getCheckoutStatus` callback up to 30 times, one second apart. Both callbacks call your authenticated merchant backend:
+
+```tsx
+<BillingProvider
+  publishableKey={publishableKey}
+  createCheckout={createCheckout}
+  verifyCheckout={async (checkoutId, verification) => {
+    const response = await fetch(`/api/billing/checkout/${checkoutId}/verify`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(verification),
+    })
+    if (!response.ok) throw new Error('Verification failed')
+    return response.json()
+  }}
+  getCheckoutStatus={async (checkoutId) => {
+    const response = await fetch(`/api/billing/checkout/${checkoutId}`, {
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Status failed')
+    return response.json()
+  }}
+>
+  <CheckoutButton planCode="pro_monthly" />
+</BillingProvider>
+```
+
+`CheckoutButton` rejects a Razorpay result without `checkout_id`, `key_id` and `order_id`, and throws when `BillingProvider` has no `verifyCheckout`. See the [React components](/sdks/react/components) and [hooks](/sdks/react/hooks#checkout-result-types).
+
+### HTTP
+
+The SDKs call these Engine endpoints. All three need a secret key with `payment:write` (create, verify) or `payment:read` (status):
+
+| Call | Purpose |
+|---|---|
+| `POST https://api.nozle.app/engine/api/v1/checkout` | Create the checkout. See [Create checkout](/api/create-checkout) |
+| `POST https://api.nozle.app/engine/api/v1/checkout/{checkout_id}/verify` | Send `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature`. A missing field returns `400` |
+| `GET https://api.nozle.app/engine/api/v1/checkout/{checkout_id}` | Read the status. Each call fetches the order's payments from Razorpay and settles any captured one |
+
+Add `customer_id` and `subscription_id` query parameters together to scope verify and status to one customer and subscription. An unknown checkout ID returns `404 checkout_session_not_found`.
+
+## How Nozle verifies a payment
+
+- **Verify call.** Nozle checks that the order ID is this checkout's order and that `razorpay_signature` is the HMAC-SHA256 of `order_id|payment_id` computed with your key secret. A mismatch returns `422 validation_errors` with `invalid_checkout_signature`.
+- **Provider fetch.** Nozle then fetches the payment from Razorpay with your connection's credentials. It never trusts the browser fields or a webhook body alone.
+- **Settlement checks.** Nozle settles only a payment that is `captured`, belongs to the order or link, and matches the checkout's amount and currency. The invoice must still be payable, not expired, and the customer must still use the same connection.
+- **Authorized is not paid.** An `authorized` payment moves the checkout to `processing` and waits for capture.
+
+A browser success callback alone never activates a plan.
+
+## Status
+
+`GET /checkout/{checkout_id}` and verify return the checkout status:
+
+| `status` | Meaning |
+|---|---|
+| `awaiting_payment` | The order or link exists and is waiting for payment |
+| `processing` | The order is not ready yet, or an authorized payment is waiting for capture |
+| `succeeded` | A captured payment settled the checkout |
+| `failed` | Razorpay rejected the order, or the order could not be submitted |
+| `expired` | The checkout's `expires_at` passed |
+| `needs_review` | A capture could not be applied safely. See below |
+
+| `fulfillment_status` | Meaning |
+|---|---|
+| `pending` | The payment has not settled |
+| `processing` | Payment settled, but the plan activation or credit grant is still being applied |
+| `succeeded` | Fulfilled |
+
+Show success only when both are `succeeded`, then reload the subscription. The response also carries `checkout_id`, `provider`, `amount_cents`, `currency` and `invoice_id`, plus a nested `checkout` result while the checkout is `awaiting_payment`, so a client can resume after a reload.
+
+`needs_review` means a captured payment could not settle its invoice. Causes are a changed amount or currency, a checkout that expired before capture, an invoice that is no longer payable, a changed provider connection, or another payment in progress. Nozle grants no plan, credits or successful payment for it. Check the payment in the Razorpay dashboard and refund or reconcile it deliberately. Razorpay orders cannot be cancelled remotely, so an expired order can still be paid late.
+
+If the customer closes or fails the modal, a one-time order stays open and can be retried until it expires. The React SDK reports a modal `payment.failed` event as "Payment failed. You can retry checkout."
+
+## Payment links
+
+Nozle uses a Razorpay payment link where the customer is not inside your checkout modal: an invoice payment URL, a credit top-up purchase, and the link for overdue invoices. Nozle asks Razorpay not to send SMS or email for the link, and the link expires after 24 hours. A hosted result has `type: "hosted"`, `payment_url` and `checkout_id`.
+
+Redirect the customer to `payment_url`. The `payment_link.paid` webhook settles it. Payment links are not verified with the verify call, which is for orders.
+
+## Credit top-ups
+
+A credit top-up for a Razorpay customer returns a Razorpay payment link as `payment_url`, and `payment_provider` is `razorpay`. Navigate to it. Credits are granted only after Razorpay confirms the captured payment and the credit signal is delivered, so capture and the credit grant can finish at different times. The top-up package must be priced in INR. See [Paid Credit Top-ups](/guides/credits/top-ups) and [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase).
+
+## Recurring payments with UPI AutoPay
+
+Renewals are charged automatically only for a confirmed UPI AutoPay mandate. Otherwise Nozle does not charge, and the customer pays the invoice through a new checkout or payment link.
+
+To register a mandate:
+
+1. Turn on **Enable recurring payments** and set the mandate maximum on the connection. Your Razorpay account must have UPI AutoPay enabled.
+2. Create the checkout for a subscription invoice with `registerMandate: true` (`register_mandate` in HTTP and Python). The customer needs a name, email and phone number.
+3. Open the modal with `customer_id` and `recurring: '1'`. Nozle creates the order as a UPI authorization with the connection's maximum amount.
+4. Razorpay sends `token.confirmed`. Only then does the mandate become usable, and only for the subscriptions covered by that registration.
+
+For a renewal, Nozle uses a confirmed, unexpired UPI mandate that covers every subscription on the invoice and whose maximum is at least the amount due. Razorpay schedules its pre-debit notification and the collection, so the debit is not instant. If the debit is rejected, the invoice returns to needing an interactive payment and Nozle sends the invoice payment-failure notification.
+
+Mandate registration errors:
+
+| Code | Cause |
+|---|---|
+| `razorpay_mandate_registration_unavailable` | Recurring is off on the connection, the invoice is not a subscription invoice, or a hosted link was requested |
+| `razorpay_mandate_amount_exceeds_limit` | The amount due is above the mandate maximum |
+| `razorpay_mandate_requires_name_email_phone` | The customer lacks a name, email or phone number |
+
+## Refunds and disputes
+
+- **Refunds.** A credit-note refund is sent to Razorpay against the captured payment at normal speed. It stays `pending` until Razorpay reports `processed`. If Razorpay reports `failed`, Nozle sends the `credit_note.provider_refund_failure` webhook.
+- **Disputes.** On `payment.dispute.lost`, Nozle fetches the dispute from Razorpay, validates it against the payment, and marks the invoice's dispute lost. A closed or won dispute is not treated as lost.
+
+## Errors
+
+Checkout errors that are specific to Razorpay. See [Create checkout](/api/create-checkout#errors) for the full list.
+
+| Status | Code | Cause |
+|---|---|---|
+| `422` | `razorpay_requires_inr` | The invoice, upgrade or payment request is not in INR. Returned in `error_details.base` of a `validation_errors` response |
+| `422` | `payment_already_processing` | A payment for the invoice is already in progress |
+| `422` | `missing_payment_provider_customer` | The customer is not linked to the Razorpay connection that the checkout needs |
+| `422` | `checkout_amount_changed`, `checkout_payment_provider_changed` | The open checkout no longer matches the invoice or the customer's connection |
+| `422` | `invalid_checkout_signature` | The verify call's order ID or signature did not match the checkout |
+| `422` | `third_party_error` | Razorpay rejected the request. `error_details.third_party` is `Razorpay` |
+| `404` | `checkout_session_not_found` | Unknown checkout ID |
+
+## Limits
+
+- INR only. Cross-currency collection is not enabled.
+- Cards and UPI through the interactive checkout, and UPI AutoPay mandates for subscription invoices.
+- Not enabled: standalone zero-value or trial mandates, hosted mandate-registration links, recurring cards and arbitrary grouped automatic debits.
+- Overdue invoices can be grouped into one payment link. Credit top-up and prepaid-credit invoices cannot be grouped and are collected individually.
+- The Key ID of a connection cannot change.
+- Which payment methods appear in the modal depends on your Razorpay account.
+
+## Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| Webhooks never arrive, or Razorpay shows `400` | The URL is the one shown on the connection, the webhook secret matches exactly, and your Nozle public API URL is reachable |
+| Payment captured in Razorpay but the plan is not active | Call checkout status. It reconciles with Razorpay. Look for `needs_review`, and confirm the five payment events are enabled |
+| `payment_provider_required` | The customer's **Payment provider** is not set to a Razorpay connection |
+| `razorpay_requires_inr` | The plan, invoice or top-up package currency is not INR |
+| `invalid_checkout_signature` | Forward the three fields exactly as the Razorpay handler returned them, and verify against the checkout they belong to |
+| Test and live payments get mixed up | Use one connection per Key ID and assign each customer to the right one |
+
+Razorpay test mode and bank-mandate behaviour depend on your own Razorpay account. Test the flows you use with your test Key ID before you connect live keys.
