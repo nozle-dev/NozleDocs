@@ -5,7 +5,7 @@ description: Payment providers you can connect to Nozle
 
 Nozle collects payments through the payment provider you connect to your organization. Each organization connects its own provider account, so your customers pay into your account, not Nozle's.
 
-Connect a provider in the dashboard under **Settings > Billing > Integrations**. Nozle supports Stripe and Razorpay.
+Connect a provider in the dashboard under **Settings > Billing settings > Integrations**. Each provider shows **Connect** until it has a connection, then **Add another**, **Edit** and **Disconnect**. Nozle supports Stripe and Razorpay.
 
 | | [Stripe](/integrations/stripe) | [Razorpay](/integrations/razorpay) |
 |---|---|---|
@@ -15,7 +15,7 @@ Connect a provider in the dashboard under **Settings > Billing > Integrations**.
 | **Payment links** | Hosted Stripe Checkout page | Razorpay payment link |
 | **Webhook** | Nozle registers it right after you connect | You add it in the Razorpay dashboard |
 | **Payment confirmation** | Signed webhook only | Signed webhook, and your backend's verify call for an order |
-| **Checkout status** | Paid upgrades only, by upgrade ID. A new subscription has no checkout ID | Every checkout, by checkout ID |
+| **Checkout status** | Paid upgrades only, by upgrade ID. It reads the session from Stripe but never settles a payment. A new subscription has no checkout ID | Every checkout, by checkout ID. It reconciles with Razorpay and settles a captured payment |
 | **Renewals** | Automatic charge on the saved card | Automatic only with a UPI AutoPay mandate |
 | **Refunds and disputes** | Credit-note refunds and lost disputes | Credit-note refunds and lost disputes |
 

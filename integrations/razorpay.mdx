@@ -16,17 +16,19 @@ Nozle uses Razorpay to collect INR payments through the Razorpay checkout modal 
 
 ## Setup
 
-Connect Razorpay in the Nozle dashboard under **Settings > Billing > Integrations > Razorpay > Connect**. The form asks for:
+Connect Razorpay in the Nozle dashboard under **Settings > Billing settings > Integrations**. In the Razorpay group choose **Connect**. Once a connection exists, the group offers **Add another**, **Edit** and **Disconnect**. The form asks for:
 
 | Field | What to enter |
 |---|---|
 | **Name** | A label for the connection |
 | **Code** | A stable identifier. You use it when you assign this connection to a customer |
 | **Key ID** | `rzp_test_...` or `rzp_live_...`. It is set once and cannot be edited |
-| **Key secret** | The secret for the Key ID. Stored encrypted. Leave it blank when editing to keep the stored value |
-| **Webhook secret** | The secret you will also enter in Razorpay. Leave it blank when editing to keep the stored value |
+| **Key secret** | The secret for the Key ID. Required when you connect. Stored encrypted. Leave it blank when editing to keep the stored value |
+| **Webhook secret** | The secret you will also enter in Razorpay. Required when you connect. Leave it blank when editing to keep the stored value |
 | **Enable recurring payments** | Optional. Lets customers authorize UPI AutoPay mandates |
 | **Mandate maximum (paise)** | Required when recurring payments are on. A whole number of paise, at least `100` |
+
+The dashboard keeps **Connect** disabled until the Key ID matches `rzp_test_` or `rzp_live_`, and, with recurring payments on, until the mandate maximum is a whole number of at least `100`. Nozle does not check the credentials with Razorpay when you connect. A wrong key secret is accepted and fails only at the first checkout, with `422 third_party_error`. Make a test checkout right after you connect.
 
 Nozle reads the mode from the Key ID prefix and shows it on the connection together with the webhook URL. To use a different Key ID, for example to move from test to live, create a new connection. You can add several connections to one organization.
 
@@ -37,6 +39,12 @@ To rotate the webhook secret, edit the connection and enter the new value. Nozle
 A customer pays through Razorpay only when that customer uses a Razorpay connection. Select it in the customer's **Payment provider** setting in the dashboard, which lists connections as name and code. A customer who is not assigned to Razorpay goes through the Stripe path, and checkout returns `payment_provider_required` if no Stripe connection exists either. If the customer's connection code matches no Razorpay connection, checkout returns `404 payment_provider_not_found`.
 
 Nozle links the customer to the connection at checkout. It creates the customer in Razorpay for mandate registration, which needs the customer's name, email and phone number.
+
+Once a customer has started a Razorpay checkout, it stays linked to that connection. Switching the customer to another Razorpay connection then fails with `422 razorpay_customer_connection_cannot_change`. Nozle also stores the new code on the customer even though the call fails. This is a known bug, so do not switch: create a new customer for the other connection instead.
+
+<Warning>
+A customer created through the REST API keeps its provider assignment only when the `billing_configuration` of the request has `sync_with_provider: true` or a `provider_customer_id`. Otherwise Nozle drops the `payment_provider` and `payment_provider_code` you sent, and plan checkout treats the customer as a Stripe customer. Send one of the two fields, or assign the connection in the dashboard before checkout.
+</Warning>
 
 ## What Nozle handles
 
@@ -70,7 +78,15 @@ https://api.nozle.app/core/webhooks/razorpay/{payment_provider_id}
 | `payment.dispute.lost`, `payment.dispute.closed` | Disputes |
 | `token.confirmed`, `token.rejected`, `token.cancelled`, `token.paused`, `token.resumed` | UPI AutoPay mandates |
 
-Nozle computes an HMAC-SHA256 of the raw request body with the webhook secret and compares it with the `X-Razorpay-Signature` header. A request with a bad signature, a missing `X-Razorpay-Event-Id` header, or an unreadable body is answered with `400`. A valid request is queued and answered with `200`. Nozle de-duplicates on the event ID, so a repeated event never settles twice.
+Nozle computes an HMAC-SHA256 of the raw request body with the webhook secret and compares it with the `X-Razorpay-Signature` header. A request is answered with `400` when:
+
+- the provider ID in the URL is unknown or is not a UUID;
+- the signature is not 64 lowercase hexadecimal characters, or does not match the body;
+- the `X-Razorpay-Event-Id` header is missing or longer than 255 bytes;
+- the body is not valid JSON or has no `event`; or
+- an event ID that Nozle already received arrives with a different body (`webhook_event_payload_conflict`).
+
+A valid request is queued and answered with `200`. Nozle de-duplicates on the event ID, so a repeated event never settles twice.
 
 If the webhook is missing or blocked, Razorpay can capture the payment but Nozle is not told. A captured order then settles only when your backend calls verify or status, or when the reconciliation job that runs every five minutes reaches it. Dispute and mandate events are never received.
 
@@ -107,9 +123,11 @@ If prepaid credits fully cover the invoice, Nozle returns a completed checkout a
 - `key_id` is the public Key ID. The key secret and webhook secret never appear in a response.
 - `amount_cents` is in paise.
 - A paid upgrade returns `plan_upgrade_intent_id` instead of `invoice_id`.
-- A mandate checkout also returns `customer_id`, `recurring: true` and `mandate_max_amount_cents`.
+- An Entity checkout adds `external_entity_id` and `external_subscription_id`. Single-Entity and bulk Entity checkouts both return a `razorpay` result.
+- A mandate checkout also returns `customer_id` (a Razorpay customer ID), `recurring: true` and `mandate_max_amount_cents`. The customer needs a name, email and phone number.
 - An order stays open for 24 hours. A paid upgrade stays open for 35 minutes, and a bulk Entity checkout for 23 hours.
-- If the order is not ready yet, or has expired, the result is `{"type": "processing", "checkout_id", "status"}`. Recover it with checkout status rather than starting another checkout.
+- If the order is not ready yet, or has expired, the result is `{"type": "processing", "checkout_id", "status"}`. Recover it with checkout status rather than starting another checkout. Some checkouts return this shape first, because Nozle submits the order to Razorpay in the background: a bulk Entity checkout answers `{"entity_subscription_checkout": {"type": "processing", "status": "open", "checkout_id": "..."}}`, and its `razorpay` result follows from checkout status once the order is ready.
+- In a `processing` result, `status` is an internal operation status, for example `ready` for an unpaid order that has expired. Read the top-level `status` of checkout status for the state of the checkout.
 
 ### Create, verify and poll
 
@@ -264,21 +282,43 @@ A browser success callback alone never activates a plan.
 | `processing` | Payment settled, but the plan activation or credit grant is still being applied |
 | `succeeded` | Fulfilled |
 
-Show success only when both are `succeeded`, then reload the subscription. The response also carries `checkout_id`, `provider`, `amount_cents`, `currency` and `invoice_id`, plus a nested `checkout` result while the checkout is `awaiting_payment`, so a client can resume after a reload.
+Show success only when both are `succeeded`, then reload the subscription. The response also carries `checkout_id`, `provider`, `amount_cents`, `currency` and `invoice_id`, plus a nested `checkout` result while the checkout is `awaiting_payment`, so a client can resume after a reload. The nested `checkout` can also appear while the top-level `status` is `expired`: for an unpaid order that has passed its `expires_at`, it is `{"type": "processing", "status": "ready", ...}`, not a `razorpay` result. `ready` is an internal operation status. Do not reopen the modal for it.
 
 `needs_review` means a captured payment could not settle its invoice. Causes are a changed amount or currency, a checkout that expired before capture, an invoice that is no longer payable, a changed provider connection, or another payment in progress. Nozle grants no plan, credits or successful payment for it. Check the payment in the Razorpay dashboard and refund or reconcile it deliberately. Nozle cannot cancel a Razorpay order, so an expired order can still be paid late.
 
-If the customer closes or fails the modal, a one-time order stays open and can be retried until it expires. The React SDK reports a modal `payment.failed` event as "Payment failed. You can retry checkout."
+If the customer closes or fails the modal, a one-time order stays open until it expires, and reopening the modal on the same order works. Checkout status returns the order as the nested `checkout` while the status is `awaiting_payment`, so store the `checkout` you received, or fetch it again from status, and open the modal with it.
+
+The React SDK reports a modal `payment.failed` event as "Payment failed. You can retry checkout." The retry button calls your `createCheckout` callback again. For a new subscription that returns `subscription_incomplete`, described under [Retry a new-subscription checkout](#retry-a-new-subscription-checkout), so reopen the modal with the stored checkout instead, or use an invoice checkout.
+
+### Retry a new-subscription checkout
+
+A new-subscription checkout leaves an incomplete subscription behind until the first order is paid. Calling checkout again for the same customer while the first order is unpaid fails with `422 validation_errors` and `error_details.subscription` set to `["subscription_incomplete"]`. The same `Idempotency-Key` does not change this. It happens when the customer closed the modal, the payment failed, or the page reloaded.
+
+The same `422` appears after an attempt that failed in Nozle or at Razorpay, such as `razorpay_requires_inr`, a mandate error or a wrong key secret, because the incomplete subscription already exists. Fix the cause, then recover in one of two ways:
+
+- call checkout status with the `checkout_id` of the first response; or
+- call an invoice checkout for the `invoice_id` of the first response. It returns the same order.
 
 ## Payment links
 
-Nozle uses a Razorpay payment link where the customer is not inside your checkout modal: an invoice payment URL, a credit top-up purchase, and the link for overdue invoices. Nozle asks Razorpay not to send SMS or email for the link, and the link expires after 24 hours. A hosted result has `type: "hosted"`, `payment_url` and `checkout_id`.
+Nozle uses a Razorpay payment link where the customer is not inside your checkout modal: an invoice payment URL, a credit top-up purchase, and the link for overdue invoices. Nozle asks Razorpay not to send SMS or email for the link, and the link expires after 24 hours. The link is an `rzp.io` URL in a `payment_url` field. Two calls return it:
 
-Redirect the customer to `payment_url`. The `payment_link.paid` webhook settles it. Payment links are not verified with the verify call, which is for orders.
+- `POST https://api.nozle.app/core/api/v1/invoices/{id}/payment_url` returns `{"invoice_payment_details": {"customer_id", "external_customer_id", "payment_provider", "invoice_id", "payment_url"}}`.
+- [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase) returns the purchase with `payment_status`, `payment_provider: "razorpay"` and `payment_url`.
+
+Neither result has a checkout ID, so there is nothing to poll. Redirect the customer to `payment_url`. The `payment_link.paid` webhook settles it, Payment links are not verified with the verify call, which is for orders.
+
+`POST /checkout` never returns `type: "hosted"` for Razorpay: it returns an order. Only the deprecated `POST https://api.nozle.app/engine/api/v1/credits/purchase` returns `type: "hosted"` with a `payment_url`. The SDK result types still declare `hosted`.
 
 ## Credit top-ups
 
-A credit top-up for a Razorpay customer returns a Razorpay payment link as `payment_url`, and `payment_provider` is `razorpay`. Navigate to it. Credits are granted only after Razorpay confirms the captured payment and the credit signal is delivered, so capture and the credit grant can finish at different times. The top-up package must be priced in INR. See [Paid Credit Top-ups](/guides/credits/top-ups) and [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase).
+A credit top-up for a Razorpay customer returns a Razorpay payment link as `payment_url`, and `payment_provider` is `razorpay`. Navigate to it. Credits are granted only after Razorpay confirms the captured payment and the credit signal is delivered, so capture and the credit grant can finish at different times. The top-up package must be priced in INR, and its currency must match the customer's currency. See [Paid Credit Top-ups](/guides/credits/top-ups) and [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase).
+
+| Case | Result |
+|---|---|
+| A USD package for a USD customer on Razorpay | `422 validation_errors` with `razorpay_requires_inr` |
+| An INR customer and a USD package | `422 validation_errors` with `customer_currency_mismatch` in `error_details.currency` |
+| A customer with no payment provider | `422 validation_errors` with `no_linked_payment_provider` |
 
 ## Recurring payments with UPI AutoPay
 
@@ -314,7 +354,10 @@ Checkout errors that are specific to Razorpay. See [Create checkout](/api/create
 |---|---|---|
 | `422` | `razorpay_requires_inr` | The invoice, upgrade or payment request is not in INR. Returned in `error_details.base` of a `validation_errors` response |
 | `422` | `payment_already_processing` | A payment for the invoice is already in progress |
+| `422` | `validation_errors` | `error_details.subscription` is `subscription_incomplete`: a new-subscription checkout was retried while its first order is unpaid, or after a failed attempt. See [Retry a new-subscription checkout](#retry-a-new-subscription-checkout) |
 | `422` | `missing_payment_provider_customer` | The customer is not linked to the Razorpay connection that the checkout needs |
+| `422` | `razorpay_customer_connection_cannot_change` | The customer already started a Razorpay checkout and was switched to another Razorpay connection. Create a new customer instead |
+| `404` | `payment_provider_not_found` | The customer's connection code matches no Razorpay connection |
 | `422` | `checkout_amount_changed`, `checkout_payment_provider_changed` | The open checkout no longer matches the invoice or the customer's connection |
 | `422` | `invalid_checkout_signature` | The verify call's order ID or signature did not match the checkout |
 | `422` | `third_party_error` | Razorpay rejected the request. `error_details.third_party` is `Razorpay` |
@@ -337,6 +380,14 @@ Checkout errors that are specific to Razorpay. See [Create checkout](/api/create
 | `payment_provider_required` | The customer's **Payment provider** is not set to a Razorpay connection |
 | `razorpay_requires_inr` | The plan, invoice or top-up package currency is not INR |
 | `invalid_checkout_signature` | Forward the three fields exactly as the Razorpay handler returned them, and verify against the checkout they belong to |
+| A retried checkout returns `422 subscription_incomplete` | The first order is unpaid. Reopen the modal with the stored checkout, call checkout status, or call an invoice checkout with the first `invoice_id` |
+| The first checkout fails with `422 third_party_error` | Nozle does not validate the key secret when you connect. Edit the connection and enter the correct secret |
 | Test and live payments get mixed up | Use one connection per Key ID and assign each customer to the right one |
 
-Test the flows you use with a test Key ID connection before you connect live keys.
+## Testing with a test Key ID
+
+Test the flows you use with a test Key ID connection before you connect live keys. These points came up in test-mode runs of the checkout, with a signed webhook, on a local stack:
+
+- The test card `4111 1111 1111 1111` is rejected by many Razorpay test accounts, which accept domestic cards only. Use a domestic test card such as the Visa `4386 2894 0766 0153`, and choose **Success** on the bank page.
+- UPI collect and UPI AutoPay are not available in every test account, so test a mandate checkout only in an account that has them.
+- The Razorpay modal rejects obviously fake phone numbers. Enter a plausible number.
