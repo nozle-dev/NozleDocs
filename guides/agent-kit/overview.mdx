@@ -1,0 +1,91 @@
+---
+title: Nozle Agent Kit
+sidebarTitle: Overview
+description: Let a coding agent integrate Nozle billing into your application, with your approval at every step.
+keywords: ["agent kit", "coding agent", "Claude Code", "Codex", "OpenCode", "skills", "MCP"]
+---
+
+The Nozle Agent Kit is a set of skills, guard hooks, and a small checker (`nozle-check`) for coding agents. With it, an agent can add Nozle billing to your application. The agent checks your stack, reads your Nozle account, studies your code, and asks only the questions that are still open. It then shows a plan and edits only the files you approve.
+
+The kit is open source at [nozle-dev/nozle-agent-kit](https://github.com/nozle-dev/nozle-agent-kit).
+
+## Quick start
+
+<Steps>
+<Step title="Install the kit">
+For Claude Code:
+
+```bash
+claude plugin marketplace add nozle-dev/nozle-agent-kit
+claude plugin install nozle-agent-kit@nozle
+```
+
+For Codex CLI, OpenCode, and other hosts, see [Install](/guides/agent-kit/install).
+</Step>
+<Step title="Open your repository on a clean branch">
+```bash
+git switch -c nozle-billing
+claude
+```
+
+In Codex, run `codex --enable default_mode_request_user_input` instead of `claude`.
+</Step>
+<Step title="Ask the agent to integrate Nozle">
+Say "integrate Nozle". The agent checks your stack and asks you to log in once.
+</Step>
+<Step title="Answer its questions and approve the scope">
+The agent studies your code and shows the choices that fit, with a recommendation first. It edits only the files you approve.
+</Step>
+<Step title="Do your dashboard steps">
+Create your API keys and put them in your `.env`. Create anything else your account is missing. Then run `nozle-verify`. For the full flow, see [Run an integration](/guides/agent-kit/workflow).
+</Step>
+</Steps>
+
+## Supported hosts
+
+| Host | Support |
+|---|---|
+| Claude Code | Full: skills, helper agents, guard hooks, account and docs MCP servers |
+| Codex CLI | Full: skills, MCP servers, and guard hooks that you add to each repository |
+| OpenCode | Skills, MCP servers, and an edit and command guard |
+| Cursor, Windsurf, Gemini CLI, VS Code Copilot | Skills and guards, less tested |
+
+## What the agent does and does not do
+
+<Columns cols={2}>
+  <Card title="Does" icon="check">
+    Inspects your code and your Nozle configuration. Asks focused billing questions, with a recommendation first. Implements the approved integration. Installs the packages it needs with your package manager, after you approve the command. Verifies it with your tests.
+  </Card>
+  <Card title="Never does" icon="shield">
+    Changes your Nozle account. Creates or reads an API key. Installs a package that the approved scope does not list. Runs your app, or sends a billable event.
+  </Card>
+</Columns>
+
+The account connection uses OAuth and is read-only on the server. You create plans, meters, and credit systems in the dashboard. The agent tells you which ones you need, and why.
+
+## Skills
+
+| You want to | Say or run | What happens |
+|---|---|---|
+| Integrate Nozle | "integrate Nozle", `nozle-integrate` | Stack check, login, account read, code study, questions, scope approval, build, hand-off |
+| Add one capability | `nozle-add credits` | The same flow for one capability, with only its open questions |
+| See where things stand | `nozle-status` | Implemented, Verified, Pending, and Not done |
+| Continue after a break | `nozle-resume` | Re-reads the account and code, shows what changed, continues |
+| Run the integration's tests | `nozle-verify` | You approve each command (tests, lint, type check); they run without Nozle keys. It can also write a live check that you run against a test organization |
+| Look for opportunities and gaps | `nozle-audit` | Read-only review |
+| Check an integration for mistakes | `nozle-doctor` | Pass, fail, or unverified for each known billing mistake, with file and line |
+| Finish dashboard setup or check your keys | `nozle-setup` | Connects, reads the account, lists your dashboard steps, and checks that your API keys work without showing them |
+| Back changes out | `nozle-undo` | Shows the diff and reverts only the files you confirm |
+
+In Claude Code, the skills are `/nozle-agent-kit:<name>`. In Codex and OpenCode, name the skill or describe the task.
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Install and log in" icon="download" href="/guides/agent-kit/install">
+    Install the kit for your host, log in, update, or remove it.
+  </Card>
+  <Card title="Run an integration" icon="play" href="/guides/agent-kit/workflow">
+    Where to start the agent, what it asks, and what to do after it finishes.
+  </Card>
+</Columns>

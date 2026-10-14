@@ -1,0 +1,105 @@
+---
+title: Run an integration with the Agent Kit
+sidebarTitle: Run an integration
+description: Where to start the agent, what happens during a run, what the guards enforce, and what to do after it finishes.
+keywords: ["agent kit", "integration", "nozle-integrate", "guards", "nozle.integration.yaml", "troubleshooting"]
+---
+
+This page assumes you have [installed the Agent Kit](/guides/agent-kit/install).
+
+## Where to start the session
+
+The agent can only integrate the code it can see.
+
+- **One repository:** start in the repository root.
+- **A monorepo:** start in the monorepo root. The agent finds the target app and keeps its edits inside it.
+- **Separate backend and frontend repositories:** start in the backend repository and add the frontend with `--add-dir ../frontend` (Claude Code and Codex). The backend holds the secret key and owns customers, subscriptions, usage, limits, and webhooks. It also publishes the routes that the frontend calls.
+- **Other services of the same product,** such as a worker or an AI service: add their folders with `--add-dir`. If a folder is missing, the agent says so and asks how to continue.
+- **A frontend with no backend:** the agent recommends that you point it at a backend, because checkout, usage, limits, and credits need the secret key on a server.
+
+If one session cannot see both repositories, run the backend session first. A second session in the frontend repository then reads the backend's record and reuses its decisions.
+
+## What happens during a run
+
+1. **Stack check.** The agent runs `nozle-check env` and says which Nozle SDK fits your backend and frontend.
+2. **Login,** if this agent has not logged in yet.
+3. **Account and code.** The agent reads your plans, meters, entitlements, credit systems, and payment providers. Then it reads your authentication, your payer, your AI calls, and every action that spends, sends, or generates something.
+4. **Existing work.** If Nozle code or a record already exists, the agent shows what is integrated and works only on the gaps.
+5. **Choices.** The agent shows each goal with what your account already has, its advice, and where the code changes. You pick the goals.
+6. **Questions.** For each activity it found, you choose: track as billable usage, track cost only, do not track, or decide later. The agent never decides for you. Then it asks about the payer, when to charge, and your payment provider.
+7. **Scope.** The agent shows the files it will change, the packages it will install (with exact versions), what is excluded, the financial rules, the effect on current users, the tests, and your dashboard steps. Nothing in your application changes before you approve.
+8. **Build.** The agent installs the packages from the scope with your project's package manager, such as npm, pnpm, yarn, bun, uv, poetry, pip, or `go get`. Your agent asks you to approve each install command. Then the agent works step by step. It re-reads the account before the first edit and reviews its own diff against known billing mistakes.
+9. **Hand-off.** The agent reports four groups: Implemented, Verified, Pending, and Not done.
+
+You can start before you log in. The agent saves its code study in `nozle-study.yaml`, then asks you to log in, continue with docs and code only, or stop.
+
+## What the guards enforce
+
+The guards are on while `nozle.integration.yaml` or `nozle-setup-plan.yaml` exists in your repository. They are a backstop: the account connection is read-only on the server in any case.
+
+| The agent tries to | Result |
+|---|---|
+| Edit application code before you approve a scope | Refused |
+| Edit before every activity has an answer | Refused, with the open activities listed |
+| Edit a file outside the approved scope, or one you excluded | Refused |
+| Write a file through the shell (`cat >>`, `tee`, `sed -i`) | Judged by the same rules |
+| Edit a real `.env` file | Refused. Variable names go in `.env.example` |
+| Put a secret key in browser code, or import an SDK that contradicts the recorded stack | Blocked after the edit |
+| Build a usage key from a random id, or detect a 409 from message text | Advice after the edit |
+| Run a command with a Nozle key in it, call the production API, or send a billable event | Refused |
+| Call an account tool that writes | Refused |
+| Finish with unrecorded changes, an invalid record, or a failed self-review check | Stop blocked once, with the list |
+
+## Records in your repository
+
+| File | Contents |
+|---|---|
+| `nozle.integration.yaml` | Goals, stack, approved scope, decisions, file hashes, and tasks with evidence |
+| `nozle-study.yaml` | The code study: activities and existing integration |
+| `nozle-setup-plan.yaml` | Your dashboard steps and their state |
+| `nozle-integration-report.md` | Findings, decisions, test results, and remaining manual work |
+
+The records contain no keys. Commit them with your code so that the next session or a teammate can resume. In a split setup, each repository keeps its own record and names the other under `peers`.
+
+## After the agent finishes
+
+1. If the agent could not install a package, run the install command it gave you. This happens when you refuse the command or the agent has no network access.
+2. Create your API keys under **Settings > API Keys**. Put them in `.env`, and fill in the variables listed in `.env.example`.
+3. Create the dashboard items listed in `nozle-setup-plan.yaml`, then run `nozle-resume`.
+4. Ask the agent to check your keys. It runs `nozle-check key`, which reports whether each key works and never prints its value.
+5. Run `nozle-verify`. It runs your tests, lint, and type check on the changed files, with your approval for each command.
+6. Optional: ask `nozle-verify` for a live check. The agent writes `nozle-live-check`, a script that drives each integrated flow against a test organization and reads every result back from Nozle. You run it with a test organization's keys; the agent never runs it.
+7. Send one real event yourself with `nozle-first-event.mjs` in the skill folder. Do a dry run first, then run it with `--yes`. The agent never sends this event.
+
+<Warning>
+Never paste an `sk_` secret key into the agent chat. The agent does not need it, and the guards refuse commands that contain one.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+<Accordion title="The login ends with onboarding_incomplete">
+The organization is not onboarded. Create a meter and a plan in the dashboard, then log in again.
+</Accordion>
+<Accordion title="The account tools are missing, or the agent says the login ended">
+The login was unused for 7 days, was revoked, or was never done in this agent. Log in again (see [Log in](/guides/agent-kit/install#log-in)), then say "continue".
+</Accordion>
+<Accordion title="The page after Allow does not load">
+Your browser runs on another machine. Copy the full address from the address bar into the agent.
+</Accordion>
+<Accordion title="Codex shows no question picker">
+Start Codex with `codex --enable default_mode_request_user_input`.
+</Accordion>
+<Accordion title="No guard runs in Codex">
+Run the `hosts codex --write` command in the repository, trust the folder, and approve the hooks with `/hooks`.
+</Accordion>
+<Accordion title="An edit is refused as outside the scope">
+The plan changed. Approve the changed scope, or tell the agent to leave the file.
+</Accordion>
+<Accordion title="A step is blocked">
+A dashboard item that the step needs is missing. Create it, as listed in `nozle-setup-plan.yaml`, then run `nozle-resume`.
+</Accordion>
+<Accordion title="You want the guards off">
+The guards are on while a record exists. Run `nozle-undo`, or delete the record files.
+</Accordion>
+</AccordionGroup>
