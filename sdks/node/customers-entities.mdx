@@ -24,6 +24,33 @@ const customer = await nozle.customers.upsert({
 | `externalId` | `string` | yes | Stable application-owned customer identifier. |
 | `name` | `string` | no | Display name. |
 | `email` | `string` | no | Billing or contact email. |
+| `billingConfiguration` | `CustomerBillingConfiguration` | no | Payment provider assignment. Requires Node.js `0.12.0`. |
+
+### Link a customer that already exists in Stripe
+
+Pass `billingConfiguration` with the Stripe customer ID to link it in the same call. Nozle stores the link and does not create a new Stripe customer. Sending the same upsert again is safe.
+
+```ts
+await nozle.customers.upsert({
+  externalId: 'workspace_123',
+  name: 'Acme Workspace',
+  billingConfiguration: {
+    paymentProvider: 'stripe',
+    paymentProviderCode: 'stripe_main',
+    providerCustomerId: 'cus_ABC123',
+  },
+})
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `paymentProvider` | `string` | yes | Provider type, such as `stripe`. |
+| `paymentProviderCode` | `string` | no | Code of the provider connection in Nozle. |
+| `providerCustomerId` | `string` | no | Existing customer ID at the provider, such as `cus_…`. |
+| `syncWithProvider` | `boolean` | no | Create the customer at the provider when no `providerCustomerId` is given. |
+| `providerPaymentMethods` | `string[]` | no | Payment methods the customer may use. Defaults to `card`. |
+
+The assignment is kept only with `providerCustomerId` or `syncWithProvider: true`; otherwise Nozle drops it. See [Assign the connection to customers](/integrations/stripe#assign-the-connection-to-customers).
 
 ## Read Entities
 

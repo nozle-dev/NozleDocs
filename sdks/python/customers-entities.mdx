@@ -19,7 +19,25 @@ customer = nozle.customers.upsert(
 )
 ```
 
-`external_id` is required. `name` and `email` are optional.
+`external_id` is required. `name`, `email` and `billing_configuration` are optional.
+
+### Link a customer that already exists in Stripe
+
+Pass `billing_configuration` with the Stripe customer ID to link it in the same call (requires `nozle-sdk` `0.12.0`). Nozle stores the link and does not create a new Stripe customer. Sending the same upsert again is safe.
+
+```python
+nozle.customers.upsert(
+    "workspace_123",
+    name="Acme Workspace",
+    billing_configuration={
+        "payment_provider": "stripe",
+        "payment_provider_code": "stripe_main",
+        "provider_customer_id": "cus_ABC123",
+    },
+)
+```
+
+`payment_provider` is required inside `billing_configuration`. `payment_provider_code`, `provider_customer_id`, `sync_with_provider` and `provider_payment_methods` are optional. The assignment is kept only with `provider_customer_id` or `sync_with_provider=True`; otherwise Nozle drops it. See [Assign the connection to customers](/integrations/stripe#assign-the-connection-to-customers).
 
 ## Read Entities
 

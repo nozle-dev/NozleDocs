@@ -51,6 +51,8 @@ At checkout Nozle creates the missing Stripe customer with the customer's name, 
 A customer created through the REST API keeps its provider assignment only when the `billing_configuration` of the request has `sync_with_provider: true` or a `provider_customer_id`. Without one of them, Nozle drops the `payment_provider` and `payment_provider_code` you sent, and the customer has no assigned provider. Plan checkout then falls back to the organization's oldest Stripe connection, which can be a different Stripe account than the one you meant. Send one of the two fields, or assign the connection in the dashboard before checkout.
 </Warning>
 
+To link a customer that already exists in Stripe from code, pass the Stripe customer ID when you upsert the customer: `billingConfiguration` in [Node.js](/sdks/node/customers-entities#link-a-customer-that-already-exists-in-stripe), `billing_configuration` in [Python](/sdks/python/customers-entities#link-a-customer-that-already-exists-in-stripe), or `BillingConfiguration` in [Go](/sdks/go/customers-entities#link-a-customer-that-already-exists-in-stripe). Nozle stores the link without creating a new Stripe customer, so payment methods already saved in Stripe stay usable.
+
 Credit top-ups and payment links do not assign a customer. The customer must already be assigned and linked to a Stripe customer. See [Credit top-ups](#credit-top-ups).
 
 ## What Nozle handles

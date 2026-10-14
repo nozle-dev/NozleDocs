@@ -16,6 +16,24 @@ _ = entity
 _ = err
 ```
 
+### Link a customer that already exists in Stripe
+
+Set `BillingConfiguration` with the Stripe customer ID to link it in the same call (requires `v0.11.0`). Nozle stores the link and does not create a new Stripe customer. Sending the same upsert again is safe.
+
+```go
+customer, err := client.UpsertCustomer(ctx, nozle.Customer{
+  ExternalID: "workspace_123",
+  Name:       "Acme",
+  BillingConfiguration: &nozle.CustomerBillingConfiguration{
+    PaymentProvider:     "stripe",
+    PaymentProviderCode: "stripe_main",
+    ProviderCustomerID:  "cus_ABC123",
+  },
+})
+```
+
+`PaymentProvider` is required when `BillingConfiguration` is set. The assignment is kept only with `ProviderCustomerID` or `SyncWithProvider: true`; otherwise Nozle drops it. A returned `Customer` without a provider has a nil `BillingConfiguration`, so it can be passed back to `UpsertCustomer` unchanged. See [Assign the connection to customers](/integrations/stripe#assign-the-connection-to-customers).
+
 Use `GetEntity`, `ListEntities`, `ActivateEntity`, `SuspendEntity`, and `BulkUpsertEntities` for the Entity lifecycle. List pages accept `PageOptions` with status, limit (1–100), and cursor. Bulk upsert accepts 1–500 distinct IDs. Mutations use caller-supplied idempotency keys of at most 255 UTF-8 bytes. Entity lifecycle changes do not emit seat billing events automatically.
 
 ## Read and update Entities
