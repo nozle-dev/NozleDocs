@@ -5,6 +5,15 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Link existing Stripe customers from the SDKs
+
+_October 14, 2026_
+
+- Customer upsert accepts a billing configuration, so a customer can be created and linked to an existing Stripe customer (`cus_…`) in one call, without a separate REST request. Nozle stores the link and creates nothing in Stripe; repeating the upsert is safe.
+- [`@nozle-js/node` 0.12.0](https://github.com/nozle-dev/nozle-js/releases/tag/node-v0.12.0): `customers.upsert({ billingConfiguration })`. [`nozle-sdk` 0.12.0](https://github.com/nozle-dev/nozle-python/releases/tag/v0.12.0): `customers.upsert(..., billing_configuration=...)`. [`github.com/nozle-dev/nozle-go` v0.11.0](https://github.com/nozle-dev/nozle-go/releases/tag/v0.11.0): `Customer.BillingConfiguration`.
+- Upserts without it send the same request as before. See [Customers and Entities](/sdks/node/customers-entities#link-a-customer-that-already-exists-in-stripe) and [Assign the connection to customers](/integrations/stripe#assign-the-connection-to-customers).
+- Install with `npm install @nozle-js/node@0.12.0`, `pip install nozle-sdk==0.12.0` or `go get github.com/nozle-dev/nozle-go@v0.11.0`.
+
 ### Nozle Agent Kit
 
 _October 13, 2026_
