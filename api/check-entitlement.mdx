@@ -7,7 +7,7 @@ Base URL: `https://api.nozle.app/engine/api/v1`.
 
 Check whether a customer is entitled to use a feature under their current plan. This is the primary gating endpoint -- call it before executing any metered or limited operation.
 
-**Auth:** secret key only. Publishable keys are always rejected.
+**Auth:** secret key only. When API permissions are enabled, the key requires `customer_usage:read`. Publishable keys are always rejected.
 
 <ParamField query="customer_id" type="string" required>
   External customer ID derived by the trusted merchant backend.
@@ -15,6 +15,10 @@ Check whether a customer is entitled to use a feature under their current plan. 
 
 <ParamField query="feature" type="string" required>
   Feature key to check (matches a feature code)
+</ParamField>
+
+<ParamField query="metadata" type="string">
+  URL-encoded JSON object of event properties. The economics estimate uses it to evaluate Cost Sheet conditions and quantities. A value that is not a JSON object returns `400`.
 </ParamField>
 
 <ResponseField name="allowed" type="boolean" required>
@@ -26,15 +30,15 @@ Check whether a customer is entitled to use a feature under their current plan. 
 </ResponseField>
 
 <ResponseField name="feature_type" type="string">
-  Type of the feature. Not returned when the feature or the subscription is missing.
+  Type of the feature. Not returned when the feature or the subscription is missing, or when a metered feature has neither an entitlement nor a charge on the plan.
 </ResponseField>
 
 <ResponseField name="configuration" type="object">
   Configuration values granted by the plan for a non-metered feature. Omitted when there are none.
 </ResponseField>
 
-<ResponseField name="used" type="number" required>
-  Units consumed in the current billing period. `0` for a denial that is decided before usage is read, and for features that are not metered.
+<ResponseField name="used" type="integer" required>
+  Units consumed in the current billing period, as a whole number (a fractional total is truncated). `0` for a denial that is decided before usage is read, and for features that are not metered.
 </ResponseField>
 
 <ResponseField name="limit" type="number | null" required>
@@ -65,7 +69,21 @@ The `economics.status` value is `estimated`, `not_configured`, `unavailable`, or
 | `usage_limit_exceeded` | A hard limit is reached. A soft limit never denies; it sets `overage` to `true`. |
 | `economic_policy_denied` | A margin policy in `deny` mode rejected the estimated cost or margin. The `policy` object has the detail. |
 
-A denial is an HTTP `200` response with `allowed: false`. `400` means `customer_id` or `feature` is missing, `403` means a publishable key or a customer scope mismatch.
+A denial is an HTTP `200` response with `allowed: false`.
+
+## Errors
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| `400` | `{"error": "customer_id and feature required"}` | `customer_id` or `feature` is missing. |
+| `400` | `{"error": "metadata must be a JSON object"}` | `metadata` is not a JSON object. |
+| `401` | `{"error": "..."}` | The `Authorization` header is missing or malformed, or the key is unknown. |
+| `403` | `{"error": "..."}` | A publishable key, or a secret key without `customer_usage:read` when API permissions are enabled. |
+| `503` | `{"error": "usage lookup failed", "code": "usage_unavailable", "request_id": "..."}` | The usage counter could not be read. The response has `Retry-After: 1`. Retry after that many seconds, and quote `request_id` to support. |
+| `503` | `{"error": "subscription access unavailable"}` | The customer's subscription could not be read. Retry later. |
+| `503` | `{"error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |
+
+A failed usage read is never treated as zero usage, so a `503` is not an access decision. Branch on `code`, not on the `error` text.
 
 <Info>
 When `allowed` is `false`, the `reason` field tells you why -- use it to show contextual upgrade prompts in your UI. The entitlement decision is authoritative for access at that instant. The economics object is an estimate only and does not create usage, alter a pricing period, or write a financial ledger entry.

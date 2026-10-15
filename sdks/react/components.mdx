@@ -25,7 +25,7 @@ These exports are available in React `0.10.2`. See [Billing portal and self-serv
 
 ### `PricingTable`
 
-Renders responsive plan cards, an optional monthly/annual toggle, current-plan state, highlighted plans, and checkout actions.
+Renders responsive plan cards, an optional monthly/annual toggle, current-plan state, highlighted plans, and checkout actions. Each card lists what the plan gives, built from the catalog: entitlements, credit grants and flat per-unit usage prices.
 
 ```tsx
 import { PricingTable } from '@nozle-js/react'
@@ -34,11 +34,6 @@ import { PricingTable } from '@nozle-js/react'
   currentPlanCode="free_monthly"
   highlightPlan="pro_monthly"
   returnUrl="https://app.example.com/settings/billing"
-  features={[
-    ['3 projects', 'Community support'],
-    ['Unlimited projects', 'Priority support', 'Advanced analytics'],
-    ['Custom limits', 'Dedicated support'],
-  ]}
   enterpriseEmail="sales@example.com"
   onStripeClientSecret={setClientSecret}
   onCheckoutError={setError}
@@ -57,7 +52,8 @@ If its own catalog request fails, `PricingTable` renders `Plans could not be loa
 |---|---|---|---|
 | `currentPlanCode` | `string` | — | Plan displayed as current and disabled. |
 | `plans` | `PricingPlan[]` | Public catalog | Caller-supplied plan list. |
-| `features` | `string[][]` | — | Feature lists aligned to the rendered plan order. |
+| `features` | `string[][]` or `Record<string, string[]>` | Read from each plan | Optional. Replaces the generated lines of a plan: an array aligned to the rendered plan order, or an object keyed by plan code. |
+| `sort` | `(a, b) => number` | Cheapest first | Optional. Orders the plans. |
 | `onSelect` | `(plan) => void` | Provider checkout | Overrides built-in checkout selection. |
 | `returnUrl` | `string` | Current URL | Return URL sent to `createCheckout`. |
 | `onStripeClientSecret` | `(secret) => void` | — | Receives embedded Stripe checkout secrets. |
@@ -68,32 +64,55 @@ If its own catalog request fails, `PricingTable` renders `Plans could not be loa
 | `className` | `string` | — | Class applied to the root container. |
 | `enterpriseEmail` | `string` | — | Opens a prefilled mail link for enterprise/custom plans. |
 
-`PricingPlan` contains `code`, `name`, `amount_cents`, `amount_currency`, `interval`, and optional `description`.
+**Plan order.** The catalog returns plans newest first. `PricingTable` sorts them by base price, cheapest first, and puts custom plans last. Plans in different currencies stay grouped in the order each currency first appears, and plans with the same price keep the catalog order. Pass `sort` for another order; `sortPlansByPrice(plans)` returns the default.
+
+`PricingPlan` contains `code`, `name`, `amount_cents`, `amount_currency`, `interval`, and optional `description`, `entitlements`, `credit_grant_rules` and `charges`. The three optional arrays are what the public catalog returns; see the [public plan catalog](/api/list-plans).
+
+The generated feature list has one line per item, in this order:
+
+| Source | Line |
+|---|---|
+| Metered entitlement with a `usage_limit` | `100,000 API calls` |
+| Metered entitlement without a limit, and boolean entitlements | The entitlement name |
+| `config` entitlement | `Support: priority` (one line per privilege value) |
+| Credit grant rule | `500 ai credits every month`, `10 credits (one time)` |
+| `standard` usage charge | `$0.01 per api calls` |
+| `graduated`, `volume` and `graduated_percentage` charges | One line per range, for example `0 to 1,000 emails: free` and `1,001+ emails: $0.01 each` |
+| `package` charge | `$5.00 per 100 sms, first 50 free` |
+| `percentage` charge | `2.9% of each payment + $0.30 per payment` |
+
+Leave `features` out and the table can only show what the plan gives. A `custom` or `dynamic` charge produces no line, so pass `features` for a plan that needs one. Call `planFeatures(plan)` to get the same lines for your own layout.
 
 ### `PlanCard`
 
-Use `PlanCard` when you already have a custom pricing layout and want an individual card.
+Use `PlanCard` when you already have a custom pricing layout and want an individual card. It takes a plan from the catalog and reads the price, currency, interval and feature lines from it.
 
 ```tsx
 <PlanCard
-  id="growth"
-  name="Growth"
-  monthlyPrice={49}
-  annualPrice={490}
-  description="For growing product teams"
-  features={['Unlimited projects', 'Priority support']}
-  isAnnual={annualBilling}
+  plan={plans.find((plan) => plan.code === 'growth')!}
   isCurrent={currentPlan === 'growth'}
   returnUrl="https://app.example.com/settings/billing"
   onSelect={({ planCode, returnUrl }) => startCheckout(planCode, returnUrl)}
 />
 ```
 
-Prices are expressed in major currency units for this presentational component, not cents. `PlanCard` declares a `children` prop but does not render it.
+| Prop | Type | Description |
+|---|---|---|
+| `plan` | `PricingPlan` | A plan from the public catalog. |
+| `isCurrent` | `boolean` | Shows the card as the current plan and disables its button. |
+| `features` | `string[]` | Optional. Replaces the lines read from the plan. |
+| `returnUrl` | `string` | Return URL sent to the checkout callback. Defaults to the current URL. |
+| `onSelect` | `(input) => void` | Called with `planCode` and `returnUrl`. The button is not rendered without it. |
 
 ### `PlanComparison`
 
-Renders a side-by-side feature table. Each feature maps plan IDs to a string or boolean.
+Renders a side-by-side table of the plans you pass, cheapest first (pass `sort` for another order). Each row is an entitlement or a granted credit system, in the order the plans return them, and a plan that does not have it shows a cross.
+
+```tsx
+<PlanComparison plans={plans} />
+```
+
+Each cell shows `✓` for an included entitlement, the limit for a metered entitlement that has one, the value of a `config` entitlement, or the credit grant. Pass `features` to replace the rows:
 
 ```tsx
 <PlanComparison
@@ -104,14 +123,11 @@ Renders a side-by-side feature table. Each feature maps plan IDs to a string or 
       label: 'Projects',
       values: { free: '3', growth: 'Unlimited', scale: 'Unlimited' },
     },
-    {
-      key: 'sso',
-      label: 'SAML SSO',
-      values: { free: false, growth: false, scale: true },
-    },
   ]}
 />
 ```
+
+`values` is keyed by plan `code`. Call `comparisonRows(plans)` for the generated rows.
 
 ## Checkout components
 
@@ -288,7 +304,7 @@ Without `onUpdatePaymentMethod`, the update button navigates to `updateHref`, wh
 | Prop | Type | Default | Description |
 |---|---|---|---|
 | `used` | `number` | required | Current usage. |
-| `limit` | `number` | required | Usage limit. |
+| `limit` | `number` or `null` | — | Usage limit. Without one the text reads `Unlimited` and the bar stays empty. |
 | `label` | `string` | — | Label above the bar. |
 | `showText` | `boolean` | `true` | Shows the numeric used/limit text when a label exists. |
 
@@ -305,7 +321,46 @@ The fill uses the primary color below 80%, warning from 80–94%, and destructiv
 />
 ```
 
-Pass `loading` to render three skeleton rows. `features` defaults to an empty array.
+To take the labels from the plan, join the plan's metered entitlements (from the [public catalog](/api/list-plans)) with the usage results you read on your backend, keyed by feature code. A result needs `used` and optionally `limit`, the fields of a `can()` result.
+
+```tsx
+import { UsageDashboard, usageItems } from '@nozle-js/react'
+
+<UsageDashboard features={usageItems(plan.entitlements ?? [], resultsByFeatureCode)} />
+```
+
+Entitlements that are not metered, or have no result, are left out. A feature without a `limit` shows as unlimited.
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `features` | `{ key, label, used, limit? }[]` | `[]` | Rows to show. |
+| `loading` | `boolean` | `false` | Renders three skeleton rows. |
+| `error` | `Error \| string \| null` | `null` | Shows the message as an alert instead of the rows. |
+| `emptyMessage` | `string` | `No usage to show yet.` | Shown when there are no rows. |
+
+### `UsageBreakdown` and `UsageTrend`
+
+Both render the usage your backend reads from Core and pass in. Neither fetches anything and neither holds a key. Read it on your backend with a secret key:
+
+- `GET https://api.nozle.app/core/api/v1/customers/{external_customer_id}/current_usage` returns `customer_usage` for the current period. Pass it to `UsageBreakdown`.
+- `GET https://api.nozle.app/core/api/v1/customers/{external_customer_id}/past_usage` returns `usage_periods`, one item per past period. Pass them to `UsageTrend`. The endpoint takes `periods_count` and `feature_code`.
+
+Both endpoints take `external_subscription_id` when the customer has more than one subscription. Both are in the Customers section of the API reference.
+
+```tsx
+import { UsageBreakdown, UsageTrend } from '@nozle-js/react'
+
+<UsageBreakdown usage={currentUsage.customer_usage} />
+<UsageTrend periods={pastUsage.usage_periods} />
+<UsageTrend periods={pastUsage.usage_periods} featureCode="emails" />
+```
+
+| Component | Shows | Props |
+|---|---|---|
+| `UsageBreakdown` | One period: each feature's name, units and amount, largest amount first, and the total. | `usage`, `isLoading`, `error`, `emptyMessage` |
+| `UsageTrend` | One bar per period, oldest first: the period amount, or the units of `featureCode` (zero where a period has none). | `periods`, `featureCode`, `isLoading`, `error`, `emptyMessage` |
+
+Each has a loading placeholder, an error message and an empty message. A charge's `invoice_display_name` is used as the row name when it is set; otherwise the feature name.
 
 ### `UsageAlert`
 
@@ -321,6 +376,50 @@ Pass `loading` to render three skeleton rows. `features` defaults to an empty ar
 ```
 
 The component renders one dismissible warning for each feature at or above `threshold`. The default threshold is `80` and the default upgrade link is `/plans`.
+
+## Credit components
+
+Both components render data you read on your backend with the SDK; neither fetches anything and neither holds a key. Each shows a loading state, an error message and an empty message.
+
+### `CreditBalance`
+
+Renders one credit balance: the available credits with the unit name, the time of the reading, and the sources the credits come from (plan grant, top-up, granted, adjustment, allocated top-up) with what remains and when it expires. Sources with nothing left are hidden.
+
+```tsx
+import { CreditBalance } from '@nozle-js/react'
+
+// `balance` is one entry of the SDK's `credits.balance` result
+<CreditBalance balance={balance} isLoading={isLoading} error={error} />
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `balance` | `CreditBalanceData` or `null` | `credit_system_name`, `unit_name`, `available`, `as_of` and optional `sources`. `null` shows the empty message. |
+| `isLoading` | `boolean` | Shows a loading placeholder. |
+| `error` | `Error` or `string` | Shows the message as an alert. |
+| `emptyMessage` | `string` | Defaults to `No credit balance yet.` |
+
+### `CreditHistory`
+
+Renders credit operations as a table: when, type (used, granted, adjustment, expired, revoked, refunded, transfer), feature, credits and status.
+
+```tsx
+<CreditHistory
+  operations={page.operations}
+  hasMore={page.next_cursor !== null}
+  onLoadMore={() => loadNextPage(page.next_cursor)}
+  isLoading={isLoading}
+  error={error}
+/>
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `operations` | `CreditOperationData[]` | `id`, `type`, `status`, `credit_amount`, `feature_code` and `occurred_at` of each operation. |
+| `hasMore`, `onLoadMore` | `boolean`, `() => void` | Show a `Load more` button. Fetch the next page with the SDK's `next_cursor`. |
+| `isLoading` | `boolean` | Shows a placeholder, or disables the button while a page loads. |
+| `error` | `Error` or `string` | Shows the message as an alert. |
+| `emptyMessage` | `string` | Defaults to `No credit activity yet.` |
 
 ## Access-control components
 

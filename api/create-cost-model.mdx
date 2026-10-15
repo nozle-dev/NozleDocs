@@ -18,17 +18,66 @@ All cost model endpoints require a secret key (`sk_`). Publishable keys will rec
 </Warning>
 
 <ParamField body="name" type="string" required>
-  Human-readable name for the cost model (for example, "Large Model Token Cost")
+  Human-readable name for the cost model (for example, "Large Model Token Cost"). Must not be blank.
 </ParamField>
 
 <ParamField body="metric_code" type="string" required>
-  feature code this cost model applies to
+  Feature code this cost model applies to. Must not be blank.
 </ParamField>
 
-<ParamField body="cost_per_unit_cents" type="number" required>
-  Cost per unit in cents
+<ParamField body="cost_type" type="string" required>
+  How the cost is calculated: `per_unit`, `per_model` or `tiered`. The fields required by each type are listed below.
 </ParamField>
 
-<ParamField body="model" type="string">
-  Provider model identifier used in your usage events
+<ParamField body="amount_cents" type="integer">
+  Cost per unit in cents. Required for `per_unit`. Must be 0 or more.
 </ParamField>
+
+<ParamField body="model_rates" type="object">
+  Rates keyed by the model name used in your usage events. Each value is `{ "input": <cents>, "output": <cents> }`. Required and non-empty for `per_model`. Names must not be blank, and rates must be 0 or more.
+</ParamField>
+
+<ParamField body="tier_mode" type="string">
+  Must be `SLAB` for `tiered`.
+</ParamField>
+
+<ParamField body="tiers" type="array">
+  Required and non-empty for `tiered`. Each tier is `{ "up_to": <integer or null>, "unit_amount_cents": <integer>, "flat_amount_cents": <integer> }`. Amounts must be 0 or more. `up_to` values must strictly increase, and only the last tier has `"up_to": null`.
+</ParamField>
+
+<ParamField body="filter_values" type="object">
+  Event property filters. Each key maps to an array of the values it matches, for example `{ "region": ["eu"] }`.
+</ParamField>
+
+<ParamField body="status" type="string" default="active">
+  `active` or `archived`.
+</ParamField>
+
+`id`, `org_id`, `created_at` and `updated_at` in the body are ignored. The response is the stored cost model with those fields set.
+
+## Example
+
+```bash
+curl -X POST https://api.nozle.app/engine/api/v1/cost-models \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "LLM token cost",
+    "metric_code": "llm_tokens",
+    "cost_type": "per_model",
+    "model_rates": {
+      "<model-name>": { "input": 250, "output": 1000 }
+    }
+  }'
+```
+
+## Errors
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| `400` | `{"error": "..."}` | The body is not valid JSON. |
+| `401` | `{"error": "..."}` | The `Authorization` header is missing or malformed, or the key is unknown. |
+| `403` | `{"error": "..."}` | A publishable key was used. |
+| `422` | `{"error": "..."}` | A validation rule above failed, for example `amount_cents is required for per_unit cost models` or `unsupported cost_type ""`. |
+| `500` | `{"error": "..."}` | The cost model could not be stored. A `status` other than `active` or `archived` ends here. |
+| `503` | `{"error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |

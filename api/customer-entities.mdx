@@ -8,12 +8,14 @@ Base URL: `https://api.nozle.app/engine/api/v1`.
 
 **Auth:** secret key only. When API permissions are enabled, reads require `entity:read` and mutations require `entity:write`. Publishable keys cannot read the Entity directory.
 
-List Entities with an optional `status`, `limit` from 1 to 100, and opaque `cursor`:
+List Entities with an optional `status` (`active`, `suspended`, or `deleted`), `limit`, and opaque `cursor`. `limit` is an integer from 1 to 200. Omitted, empty, or `0` uses the default of 50. Any other value returns `400 invalid_request`.
 
 ```http
 GET /customers/workspace_123/entities?status=active&limit=50
 Authorization: Bearer sk_...
 ```
+
+The response is `{ "customer_id", "entities": [...], "next_cursor" }`. `next_cursor` is `null` on the last page.
 
 Read one Entity:
 
@@ -21,6 +23,26 @@ Read one Entity:
 GET /customers/workspace_123/entities/user_42
 Authorization: Bearer sk_...
 ```
+
+The response wraps the Entity in `entity`:
+
+```json
+{
+  "entity": {
+    "id": "0e7c5a7e-3b8f-4c6a-9f1d-2a4b6c8d0e1f",
+    "customer_id": "workspace_123",
+    "external_id": "user_42",
+    "name": "Asha",
+    "status": "active",
+    "metadata": { "role": "agent" },
+    "created_at": "2026-07-22T10:00:00Z",
+    "updated_at": "2026-07-22T10:00:00Z",
+    "deleted_at": null
+  }
+}
+```
+
+An unknown customer returns `404 customer_not_found`. An unknown Entity returns `404 entity_not_found`.
 
 Create or replace its display fields and status:
 
@@ -38,6 +60,10 @@ Content-Type: application/json
 ```
 
 The upsert payload is a complete snapshot. When changing only status, send the current `name` and `metadata` so they are not cleared.
+
+`status` is required. `name` is at most 255 characters. `metadata` is a JSON object of at most 64 KiB. Unknown fields return `400 invalid_request`. These status changes are allowed: `active` to `suspended` or `deleted`, `suspended` to `active` or `deleted`, and `deleted` to `active`. Any other change returns `422 entity_status_transition_invalid`.
+
+A new Entity returns `201`. An update, an unchanged Entity, or a replay returns `200`. The body is `{ "action", "entity", "replayed" }`. `action` is one of `created`, `updated`, `unchanged`, `activated`, `reactivated`, `suspended`, or `deleted`.
 
 Entity lifecycle operations never create billing events. If your product bills
 per seat, your backend must track that seat separately through the Events API.
@@ -58,6 +84,8 @@ Content-Type: application/json
 }
 ```
 
+Bulk upsert returns `200` with `{ "customer_id", "entities": [{ "action", "entity" }], "counts", "replayed" }`. `counts` has one integer per action. An empty list, more than 500 items, or a duplicate `external_id` returns `400 invalid_request`.
+
 Delete through the lifecycle endpoint:
 
 ```http
@@ -66,4 +94,8 @@ Authorization: Bearer sk_...
 Idempotency-Key: delete-user-42
 ```
 
+Delete returns `200` with `{ "action", "entity", "replayed" }`.
+
 Deletion is not a financial cascade. It preserves all source, allocation, operation, and audit rows. Retry an uncertain mutation with the same idempotency key and identical payload.
+
+Every mutation requires an `Idempotency-Key` of at most 255 bytes. A missing or longer key returns `400 invalid_request`. Reusing a key with a different request returns `409 idempotency_key_reused`. A retryable failure returns `503` with `Retry-After` and code `entity_service_temporarily_unavailable`. If the Entity was saved but its credit grants could not be scheduled, `PUT` and bulk upsert return `503 entity_grant_scheduling_unavailable`. Retry both with the same key.

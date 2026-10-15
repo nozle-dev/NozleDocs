@@ -5,7 +5,7 @@ api: "GET https://api.nozle.app/engine/api/v1/invoices"
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-List all invoices for a customer. Returns invoices in reverse chronological order.
+List a customer's invoices, newest first. The response holds at most 50 invoices and has no pagination. Draft invoices are not returned.
 
 **Auth:** secret key only. Publishable keys are always rejected.
 
@@ -15,4 +15,33 @@ List all invoices for a customer. Returns invoices in reverse chronological orde
 
 ### Response
 
-Returns an array of invoice objects including status, amounts, and payment details.
+Returns an object with an `invoices` array. The array is empty when the customer has no invoices.
+
+```json
+{
+  "invoices": [
+    {
+      "id": "invoice_uuid",
+      "number": "ACME-202610-001",
+      "status": "finalized",
+      "payment_status": "succeeded",
+      "invoice_type": "subscription",
+      "amount_cents": 4900,
+      "currency": "USD",
+      "issuing_date": "2026-10-01",
+      "payment_due_date": "2026-10-01",
+      "created_at": "2026-10-01T00:00:05Z"
+    }
+  ]
+}
+```
+
+| Field | Values |
+| --- | --- |
+| `status` | `finalized`, `voided`, `pending`, `failed`, or `unknown` |
+| `payment_status` | `pending`, `succeeded`, `failed`, or `unknown` |
+| `invoice_type` | `subscription`, `add_on`, `credit`, `one_off`, or `other` |
+| `amount_cents` | Invoice total, in the currency's smallest unit |
+| `issuing_date`, `payment_due_date` | `YYYY-MM-DD`, or `null` |
+
+A missing `customer_id` returns `400`. A database failure returns `500`.

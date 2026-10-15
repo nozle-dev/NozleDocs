@@ -46,6 +46,8 @@ For an Entity-scoped balance, include the exact Entity ID associated with the im
 
 ## Response
 
+A new import returns `201`. A dry run or a replay returns `200`. The body has the same shape in every case.
+
 ```json
 {
   "credit_balance_import": {
@@ -54,8 +56,8 @@ For an Entity-scoped balance, include the exact Entity ID associated with the im
     "external_customer_id": "workspace_123",
     "external_subscription_id": "merchant_subscription_123",
     "credit_system_code": "ai_credits",
-    "granted_amount": "500.000000000000",
-    "remaining_amount": "320.000000000000",
+    "granted_amount": "500",
+    "remaining_amount": "320",
     "current_period_start": "2026-08-15T00:00:00Z",
     "expires_at": "2026-09-15T00:00:00Z",
     "invoice_created": false,
@@ -81,7 +83,18 @@ If the plan grants more than one Credit System, import each one. Nozle freezes t
 
 Set `dry_run` to `true` to validate the customer, subscription, Entity, Credit System, grant rule, period, and amounts without writing ledger state.
 
-Retry an uncertain response with the same idempotency key and identical payload. A replay returns the original imported values, even if the customer has consumed credits since the import. Reusing the key with a different request returns `409`.
+Retry an uncertain response with the same idempotency key and identical payload. A replay returns the original imported values, even if the customer has consumed credits since the import. Reusing the key with a different request returns `409 idempotency_key_reused`.
+
+## Errors
+
+| Status | Code | Cause |
+| --- | --- | --- |
+| `400` | `invalid_request` | Invalid body, unknown field, missing required field, amounts that are not decimal strings, `granted_amount` not positive, `remaining_amount` negative or above `granted_amount`, or a missing `Idempotency-Key` or one over 255 bytes. |
+| `404` | `customer_not_found`, `subscription_not_found`, `entity_not_found`, `credit_system_not_found` | The named record was not found. |
+| `409` | `opening_balance_already_materialized` | The current plan grant already exists. |
+| `409` | `idempotency_key_reused` | The key was used with a different request. |
+| `422` | `grant_rule_not_found`, `grant_amount_mismatch`, `mixed_grant_scopes`, `grant_scope_mismatch`, `subscription_not_eligible` | The grant configuration or amount does not match the import. |
+| `500` | `internal_error` | The import failed. |
 
 <Warning>
 Do not run the merchant's local credit deduction and Nozle `.track()` as simultaneous authorities. After the import is accepted, switch the gate cleanly: use `.can()` for the advisory check and `.track()` for the authoritative deduction.
