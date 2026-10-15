@@ -48,8 +48,10 @@ Catch `NozleAuthenticationError` before `NozleValidationError` if the branches n
 `NozleAPIError` exposes:
 
 - `operation`;
-- `status_code`; and
-- `response_details`.
+- `status_code`;
+- `response_details`;
+- `request_id`, the `X-Request-Id` response header (Core sends it, the Engine does not yet), or `None`. Quote it when you contact support; and
+- `retry_after`, the seconds from the `Retry-After` header (a number or an HTTP date), or `None`.
 
 `status_code` is not always an HTTP error status. When `track()` resolves the subscription itself and the customer has no active subscription, or more than one, it raises `NozleAPIError` with `status_code` 200. The message gives the cause: `no active subscription for customer '…'` or `has 2 active subscriptions; specify subscription_id`. Do not treat 200 as success. See [subscription resolution](/sdks/python/tracking-events#subscription-resolution).
 

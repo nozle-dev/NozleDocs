@@ -24,7 +24,7 @@ Check `AuthenticationError` separately when handling key type errors; a `*Valida
 
 Not every local failure is typed. `Meter` with 0 or more than 100 events returns the plain error `nozle: batch size must be 1-100` without sending a request; it is not a `*ValidationError`.
 
-`nozle.AsAPIError(err, &apiErr)` is a shortcut for `errors.As` and fills `StatusCode`, `Operation`, `Path`, and `Body`. `nozle.WithDebug(true)` logs one `[nozle] METHOD url` line per request through `log.Printf`; it does not log the key or request and response bodies.
+`nozle.AsAPIError(err, &apiErr)` is a shortcut for `errors.As` and fills `StatusCode`, `Operation`, `Path`, `Body`, `RequestID` and `RetryAfter`. `RequestID` is the `X-Request-Id` response header (Core sends it, the Engine does not yet) and is empty when absent; quote it when you contact support. `RetryAfter` is a `time.Duration` read from the `Retry-After` header as seconds or an HTTP date, and is zero when absent. `nozle.WithDebug(true)` logs one `[nozle] METHOD url` line per request through `log.Printf`; it does not log the key or request and response bodies.
 
 ## Retry behavior
 
