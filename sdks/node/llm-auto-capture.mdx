@@ -67,7 +67,7 @@ A request without a customer passes through and nothing is recorded.
 | `feature` | `string` | Stored as the `feature` property. The `X-Nozle-Feature` header wins. |
 | `costMeterCode` | `string` | Also send one Cost Event per token category to this Cost Event Meter. |
 | `includeStreamUsage` | `boolean` | Default `true`: chat completion streams are sent with `stream_options.include_usage`, which they otherwise leave out. Set `false` for a server that rejects the field. |
-| `onError` | `(error) => void` | Called when usage could not be read or recorded. The provider response is never affected. |
+| `onError` | `(error) => void` | Called when usage could not be read or recorded, and once per event code with `code: "feature_not_found"` when no Feature has that code (the usage is then stored but not billed). The provider response is never affected. |
 
 The second argument of `captureFetch` is the `fetch` to wrap; it defaults to the global `fetch`.
 

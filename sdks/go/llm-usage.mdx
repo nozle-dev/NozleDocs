@@ -26,7 +26,7 @@ ctx = nozle.WithCustomer(ctx, workspace.ID)
 response, err := openaiClient.Chat.Completions.New(ctx, params)
 ```
 
-The customer for a request is, in order: the `X-Nozle-Customer-Id` request header (removed before the request is sent), `WithCustomer` on the request context, `CaptureOptions.CustomerIDFunc`, then `CaptureOptions.CustomerID`. A request without a customer passes through and nothing is recorded. `X-Nozle-Feature` (also removed) or `Feature` sets the `feature` property; `CostMeterCode` adds categorized Cost Events. Chat completion streams are sent with `stream_options.include_usage`; set `SkipStreamUsage` for a server that rejects the field.
+The customer for a request is, in order: the `X-Nozle-Customer-Id` request header (removed before the request is sent), `WithCustomer` on the request context, `CaptureOptions.CustomerIDFunc`, then `CaptureOptions.CustomerID`. A request without a customer passes through and nothing is recorded. `X-Nozle-Feature` (also removed) or `Feature` sets the `feature` property; `CostMeterCode` adds categorized Cost Events. Chat completion streams are sent with `stream_options.include_usage`; set `SkipStreamUsage` for a server that rejects the field. `OnError` also receives, once per event code, a `*nozle.SetupError` with `Code` `feature_not_found` when no Feature has the event code.
 
 `client.RecordUsage(ctx, nozle.ProviderCapture{CustomerID: ..., Model: ..., RequestID: ...}, nozle.Usage{InputTokens: ..., OutputTokens: ...})` records usage your code read itself.
 

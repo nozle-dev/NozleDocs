@@ -53,7 +53,7 @@ client.chat.completions.create(
 | `feature` | Stored as the `feature` property. |
 | `cost_meter_code` | Also send one Cost Event per token category to this Cost Event Meter. |
 | `include_stream_usage` | Default `True`: chat completion streams are sent with `stream_options.include_usage`. Set `False` for a server that rejects the field. |
-| `on_error` | Called with a recording failure. Without it, a `NozleTrackingWarning` is emitted. The provider response is never affected. |
+| `on_error` | Called with a recording failure, and once per event code with an error whose `code` is `feature_not_found` when no Feature has that code. Without it, a `NozleTrackingWarning` is emitted. The provider response is never affected. |
 
 Recording runs in a background thread after the response has been read.
 
