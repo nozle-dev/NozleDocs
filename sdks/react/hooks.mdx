@@ -1,17 +1,84 @@
 ---
 title: "Provider and hooks"
-description: "Read the public catalog, start merchant-backed checkout, and access the React SDK context."
+description: "Read the public catalog and the signed-in customer's subscription, entitlements, credits and usage with TanStack Query hooks."
 ---
 
-The current React SDK exports two data hooks: `usePlans` and `useCheckoutSession`. Customer-specific hooks such as `useCan`, `useUsage`, and `usePlan` are intentionally not browser exports; retrieve that state from your authenticated backend.
+The data hooks are built on [TanStack Query](https://tanstack.com/query) v5, a peer dependency:
 
-For customer subscription self-service, use the [billing portal action adapters](/sdks/react/billing-portal). They provide scoped load, preview, apply and recovery callbacks; there is no new generic customer-data hook.
+```bash
+npm install @nozle-js/react @tanstack/react-query
+```
+
+`usePlans` reads the public plan catalog with the publishable key. The customer hooks read the signed-in customer's billing data from a route on your own backend, so the browser never holds a secret key and can only see its own customer.
+
+## Customer hooks
+
+### Serve the hooks from your backend
+
+`createBillingHandler` from `@nozle-js/node` is a web-standard request handler that serves every customer hook with your secret key. The customer always comes from `getCustomerId`, read from your session; a customer id sent by the browser is ignored.
+
+```ts title="app/api/nozle/[route]/route.ts"
+import { Nozle, createBillingHandler } from '@nozle-js/node'
+import { auth } from '@/lib/auth'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
+export const GET = createBillingHandler(nozle, {
+  getCustomerId: async (request) => (await auth(request))?.workspaceId,
+})
+```
+
+The last path segment picks the route: `subscription`, `entitlement`, `credits`, `credit-history`, `usage` or `preview`. The handler answers `401` without a customer, passes Nozle's `4xx` errors through with their `code`, and answers `502 billing_unavailable` for upstream failures without internal detail. It runs in Next.js route handlers, Hono, Remix, Bun and Deno.
+
+Then point the provider at it:
+
+```tsx
+<BillingProvider
+  publishableKey="pk_..."
+  billingEndpoint="/api/nozle"
+  billingHeaders={() => ({ 'X-CSRF-Token': csrfToken })}
+>
+  {children}
+</BillingProvider>
+```
+
+`billingHeaders` adds headers such as a CSRF token. Pass your app's `queryClient` to share its cache and devtools; without one the provider makes its own. The hooks pass their client explicitly and never replace your app's `QueryClientProvider`.
+
+### The hooks
+
+Each hook returns TanStack Query's result (`data`, `isPending`, `error`, `refetch` and the rest).
+
+| Hook | `data` | Use with |
+|---|---|---|
+| `useSubscription()` | `{ subscription, pending_change }`: plan, status, `ending_at` and a scheduled change; nulls without a subscription | An "upgrade" or "ends on" banner |
+| `useEntitlement(featureCode)` | `allowed`, `used`, `limit`, `remaining` (the `can()` result) | `FeatureGate`, `UsageMeter` |
+| `useCreditBalance(creditSystemCode?)` | One balance: the given credit system, else the first with credits | `<CreditBalance balance={data} />` |
+| `useCreditHistory({ creditSystemCode?, limit? })` | Paged operations; `operations` flattens the loaded pages | `<CreditHistory operations={operations} hasMore={hasNextPage} onLoadMore={fetchNextPage} />` |
+| `useUsage({ period })` | `period: "current"` (default): this period's usage; `"past"`: past periods | `<UsageBreakdown usage={data} />`, `<UsageTrend periods={data} />` |
+| `useUpgradePreview(planCode)` | The price of changing to `planCode`, now and at the effective date; waits until a plan is given | A confirm step before a plan change |
+
+`useBillingRefresh()` returns a function that reloads every billing hook, for example after checkout or a plan change.
+
+```tsx
+import { CreditBalance, useCreditBalance, useEntitlement } from '@nozle-js/react'
+
+function AiPanel() {
+  const credits = useCreditBalance()
+  const entitlement = useEntitlement('ai_calls')
+  if (entitlement.data && !entitlement.data.allowed) return <p>Upgrade to keep using AI.</p>
+  return <CreditBalance balance={credits.data} isLoading={credits.isPending} error={credits.error} />
+}
+```
+
+A failed request throws `BillingRequestError` with `status`, `code` and `requestId`. A `4xx` is not retried; other failures are retried twice.
+
+For subscription changes with confirmation and recovery, use the [billing portal action adapters](/sdks/react/billing-portal).
 
 ## `usePlans`
 
 Fetches `GET /api/v1/plans` through the `BillingProvider` catalog client.
 
-Each `usePlans` call makes its own request; there is no shared cache, so two components that call it make two requests. The hook refetches when `publishableKey` or `baseUrl` changes. While it refetches, `plans` is `[]` and `isLoading` is `true`. `usePlans` does not fetch during server rendering; it renders the initial loading state.
+Calls share one cached request per `publishableKey` and `baseUrl`, kept for five minutes. A failed load is not retried automatically; call `refetch()`. `usePlans` does not fetch during server rendering; it renders the initial loading state.
 
 ```tsx
 import { usePlans } from '@nozle-js/react'
@@ -37,6 +104,7 @@ function PlanList() {
 | `plans` | `CatalogPlan[]` | Every plan of the organization, as the catalog returns it. See [what the type declares](#catalogplan-type-versus-runtime). |
 | `isLoading` | `boolean` | `true` until the catalog request settles. |
 | `error` | `Error \| null` | Set when the request fails: `HTTP <status>` (for example `HTTP 500`) or the thrown message, such as `Failed to fetch`. `plans` is `[]`. |
+| `refetch` | `() => Promise` | Loads the catalog again. |
 
 ### `CatalogPlan`: type versus runtime
 
