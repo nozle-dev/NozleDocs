@@ -25,7 +25,7 @@ These exports are available in React `0.10.2`. See [Billing portal and self-serv
 
 ### `PricingTable`
 
-Renders responsive plan cards, an optional monthly/annual toggle, current-plan state, highlighted plans, and checkout actions.
+Renders responsive plan cards, an optional monthly/annual toggle, current-plan state, highlighted plans, and checkout actions. Each card lists what the plan gives, built from the catalog: entitlements, credit grants and flat per-unit usage prices.
 
 ```tsx
 import { PricingTable } from '@nozle-js/react'
@@ -57,7 +57,7 @@ If its own catalog request fails, `PricingTable` renders `Plans could not be loa
 |---|---|---|---|
 | `currentPlanCode` | `string` | — | Plan displayed as current and disabled. |
 | `plans` | `PricingPlan[]` | Public catalog | Caller-supplied plan list. |
-| `features` | `string[][]` | — | Feature lists aligned to the rendered plan order. |
+| `features` | `string[][]` | Built from the plan | Feature lists aligned to the rendered plan order. A list you pass for a plan replaces the generated one. |
 | `onSelect` | `(plan) => void` | Provider checkout | Overrides built-in checkout selection. |
 | `returnUrl` | `string` | Current URL | Return URL sent to `createCheckout`. |
 | `onStripeClientSecret` | `(secret) => void` | — | Receives embedded Stripe checkout secrets. |
@@ -68,7 +68,19 @@ If its own catalog request fails, `PricingTable` renders `Plans could not be loa
 | `className` | `string` | — | Class applied to the root container. |
 | `enterpriseEmail` | `string` | — | Opens a prefilled mail link for enterprise/custom plans. |
 
-`PricingPlan` contains `code`, `name`, `amount_cents`, `amount_currency`, `interval`, and optional `description`.
+`PricingPlan` contains `code`, `name`, `amount_cents`, `amount_currency`, `interval`, and optional `description`, `entitlements`, `credit_grant_rules` and `charges`. The three optional arrays are what the public catalog returns; see the [public plan catalog](/api/list-plans).
+
+The generated feature list has one line per item, in this order:
+
+| Source | Line |
+|---|---|
+| Metered entitlement with a `usage_limit` | `100,000 API calls` |
+| Metered entitlement without a limit, and boolean entitlements | The entitlement name |
+| `config` entitlement | `Support: priority` (one line per privilege value) |
+| Credit grant rule | `500 ai credits every month`, `10 credits (one time)` |
+| `standard` usage charge | `$0.01 per api calls` |
+
+Tiered, package, volume and percentage charges do not produce a line; pass `features` for those. Call `planFeatures(plan)` to get the same lines for your own layout.
 
 ### `PlanCard`
 
