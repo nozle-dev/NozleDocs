@@ -72,7 +72,15 @@ try {
 
 ## Retry behavior
 
-The SDK does not retry. Every call is one request with `AbortSignal.timeout(timeout)`; the default `timeout` is 10 seconds.
+By default the SDK does not retry: every call is one request with a per-attempt timeout (`timeout`, default 10 seconds). Set `maxRetries` to retry network errors, timeouts, `429` and `5xx` with backoff, or after `NozleApiError.retryAfter` seconds when the service sent `Retry-After`:
+
+```ts
+const nozle = new Nozle({ maxRetries: 2, retryDelayMs: 500 })
+```
+
+Only requests that are safe to repeat are retried: reads, calls that carry an idempotency key (such as `usage.track`), event, cost event and customer writes, and the read-only usage check and transition preview. `subscribe`, `checkout` and other writes without a key are never retried.
+
+To retry in your own code instead:
 
 - Retry only after a network error, a `429`, or a `5xx`.
 - Retry with the same idempotency key and the same request, including the `timestamp`.

@@ -59,7 +59,7 @@ The transport redacts known secret, token, authorization, and key fields and rep
 
 ## Retry behavior
 
-The SDK configures zero automatic HTTP retries. This avoids replaying mutations without application context.
+By default the SDK does not retry, so a mutation is never replayed without application context. Set `max_retries` (and optionally `retry_delay`) to retry network errors, timeouts, `429` and `5xx` with backoff, or after `NozleAPIError.retry_after` seconds when the service sent `Retry-After`. Only requests that are safe to repeat are retried: reads, calls that carry an idempotency key (such as `usage.track`), event, cost event and customer writes, and the read-only usage check and transition preview. `subscribe`, `checkout` and other writes without a key are never retried.
 
 - For idempotent Entity, credit-transfer, and usage mutations, retry with the same idempotency key and payload.
 - For `track()`, retry the same event with the same transaction ID.
