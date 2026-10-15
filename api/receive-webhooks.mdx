@@ -1,0 +1,100 @@
+---
+title: "Receive Nozle webhooks"
+description: "Webhooks Nozle sends to your endpoint: how to register one, verify the signature, and handle retries"
+---
+
+Nozle sends a JSON `POST` to your endpoint when something changes, for example `subscription.started` or `invoice.payment_status_updated`. This page is about those webhooks. For the events Stripe and Razorpay send to Nozle, see [Webhooks](/api/webhooks).
+
+## Register an endpoint
+
+Create an endpoint in the dashboard under **Developers > Webhooks**, or with `POST /webhook_endpoints`:
+
+```json
+{
+  "webhook_endpoint": {
+    "webhook_url": "https://app.example.com/nozle/webhooks",
+    "signature_algo": "hmac"
+  }
+}
+```
+
+`signature_algo` is `jwt` (the default) or `hmac`. The URL must be valid and each URL can be registered once per organization. The dashboard form selects `hmac` by default, while the API uses `jwt` when you send no value. The API reference has a Webhook Endpoints section.
+
+Each delivery is a JSON body with a `webhook_type` such as `subscription.started` and the object it is about, for example `subscription`. The event types are listed in the API reference under Webhooks.
+
+## Headers
+
+| Header | Value |
+|---|---|
+| `X-Nozle-Signature` | The signature of the body, in the format set by `signature_algo`. |
+| `X-Nozle-Signature-Algorithm` | `jwt` or `hmac`. |
+| `X-Nozle-Unique-Key` | The delivery ID. It is the same on every attempt of one webhook. |
+
+## Verify the signature
+
+Verify the **raw request body** before you parse it. A framework that parses and re-serialises the JSON can change the bytes and break the check.
+
+### `hmac`
+
+The signature is `Base64(HMAC-SHA256(hmac_key, raw body))`. The `hmac_key` is your organization's signing secret, shown on the **Developers > Webhooks** page of the dashboard.
+
+<Tabs>
+<Tab title="Node.js">
+```ts
+import { createHmac, timingSafeEqual } from 'node:crypto'
+
+function isValid(rawBody: Buffer, signature: string, hmacKey: string): boolean {
+  const expected = createHmac('sha256', hmacKey).update(rawBody).digest()
+  const received = Buffer.from(signature, 'base64')
+  return received.length === expected.length && timingSafeEqual(received, expected)
+}
+```
+</Tab>
+<Tab title="Python">
+```python
+import base64, hashlib, hmac
+
+def is_valid(raw_body: bytes, signature: str, hmac_key: str) -> bool:
+    expected = hmac.new(hmac_key.encode(), raw_body, hashlib.sha256).digest()
+    return hmac.compare_digest(base64.b64decode(signature), expected)
+```
+</Tab>
+<Tab title="Go">
+```go
+func isValid(rawBody []byte, signature, hmacKey string) bool {
+	received, err := base64.StdEncoding.DecodeString(signature)
+	if err != nil {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(hmacKey))
+	mac.Write(rawBody)
+	return hmac.Equal(received, mac.Sum(nil))
+}
+```
+</Tab>
+</Tabs>
+
+### `jwt`
+
+The signature is an RS256 JWT. Its claims are `data`, the payload as a JSON string, and `iss`. Fetch the public key from `GET /webhooks/json_public_key` with your secret key. The response is `{"webhook": {"public_key": "..."}}`, where the key is the PEM text encoded in Base64.
+
+```ts
+import jwt from 'jsonwebtoken'
+
+const pem = Buffer.from(publicKeyBase64, 'base64').toString('utf8')
+const claims = jwt.verify(signature, pem, { algorithms: ['RS256'] }) as { data: string }
+const isGenuine = claims.data === rawBody.toString('utf8')
+```
+
+Cache the key; it changes only when Nozle rotates it. The older `GET /webhooks/public_key` returns the same key as plain text and is deprecated.
+
+## Delivery, retries and ordering
+
+- Respond with a `2xx` within 30 seconds. Any other status, a timeout or a connection error is a failed attempt.
+- Nozle makes up to 3 attempts, the second about 3 seconds after the first and the third about 20 seconds after the second. After the third failure the webhook is marked failed and is not sent again.
+- Delivery is at least once. Deduplicate on `X-Nozle-Unique-Key`.
+- Order is not guaranteed. Treat a payload as the state of the object at that moment and read the object from the API when you need the latest.
+- The signature does not contain a timestamp, so a replayed delivery cannot be rejected by its age. The unique key is what protects you from handling one twice.
+- Return `200` for event types you do not handle, so they are not retried.
+
+Nozle keeps delivery records for 90 days.
