@@ -30725,6 +30725,9 @@ components:
                     enum:
                       - immediate
                       - end_of_period
+                required:
+                  - direction
+                  - timing
         checkout:
           type:
             - object
@@ -30738,6 +30741,10 @@ components:
               type: string
             plan_code:
               type: string
+          required:
+            - id
+            - status
+            - plan_code
     BillingTransitionRequest:
       type: object
       additionalProperties: false
@@ -33280,9 +33287,17 @@ components:
         mode:
           type: string
           description: Decision used when a threshold is broken. `deny` denies the request.
+          enum:
+            - allow
+            - warn
+            - deny
         on_unavailable:
           type: string
           description: Decision used when economics are not `estimated` or cannot be compared.
+          enum:
+            - allow
+            - warn
+            - deny
         minimum_margin_amount:
           type: string
           description: Decimal string. Absent when not set.
@@ -33298,6 +33313,10 @@ components:
         decision:
           type: string
           description: '`allow`, or the policy''s `mode` or `on_unavailable` value. `deny` sets `allowed` to `false` with reason `economic_policy_denied`.'
+          enum:
+            - allow
+            - warn
+            - deny
         reason:
           type: string
           description: Machine code such as `within_policy`, `maximum_estimated_cost_exceeded`, `minimum_margin_amount_not_met`, `minimum_margin_percentage_not_met`, `reporting_currency_mismatch` or `economics_<status>`.
