@@ -1,29 +1,27 @@
 ---
 title: Quickstart
-description: Track your first billable event and connect secure checkout
+description: Send your first billable event from your backend and read it back
 ---
+
+You are done when `can()` shows `used: 1` for a customer. Everything here runs on your backend. React pricing and checkout are covered in [Next steps](#next-steps).
 
 <Steps>
 
 <Step>
-## Create your Nozle account
+## Get a secret key
 
-Sign up at [app.nozle.dev](https://app.nozle.dev/signup) and create your first workspace.
-</Step>
-
-<Step>
-## Get your API keys
-
-From the dashboard, navigate to **Settings > API Keys**. Create the key types your integration needs:
+Sign up at [app.nozle.dev](https://app.nozle.dev/signup), create a workspace, then open **Settings > API Keys** and create a secret key.
 
 | Key prefix | Purpose | Use in |
 |------------|---------|--------|
-| `pk_` | Publishable key | Public plan catalog only |
-| `sk_` | Secret key | Server-side only (Node.js, Python, Go) |
+| `sk_` | Secret key | Your backend only (Node.js, Python, Go) |
+| `pk_` | Publishable key | Reading the public plan catalog from a browser |
 
 <Warning>
-Never expose your `sk_` secret key in client-side code. Use `pk_` only for public pricing and route every customer operation through your authenticated backend.
+Never put an `sk_` key in browser code. A `pk_` key can only read the plan catalog, so it cannot send events.
 </Warning>
+
+**You should have:** a key that starts with `sk_`. Store it as `NOZLE_SECRET_KEY` in your backend environment.
 </Step>
 
 <Step>
@@ -49,9 +47,9 @@ go get github.com/nozle-dev/nozle-go
 </Step>
 
 <Step>
-## Initialize the client
+## Create the client
 
-Set `NOZLE_SECRET_KEY` in your backend environment to your restricted `sk_` key, then create a Nozle client. The SDKs read that variable when you do not pass a key.
+The SDKs read `NOZLE_SECRET_KEY` when you do not pass a key.
 
 <Tabs>
 <Tab title="Node.js">
@@ -63,7 +61,6 @@ const nozle = new Nozle();
 </Tab>
 <Tab title="Python">
 ```python title="nozle_client.py"
-import os
 from nozle import Nozle
 
 nozle = Nozle()
@@ -71,36 +68,40 @@ nozle = Nozle()
 </Tab>
 <Tab title="Go">
 ```go title="nozle_client.go"
-import (
-  "os"
-  nozle "github.com/nozle-dev/nozle-go"
-)
+import nozle "github.com/nozle-dev/nozle-go"
 
 client := nozle.New("") // an empty key reads NOZLE_SECRET_KEY
 ```
 </Tab>
 </Tabs>
+
+**If it fails:** Node.js throws `Nozle: pass apiKey or set the NOZLE_SECRET_KEY environment variable`, Python raises `ValueError`, and Go panics with `nozle: apiKey must not be empty (pass it or set NOZLE_SECRET_KEY)`. The variable is not set in the process that runs your code.
 </Step>
 
 <Step>
-## Create the feature, plan, customer and subscription
+## Create a feature, a plan, a customer and a subscription
 
-Before sending an event, create a **metered Feature** with code `api_calls` in the dashboard. Add it to a **free plan** with code `quickstart_free`, using count aggregation and a limit of 10,000. Create a customer with external ID `customer_123` and activate a subscription to that plan. See [plans](/guides/billing/plans) and [subscriptions](/guides/billing/subscriptions) for the configuration steps.
+In the dashboard:
 
-Use the same Feature code, customer ID and subscription in the calls below. A placeholder customer without an active subscription cannot complete this quickstart. If the customer has multiple active subscriptions, pass the target external subscription ID explicitly using the SDK's [event options](/sdks/node/tracking-events).
+1. Create a **metered feature** with code `api_calls`.
+2. Create a **free plan** with code `quickstart_free`. Add the feature with count aggregation and a limit of 10,000.
+3. Create a customer with external ID `customer_123`.
+4. Activate a subscription for that customer on `quickstart_free`.
 
-This free count-based example does not charge a payment method or configure cost rating. The optional `tokens` metadata does not change the count: each unique event increments usage by one.
+See [plans](/guides/billing/plans) and [subscriptions](/guides/billing/subscriptions) for the screens. This plan is free, so no payment method or cost rating is needed.
+
+**You should see:** `customer_123` with one active subscription on `quickstart_free`.
 </Step>
 
 <Step>
-## Track your first event
+## Send your first event
 
-Send a billable event with metadata. If you do not pass a subscription ID, the SDK looks up the customer's active subscription. Node.js and Python look it up once per customer and keep it. From Node.js `0.10.0` and Python `0.10.0` the client clears that entry after its own `subscribe`, `checkout`, cancel and plan-change calls; earlier versions never refreshed it. A change made outside that client instance, or by a payment that completes later, still needs an explicit subscription ID. Go looks it up on every call, which adds one request. Tracking fails when the customer has no active subscription or more than one.
+The event name is the feature code, `api_calls`. Each event adds one to the count; `tokens` is metadata and does not change it.
 
 <Tabs>
 <Tab title="Node.js">
 ```ts
-await nozle.track('customer_123', 'api_calls', {
+const transactionId = await nozle.track('customer_123', 'api_calls', {
   model: 'example-model',
   tokens: 1500,
 });
@@ -108,7 +109,7 @@ await nozle.track('customer_123', 'api_calls', {
 </Tab>
 <Tab title="Python">
 ```python
-nozle.track("customer_123", "api_calls", {
+transaction_id = nozle.track("customer_123", "api_calls", {
     "model": "example-model",
     "tokens": 1500,
 })
@@ -126,127 +127,55 @@ if err != nil { return err }
 </Tab>
 </Tabs>
 
-Events are matched against your Feature definitions. For this count-based example, wait for asynchronous processing, then expect `used: 1`, `limit: 10000` and `remaining: 9999`. To meter token quantities instead, configure a separate sum-based Feature with `tokens` as its aggregation property.
+**You should get:** the event's transaction ID back in Node.js and Python (a UUID string), and no error in Go. Without a subscription ID the SDK looks up the customer's active subscription, so the call needs exactly one.
+
+**If it fails:**
+
+| What you see | Cause and fix |
+|---|---|
+| `No active subscription for customer 'customer_123'` | The customer has no active subscription. Finish the previous step. |
+| `Customer 'customer_123' has 2 active subscriptions — pass subscriptionId explicitly` | Pass the subscription's external ID in the [event options](/sdks/node/tracking-events). |
+| A `401` response (Node.js: `track failed: 401 Unauthorized`) | The key is wrong or revoked. Create a new `sk_` key. |
+| A `403` response (Node.js: `subscription lookup failed: 403 Forbidden`) | The key is a `pk_` key. Use an `sk_` key. |
 </Step>
 
 <Step>
-## Check entitlements
-
-Before executing an expensive operation, check whether the customer still has capacity on their plan.
+## Read it back
 
 <Tabs>
 <Tab title="Node.js">
 ```ts
 const result = await nozle.can('customer_123', 'api_calls');
-// {
-//   allowed: true,
-//   remaining: 9999,
-//   limit: 10000,
-//   used: 1
-// }
-
-if (!result.allowed) {
-  throw new Error('Usage limit reached — upgrade your plan');
-}
+// { allowed: true, remaining: 9999, limit: 10000, used: 1 }
 ```
 </Tab>
 <Tab title="Python">
 ```python
 result = nozle.can("customer_123", "api_calls")
-# {
-#   "allowed": True,
-#   "remaining": 9999,
-#   "limit": 10000,
-#   "used": 1
-# }
-
-if not result["allowed"]:
-    raise Exception("Usage limit reached — upgrade your plan")
+# {"allowed": True, "remaining": 9999, "limit": 10000, "used": 1}
 ```
 </Tab>
 <Tab title="Go">
 ```go
 result, err := client.Can(ctx, "customer_123", "api_calls")
 if err != nil { return err }
-if !result.Allowed { return errors.New("usage limit reached — upgrade your plan") }
+// result.Allowed == true; the used, limit and remaining fields are in the result
 ```
 </Tab>
 </Tabs>
 
-The response includes `remaining`, `limit`, and `used` fields so you can show usage progress in your UI. Event processing is asynchronous; an immediate read may still show the earlier count. `can()` is a point-in-time check and does not reserve quota. Handle dependency errors as unavailable decisions, and read the [production integration checklist](/guides/getting-started/production-readiness) before accepting customer traffic.
-</Step>
+**You should get:** `used: 1`, `limit: 10000` and `remaining: 9999`.
 
-<Step>
-## Add React billing components
+**If `used` is `0`:** events are processed asynchronously, so wait a few seconds and call `can()` again. If it stays at `0`, check that the event name matches the feature code exactly (`api_calls`) and that the event was sent for the customer you are reading.
 
-Install the React SDK to get pre-built billing UI components.
-
-```bash
-npm install @nozle-js/react
-```
-
-Use a publishable key for public pricing. Provide a callback that calls your own authenticated backend for checkout:
-
-```tsx title="app/providers.tsx"
-import { BillingProvider, PricingTable } from '@nozle-js/react';
-
-export function Providers({ csrfToken }: { csrfToken: string }) {
-  return (
-    <BillingProvider
-      publishableKey="pk_..."
-      createCheckout={async ({ planCode, returnUrl }) => {
-        const response = await fetch('/api/billing/checkout', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
-          body: JSON.stringify({planCode, returnUrl}),
-        })
-        if (!response.ok) throw new Error('Checkout failed')
-        return response.json()
-      }}
-    >
-      <PricingTable returnUrl={window.location.href} />
-    </BillingProvider>
-  );
-}
-```
-
-Your backend authenticates the user, derives their Nozle customer, validates the plan and return URL, and calls Nozle with a restricted secret key.
-</Step>
-
-<Step>
-## Show a pricing table and checkout
-
-Drop in a `PricingTable` to display plans. Its CTA invokes the merchant callback configured above.
-
-```tsx title="app/pricing/page.tsx"
-import { PricingTable } from '@nozle-js/react';
-
-export default function PricingPage() {
-  return (
-    <div>
-      <h1>Choose your plan</h1>
-      <PricingTable returnUrl={window.location.href} />
-    </div>
-  );
-}
-```
-
-Fetch customer entitlements from your backend and pass the result into the presentational `FeatureGate`:
-
-```tsx
-import { FeatureGate } from '@nozle-js/react';
-
-function AiFeature({ allowed }: { allowed: boolean }) {
-  return <FeatureGate allowed={allowed} fallback={<p>Upgrade to continue.</p>}>AI feature</FeatureGate>;
-}
-```
+`can()` is a point-in-time check and does not reserve quota. Treat a dependency error as an unavailable decision, not as a denial.
 </Step>
 
 </Steps>
 
-## What's next
+## Next steps
 
-- [React SDK](/sdks/react/installation), [Node.js SDK](/sdks/node/installation), [Python SDK](/sdks/python/installation), and [Go SDK](/sdks/go/installation)
-- [Billing Concepts](/guides/getting-started/concepts) -- plans, metrics, and subscriptions
-- [Entitlements](/guides/entitlements/overview) -- advanced gating with margin-aware rules
+- [Production integration checklist](/guides/getting-started/production-readiness): event delivery, credits, cost rating and payments, before you accept customer traffic.
+- [Show a pricing table and checkout](/sdks/react/installation) with `@nozle-js/react`, and the [merchant backend](/guides/getting-started/merchant-backend-bff) that creates checkout sessions.
+- SDK references: [Node.js](/sdks/node/installation), [Python](/sdks/python/installation), [Go](/sdks/go/installation).
+- [Billing concepts](/guides/getting-started/concepts) and [entitlements](/guides/entitlements/overview).
