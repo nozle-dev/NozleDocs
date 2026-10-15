@@ -4547,11 +4547,10 @@ paths:
 
         **Publishable keys.** A publishable `pk_` key may call this endpoint and `GET /plans/{code}`, and nothing else. Any other request with a `pk_` key returns `403` with the code `publishable_key_not_allowed`.
 
-        With a `pk_` key you receive the same body a secret key receives: every plan in full, with `charges`, `taxes`, `minimum_commitment`, `usage_thresholds`, `entitlements`, `credit_grant_rules`, `credit_pool_policies` and `metadata`. The response is not reduced to a display subset.
+        With a `pk_` key you receive a trimmed plan, still with `charges`, `taxes`, `minimum_commitment`, `usage_thresholds`, `entitlements`, `credit_grant_rules`, `credit_pool_policies` and `metadata`. Invoice names, internal ids, margin settings, grant policies and timestamps are left out, and plans pending deletion are not returned. A secret key receives the whole plan.
 
-        - All top-level plans of the organization are returned, newest first. There is no listed or public flag. Plans with a trial (`trial_period`), pay-in-arrears plans (`pay_in_advance: false`) and plans pending deletion (`pending_deletion: true`) are included. Per-customer override plans (`parent_id` set) are not.
+        - All top-level plans of the organization are returned, newest first. There is no listed or public flag. Plans with a trial (`trial_period`) and pay-in-arrears plans (`pay_in_advance: false`) are included. Plans pending deletion (`pending_deletion: true`) are included for a secret key only. Per-customer override plans (`parent_id` set) are not.
         - Items do not include `fixed_charges`; use `GET /plans/{code}` for those.
-        - `customers_count`, `active_subscriptions_count` and `draft_invoices_count` are always `0`.
         - The Engine host serves this list at `https://api.nozle.app/engine/api/v1/plans` with the same body. Engine ignores `page` and `per_page` and returns the first page (up to 100 plans). Use this Core endpoint to page through larger catalogs.
 
         Because a publishable key ships in browsers, anything stored on a plan is readable by anyone who has the key. See [Public plan catalog](/api/list-plans).
@@ -4584,9 +4583,6 @@ paths:
                       pay_in_advance: true
                       bill_charges_monthly: null
                       bill_fixed_charges_monthly: null
-                      customers_count: 0
-                      active_subscriptions_count: 0
-                      draft_invoices_count: 0
                       parent_id: null
                       pending_deletion: false
                       charges: []
@@ -4609,9 +4605,6 @@ paths:
                       pay_in_advance: false
                       bill_charges_monthly: null
                       bill_fixed_charges_monthly: null
-                      customers_count: 0
-                      active_subscriptions_count: 0
-                      draft_invoices_count: 0
                       parent_id: null
                       pending_deletion: false
                       charges:
@@ -4741,9 +4734,6 @@ paths:
                       pay_in_advance: true
                       bill_charges_monthly: null
                       bill_fixed_charges_monthly: null
-                      customers_count: 0
-                      active_subscriptions_count: 0
-                      draft_invoices_count: 0
                       parent_id: null
                       pending_deletion: false
                       charges:
@@ -20305,9 +20295,6 @@ components:
         - pay_in_advance
         - bill_charges_monthly
         - bill_fixed_charges_monthly
-        - customers_count
-        - active_subscriptions_count
-        - draft_invoices_count
         - parent_id
         - pending_deletion
       properties:
@@ -20381,24 +20368,6 @@ components:
             - 'null'
           description: This field, when set to `true`, enables to invoice fixed charges on monthly basis, even if the cadence of the plan is yearly or semiannual. This allows customers to pay fixed charges on a monthly basis. This can be set to true only if the plan's interval is `yearly` or `semiannual`.
           example: null
-        customers_count:
-          type: integer
-          enum:
-            - 0
-          description: Reserved. Always `0` in API responses, for every key type. It is not the number of customers on the plan. Do not rely on it.
-          example: 0
-        active_subscriptions_count:
-          type: integer
-          enum:
-            - 0
-          description: Reserved. Always `0` in API responses, for every key type. It is not the number of active subscriptions. Do not rely on it.
-          example: 0
-        draft_invoices_count:
-          type: integer
-          enum:
-            - 0
-          description: Reserved. Always `0` in API responses, for every key type. It is not the number of draft invoices. Do not rely on it.
-          example: 0
         parent_id:
           type:
             - string

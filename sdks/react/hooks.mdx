@@ -42,28 +42,27 @@ function PlanList() {
 
 The TypeScript type `CatalogPlan` declares five fields: `code`, `name`, `amount_cents`, `amount_currency` and `interval`.
 
-At runtime, each item in `plans` is the full plan object the API returned. `usePlans` does not remove or rename fields. Besides the five declared fields, a plan carries `nozle_id`, `invoice_display_name`, `description`, `trial_period`, `pay_in_advance`, `parent_id`, `pending_deletion`, `charges`, `entitlements`, `usage_thresholds`, `taxes`, `credit_grant_rules`, `credit_pool_policies`, `metadata` when set, and three counts (`customers_count`, `active_subscriptions_count`, `draft_invoices_count`) that are always `0`. See the [public plan catalog](/api/list-plans) for every field.
+At runtime, each item in `plans` is the trimmed plan object the API returns to a publishable key. `usePlans` does not remove or rename fields. Besides the five declared fields, a plan carries `nozle_id`, `description`, `trial_period`, `pay_in_advance`, `charges`, `entitlements`, `usage_thresholds`, `taxes`, `credit_grant_rules`, `credit_pool_policies`, and `metadata` when set. Invoice names, internal ids, margin settings, grant policies and timestamps are not sent to a publishable key. See the [public plan catalog](/api/list-plans) for every field.
 
-The list is not filtered. It includes trial plans, pay-in-arrears plans and plans with `pending_deletion: true`. Decide in your component which plans to show. To read an undeclared field, widen the type:
+The list is not filtered. It includes trial plans and pay-in-arrears plans, and not plans that are pending deletion. Decide in your component which plans to show. To read an undeclared field, widen the type:
 
 ```tsx
 import { usePlans, type CatalogPlan } from '@nozle-js/react'
 
 type CatalogPlanDetail = CatalogPlan & {
-  pending_deletion?: boolean
   trial_period?: number | null
   pay_in_advance?: boolean
 }
 
-function useSellablePlans() {
+function useNonTrialPlans() {
   const { plans, isLoading, error } = usePlans()
-  const sellable = (plans as CatalogPlanDetail[]).filter((plan) => !plan.pending_deletion)
-  return { plans: sellable, isLoading, error }
+  const nonTrial = (plans as CatalogPlanDetail[]).filter((plan) => plan.trial_period == null)
+  return { plans: nonTrial, isLoading, error }
 }
 ```
 
 <Warning>
-The publishable key is public, so every field of every plan, including charges, taxes, minimums, credit grants and `metadata`, is readable by anyone who has it. Do not put sensitive or negotiated pricing in plans of an organization whose publishable key you ship. See [Keep sensitive pricing out of the catalog](/api/list-plans#keep-sensitive-pricing-out-of-the-catalog).
+The publishable key is public, so every field it receives, including charges, taxes, minimums, credit grants and `metadata`, is readable by anyone who has it. Do not put sensitive or negotiated pricing in plans of an organization whose publishable key you ship. See [Keep sensitive pricing out of the catalog](/api/list-plans#keep-sensitive-pricing-out-of-the-catalog).
 </Warning>
 
 ## `useCheckoutSession`
