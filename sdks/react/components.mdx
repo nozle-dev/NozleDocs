@@ -338,6 +338,30 @@ Entitlements that are not metered, or have no result, are left out. A feature wi
 | `error` | `Error \| string \| null` | `null` | Shows the message as an alert instead of the rows. |
 | `emptyMessage` | `string` | `No usage to show yet.` | Shown when there are no rows. |
 
+### `UsageBreakdown` and `UsageTrend`
+
+Both render the usage your backend reads from Core and pass in. Neither fetches anything and neither holds a key. Read it on your backend with a secret key:
+
+- `GET https://api.nozle.app/core/api/v1/customers/{external_customer_id}/current_usage` returns `customer_usage` for the current period. Pass it to `UsageBreakdown`.
+- `GET https://api.nozle.app/core/api/v1/customers/{external_customer_id}/past_usage` returns `usage_periods`, one item per past period. Pass them to `UsageTrend`. The endpoint takes `periods_count` and `feature_code`.
+
+Both endpoints take `external_subscription_id` when the customer has more than one subscription. Both are in the Customers section of the API reference.
+
+```tsx
+import { UsageBreakdown, UsageTrend } from '@nozle-js/react'
+
+<UsageBreakdown usage={currentUsage.customer_usage} />
+<UsageTrend periods={pastUsage.usage_periods} />
+<UsageTrend periods={pastUsage.usage_periods} featureCode="emails" />
+```
+
+| Component | Shows | Props |
+|---|---|---|
+| `UsageBreakdown` | One period: each feature's name, units and amount, largest amount first, and the total. | `usage`, `isLoading`, `error`, `emptyMessage` |
+| `UsageTrend` | One bar per period, oldest first: the period amount, or the units of `featureCode` (zero where a period has none). | `periods`, `featureCode`, `isLoading`, `error`, `emptyMessage` |
+
+Each has a loading placeholder, an error message and an empty message. A charge's `invoice_display_name` is used as the row name when it is set; otherwise the feature name.
+
 ### `UsageAlert`
 
 ```tsx
