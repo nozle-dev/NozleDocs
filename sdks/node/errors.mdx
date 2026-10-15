@@ -81,4 +81,4 @@ The SDK does not retry. Every call is one request with `AbortSignal.timeout(time
 
 ## Idempotency
 
-`usage.track()` needs an `idempotencyKey`. A retry with an identical request returns the original result, including a denial, and does not charge again. The same key with a different request returns `409`. If you omit `timestamp`, the SDK uses the current time, so a retry is a different request. See [product credits](/sdks/node/credits#atomic-usage-tracking) and [usage tracking](/guides/credits/usage-tracking).
+`usage.track()` needs an `idempotencyKey`. A retry with an identical request returns the original result, including a denial, and does not charge again. The same key with a different request returns `409`. If you omit `timestamp`, the SDK fills in the current time once per idempotency key and reuses it for a retry on the same client. Pass a fixed `timestamp` for a retry from another process or after a restart. See [product credits](/sdks/node/credits#atomic-usage-tracking) and [usage tracking](/guides/credits/usage-tracking).
