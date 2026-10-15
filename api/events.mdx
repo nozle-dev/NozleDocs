@@ -30,8 +30,8 @@ See [Node.js event tracking](/sdks/node/tracking-events), [Python event tracking
 | Field | Required | Description |
 |---|---|---|
 | `transaction_id` | no | Organization-wide identifier for the logical event. Nozle generates and returns a version 7 universally unique identifier when omitted. Preserve the identifier and complete payload on retries. |
-| `external_customer_id` | yes | Customer that generated usage. |
-| `external_subscription_id` | recommended | Subscription receiving usage. Required when resolution would be ambiguous. |
+| `external_subscription_id` | yes, in practice | Subscription receiving usage. Ingestion does not check that it is present, but it is the only field that links the event to a customer, so always send it. The SDKs look it up from the customer when you do not pass it. |
+| `external_customer_id` | no | Accepted and ignored: ingestion stores no customer ID. The SDKs send it and use it only to look up the subscription first. |
 | `code` | yes | Feature code. |
 | `properties` | no | Aggregation and attribution metadata. |
 | `timestamp` | no | Unix seconds for direct HTTP requests. The SDKs normalize their supported timestamp inputs to this wire format. |

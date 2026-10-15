@@ -1822,6 +1822,27 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const customer = await nozle.customers.upsert({
+              externalId: 'cust_123',
+              name: 'Acme',
+              email: 'billing@acme.example',
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            customer = nozle.customers.upsert("cust_123", name="Acme", email="billing@acme.example")
+        - lang: Go
+          label: Go
+          source: |-
+            customer, err := client.UpsertCustomer(ctx, nozle.Customer{
+            	ExternalID: "cust_123",
+            	Name:       "Acme",
+            	Email:      "billing@acme.example",
+            })
     get:
       tags:
         - Customers
@@ -3282,6 +3303,31 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const transactionId = await nozle.track('cust_123', 'api_calls', { tokens: 1200 }, {
+              subscriptionId: 'sub_123',
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            transaction_id = nozle.track(
+                "cust_123",
+                "api_calls",
+                {"tokens": 1200},
+                subscription_id="sub_123",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            err := client.Track(ctx, nozle.TrackParams{
+            	CustomerID:     "cust_123",
+            	SubscriptionID: "sub_123",
+            	Event:          "api_calls",
+            	Metadata:       map[string]any{"tokens": 1200},
+            })
     get:
       tags:
         - Events
@@ -3373,6 +3419,14 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: Go
+          label: Go
+          source: |-
+            err := client.Meter(ctx, []nozle.MeterEvent{
+            	{CustomerID: "cust_123", SubscriptionID: "sub_123", Event: "api_calls", Metadata: map[string]any{"tokens": 1200}},
+            	{CustomerID: "cust_123", SubscriptionID: "sub_123", Event: "api_calls", Metadata: map[string]any{"tokens": 800}},
+            })
   /events/estimate_fees:
     post:
       tags:
@@ -3506,6 +3560,31 @@ paths:
         '503':
           description: Kafka could not durably acknowledge the Cost Event
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const accepted = await nozle.costEvents.track({
+              costMeterCode: 'ai_tokens',
+              parentTransactionId: 'txn_123',
+              properties: { tokens: 900, model: 'example-model', type: 'input' },
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            accepted = nozle.cost_events.track(
+                cost_meter_code="ai_tokens",
+                parent_transaction_id="txn_123",
+                properties={"tokens": 900, "model": "example-model", "type": "input"},
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            accepted, err := client.TrackCostEvent(ctx, nozle.CostEventParams{
+            	CostMeterCode:       "ai_tokens",
+            	ParentTransactionID: "txn_123",
+            	Properties:          map[string]any{"tokens": 900, "model": "example-model", "type": "input"},
+            })
   /cost-intelligence/shared-costs/{id}/preview:
     parameters:
       - name: id
@@ -7699,6 +7778,19 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const options = await nozle.subscriptionOptions('cust_123', 'sub_123')
+        - lang: Python
+          label: Python
+          source: |-
+            options = nozle.subscription_options("cust_123", "sub_123")
+        - lang: Go
+          label: Go
+          source: |-
+            options, err := client.SubscriptionOptions(ctx, "cust_123", "sub_123")
   /subscriptions/preview:
     post:
       servers:
@@ -7779,6 +7871,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/EngineError'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const quote = await nozle.previewSubscriptionChange('cust_123', 'sub_123', 'pro')
+        - lang: Python
+          label: Python
+          source: |-
+            quote = nozle.preview_subscription_change("cust_123", "sub_123", "pro")
+        - lang: Go
+          label: Go
+          source: |-
+            quote, err := client.PreviewSubscriptionChange(ctx, "cust_123", "sub_123", "pro")
   /subscribe:
     post:
       servers:
@@ -7840,6 +7945,19 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const subscription = await nozle.subscribe('cust_123', 'free')
+        - lang: Python
+          label: Python
+          source: |-
+            subscription = nozle.subscribe("cust_123", "free")
+        - lang: Go
+          label: Go
+          source: |-
+            subscription, err := client.Subscribe(ctx, nozle.SubscribeParams{CustomerID: "cust_123", PlanCode: "free"})
   /checkout:
     post:
       servers:
@@ -7971,6 +8089,31 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const checkout = await nozle.checkout('cust_123', 'pro', 'https://app.example.com/billing', {
+              idempotencyKey: 'checkout-cust_123-pro-v1',
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            checkout = nozle.checkout(
+                "cust_123",
+                "pro",
+                return_url="https://app.example.com/billing",
+                idempotency_key="checkout-cust_123-pro-v1",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            checkout, err := client.Checkout(ctx, nozle.CheckoutParams{
+            	CustomerID:     "cust_123",
+            	PlanCode:       "pro",
+            	ReturnURL:      "https://app.example.com/billing",
+            	IdempotencyKey: "checkout-cust_123-pro-v1",
+            })
   /checkout/{id}:
     get:
       servers:
@@ -8051,6 +8194,19 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const status = await nozle.checkoutStatus('chk_123')
+        - lang: Python
+          label: Python
+          source: |-
+            status = nozle.checkout_status("chk_123")
+        - lang: Go
+          label: Go
+          source: |-
+            status, err := client.CheckoutStatus(ctx, "chk_123", nozle.CheckoutScope{})
   /checkout/{id}/verify:
     post:
       servers:
@@ -8151,6 +8307,34 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const status = await nozle.verifyCheckout('chk_123', {
+              razorpay_order_id: 'order_123',
+              razorpay_payment_id: 'pay_123',
+              razorpay_signature: 'signature_from_razorpay',
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            status = nozle.verify_checkout(
+                "chk_123",
+                {
+                    "razorpay_order_id": "order_123",
+                    "razorpay_payment_id": "pay_123",
+                    "razorpay_signature": "signature_from_razorpay",
+                },
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            status, err := client.VerifyCheckout(ctx, "chk_123", nozle.RazorpayVerification{
+            	RazorpayOrderID:   "order_123",
+            	RazorpayPaymentID: "pay_123",
+            	RazorpaySignature: "signature_from_razorpay",
+            }, nozle.CheckoutScope{})
   /billing/upgrade:
     post:
       servers:
@@ -8356,6 +8540,36 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const preview = await nozle.previewSubscriptionTransition({
+              customerId: 'cust_123',
+              subscriptionId: 'sub_123',
+              operation: 'cancel',
+              timing: 'end_of_period',
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            preview = nozle.preview_subscription_transition(
+                {
+                    "customer_id": "cust_123",
+                    "subscription_id": "sub_123",
+                    "operation": "cancel",
+                    "timing": "end_of_period",
+                }
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            preview, err := client.PreviewSubscriptionTransition(ctx, nozle.SubscriptionTransitionParams{
+            	CustomerID:     "cust_123",
+            	SubscriptionID: "sub_123",
+            	Operation:      "cancel",
+            	Timing:         "end_of_period",
+            })
   /subscriptions/transitions:
     post:
       servers:
@@ -8455,6 +8669,40 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const transition = await nozle.applySubscriptionTransition(
+              {
+                customerId: 'cust_123',
+                subscriptionId: 'sub_123',
+                operation: 'cancel',
+                timing: 'end_of_period',
+              },
+              'cancel-sub_123-v1',
+            )
+        - lang: Python
+          label: Python
+          source: |-
+            transition = nozle.apply_subscription_transition(
+                {
+                    "customer_id": "cust_123",
+                    "subscription_id": "sub_123",
+                    "operation": "cancel",
+                    "timing": "end_of_period",
+                },
+                idempotency_key="cancel-sub_123-v1",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            transition, err := client.ApplySubscriptionTransition(ctx, nozle.SubscriptionTransitionParams{
+            	CustomerID:     "cust_123",
+            	SubscriptionID: "sub_123",
+            	Operation:      "cancel",
+            	Timing:         "end_of_period",
+            }, "cancel-sub_123-v1")
   /subscriptions/transitions/withdraw:
     post:
       servers:
@@ -8548,6 +8796,29 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const withdrawn = await nozle.withdrawPendingSubscriptionChange(
+              'cust_123',
+              'sub_123',
+              'sub_pending_123',
+              'withdraw-sub_pending_123-v1',
+            )
+        - lang: Python
+          label: Python
+          source: |-
+            withdrawn = nozle.withdraw_pending_subscription_change(
+                "cust_123",
+                "sub_123",
+                "sub_pending_123",
+                idempotency_key="withdraw-sub_pending_123-v1",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            withdrawn, err := client.WithdrawPendingSubscriptionChange(ctx, "cust_123", "sub_123", "sub_pending_123", "withdraw-sub_pending_123-v1")
   /plans/{plan_code}/transition-policies:
     get:
       tags:
@@ -8874,6 +9145,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorNotFound'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const subscriptions = await nozle.entitySubscriptions.list('cust_123')
+        - lang: Python
+          label: Python
+          source: |-
+            subscriptions = nozle.entity_subscriptions.list("cust_123")
+        - lang: Go
+          label: Go
+          source: |-
+            subscriptions, err := client.ListEntitySubscriptions(ctx, "cust_123")
   /customers/{customer_id}/entities/{external_entity_id}/subscription:
     get:
       tags:
@@ -8931,6 +9215,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorNotFound'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const subscription = await nozle.entitySubscriptions.get('cust_123', 'user_42')
+        - lang: Python
+          label: Python
+          source: |-
+            subscription = nozle.entity_subscriptions.get("cust_123", "user_42")
+        - lang: Go
+          label: Go
+          source: |-
+            subscription, err := client.GetEntitySubscription(ctx, "cust_123", "user_42")
     put:
       tags:
         - Entity Subscriptions
@@ -8984,6 +9281,19 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const subscription = await nozle.entitySubscriptions.ensure('cust_123', 'user_42')
+        - lang: Python
+          label: Python
+          source: |-
+            subscription = nozle.entity_subscriptions.ensure("cust_123", "user_42")
+        - lang: Go
+          label: Go
+          source: |-
+            subscription, err := client.EnsureEntitySubscription(ctx, "cust_123", "user_42")
     delete:
       tags:
         - Entity Subscriptions
@@ -9023,6 +9333,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorNotFound'
       x-mcp-scope: delete
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            await nozle.entitySubscriptions.remove('cust_123', 'user_42')
+        - lang: Python
+          label: Python
+          source: |-
+            nozle.entity_subscriptions.remove("cust_123", "user_42")
+        - lang: Go
+          label: Go
+          source: |-
+            err := client.RemoveEntitySubscription(ctx, "cust_123", "user_42")
   /customers/{customer_id}/entities/{external_entity_id}/subscription/checkout:
     post:
       tags:
@@ -9109,6 +9432,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const checkout = await nozle.entitySubscriptions.checkout('cust_123', 'user_42', {
+              planCode: 'seat_pro',
+              returnUrl: 'https://app.example.com/billing',
+              billingTime: 'anniversary',
+              idempotencyKey: 'seat-checkout-user_42-v1',
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            checkout = nozle.entity_subscriptions.checkout(
+                "cust_123",
+                "user_42",
+                plan_code="seat_pro",
+                return_url="https://app.example.com/billing",
+                billing_time="anniversary",
+                idempotency_key="seat-checkout-user_42-v1",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            checkout, err := client.CheckoutEntitySubscription(ctx, "cust_123", "user_42", nozle.EntitySubscriptionChange{
+            	PlanCode:       "seat_pro",
+            	ReturnURL:      "https://app.example.com/billing",
+            	BillingTime:    "anniversary",
+            	IdempotencyKey: "seat-checkout-user_42-v1",
+            })
   /customers/{customer_id}/entities/{external_entity_id}/subscription/change-plan:
     post:
       tags:
@@ -9194,6 +9547,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const change = await nozle.entitySubscriptions.changePlan('cust_123', 'user_42', {
+              planCode: 'seat_team',
+              returnUrl: 'https://app.example.com/billing',
+              idempotencyKey: 'seat-change-user_42-v1',
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            change = nozle.entity_subscriptions.change_plan(
+                "cust_123",
+                "user_42",
+                plan_code="seat_team",
+                return_url="https://app.example.com/billing",
+                idempotency_key="seat-change-user_42-v1",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            change, err := client.ChangeEntitySubscriptionPlan(ctx, "cust_123", "user_42", nozle.EntitySubscriptionChange{
+            	PlanCode:       "seat_team",
+            	ReturnURL:      "https://app.example.com/billing",
+            	IdempotencyKey: "seat-change-user_42-v1",
+            })
   /customers/{customer_id}/entities/{external_entity_id}/subscription/cancel:
     post:
       tags:
@@ -9263,6 +9643,30 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const cancelled = await nozle.entitySubscriptions.cancel('cust_123', 'user_42', {
+              idempotencyKey: 'seat-cancel-user_42-v1',
+              timing: 'end_of_period',
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            cancelled = nozle.entity_subscriptions.cancel(
+                "cust_123",
+                "user_42",
+                idempotency_key="seat-cancel-user_42-v1",
+                timing="end_of_period",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            cancelled, err := client.CancelEntitySubscription(ctx, "cust_123", "user_42", nozle.EntitySubscriptionCancel{
+            	Timing:         "end_of_period",
+            	IdempotencyKey: "seat-cancel-user_42-v1",
+            })
   /customers/{customer_id}/entity-subscriptions/checkout:
     post:
       tags:
@@ -9358,6 +9762,39 @@ paths:
                   items:
                     - paid_plan_required
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const batch = await nozle.entitySubscriptions.checkoutMany('cust_123', {
+              items: [
+                { externalEntityId: 'user_42', planCode: 'seat_pro' },
+                { externalEntityId: 'user_43', planCode: 'seat_pro' },
+              ],
+              returnUrl: 'https://app.example.com/billing',
+              billingTime: 'anniversary',
+              idempotencyKey: 'seats-cust_123-v1',
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            batch = nozle.entity_subscriptions.checkout_many(
+                "cust_123",
+                items=[
+                    {"external_entity_id": "user_42", "plan_code": "seat_pro"},
+                    {"external_entity_id": "user_43", "plan_code": "seat_pro"},
+                ],
+                return_url="https://app.example.com/billing",
+                billing_time="anniversary",
+                idempotency_key="seats-cust_123-v1",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            batch, err := client.CheckoutEntitySubscriptions(ctx, "cust_123", []nozle.EntitySubscriptionCheckoutItem{
+            	{ExternalEntityID: "user_42", PlanCode: "seat_pro"},
+            	{ExternalEntityID: "user_43", PlanCode: "seat_pro"},
+            }, "https://app.example.com/billing", "anniversary", "seats-cust_123-v1")
   /customers/{customer_id}/billing-state-imports:
     post:
       tags:
@@ -9615,6 +10052,19 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: delete
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const cancelled = await nozle.cancelSubscription('cust_123', 'sub_123', 'end_of_period')
+        - lang: Python
+          label: Python
+          source: |-
+            cancelled = nozle.cancel_subscription("cust_123", "sub_123", policy="end_of_period")
+        - lang: Go
+          label: Go
+          source: |-
+            cancelled, err := client.CancelSubscription(ctx, "cust_123", "sub_123", "end_of_period")
   /customers/{customer_id}/credit-systems:
     get:
       summary: List customer credit balances
@@ -9718,6 +10168,19 @@ paths:
                   value:
                     error: API key verification is unavailable
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const balances = await nozle.credits.listBalances('cust_123')
+        - lang: Python
+          label: Python
+          source: |-
+            balances = nozle.credits.list_balances("cust_123")
+        - lang: Go
+          label: Go
+          source: |-
+            balances, err := client.ListCreditBalances(ctx, "cust_123")
   /customers/{customer_id}/credit-systems/{credit_system_code}/balance:
     get:
       summary: Get customer credit balance
@@ -9767,6 +10230,19 @@ paths:
                     error: credit data could not be loaded
         '503': *id007
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const balance = await nozle.credits.getBalance('cust_123', 'ai_credits')
+        - lang: Python
+          label: Python
+          source: |-
+            balance = nozle.credits.get_balance("cust_123", "ai_credits")
+        - lang: Go
+          label: Go
+          source: |-
+            balance, err := client.GetCreditBalance(ctx, "cust_123", "ai_credits")
   /customers/{customer_id}/credit-operations:
     get:
       summary: List customer credit operations
@@ -9861,6 +10337,22 @@ paths:
                     error: credit data could not be loaded
         '503': *id007
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const page = await nozle.credits.listOperations('cust_123', {
+              creditSystemCode: 'ai_credits',
+              limit: 25,
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            page = nozle.credits.list_operations("cust_123", credit_system_code="ai_credits", limit=25)
+        - lang: Go
+          label: Go
+          source: |-
+            page, err := client.ListCreditOperations(ctx, "cust_123", nozle.PageOptions{CreditSystemCode: "ai_credits", Limit: 25})
   /customers/{customer_id}/entities/{entity_id}/credit-systems:
     get:
       summary: List Entity credit balances
@@ -9947,6 +10439,19 @@ paths:
                     error: credit data could not be loaded
         '503': *id007
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const balances = await nozle.credits.listEntityBalances('cust_123', 'user_42')
+        - lang: Python
+          label: Python
+          source: |-
+            balances = nozle.credits.list_entity_balances("cust_123", "user_42")
+        - lang: Go
+          label: Go
+          source: |-
+            balances, err := client.ListEntityCreditBalances(ctx, "cust_123", "user_42")
   /customers/{customer_id}/entities/{entity_id}/credit-systems/{credit_system_code}/balance:
     get:
       summary: Get Entity credit balance
@@ -9990,6 +10495,19 @@ paths:
                     error: credit data could not be loaded
         '503': *id007
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const balance = await nozle.credits.getEntityBalance('cust_123', 'user_42', 'ai_credits')
+        - lang: Python
+          label: Python
+          source: |-
+            balance = nozle.credits.get_entity_balance("cust_123", "user_42", "ai_credits")
+        - lang: Go
+          label: Go
+          source: |-
+            balance, err := client.GetEntityCreditBalance(ctx, "cust_123", "user_42", "ai_credits")
   /customers/{customer_id}/entities/{entity_id}/credit-operations:
     get:
       summary: List Entity credit operations
@@ -10056,6 +10574,27 @@ paths:
                     error: credit data could not be loaded
         '503': *id007
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const history = await nozle.credits.listEntityOperations('cust_123', 'user_42', {
+              creditSystemCode: 'ai_credits',
+              limit: 25,
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            history = nozle.credits.list_entity_operations(
+                "cust_123",
+                "user_42",
+                credit_system_code="ai_credits",
+                limit=25,
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            history, err := client.ListEntityCreditOperations(ctx, "cust_123", "user_42", nozle.PageOptions{CreditSystemCode: "ai_credits", Limit: 25})
   /customers/{customer_id}/entities:
     get:
       summary: List customer Entities
@@ -10156,6 +10695,19 @@ paths:
                   value:
                     error: API key verification is unavailable
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const page = await nozle.entities.list('cust_123', { status: 'active', limit: 50 })
+        - lang: Python
+          label: Python
+          source: |-
+            page = nozle.entities.list("cust_123", status="active", limit=50)
+        - lang: Go
+          label: Go
+          source: |-
+            page, err := client.ListEntities(ctx, "cust_123", nozle.PageOptions{Status: "active", Limit: 50})
   /customers/{customer_id}/entities/{entity_id}:
     get:
       summary: Get a customer Entity
@@ -10218,6 +10770,19 @@ paths:
                   value:
                     error: API key verification is unavailable
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const entity = await nozle.entities.get('cust_123', 'user_42')
+        - lang: Python
+          label: Python
+          source: |-
+            entity = nozle.entities.get("cust_123", "user_42")
+        - lang: Go
+          label: Go
+          source: |-
+            entity, err := client.GetEntity(ctx, "cust_123", "user_42")
     put:
       summary: Create or update a customer Entity
       description: Creates the Entity or replaces its name, status and metadata. The body is a complete snapshot. Entity lifecycle changes never create billing events. When the Entity becomes active (created, activated or reactivated), its credit grants are scheduled. The body is at most 128 KiB. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `entity:write`. Publishable keys are rejected.
@@ -10317,6 +10882,35 @@ paths:
                   value:
                     error: API key verification is unavailable
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const result = await nozle.entities.upsert(
+              'cust_123',
+              'user_42',
+              { name: 'Ada Lovelace', status: 'active', metadata: { role: 'admin' } },
+              { idempotencyKey: 'upsert-user_42-v1' },
+            )
+        - lang: Python
+          label: Python
+          source: |-
+            result = nozle.entities.upsert(
+                "cust_123",
+                "user_42",
+                name="Ada Lovelace",
+                status="active",
+                metadata={"role": "admin"},
+                idempotency_key="upsert-user_42-v1",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            result, err := client.UpsertEntity(ctx, "cust_123", "user_42", nozle.EntityInput{
+            	Name:     "Ada Lovelace",
+            	Status:   "active",
+            	Metadata: map[string]any{"role": "admin"},
+            }, "upsert-user_42-v1")
     delete:
       summary: Delete a customer Entity
       description: 'Moves the Entity to `deleted`. Deletion is not a financial cascade: sources, allocations, operations and audit rows are kept. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `entity:write`. Publishable keys are rejected.'
@@ -10497,6 +11091,36 @@ paths:
                   value:
                     error: API key verification is unavailable
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const result = await nozle.entities.bulkUpsert(
+              'cust_123',
+              [
+                { externalId: 'user_42', name: 'Ada Lovelace', status: 'active' },
+                { externalId: 'user_43', status: 'suspended' },
+              ],
+              { idempotencyKey: 'bulk-cust_123-v1' },
+            )
+        - lang: Python
+          label: Python
+          source: |-
+            result = nozle.entities.bulk_upsert(
+                "cust_123",
+                [
+                    {"external_id": "user_42", "name": "Ada Lovelace", "status": "active"},
+                    {"external_id": "user_43", "status": "suspended"},
+                ],
+                idempotency_key="bulk-cust_123-v1",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            result, err := client.BulkUpsertEntities(ctx, "cust_123", []nozle.EntityInput{
+            	{ExternalID: "user_42", Name: "Ada Lovelace", Status: "active"},
+            	{ExternalID: "user_43", Status: "suspended"},
+            }, "bulk-cust_123-v1")
   /customers/{customer_id}/entities/{entity_id}/credit-allocations:
     post:
       summary: Allocate credits to an Entity
@@ -10604,6 +11228,30 @@ paths:
                   value:
                     error: API key verification is unavailable
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const allocation = await nozle.credits.allocate(
+              'cust_123',
+              'user_42',
+              { creditSystemCode: 'ai_credits', amount: '100' },
+              { idempotencyKey: 'allocate-user_42-100-v1' },
+            )
+        - lang: Python
+          label: Python
+          source: |-
+            allocation = nozle.credits.allocate(
+                "cust_123",
+                "user_42",
+                credit_system_code="ai_credits",
+                amount="100",
+                idempotency_key="allocate-user_42-100-v1",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            allocation, err := client.AllocateCredits(ctx, "cust_123", "user_42", "ai_credits", nozle.Decimal("100"), "allocate-user_42-100-v1")
   /customers/{customer_id}/entities/{entity_id}/credit-deallocations:
     post:
       summary: Return Entity credits to the customer pool
@@ -10692,6 +11340,30 @@ paths:
                     error: credit transfer failed
         '503': *id017
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const deallocation = await nozle.credits.deallocate(
+              'cust_123',
+              'user_42',
+              { creditSystemCode: 'ai_credits', amount: '25' },
+              { idempotencyKey: 'deallocate-user_42-25-v1' },
+            )
+        - lang: Python
+          label: Python
+          source: |-
+            deallocation = nozle.credits.deallocate(
+                "cust_123",
+                "user_42",
+                credit_system_code="ai_credits",
+                amount="25",
+                idempotency_key="deallocate-user_42-25-v1",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            deallocation, err := client.DeallocateCredits(ctx, "cust_123", "user_42", "ai_credits", nozle.Decimal("25"), "deallocate-user_42-25-v1")
   /customers/{customer_id}/credit-balance-imports:
     post:
       summary: Import an opening credit balance
@@ -11050,6 +11722,34 @@ paths:
                   value:
                     error: API key verification is unavailable
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const check = await nozle.usage.check({
+              customerId: 'cust_123',
+              featureCode: 'agent_execution',
+              creditSystemCode: 'ai_credits',
+              properties: { model: 'example-model' },
+            })
+        - lang: Python
+          label: Python
+          source: |-
+            check = nozle.usage.check(
+                "cust_123",
+                "agent_execution",
+                credit_system_code="ai_credits",
+                properties={"model": "example-model"},
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            check, err := client.CheckUsage(ctx, nozle.UsageParams{
+            	CustomerID:       "cust_123",
+            	FeatureCode:      "agent_execution",
+            	CreditSystemCode: "ai_credits",
+            	Properties:       map[string]any{"model": "example-model"},
+            })
   /usage/track:
     post:
       summary: Track and consume credits
@@ -11144,6 +11844,38 @@ paths:
                   value:
                     error: API key verification is unavailable
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const result = await nozle.usage.track(
+              {
+                customerId: 'cust_123',
+                featureCode: 'agent_execution',
+                creditSystemCode: 'ai_credits',
+                properties: { model: 'example-model' },
+              },
+              { idempotencyKey: 'agent-execution-0183f' },
+            )
+        - lang: Python
+          label: Python
+          source: |-
+            result = nozle.usage.track(
+                "cust_123",
+                "agent_execution",
+                credit_system_code="ai_credits",
+                properties={"model": "example-model"},
+                idempotency_key="agent-execution-0183f",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            result, err := client.TrackUsage(ctx, nozle.UsageParams{
+            	CustomerID:       "cust_123",
+            	FeatureCode:      "agent_execution",
+            	CreditSystemCode: "ai_credits",
+            	Properties:       map[string]any{"model": "example-model"},
+            }, "agent-execution-0183f")
   /check-and-deduct:
     post:
       summary: Check and deduct legacy wallet credits
@@ -11216,6 +11948,19 @@ paths:
                     error: could not deduct wallet credits
         '503': *id018
       x-mcp-scope: write
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const result = await nozle.checkAndDeduct({ customerId: 'cust_123', credits: 5 })
+        - lang: Python
+          label: Python
+          source: |-
+            result = nozle.check_and_deduct("cust_123", credits=5)
+        - lang: Go
+          label: Go
+          source: |-
+            result, err := client.CheckAndDeduct(ctx, nozle.CheckAndDeductParams{CustomerID: "cust_123", Credits: 5})
   /margin/summary:
     get:
       summary: Get margin summary
@@ -11294,6 +12039,19 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const summary = await nozle.margin.summary({ from: '2026-07-01', to: '2026-07-31' })
+        - lang: Python
+          label: Python
+          source: |-
+            summary = nozle.margin.summary(from_date="2026-07-01", to_date="2026-07-31")
+        - lang: Go
+          label: Go
+          source: |-
+            summary, err := client.MarginSummary(ctx, url.Values{"from": {"2026-07-01"}, "to": {"2026-07-31"}})
   /margin/customers:
     get:
       summary: Get margin by customer
@@ -11377,6 +12135,19 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const customers = await nozle.margin.byCustomer({ from: '2026-07-01', to: '2026-07-31' })
+        - lang: Python
+          label: Python
+          source: |-
+            customers = nozle.margin.by_customer(from_date="2026-07-01", to_date="2026-07-31")
+        - lang: Go
+          label: Go
+          source: |-
+            customers, err := client.MarginByCustomer(ctx, url.Values{"from": {"2026-07-01"}, "to": {"2026-07-31"}})
   /margin/metrics:
     get:
       summary: Get margin by metric
@@ -11460,6 +12231,19 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const metrics = await nozle.margin.byMetric({ from: '2026-07-01', to: '2026-07-31' })
+        - lang: Python
+          label: Python
+          source: |-
+            metrics = nozle.margin.by_metric(from_date="2026-07-01", to_date="2026-07-31")
+        - lang: Go
+          label: Go
+          source: |-
+            metrics, err := client.MarginByMetric(ctx, url.Values{"from": {"2026-07-01"}, "to": {"2026-07-31"}})
   /margin/plans:
     get:
       summary: Get margin by plan
@@ -11543,6 +12327,19 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const plans = await nozle.margin.byPlan({ from: '2026-07-01', to: '2026-07-31' })
+        - lang: Python
+          label: Python
+          source: |-
+            plans = nozle.margin.by_plan(from_date="2026-07-01", to_date="2026-07-31")
+        - lang: Go
+          label: Go
+          source: |-
+            plans, err := client.MarginByPlan(ctx, url.Values{"from": {"2026-07-01"}, "to": {"2026-07-31"}})
   /margin/models:
     get:
       summary: Get margin by model
@@ -11626,6 +12423,19 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const models = await nozle.margin.byModel({ from: '2026-07-01', to: '2026-07-31' })
+        - lang: Python
+          label: Python
+          source: |-
+            models = nozle.margin.by_model(from_date="2026-07-01", to_date="2026-07-31")
+        - lang: Go
+          label: Go
+          source: |-
+            models, err := client.MarginByModel(ctx, url.Values{"from": {"2026-07-01"}, "to": {"2026-07-31"}})
   /margin/trend:
     get:
       summary: Get margin trend
@@ -11733,6 +12543,19 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const trend = await nozle.margin.trend({ granularity: 'day', from: '2026-07-01', to: '2026-07-31' })
+        - lang: Python
+          label: Python
+          source: |-
+            trend = nozle.margin.trend(granularity="day", from_date="2026-07-01", to_date="2026-07-31")
+        - lang: Go
+          label: Go
+          source: |-
+            trend, err := client.MarginTrend(ctx, "day", url.Values{"from": {"2026-07-01"}, "to": {"2026-07-31"}})
   /margin/forecast:
     get:
       summary: Get margin forecast
@@ -12015,6 +12838,19 @@ paths:
                   value:
                     error: subscription access unavailable
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const check = await nozle.can('cust_123', 'api_calls')
+        - lang: Python
+          label: Python
+          source: |-
+            check = nozle.can("cust_123", "api_calls")
+        - lang: Go
+          label: Go
+          source: |-
+            check, err := client.Can(ctx, "cust_123", "api_calls")
   /ping:
     get:
       servers:
@@ -12055,6 +12891,19 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const health = await nozle.ping()
+        - lang: Python
+          label: Python
+          source: |-
+            health = nozle.ping()
+        - lang: Go
+          label: Go
+          source: |-
+            health, err := client.Ping(ctx)
   /auth/centrifugo-token:
     get:
       servers:
@@ -12143,6 +12992,19 @@ paths:
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-mcp-scope: read
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const plans = await nozle.plans()
+        - lang: Python
+          label: Python
+          source: |-
+            plans = nozle.plans()
+        - lang: Go
+          label: Go
+          source: |-
+            plans, err := client.Plans(ctx)
   /proxy/openai/{providerPath}:
     parameters:
       - name: providerPath
@@ -23200,7 +24062,6 @@ components:
     EventInputObject:
       type: object
       required:
-        - external_subscription_id
         - code
       properties:
         transaction_id:
@@ -23215,7 +24076,7 @@ components:
           type: string
           maxLength: 255
           example: sub_1234567890
-          description: The unique identifier of the subscription in your application. This field is mandatory in order to link events to the correct customer subscription.
+          description: External ID of the subscription the event is billed to. Ingestion does not check that it is present, but it is the only field that links the event to a customer, so always send it. The SDKs look it up when you pass only a customer.
         code:
           type: string
           maxLength: 255
@@ -23248,6 +24109,10 @@ components:
               - type: number
           example:
             gb: 10
+        external_customer_id:
+          type: string
+          deprecated: true
+          description: 'Accepted and ignored: ingestion stores no customer ID. The SDKs send it and use it only to look up the subscription before sending the event.'
     CostEventInput:
       type: object
       required:
@@ -23676,7 +24541,7 @@ components:
     EventBatchInput:
       type: object
       required:
-        - Events
+        - events
       properties:
         events:
           type: array
@@ -29836,6 +30701,12 @@ components:
             effective_at:
               type: string
               format: date-time
+          required:
+            - id
+            - plan_code
+            - name
+            - plan
+            - effective_at
         eligible_plans:
           type: array
           description: Plans with a resolvable transition policy. Empty when the subscription is externally billed, is scheduled to end, has a pending change, or has an unresolved upgrade checkout. Downgrades appear only with `end_of_period` timing and `keep_anchor`.
@@ -31775,6 +32646,10 @@ components:
       required:
         - advisory
         - allowed
+        - metric_amount
+        - credit_system
+        - credits_required
+        - available
       description: Advisory decision. No source or ledger row changes. Empty string fields are omitted.
       properties:
         advisory:
