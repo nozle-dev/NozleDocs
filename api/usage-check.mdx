@@ -18,13 +18,18 @@ Base URL: `https://api.nozle.app/engine/api/v1`.
 }
 ```
 
+`customer_id` and `feature_code` are required. Add `entity_id` to check usage for one Entity of the customer. Unknown fields return `400 invalid_request`. An unknown Entity returns `404 entity_not_found`, an inactive Entity returns `422 entity_inactive`, and Entity usage without an explicit pool policy on the plan returns `422 credit_pool_policy_not_configured`.
+
 `occurred_at` is required and must be Unix seconds (a JSON number such as `1788345001` or `1788345001.5`, or a numeric string such as `"1788345001"`) or an RFC 3339 string with a time zone offset or `Z`. A date without a time, a time without an offset, zero or negative seconds, and any other JSON type return `400 invalid_request` with `occurred_at must be Unix seconds (a number or a numeric string) or an RFC 3339 timestamp with an offset or Z` (zero or negative seconds: `occurred_at must be greater than zero`). A missing value returns `400 invalid_request` with `occurred_at is required`. Unix seconds are available from the Engine release that includes this change; before it, only RFC 3339 is accepted. The SDKs send the current time when you omit it.
 
-A customer with more than one active subscription returns `422 active_subscription_ambiguous`. A time with no effective Credit System rate returns `422 credit_usage_configuration_invalid` (`no effective credit rate`).
+A customer with more than one active subscription returns `422 active_subscription_ambiguous`. A time with no effective Credit System rate returns `422` with code `credit_usage_configuration_invalid` and the message `no effective credit rate`.
 
 The response includes `advisory: true`, exact `metric_amount`,
 `credits_required`, the available balance, and the projected source
-selection:
+selection. `projected_remaining` and `projected_deductions` appear only when
+`allowed` is `true`. When `allowed` is `false`, `reason` gives the code, for
+example `insufficient_credits`. `entity_id` and `pool_policy` are included when
+they apply. Empty fields are omitted.
 
 ```json
 {
@@ -39,6 +44,7 @@ selection:
     {
       "balance_source_id": "0f89...",
       "source_type": "subscription_grant",
+      "source_scope": "customer",
       "amount": "2",
       "remaining": "373"
     }

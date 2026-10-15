@@ -28,8 +28,10 @@ Authorization: Bearer sk_nozle_...
   "entity_id": "user_42",
   "entity_status": "active",
   "credit_system": "ai_credits",
+  "credit_system_id": "c15f2949-7df6-4f05-89af-3f1b0bc82189",
   "credit_system_name": "AI Credits",
   "unit_name": "credit",
+  "system_status": "active",
   "entity_available": "480.000000000001",
   "shared_available": "250",
   "effective_available": "730.000000000001",
@@ -45,14 +47,23 @@ Authorization: Bearer sk_nozle_...
       "transferable": false,
       "returnable": true,
       "type": "allocated_top_up",
+      "reference": "opaque-source-reference",
+      "subscription_id": null,
       "initial": "100",
       "remaining": "100",
+      "valid_from": "2026-07-21T09:00:00Z",
       "expires_at": null,
+      "priority": 100,
+      "status": "active",
       "available": true
     }
   ]
 }
 ```
+
+The list endpoint returns `{ "customer_id", "entity_id", "entity_status", "as_of", "balances": [...] }`, with one object of this shape per item. Source fields have the same meaning as in [Customer Credit Balances](/api/customer-credit-balances). `pool_policy` is `null` when no policy applies.
+
+An unknown customer returns `404 customer_not_found`, an unknown Entity returns `404 entity_not_found`, and an unknown Credit System code returns `404 credit_system_not_found`. A retryable read failure returns `503 credit_read_temporarily_unavailable` with `Retry-After`.
 
 All amounts are strings. `entity_available` and `shared_available` expose separate source pools. `effective_available` applies the current plan policy and becomes zero when the Entity is inactive or no unambiguous policy exists.
 

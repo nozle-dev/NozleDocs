@@ -12,3 +12,15 @@ Get a WebSocket authentication token for real-time entitlement updates via Centr
 <ResponseField name="token" type="string" required>
   JWT token for authenticating WebSocket connections to Centrifugo
 </ResponseField>
+
+The token is signed with HS256 and expires 24 hours after it is issued. Its `sub` claim is your organization ID, and its `channels` claim is `["customer:<organization_id>"]`. The channel name holds the organization ID, not a customer ID.
+
+## Errors
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| `401` | `{"error": "..."}` | The `Authorization` header is missing or malformed, or the key is unknown. |
+| `403` | `{"error": "..."}` | A publishable key was used. |
+| `404` | `{"error": "centrifugo not configured"}` | Real-time updates are not configured on this Engine. |
+| `500` | `{"error": "failed to sign token"}` | The token could not be signed. |
+| `503` | `{"error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |

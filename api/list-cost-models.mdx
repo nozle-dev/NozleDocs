@@ -5,7 +5,7 @@ api: "GET https://api.nozle.app/engine/api/v1/cost-models"
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-List all cost models for the current organization.
+List all cost models for the current organization, newest first. Archived cost models are included; check `status`.
 
 <Warning>
 This legacy endpoint does not return the new versioned Cost Sheets. Use the Cost Intelligence dashboard for new implementations.
@@ -16,3 +16,35 @@ This legacy endpoint does not return the new versioned Cost Sheets. Use the Cost
 <Warning>
 All cost model endpoints require a secret key (`sk_`). Publishable keys will receive a 403 Forbidden response.
 </Warning>
+
+<ParamField query="page" type="integer" default="1">
+  Page number, 1 or more. Sending `page` or `per_page` turns on paging.
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="20">
+  Page size, from 1 to 100.
+</ParamField>
+
+Without `page` and `per_page`, every cost model is returned and there is no `meta`. In that case `cost_models` is `null` when the organization has none. With either parameter, the list is paged, `cost_models` is an array, and `meta` is added.
+
+<ResponseField name="cost_models" type="array | null" required>
+  Cost models. Each has `id`, `org_id`, `name`, `metric_code`, `cost_type`, `status` (`active` or `archived`), `created_at` and `updated_at`, plus `amount_cents`, `model_rates`, `tier_mode`, `tiers` and `filter_values` when set. See [Create Cost Model](/api/create-cost-model) for these fields.
+</ResponseField>
+
+<ResponseField name="count" type="integer" required>
+  Number of cost models in this response.
+</ResponseField>
+
+<ResponseField name="meta" type="object">
+  Only when paging is on. Fields: `current_page`, `limit_value` (page size), `total_count` and `total_pages`.
+</ResponseField>
+
+## Errors
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| `400` | `{"error": "invalid pagination"}` | `page` or `per_page` is not an integer in range. |
+| `401` | `{"error": "..."}` | The `Authorization` header is missing or malformed, or the key is unknown. |
+| `403` | `{"error": "..."}` | A publishable key was used. |
+| `500` | `{"error": "..."}` | The cost models could not be read. |
+| `503` | `{"error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |

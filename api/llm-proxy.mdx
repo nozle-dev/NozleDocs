@@ -25,13 +25,15 @@ Proxies all requests to `https://api.openai.com/v1/*`. Any OpenAI-compatible end
 | Header | Description |
 |--------|-------------|
 | `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`) |
-| `X-Nozle-Customer` | External customer ID to bill for this usage |
+| `X-Nozle-Customer-Id` | External customer ID to bill for this usage. Missing returns `400`. |
 | `Authorization` | Customer's OpenAI API key (`Bearer sk-...`) |
+
+**Optional header:** `X-Nozle-Feature`, a feature code stored as the `feature` property of the tracked event.
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/openai/v1/chat/completions \
   -H "X-Nozle-Key: sk_live_your_nozle_key" \
-  -H "X-Nozle-Customer: cust_123" \
+  -H "X-Nozle-Customer-Id: cust_123" \
   -H "Authorization: Bearer sk-customer-openai-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -53,13 +55,16 @@ Proxies all requests to `https://api.anthropic.com/v1/*`.
 | Header | Description |
 |--------|-------------|
 | `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`) |
-| `X-Nozle-Customer` | External customer ID to bill for this usage |
-| `Authorization` | Customer's Anthropic API key |
+| `X-Nozle-Customer-Id` | External customer ID to bill for this usage. Missing returns `400`. |
+| `x-api-key` | Customer's Anthropic API key |
+| `anthropic-version` | Anthropic API version |
+
+**Optional header:** `X-Nozle-Feature`, a feature code stored as the `feature` property of the tracked event.
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/anthropic/v1/messages \
   -H "X-Nozle-Key: sk_live_your_nozle_key" \
-  -H "X-Nozle-Customer: cust_123" \
+  -H "X-Nozle-Customer-Id: cust_123" \
   -H "x-api-key: customer-anthropic-key" \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \
@@ -73,3 +78,23 @@ curl -X POST https://api.nozle.app/engine/api/v1/proxy/anthropic/v1/messages \
 <Info>
 The proxy returns the provider's response unchanged. Your customer's API key is forwarded but never stored. Token usage is extracted from the response and tracked automatically as a billing event on the `llm_tokens` metric.
 </Info>
+
+## How it works
+
+- The path after `/proxy/openai/` or `/proxy/anthropic/` is sent to the provider host unchanged, with the same method, query string, headers and body.
+- Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id` and `X-Nozle-Feature` before forwarding. All other headers, including `Authorization` and `x-api-key`, are forwarded.
+- Streaming (`text/event-stream`) responses are passed through as they arrive. Usage is read when the stream closes.
+- An event is tracked only when the response reports more than zero input or output tokens. Its properties are `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. Tracking runs in the background; a tracking failure does not change the response.
+
+## Errors
+
+These come from Engine. Provider errors are returned unchanged, with the provider's status and body.
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| `400` | `{"error": "missing X-Nozle-Customer-Id header"}` | `X-Nozle-Customer-Id` is missing. |
+| `401` | `{"error": "missing X-Nozle-Key header"}` | `X-Nozle-Key` is missing. |
+| `401` | `{"error": "invalid nozle key"}` | The key is unknown. |
+| `403` | `{"error": "publishable keys are limited to GET /api/v1/plans"}` | A publishable key was used. |
+| `502` | Empty | Engine could not reach the provider. |
+| `503` | `{"error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |

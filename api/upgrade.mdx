@@ -19,9 +19,9 @@ Change a customer's current plan without checkout from a trusted backend.
 
 ### Response
 
-Returns the updated subscription details for an allowed no-payment change.
+Nozle reads the customer's active subscription (the most recently started one) and its plan. If the target plan's yearly amount is above zero and at least the current plan's yearly amount, the request returns `422` and nothing changes. This includes a change between two paid plans with the same price. Otherwise Nozle changes the plan and returns Core's subscription response, `{"subscription": {...}}`, with Core's status code.
 
-Paid upgrades return:
+The `422` body:
 
 ```json
 {
@@ -29,6 +29,8 @@ Paid upgrades return:
   "code": "payment_checkout_required"
 }
 ```
+
+`404` means the plan, the active subscription, or the active subscription's plan was not found. A missing `plan_code` or `customer_id` returns `400`.
 
 For customer self-service, use a signed preview and `POST /checkout` for a selected upgrade, or the end-of-period transition API for a scheduled downgrade. The current paid plan stays active until required payment is fulfilled. See [Subscription self-service](/api/subscription-management) for the complete flow.
 

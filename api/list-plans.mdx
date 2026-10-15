@@ -25,6 +25,8 @@ A publishable key ships in browsers, so everything it receives is readable by an
 
 See [Authentication](/api/authentication) for the full credential model.
 
+Engine forwards the request to Core and returns Core's status code and body unchanged, including Core's errors. If Engine cannot reach Core within 10 seconds, it returns `502` with `{"error": "failed to reach billing service"}`.
+
 ## Which plans are returned
 
 All top-level plans of the organization, newest first. There is no listed, public or draft flag, so trial plans, pay-in-arrears plans and free plans are all included. Per-customer override plans (plans with a `parent_id`) and deleted plans are not.

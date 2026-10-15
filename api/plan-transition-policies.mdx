@@ -6,7 +6,7 @@ api: "PUT https://api.nozle.app/core/api/v1/plans/{plan_code}/transition-policie
 
 Base URL: `https://api.nozle.app/core/api/v1`.
 
-**Auth:** secret key only.
+**Auth:** secret key only. When API permissions are enabled, reads need `plan_transition_policy:read` and changes need `plan_transition_policy:write`.
 
 A plan transition policy tells Nozle how to move a subscription from one plan (the source) to another (the target). Policies are stored per pair of plans: `starter` to `growth` and `growth` to `starter` are two separate policies. Nozle does not infer the direction from the prices; you set it.
 
@@ -22,7 +22,7 @@ Withdrawing a pending change does not need a policy. Subscription options leave 
 One fallback exists. When the current plan is free and the target plan is paid, Nozle uses the organization's free-to-paid policy (Settings, General, "Checkout & billing policy" in the dashboard) as an upgrade. Every other pair, including paid to paid, paid to free, and free to free, needs its own policy. The dashboard sets only the free-to-paid default; create pair policies with this API.
 </Info>
 
-## Create or replace a policy
+## Create or update a policy
 
 ```http
 PUT /plans/starter/transition-policies/growth
@@ -42,7 +42,7 @@ Content-Type: application/json
 }
 ```
 
-`PUT` creates the policy or replaces the existing one for the pair. Fields you leave out take their defaults.
+`PUT` creates the policy for the pair, or updates the existing one. It returns `200` in both cases. On a new policy, fields you leave out take their defaults. On an existing policy, fields you leave out keep their current values. To return a field to its default, send the default value. `PATCH` on the same path does the same thing.
 
 | Field | Values | Default | Meaning |
 | --- | --- | --- | --- |

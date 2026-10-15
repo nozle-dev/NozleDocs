@@ -25,6 +25,8 @@ All margin endpoints require a secret key (`sk_`). These endpoints expose cost d
   Time bucket size: `hour`, `day`, `week`, or `month` (default: `day`). The server does not reject other values: `year` or any unknown value returns `200` and is bucketed by day, while the response still echoes the value you sent in `granularity`. Send only the four documented values.
 </ParamField>
 
+The endpoint reads only `from`, `to`, `from_date`, `to_date` and `granularity`. Any other query parameter is ignored without an error.
+
 ### Date range
 
 `from` and `to` take a `YYYY-MM-DD` date or an RFC3339 timestamp, and you can mix the two. The Python and Go SDKs send `from_date` and `to_date`, which the API treats the same way. If you send both `from` and `from_date` (or `to` and `to_date`), `from` and `to` win.
