@@ -53,6 +53,7 @@ If its own catalog request fails, `PricingTable` renders `Plans could not be loa
 | `currentPlanCode` | `string` | — | Plan displayed as current and disabled. |
 | `plans` | `PricingPlan[]` | Public catalog | Caller-supplied plan list. |
 | `features` | `string[][]` or `Record<string, string[]>` | Read from each plan | Optional. Replaces the generated lines of a plan: an array aligned to the rendered plan order, or an object keyed by plan code. |
+| `sort` | `(a, b) => number` | Cheapest first | Optional. Orders the plans. |
 | `onSelect` | `(plan) => void` | Provider checkout | Overrides built-in checkout selection. |
 | `returnUrl` | `string` | Current URL | Return URL sent to `createCheckout`. |
 | `onStripeClientSecret` | `(secret) => void` | — | Receives embedded Stripe checkout secrets. |
@@ -62,6 +63,8 @@ If its own catalog request fails, `PricingTable` renders `Plans could not be loa
 | `highlightPlan` | `string` | — | Plan code marked “Most Popular.” |
 | `className` | `string` | — | Class applied to the root container. |
 | `enterpriseEmail` | `string` | — | Opens a prefilled mail link for enterprise/custom plans. |
+
+**Plan order.** The catalog returns plans newest first. `PricingTable` sorts them by base price, cheapest first, and puts custom plans last. Plans in different currencies stay grouped in the order each currency first appears, and plans with the same price keep the catalog order. Pass `sort` for another order; `sortPlansByPrice(plans)` returns the default.
 
 `PricingPlan` contains `code`, `name`, `amount_cents`, `amount_currency`, `interval`, and optional `description`, `entitlements`, `credit_grant_rules` and `charges`. The three optional arrays are what the public catalog returns; see the [public plan catalog](/api/list-plans).
 
@@ -103,7 +106,7 @@ Use `PlanCard` when you already have a custom pricing layout and want an individ
 
 ### `PlanComparison`
 
-Renders a side-by-side table of the plans you pass. Each row is an entitlement or a granted credit system, in the order the plans return them, and a plan that does not have it shows a cross.
+Renders a side-by-side table of the plans you pass, cheapest first (pass `sort` for another order). Each row is an entitlement or a granted credit system, in the order the plans return them, and a plan that does not have it shows a cross.
 
 ```tsx
 <PlanComparison plans={plans} />
