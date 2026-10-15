@@ -301,7 +301,7 @@ Without `onUpdatePaymentMethod`, the update button navigates to `updateHref`, wh
 | Prop | Type | Default | Description |
 |---|---|---|---|
 | `used` | `number` | required | Current usage. |
-| `limit` | `number` | required | Usage limit. |
+| `limit` | `number` or `null` | — | Usage limit. Without one the text reads `Unlimited` and the bar stays empty. |
 | `label` | `string` | — | Label above the bar. |
 | `showText` | `boolean` | `true` | Shows the numeric used/limit text when a label exists. |
 
@@ -318,7 +318,22 @@ The fill uses the primary color below 80%, warning from 80–94%, and destructiv
 />
 ```
 
-Pass `loading` to render three skeleton rows. `features` defaults to an empty array.
+To take the labels from the plan, join the plan's metered entitlements (from the [public catalog](/api/list-plans)) with the usage results you read on your backend, keyed by feature code. A result needs `used` and optionally `limit`, the fields of a `can()` result.
+
+```tsx
+import { UsageDashboard, usageItems } from '@nozle-js/react'
+
+<UsageDashboard features={usageItems(plan.entitlements ?? [], resultsByFeatureCode)} />
+```
+
+Entitlements that are not metered, or have no result, are left out. A feature without a `limit` shows as unlimited.
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `features` | `{ key, label, used, limit? }[]` | `[]` | Rows to show. |
+| `loading` | `boolean` | `false` | Renders three skeleton rows. |
+| `error` | `Error \| string \| null` | `null` | Shows the message as an alert instead of the rows. |
+| `emptyMessage` | `string` | `No usage to show yet.` | Shown when there are no rows. |
 
 ### `UsageAlert`
 
@@ -334,6 +349,50 @@ Pass `loading` to render three skeleton rows. `features` defaults to an empty ar
 ```
 
 The component renders one dismissible warning for each feature at or above `threshold`. The default threshold is `80` and the default upgrade link is `/plans`.
+
+## Credit components
+
+Both components render data you read on your backend with the SDK; neither fetches anything and neither holds a key. Each shows a loading state, an error message and an empty message.
+
+### `CreditBalance`
+
+Renders one credit balance: the available credits with the unit name, the time of the reading, and the sources the credits come from (plan grant, top-up, granted, adjustment, allocated top-up) with what remains and when it expires. Sources with nothing left are hidden.
+
+```tsx
+import { CreditBalance } from '@nozle-js/react'
+
+// `balance` is one entry of the SDK's `credits.balance` result
+<CreditBalance balance={balance} isLoading={isLoading} error={error} />
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `balance` | `CreditBalanceData` or `null` | `credit_system_name`, `unit_name`, `available`, `as_of` and optional `sources`. `null` shows the empty message. |
+| `isLoading` | `boolean` | Shows a loading placeholder. |
+| `error` | `Error` or `string` | Shows the message as an alert. |
+| `emptyMessage` | `string` | Defaults to `No credit balance yet.` |
+
+### `CreditHistory`
+
+Renders credit operations as a table: when, type (used, granted, adjustment, expired, revoked, refunded, transfer), feature, credits and status.
+
+```tsx
+<CreditHistory
+  operations={page.operations}
+  hasMore={page.next_cursor !== null}
+  onLoadMore={() => loadNextPage(page.next_cursor)}
+  isLoading={isLoading}
+  error={error}
+/>
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `operations` | `CreditOperationData[]` | `id`, `type`, `status`, `credit_amount`, `feature_code` and `occurred_at` of each operation. |
+| `hasMore`, `onLoadMore` | `boolean`, `() => void` | Show a `Load more` button. Fetch the next page with the SDK's `next_cursor`. |
+| `isLoading` | `boolean` | Shows a placeholder, or disables the button while a page loads. |
+| `error` | `Error` or `string` | Shows the message as an alert. |
+| `emptyMessage` | `string` | Defaults to `No credit activity yet.` |
 
 ## Access-control components
 
