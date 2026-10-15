@@ -34,11 +34,6 @@ import { PricingTable } from '@nozle-js/react'
   currentPlanCode="free_monthly"
   highlightPlan="pro_monthly"
   returnUrl="https://app.example.com/settings/billing"
-  features={[
-    ['3 projects', 'Community support'],
-    ['Unlimited projects', 'Priority support', 'Advanced analytics'],
-    ['Custom limits', 'Dedicated support'],
-  ]}
   enterpriseEmail="sales@example.com"
   onStripeClientSecret={setClientSecret}
   onCheckoutError={setError}
@@ -57,7 +52,6 @@ If its own catalog request fails, `PricingTable` renders `Plans could not be loa
 |---|---|---|---|
 | `currentPlanCode` | `string` | — | Plan displayed as current and disabled. |
 | `plans` | `PricingPlan[]` | Public catalog | Caller-supplied plan list. |
-| `features` | `string[][]` | Built from the plan | Feature lists aligned to the rendered plan order. A list you pass for a plan replaces the generated one. |
 | `onSelect` | `(plan) => void` | Provider checkout | Overrides built-in checkout selection. |
 | `returnUrl` | `string` | Current URL | Return URL sent to `createCheckout`. |
 | `onStripeClientSecret` | `(secret) => void` | — | Receives embedded Stripe checkout secrets. |
@@ -79,8 +73,11 @@ The generated feature list has one line per item, in this order:
 | `config` entitlement | `Support: priority` (one line per privilege value) |
 | Credit grant rule | `500 ai credits every month`, `10 credits (one time)` |
 | `standard` usage charge | `$0.01 per api calls` |
+| `graduated`, `volume` and `graduated_percentage` charges | One line per range, for example `0 to 1,000 emails: free` and `1,001+ emails: $0.01 each` |
+| `package` charge | `$5.00 per 100 sms, first 50 free` |
+| `percentage` charge | `2.9% of each payment + $0.30 per payment` |
 
-Tiered, package, volume and percentage charges do not produce a line; pass `features` for those. Call `planFeatures(plan)` to get the same lines for your own layout.
+`PricingTable` has no `features` prop: the lines always come from the catalog, so the table cannot show something the plan does not give. A `custom` or `dynamic` charge produces no line. Call `planFeatures(plan)` to get the same lines for your own layout.
 
 ### `PlanCard`
 
