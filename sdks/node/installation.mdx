@@ -30,7 +30,7 @@ export const nozle = new Nozle({
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `apiKey` | `string` | required | Organization credential. Use a restricted `sk_` for server mutations. |
+| `apiKey` | `string` | `NOZLE_SECRET_KEY` environment variable | Organization credential. Use a restricted `sk_` for server mutations. When you do not pass it, the client reads `NOZLE_SECRET_KEY`; if that is not set the constructor throws. |
 | `host` | `string` | `https://api.nozle.app` | Root API origin. The SDK sends Engine calls to `${host}/engine` and Core calls to `${host}/core`. Set only this for a local or self-hosted deployment behind one reverse proxy. |
 | `baseUrl` | `string` | `https://api.nozle.app/engine` | Engine API origin used for `track()`, entitlements, credits, entities, usage, and margin. Overrides the address derived from `host`. |
 | `eventsUrl` | `string` | `https://api.nozle.app/core` | Core API origin used for customer writes, billing resources, subscription discovery, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. Overrides the address derived from `host`. |

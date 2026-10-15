@@ -51,16 +51,14 @@ go get github.com/nozle-dev/nozle-go
 <Step>
 ## Initialize the client
 
-Set `NOZLE_SECRET_KEY` in your backend environment to your restricted `sk_` key, then create a Nozle client.
+Set `NOZLE_SECRET_KEY` in your backend environment to your restricted `sk_` key, then create a Nozle client. The SDKs read that variable when you do not pass a key.
 
 <Tabs>
 <Tab title="Node.js">
 ```ts title="nozle.ts"
 import { Nozle } from '@nozle-js/node';
 
-const nozle = new Nozle({
-  apiKey: process.env.NOZLE_SECRET_KEY!,
-});
+const nozle = new Nozle();
 ```
 </Tab>
 <Tab title="Python">
@@ -68,9 +66,7 @@ const nozle = new Nozle({
 import os
 from nozle import Nozle
 
-nozle = Nozle(
-    api_key=os.environ["NOZLE_SECRET_KEY"],
-)
+nozle = Nozle()
 ```
 </Tab>
 <Tab title="Go">
@@ -80,7 +76,7 @@ import (
   nozle "github.com/nozle-dev/nozle-go"
 )
 
-client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"))
+client := nozle.New("") // an empty key reads NOZLE_SECRET_KEY
 ```
 </Tab>
 </Tabs>
