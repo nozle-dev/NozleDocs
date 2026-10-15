@@ -52,6 +52,7 @@ If its own catalog request fails, `PricingTable` renders `Plans could not be loa
 |---|---|---|---|
 | `currentPlanCode` | `string` | — | Plan displayed as current and disabled. |
 | `plans` | `PricingPlan[]` | Public catalog | Caller-supplied plan list. |
+| `features` | `string[][]` or `Record<string, string[]>` | Read from each plan | Optional. Replaces the generated lines of a plan: an array aligned to the rendered plan order, or an object keyed by plan code. |
 | `onSelect` | `(plan) => void` | Provider checkout | Overrides built-in checkout selection. |
 | `returnUrl` | `string` | Current URL | Return URL sent to `createCheckout`. |
 | `onStripeClientSecret` | `(secret) => void` | — | Receives embedded Stripe checkout secrets. |
@@ -77,32 +78,38 @@ The generated feature list has one line per item, in this order:
 | `package` charge | `$5.00 per 100 sms, first 50 free` |
 | `percentage` charge | `2.9% of each payment + $0.30 per payment` |
 
-`PricingTable` has no `features` prop: the lines always come from the catalog, so the table cannot show something the plan does not give. A `custom` or `dynamic` charge produces no line. Call `planFeatures(plan)` to get the same lines for your own layout.
+Leave `features` out and the table can only show what the plan gives. A `custom` or `dynamic` charge produces no line, so pass `features` for a plan that needs one. Call `planFeatures(plan)` to get the same lines for your own layout.
 
 ### `PlanCard`
 
-Use `PlanCard` when you already have a custom pricing layout and want an individual card.
+Use `PlanCard` when you already have a custom pricing layout and want an individual card. It takes a plan from the catalog and reads the price, currency, interval and feature lines from it.
 
 ```tsx
 <PlanCard
-  id="growth"
-  name="Growth"
-  monthlyPrice={49}
-  annualPrice={490}
-  description="For growing product teams"
-  features={['Unlimited projects', 'Priority support']}
-  isAnnual={annualBilling}
+  plan={plans.find((plan) => plan.code === 'growth')!}
   isCurrent={currentPlan === 'growth'}
   returnUrl="https://app.example.com/settings/billing"
   onSelect={({ planCode, returnUrl }) => startCheckout(planCode, returnUrl)}
 />
 ```
 
-Prices are expressed in major currency units for this presentational component, not cents. `PlanCard` declares a `children` prop but does not render it.
+| Prop | Type | Description |
+|---|---|---|
+| `plan` | `PricingPlan` | A plan from the public catalog. |
+| `isCurrent` | `boolean` | Shows the card as the current plan and disables its button. |
+| `features` | `string[]` | Optional. Replaces the lines read from the plan. |
+| `returnUrl` | `string` | Return URL sent to the checkout callback. Defaults to the current URL. |
+| `onSelect` | `(input) => void` | Called with `planCode` and `returnUrl`. The button is not rendered without it. |
 
 ### `PlanComparison`
 
-Renders a side-by-side feature table. Each feature maps plan IDs to a string or boolean.
+Renders a side-by-side table of the plans you pass. Each row is an entitlement or a granted credit system, in the order the plans return them, and a plan that does not have it shows a cross.
+
+```tsx
+<PlanComparison plans={plans} />
+```
+
+Each cell shows `✓` for an included entitlement, the limit for a metered entitlement that has one, the value of a `config` entitlement, or the credit grant. Pass `features` to replace the rows:
 
 ```tsx
 <PlanComparison
@@ -113,14 +120,11 @@ Renders a side-by-side feature table. Each feature maps plan IDs to a string or 
       label: 'Projects',
       values: { free: '3', growth: 'Unlimited', scale: 'Unlimited' },
     },
-    {
-      key: 'sso',
-      label: 'SAML SSO',
-      values: { free: false, growth: false, scale: true },
-    },
   ]}
 />
 ```
+
+`values` is keyed by plan `code`. Call `comparisonRows(plans)` for the generated rows.
 
 ## Checkout components
 
