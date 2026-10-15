@@ -1,17 +1,17 @@
 ---
 title: "Errors and retries"
-description: "Read failed requests, branch on NozleApiError or the HTTP status, and retry Node SDK calls safely."
+description: "Read failed requests with NozleApiError, branch on status and code, and retry Node SDK calls safely."
 ---
 
-Failed requests throw one of two kinds of error:
+A request that gets a non-2xx response throws `NozleApiError`. It carries `status`, `code`, `errorDetails`, `requestId`, `retryAfter` and `hasCode()`. Any other failure is a plain `Error`: a network error, a timeout, or a local check that fails before a request is sent.
 
-- **`NozleApiError`** (from version 0.10.0) for failed `checkout()`, `checkoutInvoice()`, `verifyCheckout()`, `checkoutStatus()` and margin queries (`nozle.margin.*`). It carries `status`, `code`, `errorDetails` and `hasCode()`.
-- **A plain `Error`** for every other call, such as `track()`, `usage.track()`, `usage.check()`, `can()`, `costEvents.track()`, `subscribe()`, credits and entities. It has no `status` property and no response body.
+Before the version that adds `NozleApiError` to every call, only `checkout()`, `checkoutInvoice()`, `verifyCheckout()`, `checkoutStatus()` and the `nozle.margin.*` queries threw it (from 0.10.0). Every other call threw a plain `Error` with the status only in its message.
 
-| Error message | Meaning |
+| Error | Meaning |
 |---|---|
-| `<operation> failed: <HTTP status> <status text>` | Nozle returned a non-2xx response, for example `usage.track failed: 409 Conflict` or `checkoutStatus failed: 404 Not Found`. The operation is the method name; for margin queries it is `margin` followed by the path. |
-| Descriptive message | Local validation failed before any request, for example a wrong key type, a bad timestamp, or a missing argument. |
+| `NozleApiError`, message `<operation> failed: <HTTP status> <status text>` | Nozle returned a non-2xx response, for example `usage.track failed: 409 Conflict`. The operation is the method name; for margin queries it is `margin` followed by the path. |
+| Plain `Error` with a descriptive message | Local validation failed before any request, for example a wrong key type, a bad timestamp, or a missing argument. |
+| `TypeError`, `AbortError` or `TimeoutError` from `fetch` | The request did not complete: network failure or the `timeout` option. |
 
 ## Branch on `NozleApiError`
 
@@ -38,22 +38,17 @@ try {
 | `status` | The HTTP status. |
 | `code` | The top-level `code` of the response, for example `payment_provider_required`, `validation_errors` or `invalid_date_range`. Absent when the response had none. |
 | `errorDetails` | The raw `error_details` object of a `validation_errors` response, for example `{ base: ['razorpay_requires_inr'] }`. |
+| `requestId` | The `X-Request-Id` response header. Core sends it; the Engine does not yet. Quote it when you contact support. |
+| `retryAfter` | Seconds to wait, from the `Retry-After` header, when the service sends one. |
 | `hasCode(code)` | `true` when `code` equals the value, or the value is listed in `errorDetails`. |
 
 The message keeps the `<operation> failed: <status> <status text>` form, and the class extends `Error`.
 
-## Read the status of any other error
+## Branch on the status
 
-Calls that throw a plain `Error` carry the status only in the message. Read it in one helper:
+`error.status` works on every call. Use `status` to separate a retryable failure from one that is not:
 
 ```ts
-function nozleStatus(error: unknown): number | undefined {
-  if (error instanceof NozleApiError) return error.status
-  if (!(error instanceof Error)) return undefined
-  const match = / failed: (\d{3}) /.exec(error.message)
-  return match ? Number(match[1]) : undefined
-}
-
 try {
   await nozle.usage.track(
     {
@@ -65,17 +60,15 @@ try {
     { idempotencyKey: 'agent-execution-0183f' },
   )
 } catch (error) {
-  const status = nozleStatus(error)
-
-  if (status === undefined) {
+  if (!(error instanceof NozleApiError)) {
     // Local validation error or network failure.
-  } else if (status === 409) {
+  } else if (error.status === 409) {
     // The key was used with a different request. Do not retry.
+  } else if (error.status === 429 || error.status >= 500) {
+    // Retry with the same key and request after error.retryAfter seconds, if it is set.
   }
 }
 ```
-
-Errors with the same status look the same when they come from a plain `Error`: different reasons for a `422` all surface as the same message for the operation. Use `NozleApiError.code` where the call supports it.
 
 ## Retry behavior
 
