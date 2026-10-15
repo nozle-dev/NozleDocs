@@ -1,27 +1,54 @@
 ---
 title: "Errors and retries"
-description: "Read failed requests, branch on the HTTP status, and retry Node SDK calls safely."
+description: "Read failed requests, branch on NozleApiError or the HTTP status, and retry Node SDK calls safely."
 ---
 
-Every failed request throws a plain `Error`. The SDK has no error subclasses.
+Failed requests throw one of two kinds of error:
 
-| Error | Meaning |
+- **`NozleApiError`** (from version 0.10.0) for failed `checkout()`, `checkoutInvoice()`, `verifyCheckout()`, `checkoutStatus()` and margin queries (`nozle.margin.*`). It carries `status`, `code`, `errorDetails` and `hasCode()`.
+- **A plain `Error`** for every other call, such as `track()`, `usage.track()`, `usage.check()`, `can()`, `costEvents.track()`, `subscribe()`, credits and entities. It has no `status` property and no response body.
+
+| Error message | Meaning |
 |---|---|
-| `<operation> failed: <HTTP status> <status text>` | Nozle returned a non-2xx response, for example `usage.track failed: 409 Conflict`. |
+| `<operation> failed: <HTTP status> <status text>` | Nozle returned a non-2xx response, for example `usage.track failed: 409 Conflict` or `checkoutStatus failed: 404 Not Found`. The operation is the method name; for margin queries it is `margin` followed by the path. |
 | Descriptive message | Local validation failed before any request, for example a wrong key type, a bad timestamp, or a missing argument. |
 
-The error has no `status` property and no response body. Errors with the same status look the same: `paid_plan_required`, `invalid_or_untrusted`, and `plan_already_active` all surface as the same `422` message for the operation.
+## Branch on `NozleApiError`
 
-<Info>
-`checkoutInvoice()` errors are labelled `checkout`, for example `checkout failed: 404 Not Found`.
-</Info>
+```ts
+import { NozleApiError } from '@nozle-js/node'
 
-## Read the status
+try {
+  await nozle.checkout('workspace_123', 'pro', 'https://app.example.com/billing')
+} catch (error) {
+  if (error instanceof NozleApiError) {
+    if (error.hasCode('payment_provider_required')) {
+      // Assign a payment provider to the customer, then retry.
+    } else if (error.status === 422) {
+      console.error(error.code, error.errorDetails)
+    }
+  } else {
+    throw error // Local validation error or network failure.
+  }
+}
+```
 
-To branch on the status, read it from the message in one helper:
+| Property | Meaning |
+|---|---|
+| `status` | The HTTP status. |
+| `code` | The top-level `code` of the response, for example `payment_provider_required`, `validation_errors` or `invalid_date_range`. Absent when the response had none. |
+| `errorDetails` | The raw `error_details` object of a `validation_errors` response, for example `{ base: ['razorpay_requires_inr'] }`. |
+| `hasCode(code)` | `true` when `code` equals the value, or the value is listed in `errorDetails`. |
+
+The message keeps the `<operation> failed: <status> <status text>` form, and the class extends `Error`.
+
+## Read the status of any other error
+
+Calls that throw a plain `Error` carry the status only in the message. Read it in one helper:
 
 ```ts
 function nozleStatus(error: unknown): number | undefined {
+  if (error instanceof NozleApiError) return error.status
   if (!(error instanceof Error)) return undefined
   const match = / failed: (\d{3}) /.exec(error.message)
   return match ? Number(match[1]) : undefined
@@ -47,6 +74,8 @@ try {
   }
 }
 ```
+
+Errors with the same status look the same when they come from a plain `Error`: different reasons for a `422` all surface as the same message for the operation. Use `NozleApiError.code` where the call supports it.
 
 ## Retry behavior
 
