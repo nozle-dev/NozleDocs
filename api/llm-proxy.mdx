@@ -6,7 +6,9 @@ description: Reverse proxy for OpenAI and Anthropic with automatic token trackin
 
 Base URL: `https://api.nozle.app/engine/api/v1`
 
-Reverse proxy routes that forward LLM requests to OpenAI or Anthropic and automatically track token usage. The proxy reads the response to extract `{ model, input_tokens, output_tokens, latency_ms }` and fires an internal `nozle.track()` event — no SDK wrapper needed on your side.
+Reverse proxy routes that forward LLM requests to OpenAI or Anthropic and record their token usage as a usage event in your organization, signed with your own `X-Nozle-Key`. Use it when you cannot change your LLM client. When you can, prefer [usage capture in the SDK](/sdks/node/llm-auto-capture): it works with any provider and keeps LLM traffic out of Nozle.
+
+The usage event bills only when your plan has a metered Feature with the same code; see [Set up AI token billing](/guides/ai/token-billing).
 
 <Warning>
 LLM proxy routes use `X-Nozle-Key` for Nozle authentication, **not** the `Authorization` header. The `Authorization` header is reserved for the customer's own LLM provider API key, which the proxy forwards untouched to the provider.
@@ -16,7 +18,7 @@ LLM proxy routes use `X-Nozle-Key` for Nozle authentication, **not** the `Author
 
 ## /api/v1/proxy/openai/v1/*
 
-Proxies all requests to `https://api.openai.com/v1/*`. Any OpenAI-compatible endpoint works (chat completions, embeddings, etc.).
+Proxies all requests to `https://api.openai.com/v1/*`. Usage is recorded for chat completions (including streams), the Responses API and embeddings.
 
 **Auth:** `X-Nozle-Key` header (`sk_` only)
 
@@ -24,11 +26,16 @@ Proxies all requests to `https://api.openai.com/v1/*`. Any OpenAI-compatible end
 
 | Header | Description |
 |--------|-------------|
-| `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`) |
+| `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`). It needs `event:write` permission when API permissions are on. |
 | `X-Nozle-Customer-Id` | External customer ID to bill for this usage. Missing returns `400`. |
 | `Authorization` | Customer's OpenAI API key (`Bearer sk-...`) |
 
-**Optional header:** `X-Nozle-Feature`, a feature code stored as the `feature` property of the tracked event.
+**Optional headers:**
+
+| Header | Description |
+|--------|-------------|
+| `X-Nozle-Feature-Code` | Code of the usage event. Default `llm_tokens`. Must match a metered Feature to bill. |
+| `X-Nozle-Feature` | Stored as the `feature` property of the event. |
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/openai/v1/chat/completions \
@@ -54,12 +61,17 @@ Proxies all requests to `https://api.anthropic.com/v1/*`.
 
 | Header | Description |
 |--------|-------------|
-| `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`) |
+| `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`). It needs `event:write` permission when API permissions are on. |
 | `X-Nozle-Customer-Id` | External customer ID to bill for this usage. Missing returns `400`. |
 | `x-api-key` | Customer's Anthropic API key |
 | `anthropic-version` | Anthropic API version |
 
-**Optional header:** `X-Nozle-Feature`, a feature code stored as the `feature` property of the tracked event.
+**Optional headers:**
+
+| Header | Description |
+|--------|-------------|
+| `X-Nozle-Feature-Code` | Code of the usage event. Default `llm_tokens`. Must match a metered Feature to bill. |
+| `X-Nozle-Feature` | Stored as the `feature` property of the event. |
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/anthropic/v1/messages \
@@ -76,15 +88,21 @@ curl -X POST https://api.nozle.app/engine/api/v1/proxy/anthropic/v1/messages \
 ```
 
 <Info>
-The proxy returns the provider's response unchanged. Your customer's API key is forwarded but never stored. Token usage is extracted from the response and tracked automatically as a billing event on the `llm_tokens` metric.
+The proxy returns the provider's response unchanged. Your customer's API key is forwarded but never stored. Token usage is read from the response and recorded as a usage event in your organization, with the code from `X-Nozle-Feature-Code` (default `llm_tokens`).
 </Info>
+
+<Warning>
+Before this release the proxy recorded usage under Nozle's own organization instead of yours, so proxy usage from earlier calls is not in your account.
+</Warning>
 
 ## How it works
 
-- The path after `/proxy/openai/` or `/proxy/anthropic/` is sent to the provider host unchanged, with the same method, query string, headers and body.
-- Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id` and `X-Nozle-Feature` before forwarding. All other headers, including `Authorization` and `x-api-key`, are forwarded.
-- Streaming (`text/event-stream`) responses are passed through as they arrive. Usage is read when the stream closes.
-- An event is tracked only when the response reports more than zero input or output tokens. Its properties are `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. Tracking runs in the background; a tracking failure does not change the response.
+- The path after `/proxy/openai/` or `/proxy/anthropic/` is sent to the provider host unchanged, with the same method, query string, headers and body, except as noted below.
+- Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding. All other headers, including `Authorization` and `x-api-key`, are forwarded. `Accept-Encoding` is set to `identity` so the usage can be read.
+- A chat completion stream (`"stream": true` to `/chat/completions`) is sent with `stream_options.include_usage: true`, because OpenAI leaves usage out of streams otherwise.
+- Streaming (`text/event-stream`) responses are passed through as they arrive; usage is read from the stream as it passes.
+- Usage is recognised by the shape of the response: chat completions, the Responses API, and Anthropic messages, including cached input and cache writes.
+- An event is recorded only for a successful response that reports more than zero tokens. Its `transaction_id` is `llm-<format>-<response id>`, so the same response is never billed twice. Its properties are `provider`, `provider_host`, `model`, `input_tokens` (all input, including cached), `output_tokens`, `latency_ms` and, when sent, `feature`. Recording runs in the background; a recording failure does not change the response.
 
 ## Errors
 
@@ -92,9 +110,10 @@ These come from Engine. Provider errors are returned unchanged, with the provide
 
 | Status | Body | Meaning |
 |--------|------|---------|
-| `400` | `{"error": "missing X-Nozle-Customer-Id header"}` | `X-Nozle-Customer-Id` is missing. |
-| `401` | `{"error": "missing X-Nozle-Key header"}` | `X-Nozle-Key` is missing. |
-| `401` | `{"error": "invalid nozle key"}` | The key is unknown. |
-| `403` | `{"error": "publishable keys are limited to GET /api/v1/plans"}` | A publishable key was used. |
+| `400` | `{"code": "invalid_request", "error": "missing X-Nozle-Customer-Id header"}` | `X-Nozle-Customer-Id` is missing. |
+| `401` | `{"code": "unauthorized", "error": "missing X-Nozle-Key header"}` | `X-Nozle-Key` is missing. |
+| `401` | `{"code": "unauthorized", "error": "invalid nozle key"}` | The key is unknown. |
+| `403` | `{"code": "publishable_key_not_allowed", ...}` | A publishable key was used. |
+| `403` | `{"code": "permission_denied", "error": "API key requires event:write permission"}` | The key cannot write events, so the call is refused before it reaches the provider. |
 | `502` | Empty | Engine could not reach the provider. |
-| `503` | `{"error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |
+| `503` | `{"code": "unavailable", "error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |

@@ -12760,9 +12760,9 @@ paths:
       description: |-
         Forwards the request to `https://api.openai.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Any key Engine recognises except a publishable `pk_` key is accepted; the internal credential is not. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id` and `X-Nozle-Feature` before forwarding.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
-        **Tracking.** For a JSON response Engine reads `model` and `usage.prompt_tokens` / `usage.completion_tokens`. For a `text/event-stream` response it reads the same fields from the `data:` chunks when the stream closes. When either token count is above zero, Engine sends a usage event in the background with code `llm_tokens`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A tracking failure is logged and does not change the response.
+        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
         Example: `POST /proxy/openai/v1/chat/completions` is sent to `https://api.openai.com/v1/chat/completions`.
       operationId: engineProxyOpenAIPost
@@ -12785,7 +12785,13 @@ paths:
         - name: X-Nozle-Feature
           in: header
           required: false
-          description: Feature code stored as the `feature` property of the tracked event.
+          description: Stored as the `feature` property of the usage event.
+          schema:
+            type: string
+        - name: X-Nozle-Feature-Code
+          in: header
+          required: false
+          description: Code of the usage event. Default `llm_tokens`. It bills only when a metered Feature has this code.
           schema:
             type: string
         - name: Authorization
@@ -12836,9 +12842,9 @@ paths:
       description: |-
         Forwards the request to `https://api.openai.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Any key Engine recognises except a publishable `pk_` key is accepted; the internal credential is not. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id` and `X-Nozle-Feature` before forwarding.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
-        **Tracking.** For a JSON response Engine reads `model` and `usage.prompt_tokens` / `usage.completion_tokens`. For a `text/event-stream` response it reads the same fields from the `data:` chunks when the stream closes. When either token count is above zero, Engine sends a usage event in the background with code `llm_tokens`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A tracking failure is logged and does not change the response.
+        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
         Example: `POST /proxy/openai/v1/chat/completions` is sent to `https://api.openai.com/v1/chat/completions`.
       operationId: engineProxyOpenAIGet
@@ -12861,7 +12867,13 @@ paths:
         - name: X-Nozle-Feature
           in: header
           required: false
-          description: Feature code stored as the `feature` property of the tracked event.
+          description: Stored as the `feature` property of the usage event.
+          schema:
+            type: string
+        - name: X-Nozle-Feature-Code
+          in: header
+          required: false
+          description: Code of the usage event. Default `llm_tokens`. It bills only when a metered Feature has this code.
           schema:
             type: string
         - name: Authorization
@@ -12908,9 +12920,9 @@ paths:
       description: |-
         Forwards the request to `https://api.anthropic.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Any key Engine recognises except a publishable `pk_` key is accepted; the internal credential is not. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id` and `X-Nozle-Feature` before forwarding.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
-        **Tracking.** For a JSON response Engine reads `model` and `usage.input_tokens` / `usage.output_tokens`. For a `text/event-stream` response it reads `message.model` and `message.usage.input_tokens` from the start event and `usage.output_tokens` from later events when the stream closes. When either token count is above zero, Engine sends a usage event in the background with code `llm_tokens`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A tracking failure is logged and does not change the response.
+        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
         Example: `POST /proxy/anthropic/v1/messages` is sent to `https://api.anthropic.com/v1/messages`.
       operationId: engineProxyAnthropicPost
@@ -12933,7 +12945,13 @@ paths:
         - name: X-Nozle-Feature
           in: header
           required: false
-          description: Feature code stored as the `feature` property of the tracked event.
+          description: Stored as the `feature` property of the usage event.
+          schema:
+            type: string
+        - name: X-Nozle-Feature-Code
+          in: header
+          required: false
+          description: Code of the usage event. Default `llm_tokens`. It bills only when a metered Feature has this code.
           schema:
             type: string
         - name: x-api-key
@@ -12992,9 +13010,9 @@ paths:
       description: |-
         Forwards the request to `https://api.anthropic.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Any key Engine recognises except a publishable `pk_` key is accepted; the internal credential is not. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id` and `X-Nozle-Feature` before forwarding.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
-        **Tracking.** For a JSON response Engine reads `model` and `usage.input_tokens` / `usage.output_tokens`. For a `text/event-stream` response it reads `message.model` and `message.usage.input_tokens` from the start event and `usage.output_tokens` from later events when the stream closes. When either token count is above zero, Engine sends a usage event in the background with code `llm_tokens`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A tracking failure is logged and does not change the response.
+        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
         Example: `POST /proxy/anthropic/v1/messages` is sent to `https://api.anthropic.com/v1/messages`.
       operationId: engineProxyAnthropicGet
@@ -13017,7 +13035,13 @@ paths:
         - name: X-Nozle-Feature
           in: header
           required: false
-          description: Feature code stored as the `feature` property of the tracked event.
+          description: Stored as the `feature` property of the usage event.
+          schema:
+            type: string
+        - name: X-Nozle-Feature-Code
+          in: header
+          required: false
+          description: Code of the usage event. Default `llm_tokens`. It bills only when a metered Feature has this code.
           schema:
             type: string
         - name: x-api-key
