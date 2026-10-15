@@ -1,0 +1,28 @@
+---
+title: Idempotency
+description: Which calls are idempotent, what to send, and what a retry returns
+---
+
+A retry must send the same request. Keep the key and the whole payload, including any `timestamp`, and send them again after a timeout, a network error or a `5xx`. A new key means a new operation.
+
+| Call | What makes it idempotent | A retry of the same request | A different request with the same key |
+|---|---|---|---|
+| [Events](/api/events) | `transaction_id` in the event. The SDKs generate one when you omit it. | The first accepted event keeps the identifier. | Ignored: the first accepted event owns the identifier, even if the subscription or timestamp changed. |
+| [Credit usage](/api/usage-track) (`usage.track`) | `Idempotency-Key` header, required, up to 255 bytes. | Returns the original result, including a denial. A denial is also idempotent, so use a new key after adding credits. | `409 idempotency_key_reused`. |
+| [Checkout](/api/create-checkout), [subscription changes](/api/subscription-management), [Entity subscriptions](/api/entity-subscriptions) | `Idempotency-Key` header. | A replay of an accepted quoted request returns the original result, even after the quote expires. A new-subscription checkout retried while the first attempt is unpaid returns `422 subscription_incomplete` even with the same key. | `409 idempotency_key_reused` on checkout and subscription changes; `422` with `idempotency_key_reused` on Entity subscriptions. |
+| [Credit top-up purchase](/api/create-credit-top-up-purchase), [billing state import](/api/import-billing-state), [opening balance import](/api/import-opening-credit-balance), [Entity credit transfers](/api/entity-credit-transfers), [Entities](/api/customer-entities) | `Idempotency-Key` header. Required on the top-up purchase, the billing state import and the opening balance import. | Returns the original result. An opening balance replay returns the imported values even if credits were used since. | `422` with `idempotency_key_reused` on the billing state import; a conflict (`409`) on the others. |
+
+## Retry or not
+
+| Result | Retry? |
+|---|---|
+| Network error, timeout, or `5xx` | Yes, with the same key and payload. |
+| `503` with `Retry-After` (credit balance busy or publication delayed) | Yes, after the `Retry-After` seconds, with the same key. |
+| `409` or `422` with `idempotency_key_reused` | No. Either the first call was committed, or the key belongs to another request. Read the result instead of sending a new key. |
+| `400`, `401`, `403`, `404`, `422` | No. Fix the request first. A retry gets the same answer. |
+
+## The timestamp is part of the request
+
+For `usage.track`, leaving `timestamp` out makes the SDK fill in the current time. The Node.js, Python and Go SDKs reuse the time they filled in when the same key is sent again on the same client. A retry from another process, or after a restart, gets a new time and fails with `409 idempotency_key_reused`, so store one time per unit of work and pass it every time.
+
+Direct HTTP callers must always send `timestamp` themselves. See [errors](/api/errors) for the codes in this page.

@@ -41,3 +41,26 @@ For direct HTTP ingestion, send this envelope to `POST https://api.nozle.app/eng
 <Note>
 For retry safety, preserve the complete event payload and reuse the same `transaction_id`. Within an organization, the first accepted event owns that identifier even if a later request changes the subscription or timestamp.
 </Note>
+
+## Responses and limits
+
+| Case | Result |
+|---|---|
+| Accepted | `200` with the event under `event`. A batch returns the events under `events`. |
+| Batch size | 1 to 100 events. An empty array returns `422` with `events: ["no_events"]`, and more than 100 returns `422` with `events: ["too_many_events"]`. |
+| An invalid event in a batch | The whole batch is rejected with `422 validation_errors` and nothing is stored. `error_details` is keyed by the position of the event in the array. |
+| The same `transaction_id` twice in one batch | The repeat is reported as `transaction_id: ["value_already_exist"]`. |
+| A `timestamp` that is not a number | `422` with `timestamp: ["invalid_format"]`. |
+| A `pk_` key | `403 publishable_key_not_allowed`. |
+| No key, or an unknown key | `401`. |
+
+Nozle does not reject events for being old or in the future. A feature code that matches no feature is accepted but never counted, so check the event name against the feature code.
+
+## Retrying
+
+- Retry a network error, a timeout or a `5xx` with the same `transaction_id` and the same payload.
+- Do not retry a `4xx`. Fix the event first, because the same request gets the same answer.
+- For a batch, resend the whole batch after a failure you cannot read: a batch is either stored or rejected.
+
+See [idempotency](/api/idempotency) and [errors](/api/errors).
+

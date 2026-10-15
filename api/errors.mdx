@@ -40,10 +40,21 @@ Do not parse human-readable text when a machine-readable `code` is available.
 
 ## Common failures
 
-| Error | Check |
-|---|---|
-| Invalid API key | Key prefix, revocation state, and target environment. |
-| Customer not found | Server-owned external customer mapping and organization scope. |
-| Feature not found | Feature code and plan entitlement configuration. |
-| Subscription not active | Checkout payment state and subscription boundary. |
-| Insufficient credits | Effective balance, source expiry, Entity status, and pool policy. |
+Match on the status and `code`, not on the message text.
+
+| Status and `code` | What happened | What to do |
+|---|---|---|
+| `401` (`missing authorization header`, `invalid authorization format, expected Bearer token`, `invalid api key`) | The Engine got no `Authorization` header, one that is not `Bearer <key>`, or a key it does not know or that was revoked. | Send `Authorization: Bearer sk_...` with a current key. |
+| `403` (`publishable_key_not_allowed` from Core; a `403` message from the Engine) | A `pk_` key called something other than the plan catalog. | Call from your backend with an `sk_` key. See [public plan catalog](/api/list-plans). |
+| `404` `customer_not_found` | No customer has that ID, for example on `subscribe`. | Create the customer with `POST /customers`, then call again. |
+| `404` `active_subscription_not_found` | `usage.check` or `usage.track` for a customer with no active subscription. | Activate a subscription for the customer. |
+| `422` `active_subscription_ambiguous` | The customer has more than one active subscription, so credit usage cannot pick one. | End all but one subscription. |
+| `409` `idempotency_key_reused` | The `Idempotency-Key` was used before with a different request. | Retry the identical request with the same key, including the same `timestamp`. Use a new key for a new operation. See [usage tracking](/api/usage-track). |
+| `422` `credit_usage_configuration_invalid` (`no effective credit rate`) | The event time is before the credit rate became effective. | Use a later time, or fix the rate. |
+| `400` `invalid_request` | A field is missing or malformed, for example a `timestamp` that is a date only. | Read the message and fix the field. |
+| `400` `invalid_return_url` | The checkout `return_url` origin is not on the allowlist. | Add the origin to the allowlist. Core and the Engine each have their own list. See [create checkout](/api/create-checkout). |
+| `422` `payment_provider_required` | The customer's payment provider is not connected. | Connect it, or assign one to the customer. See [checkout](/guides/billing/checkout). |
+| `503` `credit_usage_contention` (`Retry-After: 1`), `credit_usage_temporarily_unavailable` (`Retry-After: 1`), `credit_usage_publication_backlog` (`Retry-After: 30`) | The credit balance is busy, or publication is delayed. | Retry the same request with the same `Idempotency-Key` after the `Retry-After` seconds. |
+| `503` `usage_unavailable` from `can()` | The usage lookup failed. The body carries a `request_id`. | Treat it as an unavailable decision, not a denial, and retry after a second. Quote the `request_id` if it persists. |
+
+An event that was accepted but never counted usually means the event name does not equal the feature code, or processing has not finished: events are processed asynchronously, so read usage again after a few seconds.

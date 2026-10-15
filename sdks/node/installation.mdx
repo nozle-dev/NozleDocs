@@ -22,8 +22,6 @@ import { Nozle } from '@nozle-js/node'
 
 export const nozle = new Nozle({
   apiKey: process.env.NOZLE_SECRET_KEY!,
-  baseUrl: 'https://api.nozle.app/engine',
-  eventsUrl: 'https://api.nozle.app/core',
   timeout: 10_000,
 })
 ```
@@ -32,12 +30,15 @@ export const nozle = new Nozle({
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `apiKey` | `string` | required | Organization credential. Use a restricted `sk_` for server mutations. |
-| `baseUrl` | `string` | `https://api.nozle.app/engine` | Engine API origin used for `track()`, entitlements, credits, entities, usage, and margin. |
-| `eventsUrl` | `string` | `https://api.nozle.app/core` | Core API origin used for customer writes, billing resources, subscription discovery, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. |
-| `timeout` | `number` | `10000` | Per-request timeout in milliseconds. |
+| `apiKey` | `string` | `NOZLE_SECRET_KEY` environment variable | Organization credential. Use a restricted `sk_` for server mutations. When you do not pass it, the client reads `NOZLE_SECRET_KEY`; if that is not set the constructor throws. |
+| `host` | `string` | `https://api.nozle.app` | Root API origin. The SDK sends Engine calls to `${host}/engine` and Core calls to `${host}/core`. Set only this for a local or self-hosted deployment behind one reverse proxy. |
+| `baseUrl` | `string` | `https://api.nozle.app/engine` | Engine API origin used for `track()`, entitlements, credits, entities, usage, and margin. Overrides the address derived from `host`. |
+| `eventsUrl` | `string` | `https://api.nozle.app/core` | Core API origin used for customer writes, billing resources, subscription discovery, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. Overrides the address derived from `host`. |
+| `timeout` | `number` | `10000` | Per-attempt timeout in milliseconds. |
+| `maxRetries` | `number` | `0` | Extra attempts after a network error, timeout, `429` or `5xx`. `0` never retries. See [errors and retries](/sdks/node/errors#retry-behavior). |
+| `retryDelayMs` | `number` | `500` | First retry delay in milliseconds. It doubles each retry up to 10 seconds, or the `Retry-After` header is used when sent. |
 
-The client defaults to these public service bases. Set both URLs explicitly for local or self-hosted deployments. Trailing slashes are removed automatically.
+The client defaults to the public service bases under `https://api.nozle.app`. For a local or self-hosted deployment behind one proxy, set `host`. Set `baseUrl` or `eventsUrl` only when the two services live at unrelated addresses; each one you set wins over `host`. If you set only one of them, the other service still uses `host` (by default production), so set `host` too. Trailing slashes are removed automatically.
 
 ```mermaid
 flowchart LR
@@ -105,7 +106,7 @@ The package also exports `wrapOpenAI()` and `wrapAnthropic()` for token metadata
 - Mutation idempotency keys are caller-supplied and limited to 255 bytes.
 - Product-credit amounts are exact decimal strings, not JavaScript numbers.
 - Failed HTTP responses reject with an `Error` containing the operation and HTTP status. See [errors and retries](/sdks/node/errors).
-- Every request uses `AbortSignal.timeout(timeout)`. The SDK does not retry.
+- Every attempt uses `AbortSignal.timeout(timeout)`. The SDK does not retry unless you set `maxRetries`.
 
 ## Production pattern
 

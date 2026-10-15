@@ -1,32 +1,54 @@
 ---
 title: "Errors and retries"
-description: "Read failed requests, branch on the HTTP status, and retry Node SDK calls safely."
+description: "Read failed requests with NozleApiError, branch on status and code, and retry Node SDK calls safely."
 ---
 
-Every failed request throws a plain `Error`. The SDK has no error subclasses.
+A request that gets a non-2xx response throws `NozleApiError`. It carries `status`, `code`, `errorDetails`, `requestId`, `retryAfter` and `hasCode()`. Any other failure is a plain `Error`: a network error, a timeout, or a local check that fails before a request is sent.
+
+Before the version that adds `NozleApiError` to every call, only `checkout()`, `checkoutInvoice()`, `verifyCheckout()`, `checkoutStatus()` and the `nozle.margin.*` queries threw it (from 0.10.0). Every other call threw a plain `Error` with the status only in its message.
 
 | Error | Meaning |
 |---|---|
-| `<operation> failed: <HTTP status> <status text>` | Nozle returned a non-2xx response, for example `usage.track failed: 409 Conflict`. |
-| Descriptive message | Local validation failed before any request, for example a wrong key type, a bad timestamp, or a missing argument. |
+| `NozleApiError`, message `<operation> failed: <HTTP status> <status text>` | Nozle returned a non-2xx response, for example `usage.track failed: 409 Conflict`. The operation is the method name; for margin queries it is `margin` followed by the path. |
+| Plain `Error` with a descriptive message | Local validation failed before any request, for example a wrong key type, a bad timestamp, or a missing argument. |
+| `TypeError`, `AbortError` or `TimeoutError` from `fetch` | The request did not complete: network failure or the `timeout` option. |
 
-The error has no `status` property and no response body. Errors with the same status look the same: `paid_plan_required`, `invalid_or_untrusted`, and `plan_already_active` all surface as the same `422` message for the operation.
-
-<Info>
-`checkoutInvoice()` errors are labelled `checkout`, for example `checkout failed: 404 Not Found`.
-</Info>
-
-## Read the status
-
-To branch on the status, read it from the message in one helper:
+## Branch on `NozleApiError`
 
 ```ts
-function nozleStatus(error: unknown): number | undefined {
-  if (!(error instanceof Error)) return undefined
-  const match = / failed: (\d{3}) /.exec(error.message)
-  return match ? Number(match[1]) : undefined
-}
+import { NozleApiError } from '@nozle-js/node'
 
+try {
+  await nozle.checkout('workspace_123', 'pro', 'https://app.example.com/billing')
+} catch (error) {
+  if (error instanceof NozleApiError) {
+    if (error.hasCode('payment_provider_required')) {
+      // Assign a payment provider to the customer, then retry.
+    } else if (error.status === 422) {
+      console.error(error.code, error.errorDetails)
+    }
+  } else {
+    throw error // Local validation error or network failure.
+  }
+}
+```
+
+| Property | Meaning |
+|---|---|
+| `status` | The HTTP status. |
+| `code` | The top-level `code` of the response, for example `payment_provider_required`, `validation_errors` or `invalid_date_range`. Absent when the response had none. |
+| `errorDetails` | The raw `error_details` object of a `validation_errors` response, for example `{ base: ['razorpay_requires_inr'] }`. |
+| `requestId` | The `X-Request-Id` response header. Core sends it; the Engine does not yet. Quote it when you contact support. |
+| `retryAfter` | Seconds to wait, from the `Retry-After` header, when the service sends one. |
+| `hasCode(code)` | `true` when `code` equals the value, or the value is listed in `errorDetails`. |
+
+The message keeps the `<operation> failed: <status> <status text>` form, and the class extends `Error`.
+
+## Branch on the status
+
+`error.status` works on every call. Use `status` to separate a retryable failure from one that is not:
+
+```ts
 try {
   await nozle.usage.track(
     {
@@ -38,19 +60,27 @@ try {
     { idempotencyKey: 'agent-execution-0183f' },
   )
 } catch (error) {
-  const status = nozleStatus(error)
-
-  if (status === undefined) {
+  if (!(error instanceof NozleApiError)) {
     // Local validation error or network failure.
-  } else if (status === 409) {
+  } else if (error.status === 409) {
     // The key was used with a different request. Do not retry.
+  } else if (error.status === 429 || error.status >= 500) {
+    // Retry with the same key and request after error.retryAfter seconds, if it is set.
   }
 }
 ```
 
 ## Retry behavior
 
-The SDK does not retry. Every call is one request with `AbortSignal.timeout(timeout)`; the default `timeout` is 10 seconds.
+By default the SDK does not retry: every call is one request with a per-attempt timeout (`timeout`, default 10 seconds). Set `maxRetries` to retry network errors, timeouts, `429` and `5xx` with backoff, or after `NozleApiError.retryAfter` seconds when the service sent `Retry-After`:
+
+```ts
+const nozle = new Nozle({ maxRetries: 2, retryDelayMs: 500 })
+```
+
+Only requests that are safe to repeat are retried: reads, calls that carry an idempotency key (such as `usage.track`), event, cost event and customer writes, and the read-only usage check and transition preview. `subscribe`, `checkout` and other writes without a key are never retried.
+
+To retry in your own code instead:
 
 - Retry only after a network error, a `429`, or a `5xx`.
 - Retry with the same idempotency key and the same request, including the `timestamp`.
@@ -59,4 +89,4 @@ The SDK does not retry. Every call is one request with `AbortSignal.timeout(time
 
 ## Idempotency
 
-`usage.track()` needs an `idempotencyKey`. A retry with an identical request returns the original result, including a denial, and does not charge again. The same key with a different request returns `409`. If you omit `timestamp`, the SDK uses the current time, so a retry is a different request. See [product credits](/sdks/node/credits#atomic-usage-tracking) and [usage tracking](/guides/credits/usage-tracking).
+`usage.track()` needs an `idempotencyKey`. A retry with an identical request returns the original result, including a denial, and does not charge again. The same key with a different request returns `409`. If you omit `timestamp`, the SDK fills in the current time once per idempotency key and reuses it for a retry on the same client. Pass a fixed `timestamp` for a retry from another process or after a restart. See [product credits](/sdks/node/credits#atomic-usage-tracking) and [usage tracking](/guides/credits/usage-tracking).

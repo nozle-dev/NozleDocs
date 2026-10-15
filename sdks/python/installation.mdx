@@ -24,20 +24,21 @@ from nozle import Nozle
 
 nozle = Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
-    base_url="https://api.nozle.app/engine",
-    events_url="https://api.nozle.app/core",
     timeout=10,
 )
 ```
 
 | Argument | Type | Default | Description |
 |---|---|---|---|
-| `api_key` | `str` | required | Organization credential. Protected operations require `sk_`. |
-| `base_url` | `str` | `https://api.nozle.app/engine` | Engine API origin for `track()`, entitlements, credits, Entities, usage, and margin. |
-| `events_url` | `str` | `https://api.nozle.app/core` | Core API origin for customer writes, billing resources, subscription discovery, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. |
-| `timeout` | `float` | `10` | Per-request timeout in seconds. |
+| `api_key` | `str` | `NOZLE_SECRET_KEY` environment variable | Organization credential. Protected operations require `sk_`. When you do not pass it, the client reads `NOZLE_SECRET_KEY`; if that is not set it raises `ValueError`. |
+| `host` | `str` | `https://api.nozle.app` | Keyword-only. Root API origin. The SDK sends Engine calls to `{host}/engine` and Core calls to `{host}/core`. Set only this for a local or self-hosted deployment behind one reverse proxy. |
+| `base_url` | `str` | `https://api.nozle.app/engine` | Engine API origin for `track()`, entitlements, credits, Entities, usage, and margin. Overrides the address derived from `host`. |
+| `events_url` | `str` | `https://api.nozle.app/core` | Core API origin for customer writes, billing resources, subscription discovery, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. Overrides the address derived from `host`. |
+| `timeout` | `float` | `10` | Per-attempt timeout in seconds. |
+| `max_retries` | `int` | `0` | Keyword-only. Extra attempts after a network error, timeout, `429` or `5xx`. `0` never retries. See [errors and retries](/sdks/python/errors). |
+| `retry_delay` | `float` | `0.5` | Keyword-only. First retry delay in seconds. It doubles each retry up to 10 seconds, or the `Retry-After` header is used when sent. |
 
-The client defaults to these public service bases. Set both URLs explicitly for local or self-hosted deployments. Trailing slashes are removed automatically.
+The client defaults to the public service bases under `https://api.nozle.app`. For a local or self-hosted deployment behind one proxy, set `host`. Set `base_url` or `events_url` only when the two services live at unrelated addresses; each one you set wins over `host`. If you set only one of them, the other service still uses `host` (by default production), so set `host` too. Trailing slashes are removed automatically.
 
 ```mermaid
 flowchart LR
