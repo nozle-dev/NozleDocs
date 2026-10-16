@@ -34,6 +34,7 @@ import { PricingTable } from '@nozle-js/react'
   currentPlanCode="free_monthly"
   highlightPlan="pro_monthly"
   returnUrl="https://app.example.com/settings/billing"
+  contactSalesPlans={['enterprise']}
   enterpriseEmail="sales@example.com"
   onStripeClientSecret={setClientSecret}
   onCheckoutError={setError}
@@ -62,9 +63,11 @@ If its own catalog request fails, `PricingTable` renders `Plans could not be loa
 | `showToggle` | `boolean` | `true` | Shows monthly/annual filtering when yearly plans exist. |
 | `highlightPlan` | `string` | — | Plan code marked “Most Popular.” |
 | `className` | `string` | — | Class applied to the root container. |
-| `enterpriseEmail` | `string` | — | Opens a prefilled mail link for enterprise/custom plans. |
+| `contactSalesPlans` | `string[]` | — | Codes of plans sold on request. Their card shows "Custom" and a "Contact Sales" button. From React `0.11.0`; earlier versions guessed these plans from their names. |
+| `enterpriseEmail` | `string` | — | Opens a prefilled mail link from the "Contact Sales" button. |
+| `appearance` | `Appearance` | Provider's | Theme, variables and elements. See [Appearance](/sdks/react/styling). |
 
-**Plan order.** The catalog returns plans newest first. `PricingTable` sorts them by base price, cheapest first, and puts custom plans last. Plans in different currencies stay grouped in the order each currency first appears, and plans with the same price keep the catalog order. Pass `sort` for another order; `sortPlansByPrice(plans)` returns the default.
+**Plan order.** The catalog returns plans newest first. `PricingTable` sorts them by base price, cheapest first, and puts `contactSalesPlans` last. Plans in different currencies stay grouped in the order each currency first appears, and plans with the same price keep the catalog order. Pass `sort` for another order; `sortPlansByPrice(plans)` returns the default.
 
 `PricingPlan` contains `code`, `name`, `amount_cents`, `amount_currency`, `interval`, and optional `description`, `entitlements`, `credit_grant_rules` and `charges`. The three optional arrays are what the public catalog returns; see the [public plan catalog](/api/list-plans).
 

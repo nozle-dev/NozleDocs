@@ -1,78 +1,195 @@
 ---
-title: "Theming"
-description: "Theme React SDK components with CSS variables and application styles."
+title: "Appearance"
+description: "Pick a theme for the React components, then adjust colours, shape and single elements."
 ---
 
-React SDK components use inline structural styles plus CSS variables. Set variables on a page wrapper or `:root` to match your design system.
+Every component takes its look from `appearance`. Set it once on `BillingProvider` for all components inside, or on one component. No Tailwind or extra CSS is needed. Requires `@nozle-js/react` `0.11.0`.
 
-```css
-:root {
-  --nozle-primary: #5b5bd6;
-  --nozle-primary-foreground: #ffffff;
-  --nozle-background: #ffffff;
-  --nozle-card: #ffffff;
-  --nozle-foreground: #18181b;
-  --nozle-muted: #f4f4f5;
-  --nozle-muted-foreground: #71717a;
-  --nozle-border: #e4e4e7;
-  --nozle-accent: #7c3aed;
-  --nozle-accent-foreground: #ffffff;
-  --nozle-warning: #d97706;
-  --nozle-warning-bg: #fffbeb;
-  --nozle-warning-text: #92400e;
-  --nozle-warning-border: #fcd34d;
-  --nozle-destructive: #dc2626;
-  --nozle-radius: 12px;
-  --nozle-shadow: 0 12px 30px rgb(24 24 27 / 0.12);
-}
-```
+## Themes
 
-## Pricing-table variables
+<Tabs>
+  <Tab title="Light">
+    The default. You get it without any `appearance`.
 
-`PricingTable` supports narrower overrides in addition to the shared variables:
+    <Frame>
+      <img src="/images/react/themes/light.png" alt="PricingTable, CreditBalance and UsageDashboard in the light theme" />
+    </Frame>
 
-| Variable | Fallback | Purpose |
-|---|---|---|
-| `--nozle-pricing-bg` | `--nozle-background` | Table background. |
-| `--nozle-pricing-card-bg` | `--nozle-card` | Plan card background. |
-| `--nozle-pricing-highlight` | `--nozle-primary` | Highlight border, badge, and CTA. |
-| `--nozle-pricing-border` | `--nozle-border` | Standard plan-card border. |
-| `--nozle-pricing-radius` | `--nozle-radius` | Plan-card corner radius. |
+    ```tsx
+    import { light } from '@nozle-js/react/themes'
+
+    <BillingProvider publishableKey="pk_..." appearance={{ theme: light }}>
+    ```
+  </Tab>
+  <Tab title="Dark">
+    Dark surfaces. Put the components on a dark page background.
+
+    <Frame>
+      <img src="/images/react/themes/dark.png" alt="The components in the dark theme" />
+    </Frame>
+
+    ```tsx
+    import { dark } from '@nozle-js/react/themes'
+
+    <BillingProvider publishableKey="pk_..." appearance={{ theme: dark }}>
+    ```
+  </Tab>
+  <Tab title="System">
+    Follows the visitor's light or dark setting. It uses CSS `light-dark()`, which needs a 2024 or later browser.
+
+    <Frame>
+      <img src="/images/react/themes/system-light.png" alt="The system theme with a light preference" />
+    </Frame>
+    <Frame>
+      <img src="/images/react/themes/system-dark.png" alt="The system theme with a dark preference" />
+    </Frame>
+
+    ```tsx
+    import { system } from '@nozle-js/react/themes'
+
+    <BillingProvider publishableKey="pk_..." appearance={{ theme: system }}>
+    ```
+  </Tab>
+  <Tab title="shadcn/ui">
+    Reads your shadcn/ui variables (`--primary`, `--card`, `--border`, `--radius` and the rest), so the components follow your theme and its dark mode. Shown with the default neutral palette.
+
+    <Frame>
+      <img src="/images/react/themes/shadcn.png" alt="The components with the shadcn theme" />
+    </Frame>
+
+    ```tsx
+    import { shadcn } from '@nozle-js/react/themes'
+
+    <BillingProvider publishableKey="pk_..." appearance={{ theme: shadcn }}>
+    ```
+
+    This works with Tailwind v4, where the variables hold whole colours. With Tailwind v3 they hold HSL parts, so pass them wrapped:
+
+    ```tsx
+    appearance={{ variables: { colorPrimary: 'hsl(var(--primary))', colorBorder: 'hsl(var(--border))' } }}
+    ```
+  </Tab>
+  <Tab title="Minimal">
+    Flat: no shadows, small corners, a near-black primary.
+
+    <Frame>
+      <img src="/images/react/themes/minimal.png" alt="The components in the minimal theme" />
+    </Frame>
+
+    ```tsx
+    import { minimal } from '@nozle-js/react/themes'
+
+    <BillingProvider publishableKey="pk_..." appearance={{ theme: minimal }}>
+    ```
+  </Tab>
+  <Tab title="Neobrutal">
+    Thick borders, square corners and a hard offset shadow.
+
+    <Frame>
+      <img src="/images/react/themes/neobrutal.png" alt="The components in the neobrutal theme" />
+    </Frame>
+
+    ```tsx
+    import { neobrutal } from '@nozle-js/react/themes'
+
+    <BillingProvider publishableKey="pk_..." appearance={{ theme: neobrutal }}>
+    ```
+  </Tab>
+</Tabs>
+
+Change any colour or shape on top of a theme with `variables`:
 
 ```tsx
-<section
-  style={{
-    '--nozle-pricing-highlight': '#0f766e',
-    '--nozle-pricing-radius': '18px',
-  } as React.CSSProperties}
+<BillingProvider
+  publishableKey="pk_..."
+  appearance={{ theme: dark, variables: { colorPrimary: '#7c3aed', borderRadius: '8px' } }}
 >
-  <PricingTable highlightPlan="growth_monthly" />
-</section>
 ```
 
-## Utility classes
+## Combine themes
 
-Some presentational components include utility class names for layout. If your application does not use Tailwind, the important visual structure still comes from inline styles, but you may provide equivalent styles for classes such as `space-y-3`, `space-y-4`, and `w-full`.
+`minimal` and `neobrutal` set shape; the others set colour. Pass several themes in an array. Later ones win where they overlap.
 
-## Legacy preset export
-
-The package exposes `nozlePreset` from `@nozle-js/react/styles/preset`. It contains Tailwind component rules for older `data-nozle` markup. Current components primarily use the CSS variables above, so new integrations should theme with variables rather than depend on the preset.
-
-## Dark surfaces
-
-Scope variables to any container to render components on a dark surface:
-
-```css
-.billing-dark {
-  --nozle-background: #111827;
-  --nozle-card: #172033;
-  --nozle-foreground: #f9fafb;
-  --nozle-muted: #263247;
-  --nozle-muted-foreground: #a8b3c7;
-  --nozle-border: #334155;
-  --nozle-primary: #818cf8;
-  --nozle-primary-foreground: #111827;
-}
+```tsx
+appearance={{ theme: [neobrutal, dark] }}
 ```
 
-Ensure your chosen foreground, border, warning, and destructive colors meet your accessibility contrast requirements.
+## One component
+
+A component's own `appearance` goes on top of the provider's:
+
+```tsx
+<BillingProvider publishableKey="pk_..." appearance={{ theme: dark }}>
+  <PricingTable appearance={{ variables: { colorPrimary: '#16a34a' } }} />
+  <CreditBalance balance={balance} />
+</BillingProvider>
+```
+
+The order, highest first: the component's `variables`, the component's `theme`, the provider's `variables`, the provider's `theme`, `--nozle-*` CSS variables set by your app, then the light values.
+
+## Variables
+
+| Variable | CSS variable | Light | Dark |
+|---|---|---|---|
+| `colorPrimary` | `--nozle-primary` | `#4f46e5` | `#818cf8` |
+| `colorPrimaryForeground` | `--nozle-primary-foreground` | `#ffffff` | `#0b1020` |
+| `colorBackground` | `--nozle-background` | `#ffffff` | `#0b0f19` |
+| `colorCard` | `--nozle-card` | `#ffffff` | `#111827` |
+| `colorForeground` | `--nozle-foreground` | `#111827` | `#f3f4f6` |
+| `colorMuted` | `--nozle-muted` | `#f3f4f6` | `#1f2937` |
+| `colorMutedForeground` | `--nozle-muted-foreground` | `#6b7280` | `#9ca3af` |
+| `colorAccent` | `--nozle-accent` | `#eef2ff` | `#1e1b4b` |
+| `colorAccentForeground` | `--nozle-accent-foreground` | `#3730a3` | `#c7d2fe` |
+| `colorBorder` | `--nozle-border` | `#e5e7eb` | `#374151` |
+| `colorDanger` | `--nozle-destructive` | `#dc2626` | `#f87171` |
+| `colorWarning` | `--nozle-warning` | `#d97706` | `#fbbf24` |
+| `colorSuccess` | `--nozle-success` | `#16a34a` | `#4ade80` |
+| `fontFamily` | `--nozle-font` | system UI font | same |
+| `borderRadius` | `--nozle-radius` | `12px` | same |
+| `borderWidth` | `--nozle-border-width` | `1px` | same |
+| `shadow` | `--nozle-shadow` | soft shadow | darker shadow |
+| `colorScheme` | `color-scheme` | `light` | `dark` |
+
+Any CSS value works, including `var(...)` and `oklch(...)`. Warning and error tints are mixed from `colorWarning` and `colorDanger`.
+
+You can also set the CSS variables yourself, for example on `:root`. A component without `appearance` reads them. The older `--nozle-portal-*` and `--nozle-pricing-*` names still work after the `--nozle-*` name.
+
+## Elements
+
+`elements` changes one part of a component. A string adds a class name; an object adds inline styles. Every part also has a fixed class, `nozle-<key>`, for your own CSS.
+
+```tsx
+<PricingTable
+  appearance={{
+    elements: {
+      planCard: 'rounded-none',
+      planCard__cta: { textTransform: 'uppercase', letterSpacing: '0.04em' },
+    },
+  }}
+/>
+```
+
+The components style themselves with inline styles, so a class name from `elements` cannot override a property they set. Use an object for those properties, or a variable.
+
+| Component | Keys |
+|---|---|
+| `PricingTable` | `pricingTable`, `pricingTable__toggle`, `pricingTable__toggleButton`, `pricingTable__grid`, and the `planCard` keys |
+| `PlanCard` | `planCard`, `planCard__badge`, `planCard__name`, `planCard__description`, `planCard__price`, `planCard__features`, `planCard__feature`, `planCard__cta` |
+| `PlanComparison` | `planComparison`, `planComparison__table`, `planComparison__row`, `planComparison__cell` |
+| `CreditBalance`, `CreditHistory` | `creditBalance`, `creditBalance__amount`, `creditHistory`, `creditHistory__table`, `creditHistory__row` |
+| `UsageMeter`, `UsageDashboard`, `UsageAlert` | `usageMeter`, `usageMeter__label`, `usageMeter__value`, `usageMeter__track`, `usageMeter__fill`, `usageDashboard`, `usageAlert`, `usageAlert__dismiss` |
+| `UsageBreakdown`, `UsageTrend` | `usageBreakdown`, `usageBreakdown__row`, `usageTrend`, `usageTrend__bar` |
+| Buttons and checkout | `checkoutButton`, `upgradeButton`, `checkout`, `checkout__submit`, `checkout__error`, `upgradeModal`, `upgradeModal__dialog`, `upgradeModal__actions` |
+| Gates and badges | `upgradePrompt`, `lockedOverlay`, `lockedOverlay__panel`, `planBadge`, `paymentMethod` |
+| `BillingPortal` | `billingPortal`, `billingPortal__section`, `billingPortal__card`, `billingPortal__table`, `billingPortal__error`, `cancellationControl`, `planChangeControl` |
+
+## Stripe checkout
+
+`Checkout` passes the theme's resolved colours, corner radius and font to Stripe's Payment Element, and picks Stripe's `night` theme on a dark card. Stripe's embedded Checkout page (a `cs_` client secret) uses the branding set in your Stripe dashboard instead.
+
+## Upgrading from 0.10
+
+- Components no longer read shadcn's `--primary` and `--border` on their own. Add `theme: shadcn` to keep that look.
+- Without a theme, the default primary is now `#4f46e5` everywhere; the portal's green is gone. Set `colorPrimary` to keep your colour.
+- The `nozlePreset` Tailwind export is deprecated and does nothing for current components.
+- `PricingTable` no longer treats a plan as "Custom" because its name contains "enterprise" or "custom". List those plan codes in `contactSalesPlans`.
