@@ -208,12 +208,11 @@ For configured settlement policies, preview and apply with `SubscriptionTransiti
 ```go
 current, err := client.CurrentUsage(ctx, "cus_123", "")      // this billing period
 past, err := client.PastUsage(ctx, "cus_123", "", 6)          // newest first
-projected, err := client.ProjectedUsage(ctx, "cus_123", "")   // with ProjectedAmountCents
 ```
 
 Each period is a `CustomerUsage` with `FromDatetime`, `ToDatetime`, `Currency`, `AmountCents`, `TotalAmountCents` and `ChargesUsage` (units and amount per charge and feature). Pass a subscription ID instead of `""` to read a specific subscription.
 
-Projected usage is a premium feature of the organization; without it Core answers `403 projected_usage_not_enabled`. Without a subscription ID, the customer's one active subscription is used, and a customer with none or several gets an error.
+Without a subscription ID, the customer's one active subscription is used, and a customer with none or several gets an error.
 
 ## Invoices
 
@@ -245,4 +244,4 @@ _, err = client.DeleteAlert(ctx, target, "api_calls_80")
 wallet := nozle.AlertTarget{CustomerID: "cus_123", WalletCode: "main"}
 ```
 
-Usage alert types are `current_usage_amount`, `feature_current_usage_amount`, `feature_current_usage_units`, `lifetime_usage_amount` and `feature_lifetime_usage_units` (the `feature_*` ones need a feature code). Wallet alert types are `wallet_balance_amount`, `wallet_credits_balance`, `wallet_ongoing_balance_amount` and `wallet_credits_ongoing_balance`. Threshold values are cents, units or credits by type, and at most one threshold is recurring. Nozle sends the `alert.triggered` webhook when a threshold is crossed; [verify it](/api/receive-webhooks) before acting.
+Usage alert types are `current_usage_amount`, `feature_current_usage_amount` and `feature_current_usage_units` (the `feature_*` ones need a feature code). Wallet alert types are `wallet_balance_amount`, `wallet_credits_balance`, `wallet_ongoing_balance_amount` and `wallet_credits_ongoing_balance`. Threshold values are cents, units or credits by type, and at most one threshold is recurring. Nozle sends the `alert.triggered` webhook when a threshold is crossed; [verify it](/api/receive-webhooks) before acting.

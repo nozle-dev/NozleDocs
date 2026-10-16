@@ -319,12 +319,11 @@ See [Customers and Entities](/sdks/node/customers-entities) for lifecycle method
 ```ts
 const current = await nozle.currentUsage('cus_123')                  // this billing period
 const past = await nozle.pastUsage('cus_123', { periods: 6 })         // newest first
-const projected = await nozle.projectedUsage('cus_123')               // with projected_amount_cents
 ```
 
 Each period has `from_datetime`, `to_datetime`, `currency`, `amount_cents`, `total_amount_cents` and `charges_usage` (units and amount per charge and feature). Pass `{ subscriptionId }` to read a specific subscription.
 
-Projected usage is a premium feature of the organization; without it Core answers `403 projected_usage_not_enabled`. Without a subscription ID, the customer's one active subscription is used, and a customer with none or several gets an error.
+Without a subscription ID, the customer's one active subscription is used, and a customer with none or several gets an error.
 
 ## Invoices
 
@@ -358,4 +357,4 @@ await nozle.alerts.create({ customerId: 'cus_123', walletCode: 'main' }, {
 })
 ```
 
-Usage alert types are `current_usage_amount`, `feature_current_usage_amount`, `feature_current_usage_units`, `lifetime_usage_amount` and `feature_lifetime_usage_units` (the `feature_*` ones need a feature code). Wallet alert types are `wallet_balance_amount`, `wallet_credits_balance`, `wallet_ongoing_balance_amount` and `wallet_credits_ongoing_balance`. Threshold values are cents, units or credits by type, and at most one threshold is recurring. Nozle sends the `alert.triggered` webhook when a threshold is crossed; [verify it](/api/receive-webhooks) before acting.
+Usage alert types are `current_usage_amount`, `feature_current_usage_amount` and `feature_current_usage_units` (the `feature_*` ones need a feature code). Wallet alert types are `wallet_balance_amount`, `wallet_credits_balance`, `wallet_ongoing_balance_amount` and `wallet_credits_ongoing_balance`. Threshold values are cents, units or credits by type, and at most one threshold is recurring. Nozle sends the `alert.triggered` webhook when a threshold is crossed; [verify it](/api/receive-webhooks) before acting.

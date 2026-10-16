@@ -54,7 +54,7 @@ Each hook returns TanStack Query's result (`data`, `isPending`, `error`, `refetc
 | `useEntitlement(featureCode)` | `allowed`, `used`, `limit`, `remaining` (the `can()` result) | `FeatureGate`, `UsageMeter` |
 | `useCreditBalance(creditSystemCode?)` | One balance: the given credit system, else the first with credits | `<CreditBalance balance={data} />` |
 | `useCreditHistory({ creditSystemCode?, limit? })` | Paged operations; `operations` flattens the loaded pages | `<CreditHistory operations={operations} hasMore={hasNextPage} onLoadMore={fetchNextPage} />` |
-| `useUsage({ period })` | `period: "current"` (default): this period's usage; `"past"`: past periods; `"projected"`: this period with `projected_amount_cents` (premium) | `<UsageBreakdown usage={data} />`, `<UsageTrend periods={data} />` |
+| `useUsage({ period })` | `period: "current"` (default): this period's usage; `"past"`: past periods | `<UsageBreakdown usage={data} />`, `<UsageTrend periods={data} />` |
 | `useUpgradePreview(planCode)` | The price of changing to `planCode`, now and at the effective date; waits until a plan is given | A confirm step before a plan change |
 | `useInvoices({ page })` | `{ invoices, meta }`: the customer's finalized invoices, newest first, 20 per page | An invoice history table |
 | `useInvoiceDownload()` | A function `(invoiceId) => Promise<string \| null>`: the PDF URL, or `null` while Nozle is still generating it | A download button |
