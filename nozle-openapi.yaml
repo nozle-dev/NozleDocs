@@ -1587,7 +1587,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '405':
+        '422':
           $ref: '#/components/responses/NotAllowed'
   /credit_notes/{id}/metadata:
     post:
@@ -3801,8 +3801,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '405':
-          $ref: '#/components/responses/NotAllowed'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
     delete:
@@ -3822,7 +3820,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '405':
+        '422':
           $ref: '#/components/responses/NotAllowed'
   /invoices:
     post:
@@ -4114,7 +4112,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '405':
+        '422':
           $ref: '#/components/responses/NotAllowed'
   /invoices/{id}/refresh:
     put:
@@ -4229,7 +4227,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '405':
+        '422':
           $ref: '#/components/responses/NotAllowed'
   /invoices/{id}/void:
     post:
@@ -7301,7 +7299,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '405':
+        '422':
           $ref: '#/components/responses/NotAllowed'
 webhooks:
   alert_triggered:
@@ -14747,10 +14745,10 @@ components:
         status:
           type: integer
           format: int32
-          example: 405
+          example: 422
         error:
           type: string
-          example: Method Not Allowed
+          example: Unprocessable Entity
         code:
           type: string
           example: not_allowed
@@ -24013,7 +24011,7 @@ components:
           schema:
             $ref: '#/components/schemas/ApiErrorNotFound'
     NotAllowed:
-      description: Not Allowed error
+      description: The request is refused in the resource's current state (for example a voided invoice). The `code` says why.
       content:
         application/json:
           schema:

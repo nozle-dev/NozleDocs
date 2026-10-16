@@ -5,6 +5,16 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Error statuses and checkout fixes
+
+_Unreleased_
+
+- **Breaking:** a request that the resource's current state refuses now returns `422` instead of `405`, with the same `code` (for example `not_voidable` or `plan_transition_policy_required`). A conflict with another operation in progress returns `409`. The SDKs branch on `code`, so their behavior is unchanged. See [Errors](/api/errors).
+- Bad bodies and unreachable dependencies return JSON errors with a `code` instead of `500`: `400 bad_request`, `502 upstream_unavailable`.
+- Checkout charges only through the connection assigned to the customer, for single and bulk Entity checkout, and returns `422 payment_provider_required` otherwise. Customer create keeps `payment_provider` and `payment_provider_code` without `sync_with_provider`.
+- Checking out the same plan again reopens an abandoned new-subscription checkout; a different plan returns `409 subscription_checkout_in_progress`.
+- Stripe: a reused invoice checkout key returns `409 idempotency_key_reused`; a rejected webhook URL sends `payment_provider.error`; `payment_method.detached` clears the stored default. Razorpay credentials are checked when you connect.
+
 ### Link existing Stripe customers from the SDKs
 
 _October 14, 2026_
