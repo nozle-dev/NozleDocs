@@ -1,14 +1,21 @@
 
 
-## Invoices
+## Alerts
 
 ```go
-page, err := client.ListInvoices(ctx, "cus_123", nozle.ListInvoicesParams{Status: "finalized", Page: 1})
-invoice, err := client.GetInvoice(ctx, page.Invoices[0].NozleID)
-pdf, err := client.InvoiceDownloadURL(ctx, invoice.NozleID)    // "" until the PDF exists
-next, err := client.PreviewInvoice(ctx, nozle.PreviewInvoiceParams{CustomerID: "cus_123", SubscriptionIDs: []string{"sub_1"}})
+target := nozle.AlertTarget{SubscriptionID: "sub_123"}
+_, err := client.CreateAlert(ctx, target, nozle.AlertInput{
+	AlertType:   "feature_current_usage_units",
+	Code:        "api_calls_80",
+	FeatureCode: "api_calls",
+	Thresholds:  []nozle.AlertThreshold{{Value: "40000"}, {Value: "10000", Recurring: true}},
+})
+alerts, err := client.ListAlerts(ctx, target, 0)
+_, err = client.UpdateAlert(ctx, target, "api_calls_80", nozle.AlertInput{Name: "API calls at 80%"})
+_, err = client.DeleteAlert(ctx, target, "api_calls_80")
+
+// Balance alerts belong to a wallet:
+wallet := nozle.AlertTarget{CustomerID: "cus_123", WalletCode: "main"}
 ```
 
-`PlanCode` instead of `SubscriptionIDs` shows the first invoice of a new subscription. Pay an open invoice with `CheckoutInvoice`.
-
-A PDF is generated the first time it is asked for, so the download call returns no URL until it exists; ask again a few seconds later, or wait for the `invoice.generated` webhook. Invoice preview is a premium feature of the organization (`422 premium_integration_missing` otherwise).
+Usage alert types are `current_usage_amount`, `feature_current_usage_amount`, `feature_current_usage_units`, `lifetime_usage_amount` and `feature_lifetime_usage_units` (the `feature_*` ones need a feature code). Wallet alert types are `wallet_balance_amount`, `wallet_credits_balance`, `wallet_ongoing_balance_amount` and `wallet_credits_ongoing_balance`. Threshold values are cents, units or credits by type, and at most one threshold is recurring. Nozle sends the `alert.triggered` webhook when a threshold is crossed; [verify it](/api/receive-webhooks) before acting.

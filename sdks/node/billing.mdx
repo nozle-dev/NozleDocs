@@ -1,14 +1,23 @@
 
 
-## Invoices
+## Alerts
 
 ```ts
-const page = await nozle.invoices.list('cus_123', { status: 'finalized', page: 1 })   // { invoices, meta }
-const invoice = await nozle.invoices.get(page.invoices[0].nozle_id)
-const pdf = await nozle.invoices.downloadUrl(invoice.nozle_id)                        // string or null
-const next = await nozle.invoices.preview({ customerId: 'cus_123', subscriptionIds: ['sub_1'] })
+const subscription = { subscriptionId: 'sub_123' }
+await nozle.alerts.create(subscription, {
+  alertType: 'feature_current_usage_units',
+  code: 'api_calls_80',
+  featureCode: 'api_calls',
+  thresholds: [{ value: 40000 }, { value: 10000, recurring: true }],
+})
+const { alerts } = await nozle.alerts.list(subscription)
+await nozle.alerts.update(subscription, 'api_calls_80', { name: 'API calls at 80%' })
+await nozle.alerts.delete(subscription, 'api_calls_80')
+
+// Balance alerts belong to a wallet:
+await nozle.alerts.create({ customerId: 'cus_123', walletCode: 'main' }, {
+  alertType: 'wallet_credits_balance', code: 'low_credits', thresholds: [{ value: 100 }],
+})
 ```
 
-`preview` with `planCode` instead of `subscriptionIds` shows the first invoice of a new subscription. Pay an open invoice with `checkoutInvoice`.
-
-A PDF is generated the first time it is asked for, so the download call returns no URL until it exists; ask again a few seconds later, or wait for the `invoice.generated` webhook. Invoice preview is a premium feature of the organization (`422 premium_integration_missing` otherwise).
+Usage alert types are `current_usage_amount`, `feature_current_usage_amount`, `feature_current_usage_units`, `lifetime_usage_amount` and `feature_lifetime_usage_units` (the `feature_*` ones need a feature code). Wallet alert types are `wallet_balance_amount`, `wallet_credits_balance`, `wallet_ongoing_balance_amount` and `wallet_credits_ongoing_balance`. Threshold values are cents, units or credits by type, and at most one threshold is recurring. Nozle sends the `alert.triggered` webhook when a threshold is crossed; [verify it](/api/receive-webhooks) before acting.

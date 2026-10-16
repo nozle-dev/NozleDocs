@@ -1,14 +1,24 @@
 
 
-## Invoices
+## Alerts
 
 ```python
-page = nozle.invoices.list("cus_123", status="finalized", page=1)    # {"invoices", "meta"}
-invoice = nozle.invoices.get(page["invoices"][0]["nozle_id"])
-pdf = nozle.invoices.download_url(invoice["nozle_id"])               # str or None
-upcoming = nozle.invoices.preview("cus_123", subscription_ids=["sub_1"])
+nozle.alerts.create(
+    "feature_current_usage_units",
+    "api_calls_80",
+    [{"value": 40000}, {"value": 10000, "recurring": True}],
+    feature_code="api_calls",
+    subscription_id="sub_123",
+)
+alerts = nozle.alerts.list(subscription_id="sub_123")["alerts"]
+nozle.alerts.update("api_calls_80", name="API calls at 80%", subscription_id="sub_123")
+nozle.alerts.delete("api_calls_80", subscription_id="sub_123")
+
+# Balance alerts belong to a wallet:
+nozle.alerts.create(
+    "wallet_credits_balance", "low_credits", [{"value": 100}],
+    customer_id="cus_123", wallet_code="main",
+)
 ```
 
-`preview` with `plan_code` instead of `subscription_ids` shows the first invoice of a new subscription. Pay an open invoice with `checkout_invoice`.
-
-A PDF is generated the first time it is asked for, so the download call returns no URL until it exists; ask again a few seconds later, or wait for the `invoice.generated` webhook. Invoice preview is a premium feature of the organization (`422 premium_integration_missing` otherwise).
+Usage alert types are `current_usage_amount`, `feature_current_usage_amount`, `feature_current_usage_units`, `lifetime_usage_amount` and `feature_lifetime_usage_units` (the `feature_*` ones need a feature code). Wallet alert types are `wallet_balance_amount`, `wallet_credits_balance`, `wallet_ongoing_balance_amount` and `wallet_credits_ongoing_balance`. Threshold values are cents, units or credits by type, and at most one threshold is recurring. Nozle sends the `alert.triggered` webhook when a threshold is crossed; [verify it](/api/receive-webhooks) before acting.
