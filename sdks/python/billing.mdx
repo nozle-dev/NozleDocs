@@ -337,3 +337,15 @@ customer = nozle.customers.upsert(
 ```
 
 See [Customers and Entities](/sdks/python/customers-entities) for lifecycle details.
+
+## Read usage
+
+```python
+current = nozle.current_usage("cus_123")              # this billing period
+past = nozle.past_usage("cus_123", periods=6)         # newest first
+projected = nozle.projected_usage("cus_123")          # with projected_amount_cents
+```
+
+Each period is a `CustomerUsage` with `from_datetime`, `to_datetime`, `currency`, `amount_cents`, `total_amount_cents` and `charges_usage` (units and amount per charge and feature). Pass `subscription_id` to read a specific subscription.
+
+Projected usage is a premium feature of the organization; without it Core answers `403 projected_usage_not_enabled`. Without a subscription ID, the customer's one active subscription is used, and a customer with none or several gets an error.

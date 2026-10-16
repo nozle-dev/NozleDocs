@@ -202,3 +202,15 @@ See [Entity subscriptions](/api/entity-subscriptions) for lifecycle and payment 
 ## Settlement transitions
 
 For configured settlement policies, preview and apply with `SubscriptionTransitionParams`. Apply keys are limited to 255 UTF-8 bytes. See [Subscriptions](/guides/billing/subscriptions) for valid combinations.
+
+## Read usage
+
+```go
+current, err := client.CurrentUsage(ctx, "cus_123", "")      // this billing period
+past, err := client.PastUsage(ctx, "cus_123", "", 6)          // newest first
+projected, err := client.ProjectedUsage(ctx, "cus_123", "")   // with ProjectedAmountCents
+```
+
+Each period is a `CustomerUsage` with `FromDatetime`, `ToDatetime`, `Currency`, `AmountCents`, `TotalAmountCents` and `ChargesUsage` (units and amount per charge and feature). Pass a subscription ID instead of `""` to read a specific subscription.
+
+Projected usage is a premium feature of the organization; without it Core answers `403 projected_usage_not_enabled`. Without a subscription ID, the customer's one active subscription is used, and a customer with none or several gets an error.

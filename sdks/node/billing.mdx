@@ -313,3 +313,15 @@ const customer = await nozle.customers.upsert({
 ```
 
 See [Customers and Entities](/sdks/node/customers-entities) for lifecycle methods.
+
+## Read usage
+
+```ts
+const current = await nozle.currentUsage('cus_123')                  // this billing period
+const past = await nozle.pastUsage('cus_123', { periods: 6 })         // newest first
+const projected = await nozle.projectedUsage('cus_123')               // with projected_amount_cents
+```
+
+Each period has `from_datetime`, `to_datetime`, `currency`, `amount_cents`, `total_amount_cents` and `charges_usage` (units and amount per charge and feature). Pass `{ subscriptionId }` to read a specific subscription.
+
+Projected usage is a premium feature of the organization; without it Core answers `403 projected_usage_not_enabled`. Without a subscription ID, the customer's one active subscription is used, and a customer with none or several gets an error.
