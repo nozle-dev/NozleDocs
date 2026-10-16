@@ -34,41 +34,6 @@ Every component takes its look from `appearance`. Set it once on `BillingProvide
     <BillingProvider publishableKey="pk_..." appearance={{ theme: dark }}>
     ```
   </Tab>
-  <Tab title="System">
-    Follows the visitor's light or dark setting. It uses CSS `light-dark()`, which needs a 2024 or later browser.
-
-    <Frame>
-      <img src="/images/react/themes/system-light.png" alt="The system theme with a light preference" />
-    </Frame>
-    <Frame>
-      <img src="/images/react/themes/system-dark.png" alt="The system theme with a dark preference" />
-    </Frame>
-
-    ```tsx
-    import { system } from '@nozle-js/react/themes'
-
-    <BillingProvider publishableKey="pk_..." appearance={{ theme: system }}>
-    ```
-  </Tab>
-  <Tab title="shadcn/ui">
-    Reads your shadcn/ui variables (`--primary`, `--card`, `--border`, `--radius` and the rest), so the components follow your theme and its dark mode. Shown with the default neutral palette.
-
-    <Frame>
-      <img src="/images/react/themes/shadcn.png" alt="The components with the shadcn theme" />
-    </Frame>
-
-    ```tsx
-    import { shadcn } from '@nozle-js/react/themes'
-
-    <BillingProvider publishableKey="pk_..." appearance={{ theme: shadcn }}>
-    ```
-
-    This works with Tailwind v4, where the variables hold whole colours. With Tailwind v3 they hold HSL parts, so pass them wrapped:
-
-    ```tsx
-    appearance={{ variables: { colorPrimary: 'hsl(var(--primary))', colorBorder: 'hsl(var(--border))' } }}
-    ```
-  </Tab>
   <Tab title="Minimal">
     Flat: no shadows, small corners, a near-black primary.
 
@@ -97,7 +62,7 @@ Every component takes its look from `appearance`. Set it once on `BillingProvide
   </Tab>
 </Tabs>
 
-Change any colour or shape on top of a theme with `variables`:
+Every colour, the font, corner radius, border width and shadow can be changed on top of a theme with `variables` (full list below):
 
 ```tsx
 <BillingProvider
@@ -106,9 +71,50 @@ Change any colour or shape on top of a theme with `variables`:
 >
 ```
 
+## Highlighted plan
+
+`highlightPlan` on `PricingTable` marks one plan with a "Most Popular" badge. `highlightStyle` picks how the card stands out:
+
+<Tabs>
+  <Tab title="Outline (default)">
+    <Frame>
+      <img src="/images/react/themes/light.png" alt="The highlighted Pro card with a coloured outline" />
+    </Frame>
+
+    ```tsx
+    <PricingTable highlightPlan="pro" />
+    ```
+  </Tab>
+  <Tab title="Filled">
+    The card takes the highlight colour, and its text and button switch to the highlight text colour.
+
+    <Frame>
+      <img src="/images/react/themes/light-filled.png" alt="The highlighted Pro card filled with the highlight colour" />
+    </Frame>
+    <Frame>
+      <img src="/images/react/themes/dark-filled.png" alt="The filled highlight in the dark theme" />
+    </Frame>
+
+    ```tsx
+    <PricingTable highlightPlan="pro" highlightStyle="filled" />
+    ```
+  </Tab>
+</Tabs>
+
+Set the colours with `colorHighlight` and `colorHighlightForeground`; they default to the primary colours. Change the badge text with `highlightLabel`, or pass `highlightLabel={null}` for no badge.
+
+```tsx
+<PricingTable
+  highlightPlan="pro"
+  highlightStyle="filled"
+  highlightLabel="Best value"
+  appearance={{ variables: { colorHighlight: '#16a34a', colorHighlightForeground: '#ffffff' } }}
+/>
+```
+
 ## Combine themes
 
-`minimal` and `neobrutal` set shape; the others set colour. Pass several themes in an array. Later ones win where they overlap.
+`minimal` and `neobrutal` set shape; `light` and `dark` set colour. Pass several themes in an array. Later ones win where they overlap.
 
 ```tsx
 appearance={{ theme: [neobrutal, dark] }}
@@ -144,6 +150,8 @@ The order, highest first: the component's `variables`, the component's `theme`, 
 | `colorDanger` | `--nozle-destructive` | `#dc2626` | `#f87171` |
 | `colorWarning` | `--nozle-warning` | `#d97706` | `#fbbf24` |
 | `colorSuccess` | `--nozle-success` | `#16a34a` | `#4ade80` |
+| `colorHighlight` | `--nozle-highlight` | `colorPrimary` | `colorPrimary` |
+| `colorHighlightForeground` | `--nozle-highlight-foreground` | `colorPrimaryForeground` | `colorPrimaryForeground` |
 | `fontFamily` | `--nozle-font` | system UI font | same |
 | `borderRadius` | `--nozle-radius` | `12px` | same |
 | `borderWidth` | `--nozle-border-width` | `1px` | same |
@@ -189,7 +197,7 @@ The components style themselves with inline styles, so a class name from `elemen
 
 ## Upgrading from 0.10
 
-- Components no longer read shadcn's `--primary` and `--border` on their own. Add `theme: shadcn` to keep that look.
+- Components no longer read shadcn's `--primary` and `--border` on their own. To follow a shadcn/ui theme, pass its variables: `variables: { colorPrimary: 'var(--primary)', colorPrimaryForeground: 'var(--primary-foreground)', colorCard: 'var(--card)', colorForeground: 'var(--foreground)', colorBorder: 'var(--border)', borderRadius: 'var(--radius)' }` (Tailwind v3: wrap each in `hsl()`).
 - Without a theme, the default primary is now `#4f46e5` everywhere; the portal's green is gone. Set `colorPrimary` to keep your colour.
 - The `nozlePreset` Tailwind export is deprecated and does nothing for current components.
 - `PricingTable` no longer treats a plan as "Custom" because its name contains "enterprise" or "custom". List those plan codes in `contactSalesPlans`.
