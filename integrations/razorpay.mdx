@@ -36,15 +36,13 @@ To rotate the webhook secret, edit the connection and enter the new value. Nozle
 
 ### Assign the connection to customers
 
-A customer pays through Razorpay only when that customer uses a Razorpay connection. Select it in the customer's **Payment provider** setting in the dashboard, which lists connections as name and code. A customer who is not assigned to Razorpay goes through the Stripe path, and checkout returns `payment_provider_required` if no Stripe connection exists either. If the customer's connection code matches no Razorpay connection, checkout returns `404 payment_provider_not_found`.
+A customer pays through Razorpay only when that customer uses a Razorpay connection. Select it in the customer's **Payment provider** setting in the dashboard, which lists connections as name and code. A customer who is not assigned to Razorpay goes through the Stripe path, and checkout returns `payment_provider_required` if the customer has no assigned Stripe connection either. If the customer's connection code matches no Razorpay connection, checkout returns `404 payment_provider_not_found`.
 
 Nozle links the customer to the connection at checkout. It creates the customer in Razorpay for mandate registration, which needs the customer's name, email and phone number.
 
 Once a customer has started a Razorpay checkout, it stays linked to that connection. Switching the customer to another Razorpay connection then fails with `422 razorpay_customer_connection_cannot_change`. Nozle also stores the new code on the customer even though the call fails. This is a known bug, so do not switch: create a new customer for the other connection instead.
 
-<Warning>
-A customer created through the REST API keeps its provider assignment only when the `billing_configuration` of the request has `sync_with_provider: true` or a `provider_customer_id`. Otherwise Nozle drops the `payment_provider` and `payment_provider_code` you sent, and plan checkout treats the customer as a Stripe customer. Send one of the two fields, or assign the connection in the dashboard before checkout.
-</Warning>
+To assign the connection from code, send `billing_configuration.payment_provider: "razorpay"` and `payment_provider_code` when you create or update the customer. Nozle keeps the assignment even without `sync_with_provider`.
 
 ## What Nozle handles
 
