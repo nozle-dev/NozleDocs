@@ -37,7 +37,7 @@ To disconnect, use **Disconnect**. Customers assigned to the connection lose the
 
 ### Assign the connection to customers
 
-Plan checkout assigns a customer for you. If the customer is not on Razorpay, Nozle uses the Stripe connection with the customer's code, or your oldest Stripe connection when none matches, and assigns it to the customer. If you have no Stripe connection, checkout returns `422 payment_provider_required`. If two Stripe connections exist, assign the one you want yourself.
+Checkout charges only through the connection assigned to the customer. Nozle never picks another connection for you. A customer with no assigned connection, or whose connection code matches no Stripe connection, gets `422 payment_provider_required`, and nothing is created in Stripe or Nozle.
 
 To assign a connection yourself, select it in the customer's **Payment provider** setting in the dashboard, which lists connections as name and code. The same section has:
 
@@ -47,9 +47,7 @@ To assign a connection yourself, select it in the customer's **Payment provider*
 
 At checkout Nozle creates the missing Stripe customer with the customer's name, email, address and phone, and `card` as the payment method when the customer has no Stripe link yet. Moving a customer to a different Stripe connection at checkout creates a new Stripe customer in that account, so saved payment methods do not carry over.
 
-<Warning>
-A customer created through the REST API keeps its provider assignment only when the `billing_configuration` of the request has `sync_with_provider: true` or a `provider_customer_id`. Without one of them, Nozle drops the `payment_provider` and `payment_provider_code` you sent, and the customer has no assigned provider. Plan checkout then falls back to the organization's oldest Stripe connection, which can be a different Stripe account than the one you meant. Send one of the two fields, or assign the connection in the dashboard before checkout.
-</Warning>
+To assign a connection from code, send `billing_configuration.payment_provider: "stripe"` and `payment_provider_code` when you create or update the customer. Nozle keeps the assignment even without `sync_with_provider`; it then creates the Stripe customer at checkout.
 
 To link a customer that already exists in Stripe from code, pass the Stripe customer ID when you upsert the customer: `billingConfiguration` in [Node.js](/sdks/node/customers-entities#link-a-customer-that-already-exists-in-stripe), `billing_configuration` in [Python](/sdks/python/customers-entities#link-a-customer-that-already-exists-in-stripe), or `BillingConfiguration` in [Go](/sdks/go/customers-entities#link-a-customer-that-already-exists-in-stripe). Nozle stores the link without creating a new Stripe customer, so payment methods already saved in Stripe stay usable.
 

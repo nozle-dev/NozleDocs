@@ -32,7 +32,7 @@ customer, err := client.UpsertCustomer(ctx, nozle.Customer{
 })
 ```
 
-`PaymentProvider` is required when `BillingConfiguration` is set. The assignment is kept only with `ProviderCustomerID` or `SyncWithProvider: true`; otherwise Nozle drops it. A returned `Customer` without a provider has a nil `BillingConfiguration`, so it can be passed back to `UpsertCustomer` unchanged. See [Assign the connection to customers](/integrations/stripe#assign-the-connection-to-customers).
+`PaymentProvider` is required when `BillingConfiguration` is set. Nozle keeps the assignment with or without `SyncWithProvider`, and checkout charges only through the assigned connection. A returned `Customer` without a provider has a nil `BillingConfiguration`, so it can be passed back to `UpsertCustomer` unchanged. See [Assign the connection to customers](/integrations/stripe#assign-the-connection-to-customers).
 
 Use `GetEntity`, `ListEntities`, `ActivateEntity`, `SuspendEntity`, and `BulkUpsertEntities` for the Entity lifecycle. List pages accept `PageOptions` with status, limit (1–100), and cursor. Bulk upsert accepts 1–500 distinct IDs. Mutations use caller-supplied idempotency keys of at most 255 UTF-8 bytes. Entity lifecycle changes do not emit seat billing events automatically.
 
