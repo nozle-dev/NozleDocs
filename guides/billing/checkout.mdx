@@ -49,7 +49,7 @@ Nozle subscribes to these eight events only. Without this webhook, Stripe may co
 
 A new-subscription Stripe checkout returns no checkout ID to poll. After Embedded Checkout completes, reload the subscription or wait for your `subscription.started` webhook. A paid upgrade returns `plan_upgrade_intent_id`; poll its status with [`GET /checkout/{id}`](/api/subscription-management) and the subscription scope.
 
-Retrying a new-subscription checkout while its subscription is still incomplete returns `422 validation_errors` with `error_details.subscription: ["subscription_incomplete"]`, even with the same `Idempotency-Key`. Recover with an invoice checkout for the `invoice_id` of the first response. See [Retry a new-subscription checkout](/integrations/stripe#retry-a-new-subscription-checkout).
+Retrying a new-subscription checkout for the same plan while its subscription is still incomplete reopens the first checkout. A different plan returns `409 subscription_checkout_in_progress`. See [Retry a new-subscription checkout](/integrations/stripe#retry-a-new-subscription-checkout).
 
 ## Razorpay
 
@@ -75,7 +75,7 @@ A Razorpay checkout runs in four steps:
 
 The nested `checkout` of the status response is present while the checkout is `awaiting_payment` and also for an `expired` unpaid order. For the expired order it is `{"type": "processing", "status": "ready"}`, so do not reopen the modal for it. A status call without a customer and subscription scope needs a secret key; an unknown ID returns `404 checkout_session_not_found`. The React [`CheckoutButton`](/sdks/react/components) runs steps 2 to 4 for you when `BillingProvider` has `verifyCheckout` and `getCheckoutStatus` callbacks; it polls 30 times, one second apart.
 
-To retry a new-subscription checkout, do not call checkout again: while the first order is unpaid it returns `422 validation_errors` with `error_details.subscription: ["subscription_incomplete"]`, even with the same `Idempotency-Key`. Reopen the modal on the same order with the checkout that status returns while `awaiting_payment`, or call an invoice checkout for the `invoice_id` of the first response. The React "Payment failed. You can retry checkout." button calls checkout again, so for a new subscription use the stored checkout instead. See [Retry a new-subscription checkout](/integrations/razorpay#retry-a-new-subscription-checkout).
+To retry a new-subscription checkout, call checkout again for the same plan: while the first order is unpaid it returns that same order. The React "Payment failed. You can retry checkout." button does this. See [Retry a new-subscription checkout](/integrations/razorpay#retry-a-new-subscription-checkout).
 
 `POST /checkout` never returns `type: "hosted"` for Razorpay. A Razorpay payment link comes from an invoice payment URL (`POST /invoices/{id}/payment_url`) or a credit top-up purchase, as an `rzp.io` `payment_url` with no checkout ID to poll. Redirect the customer to it; the `payment_link.paid` webhook settles it.
 
@@ -137,7 +137,7 @@ Scheduled transition response:
 
 `effective_at` uses the customer's timezone offset, for example `2026-11-01T00:00:00.000000+05:30`.
 
-Changing an existing subscription needs a [plan transition policy](/api/plan-transition-policies) for that pair of plans. Without one, checkout returns `405 plan_transition_policy_required`. See [Create checkout](/api/create-checkout) for every result type and error.
+Changing an existing subscription needs a [plan transition policy](/api/plan-transition-policies) for that pair of plans. Without one, checkout returns `422 plan_transition_policy_required`. See [Create checkout](/api/create-checkout) for every result type and error.
 
 ## React implementation
 

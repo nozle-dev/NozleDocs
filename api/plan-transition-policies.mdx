@@ -10,7 +10,7 @@ Base URL: `https://api.nozle.app/core/api/v1`.
 
 A plan transition policy tells Nozle how to move a subscription from one plan (the source) to another (the target). Policies are stored per pair of plans: `starter` to `growth` and `growth` to `starter` are two separate policies. Nozle does not infer the direction from the prices; you set it.
 
-Changing an existing subscription's plan needs a policy for that exact pair. Without one, these calls return `405 plan_transition_policy_required`:
+Changing an existing subscription's plan needs a policy for that exact pair. Without one, these calls return `422 plan_transition_policy_required`:
 
 - [Checkout](/api/create-checkout) for a customer that already has an active subscription, including Entity subscription checkout and change-plan
 - [Subscription change preview](/api/subscription-management) (`POST /subscriptions/preview`)
@@ -142,7 +142,7 @@ When a customer with an active subscription checks out a different plan, Nozle r
 | `upgrade` with `immediate` timing | A payment-gated upgrade: a provider result when money is due, or `type: "completed"` when nothing is due. |
 | `downgrade` with `immediate` timing | The downgrade is applied and `type: "completed"` is returned. |
 
-Other `405` responses from plan changes:
+Other `422` responses from plan changes:
 
 | Code | Cause |
 | --- | --- |

@@ -223,7 +223,7 @@ Item problems fail the whole basket with `422` and the reason in `error_details.
 
 Create each Entity first with [Customer Entities](/api/customer-entities). An Entity that does not exist currently makes the request fail with a bare `500`, not a `404`; this is a known defect.
 
-An unknown customer or plan returns `404` (`customer_not_found`, `plan_not_found`). Without a connected payment provider the request returns `405 payment_provider_required`; `405 stripe_customer_required` means Nozle could not create the customer in Stripe. A single Entity checkout without a provider returns `422 payment_provider_required` instead.
+An unknown customer or plan returns `404` (`customer_not_found`, `plan_not_found`). Without a connected payment provider the request returns `422 payment_provider_required`, as a single Entity checkout does; `422 stripe_customer_required` means Nozle could not create the customer in Stripe.
 
 ```json
 {
@@ -294,7 +294,7 @@ Content-Type: application/json
 }
 ```
 
-The [plan transition policy](/api/plan-transition-policies) for the current and target plans determines whether the change is immediate, payment-gated, or scheduled for the renewal boundary. Without a policy for the pair the request returns `405 plan_transition_policy_required` (a change from a free plan to a paid plan uses the organization's free-to-paid policy instead). Change-plan takes no `billing_time`. Changing one Entity never changes another Entity's subscription.
+The [plan transition policy](/api/plan-transition-policies) for the current and target plans determines whether the change is immediate, payment-gated, or scheduled for the renewal boundary. Without a policy for the pair the request returns `422 plan_transition_policy_required` (a change from a free plan to a paid plan uses the organization's free-to-paid policy instead). Change-plan takes no `billing_time`. Changing one Entity never changes another Entity's subscription.
 
 The result is a checkout result with `external_entity_id` and `external_subscription_id` added. A scheduled change:
 

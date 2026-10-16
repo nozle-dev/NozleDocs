@@ -163,7 +163,7 @@ Starts checkout through `BillingProvider.createCheckout` with an idempotency key
 | `onDismiss` | `() => void` | — | Razorpay only. Fires when the Razorpay modal is dismissed. |
 | `onError` | `(error) => void` | — | Checkout failure callback. |
 
-Each click calls `createCheckout` again, with the same idempotency key for the same plan. For a new subscription whose first payment is still pending, the second call fails with `422 subscription_incomplete`, so a retry button such as the "Payment failed. You can retry checkout." message of the Razorpay flow does not recover it. Reopen the modal on the stored Razorpay checkout, keep the Stripe client secret you already have, or use an invoice checkout from your backend. See [Create checkout](/api/create-checkout#retry-a-new-subscription-checkout).
+Each click calls `createCheckout` again, with the same idempotency key for the same plan. For a new subscription whose first payment is still pending, the second call reopens the same checkout, so the "Payment failed. You can retry checkout." button of the Razorpay flow recovers it. See [Create checkout](/api/create-checkout#retry-a-new-subscription-checkout).
 
 ### `Checkout`
 

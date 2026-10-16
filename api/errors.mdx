@@ -12,10 +12,14 @@ description: HTTP errors, validation failures, and retry guidance
 | `401` | Missing or invalid credential. |
 | `403` | Credential lacks permission or a publishable key attempted a protected operation. |
 | `404` | Resource was not found within the authenticated organization. |
-| `409` | Idempotency key or resource-state conflict. |
-| `422` | Request is syntactically valid but violates a product rule. |
+| `409` | Idempotency key or resource-state conflict, such as another checkout in progress. Reload the state, then retry. |
+| `422` | Request is syntactically valid but violates a product rule, or the resource's current state refuses it (for example a voided invoice). |
 | `429` | Request was rate limited. |
+| `500` | Unexpected server error. The body is still JSON with a `code`. |
+| `502` | A service Nozle depends on did not answer: `upstream_unavailable`. Safe to retry. |
 | `503` | Temporary dependency, lock, or service failure. |
+
+Nozle never returns `405` for a business rule; a refused state is a `422` with a `code`.
 
 ## Response shape
 
@@ -23,10 +27,13 @@ Endpoints return a short error description and may include a stable code or addi
 
 ```json
 {
-  "error": "insufficient credits",
-  "code": "insufficient_credits"
+  "status": 422,
+  "error": "Unprocessable Entity",
+  "code": "not_voidable"
 }
 ```
+
+Every Core error carries `status`, `error` and `code`; validation errors add `error_details`. A malformed body is `400` with `code: "bad_request"`.
 
 Do not parse human-readable text when a machine-readable `code` is available.
 

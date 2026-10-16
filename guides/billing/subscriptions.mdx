@@ -36,7 +36,7 @@ The matching hosted API is available. Use React `0.10.2` with Node `0.10.0`, Pyt
 
 ## Select, preview and confirm
 
-A customer may have multiple subscriptions. Use its **external subscription ID** on every management call. Plan changes follow a [plan transition policy](/api/plan-transition-policies) that you configure for each pair of plans. Without one, preview and checkout return `405 plan_transition_policy_required`; the only fallback is the organization's free-to-paid policy, used from a free plan to a paid plan. Check eligibility through subscription options; do not infer it from price or catalog membership.
+A customer may have multiple subscriptions. Use its **external subscription ID** on every management call. Plan changes follow a [plan transition policy](/api/plan-transition-policies) that you configure for each pair of plans. Without one, preview and checkout return `422 plan_transition_policy_required`; the only fallback is the organization's free-to-paid policy, used from a free plan to a paid plan. Check eligibility through subscription options; do not infer it from price or catalog membership.
 
 The Node `subscriptionOptions`, Python `subscription_options`, and Go `SubscriptionOptions` methods return current, pending and eligible plans. Their `previewSubscriptionChange`, `preview_subscription_change`, and `PreviewSubscriptionChange` methods return an opaque signed quote with exact minor-unit amounts, currency, effective date and renewal date.
 

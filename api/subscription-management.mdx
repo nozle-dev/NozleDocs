@@ -55,7 +55,7 @@ The response includes `quote_id`, `transition_direction`, `timing`, `currency`, 
 
 It also includes `subscription_id` (Core's internal UUID of the current subscription), `external_subscription_id`, `invoice_issuing_date`, and `next_billing_date` with its camel-case alias `nextBillingDate`. `credit`, `debit`, and `net` repeat the three cent amounts in major units (for example `12.5`); use the `*_cents` fields for exact values.
 
-Previewing a change between two plans with no [transition policy](/api/plan-transition-policies) returns `405 plan_transition_policy_required` (except from a free plan to a paid plan). The response also echoes the policy it applied: `transition_policy`, `billing_anchor`, `proration_behavior`, `credit_action`, `refund_mode`, and `final_invoice_action`.
+Previewing a change between two plans with no [transition policy](/api/plan-transition-policies) returns `422 plan_transition_policy_required` (except from a free plan to a paid plan). The response also echoes the policy it applied: `transition_policy`, `billing_anchor`, `proration_behavior`, `credit_action`, `refund_mode`, and `final_invoice_action`.
 
 Quotes expire after five minutes. Show the returned amounts and dates for confirmation, and forward the opaque `quote_id` unchanged. State, policy or amount changes invalidate the quote with HTTP 409. Refresh and obtain a new confirmation instead of silently applying a different price.
 

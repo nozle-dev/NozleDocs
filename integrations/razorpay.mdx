@@ -28,7 +28,7 @@ Connect Razorpay in the Nozle dashboard under **Settings > Billing settings > In
 | **Enable recurring payments** | Optional. Lets customers authorize UPI AutoPay mandates |
 | **Mandate maximum (paise)** | Required when recurring payments are on. A whole number of paise, at least `100` |
 
-The dashboard keeps **Connect** disabled until the Key ID matches `rzp_test_` or `rzp_live_`, and, with recurring payments on, until the mandate maximum is a whole number of at least `100`. Nozle does not check the credentials with Razorpay when you connect. A wrong key secret is accepted and fails only at the first checkout, with `422 third_party_error`. Make a test checkout right after you connect.
+The dashboard keeps **Connect** disabled until the Key ID matches `rzp_test_` or `rzp_live_`, and, with recurring payments on, until the mandate maximum is a whole number of at least `100`. Nozle checks the credentials with one authenticated Razorpay call when you connect or change the key secret. Credentials Razorpay rejects fail with `422 third_party_error`, and nothing is saved.
 
 Nozle reads the mode from the Key ID prefix and shows it on the connection together with the webhook URL. To use a different Key ID, for example to move from test to live, create a new connection. You can add several connections to one organization.
 
@@ -286,16 +286,11 @@ Show success only when both are `succeeded`, then reload the subscription. The r
 
 If the customer closes or fails the modal, a one-time order stays open until it expires, and reopening the modal on the same order works. Checkout status returns the order as the nested `checkout` while the status is `awaiting_payment`, so store the `checkout` you received, or fetch it again from status, and open the modal with it.
 
-The React SDK reports a modal `payment.failed` event as "Payment failed. You can retry checkout." The retry button calls your `createCheckout` callback again. For a new subscription that returns `subscription_incomplete`, described under [Retry a new-subscription checkout](#retry-a-new-subscription-checkout), so reopen the modal with the stored checkout instead, or use an invoice checkout.
+The React SDK reports a modal `payment.failed` event as "Payment failed. You can retry checkout." The retry button calls your `createCheckout` callback again, which reopens the same order; see [Retry a new-subscription checkout](#retry-a-new-subscription-checkout).
 
 ### Retry a new-subscription checkout
 
-A new-subscription checkout leaves an incomplete subscription behind until the first order is paid. Calling checkout again for the same customer while the first order is unpaid fails with `422 validation_errors` and `error_details.subscription` set to `["subscription_incomplete"]`. The same `Idempotency-Key` does not change this. It happens when the customer closed the modal, the payment failed, or the page reloaded.
-
-The same `422` appears after an attempt that failed in Nozle or at Razorpay, such as `razorpay_requires_inr`, a mandate error or a wrong key secret, because the incomplete subscription already exists. Fix the cause, then recover in one of two ways:
-
-- call checkout status with the `checkout_id` of the first response; or
-- call an invoice checkout for the `invoice_id` of the first response. It returns the same order.
+A new-subscription checkout leaves an incomplete subscription behind until the first order is paid, for example when the customer closed the modal or the page reloaded. Calling checkout again for the same customer and plan while that subscription is incomplete reopens the first checkout for the same invoice instead of failing, with or without the same `Idempotency-Key`. Asking for a different plan while it is open returns `409 subscription_checkout_in_progress`. The reopened checkout is the same order. Checkout status with the `checkout_id` of the first response, or an invoice checkout for its `invoice_id`, also returns it.
 
 ## Payment links
 
@@ -352,7 +347,7 @@ Checkout errors that are specific to Razorpay. See [Create checkout](/api/create
 |---|---|---|
 | `422` | `razorpay_requires_inr` | The invoice, upgrade or payment request is not in INR. Returned in `error_details.base` of a `validation_errors` response |
 | `422` | `payment_already_processing` | A payment for the invoice is already in progress |
-| `422` | `validation_errors` | `error_details.subscription` is `subscription_incomplete`: a new-subscription checkout was retried while its first order is unpaid, or after a failed attempt. See [Retry a new-subscription checkout](#retry-a-new-subscription-checkout) |
+| `409` | `subscription_checkout_in_progress` | A new-subscription checkout for this customer is still open on a different plan. See [Retry a new-subscription checkout](#retry-a-new-subscription-checkout) |
 | `422` | `missing_payment_provider_customer` | The customer is not linked to the Razorpay connection that the checkout needs |
 | `422` | `razorpay_customer_connection_cannot_change` | The customer already started a Razorpay checkout and was switched to another Razorpay connection. Create a new customer instead |
 | `404` | `payment_provider_not_found` | The customer's connection code matches no Razorpay connection |
@@ -378,8 +373,8 @@ Checkout errors that are specific to Razorpay. See [Create checkout](/api/create
 | `payment_provider_required` | The customer's **Payment provider** is not set to a Razorpay connection |
 | `razorpay_requires_inr` | The plan, invoice or top-up package currency is not INR |
 | `invalid_checkout_signature` | Forward the three fields exactly as the Razorpay handler returned them, and verify against the checkout they belong to |
-| A retried checkout returns `422 subscription_incomplete` | The first order is unpaid. Reopen the modal with the stored checkout, call checkout status, or call an invoice checkout with the first `invoice_id` |
-| The first checkout fails with `422 third_party_error` | Nozle does not validate the key secret when you connect. Edit the connection and enter the correct secret |
+| A checkout returns `409 subscription_checkout_in_progress` | A new-subscription order for this customer is open on another plan. Let it be paid, or check out the same plan to reopen it |
+| Connect fails with `422 third_party_error` | Razorpay rejected the Key ID or key secret. Copy both again from the Razorpay dashboard |
 | Test and live payments get mixed up | Use one connection per Key ID and assign each customer to the right one |
 
 ## Testing with a test Key ID
