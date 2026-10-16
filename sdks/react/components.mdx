@@ -269,6 +269,42 @@ React `0.10.0` also adds `onSubmit` for an authenticated custom action without `
 
 ## Billing display components
 
+### `CurrentPlan`
+
+The customer's plan at a glance: name, status, price, a scheduled change, usage against the plan's limits, and a notice when a limit is close.
+
+<Frame>
+  <img src="/images/react/current-plan.png" alt="CurrentPlan showing the Pro plan, a scheduled change, two usage meters and a near-limit notice" />
+</Frame>
+
+Inside a `BillingProvider` with `billingEndpoint`, it reads everything itself: the subscription (`useSubscription`), the plan's metered limits from the catalog, and this period's usage (`useUsage`).
+
+```tsx
+<CurrentPlan actions={<a href="/billing">Manage billing</a>} />
+```
+
+To render it from your own data, pass `subscription` (the `useSubscription` shape) and, optionally, `usage`.
+
+```tsx
+<CurrentPlan
+  subscription={subscription}
+  usage={[{ key: 'events', label: 'Events', used: 41200, limit: 50000 }]}
+  details={[{ label: 'Renews', value: 'Nov 1, 2026' }]}
+/>
+```
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `subscription` | `BillingSubscription` or `null` | Read through `billingEndpoint` | The plan, status, end date and scheduled change. |
+| `usage` | `{ key, label, used, limit }[]` | Plan limits joined with this period's units | Meters. `limit: null` shows "Unlimited". |
+| `details` | `{ label, value }[]` | none | Extra rows, for example a renewal date. |
+| `actions` | `ReactNode` | none | Shown in the header, for example a link to your billing portal. |
+| `warningPercent` | `number` or `null` | `80` | A meter at or above it shows a notice; `null` turns notices off. |
+| `title`, `emptyMessage`, `locale` | `string` | `Current plan`, `No active plan.`, `en-US` | Text and date format. |
+| `isLoading`, `error` | | | Loading and error states when you pass the data. |
+
+Element keys for `appearance`: `currentPlan`, `currentPlan__name`, `currentPlan__status`, `currentPlan__price`, `currentPlan__scheduled`, `currentPlan__notice`, `currentPlan__usage`, `currentPlan__details`.
+
 ### `PlanBadge`
 
 ```tsx
