@@ -50,7 +50,7 @@ Each hook returns TanStack Query's result (`data`, `isPending`, `error`, `refetc
 
 | Hook | `data` | Use with |
 |---|---|---|
-| `useSubscription()` | `{ subscription, pending_change }`: plan, status, `ending_at` and a scheduled change; nulls without a subscription | An "upgrade" or "ends on" banner |
+| `useSubscription()` | `{ subscription, pending_change, past_due }`: plan, status, `ending_at`, a scheduled change, and `past_due` when an invoice is unpaid past its due date; nulls without a subscription | An "upgrade" or "ends on" banner |
 | `useEntitlement(featureCode)` | `allowed`, `used`, `limit`, `remaining` (the `can()` result) | `FeatureGate`, `UsageMeter` |
 | `useCreditBalance(creditSystemCode?)` | One balance: the given credit system, else the first with credits | `<CreditBalance balance={data} />` |
 | `useCreditHistory({ creditSystemCode?, limit? })` | Paged operations; `operations` flattens the loaded pages | `<CreditHistory operations={operations} hasMore={hasNextPage} onLoadMore={fetchNextPage} />` |
