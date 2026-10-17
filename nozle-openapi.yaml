@@ -12455,7 +12455,7 @@ paths:
         - name: metadata
           in: query
           required: false
-          description: URL-encoded JSON object of event properties. The cost estimate uses it to evaluate Cost Sheet conditions and quantities. A value that is not a JSON object returns `400`.
+          description: URL-encoded JSON object of event properties. The cost estimate uses it to evaluate Cost Sheet conditions and quantities. For a sum Feature, the revenue estimate reads the call's units from the Feature's `field_name` in it. A value that is not a JSON object returns `400`.
           schema:
             type: string
           example: '{"model":"gpt-4o","input_tokens":1200}'
@@ -33011,7 +33011,7 @@ components:
           $ref: '#/components/schemas/PlatformCanPolicy'
     PlatformCanEconomics:
       type: object
-      description: Point-in-time estimate for one more unit of an allowed metered feature. Monetary values are exact decimal strings in `currency`, not cents.
+      description: Point-in-time estimate for the proposed call of an allowed metered feature. Monetary values are exact decimal strings in `currency`, not cents.
       required:
         - status
         - calculated_at
@@ -33031,7 +33031,7 @@ components:
           description: Present when `status` is `estimated`.
         estimated_incremental_revenue:
           type: string
-          description: Revenue from the plan's standard charge for the feature, `0` when there is no charge.
+          description: 'Revenue of the proposed call: the standard charge''s unit price × the call''s units, `0` when there is no charge. A count feature adds 1 unit; a sum feature adds the value of its `field_name` in `metadata`. Without that value, and for max, latest, unique count, weighted sum and custom aggregations, `status` is `unavailable` and `excludes` has `revenue_quantity_missing` or `non_additive_revenue_aggregation`.'
         estimated_incremental_margin:
           type: string
           description: Revenue minus cost. Present when the cost is estimated.
@@ -33052,7 +33052,7 @@ components:
           type: array
           items:
             type: string
-          description: Costs that are not in the estimate, such as `shared_period_costs`, `finalized_invoice_adjustments`, `non_standard_revenue_pricing` or `foreign_exchange_conversion`.
+          description: Costs that are not in the estimate, such as `shared_period_costs`, `finalized_invoice_adjustments`, `non_standard_revenue_pricing`, `revenue_quantity_missing`, `non_additive_revenue_aggregation` or `foreign_exchange_conversion`.
         reason:
           type: string
           description: Machine code explaining a status other than `estimated`, such as `cost_estimator_unavailable`, `cost_estimate_failed`, `no_matching_cost_rule`, `estimated_revenue_unavailable`, `revenue_currency_mismatch` or `snapshot_too_old`.
@@ -33083,7 +33083,7 @@ components:
             - deny
         on_unavailable:
           type: string
-          description: Decision used when economics are not `estimated` or cannot be compared.
+          description: Decision used when economics are not `estimated` (for example `unavailable` because the call's revenue cannot be estimated) or cannot be compared.
           enum:
             - allow
             - warn
