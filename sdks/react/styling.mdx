@@ -61,7 +61,7 @@ Every component takes its look from `appearance`. Set it once on `BillingProvide
     ```
   </Tab>
   <Tab title="Nozle">
-    The Nozle dashboard look: flat cards with fine borders, and a hard ink shadow on buttons only. `nozle` is light; `nozleDark` is dark and needs a dark page background.
+    The Nozle dashboard look: flat panels with fine borders, pill buttons, and a hard ink shadow on the primary button only. Plan cards use the [panel layout](#plan-card-layout). `nozle` is light; `nozleDark` is dark and needs a dark page background.
 
     <Frame>
       <img src="/images/react/themes/nozle.png" alt="The components in the nozle theme" />
@@ -77,7 +77,7 @@ Every component takes its look from `appearance`. Set it once on `BillingProvide
     <BillingProvider publishableKey="pk_..." appearance={{ theme: nozle }}>
     ```
 
-    The theme uses the Nunito font, which your app loads, for example with `next/font/google` or a Google Fonts `<link>`. Without it the system font is used.
+    The theme uses the Nunito and JetBrains Mono fonts, which your app loads, for example with `next/font/google` or a Google Fonts `<link>`. Without them the system fonts are used.
   </Tab>
 </Tabs>
 
@@ -92,7 +92,7 @@ Every colour, the font, corner radius, border width and shadow can be changed on
 
 ## Highlighted plan
 
-`highlightPlan` on `PricingTable` marks one plan with a "Most Popular" badge. `highlightStyle` picks how the card stands out:
+`highlightPlan` on `PricingTable` marks one plan: its border and its button take the highlight colour (`colorHighlight`, by default the primary colour), with the label from `highlightLabel` (default "Most Popular"; `null` for none). `highlightStyle` picks how the card stands out:
 
 <Tabs>
   <Tab title="Outline (default)">
@@ -129,6 +129,17 @@ Set the colours with `colorHighlight` and `colorHighlightForeground`; they defau
   highlightLabel="Best value"
   appearance={{ variables: { colorHighlight: '#16a34a', colorHighlightForeground: '#ffffff' } }}
 />
+```
+
+## Plan card layout
+
+A theme's `planCardLayout` picks how `PricingTable` and `PlanCard` lay out each plan:
+
+- `card` (default): name, description, price and ticked features.
+- `panel`: the name in a header band, with `ACTIVE` on the right for the current plan and the highlight label for the highlighted plan, then price, description and plain feature lines. `nozle` and `nozleDark` use it.
+
+```tsx
+appearance={{ theme: light, planCardLayout: 'panel' }}
 ```
 
 ## Combine themes
@@ -169,16 +180,21 @@ The order, highest first: the component's `variables`, the component's `theme`, 
 | `colorDanger` | `--nozle-destructive` | `#dc2626` | `#f87171` |
 | `colorWarning` | `--nozle-warning` | `#d97706` | `#fbbf24` |
 | `colorSuccess` | `--nozle-success` | `#16a34a` | `#4ade80` |
+| `colorSecondary` | `--nozle-secondary` | `colorMuted` | `colorMuted` |
+| `colorInput` | `--nozle-input` | `colorBorder` | `colorBorder` |
 | `colorHighlight` | `--nozle-highlight` | `colorPrimary` | `colorPrimary` |
 | `colorHighlightForeground` | `--nozle-highlight-foreground` | `colorPrimaryForeground` | `colorPrimaryForeground` |
 | `fontFamily` | `--nozle-font` | system UI font | same |
+| `fontFamilyMono` | `--nozle-font-mono` | system monospace font | same |
 | `borderRadius` | `--nozle-radius` | `12px` | same |
 | `borderWidth` | `--nozle-border-width` | `1px` | same |
 | `shadow` | `--nozle-shadow` | soft shadow | darker shadow |
 | `buttonRadius` | `--nozle-button-radius` | a fraction of `borderRadius` | same |
 | `buttonBorderWidth` | `--nozle-button-border-width` | `borderWidth` | same |
-| `buttonBorderColor` | `--nozle-button-border` | each button's own colour | same |
+| `buttonBorderColor` | `--nozle-button-border` | the primary button's fill | same |
 | `buttonShadow` | `--nozle-button-shadow` | none | none |
+
+`buttonBorderColor` and `buttonShadow` apply to primary buttons only, so one action per view stands out. Secondary buttons take `colorSecondary` as their fill and `colorInput` as their border.
 | `colorScheme` | `color-scheme` | `light` | `dark` |
 
 Any CSS value works, including `var(...)` and `oklch(...)`. Warning and error tints are mixed from `colorWarning` and `colorDanger`.
