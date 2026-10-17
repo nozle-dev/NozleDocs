@@ -260,7 +260,7 @@ The components style themselves with inline styles, so a class name from `elemen
 | Component | Keys |
 |---|---|
 | `PricingTable` | `pricingTable`, `pricingTable__toggle`, `pricingTable__toggleButton`, `pricingTable__grid`, and the `planCard` keys |
-| `PlanCard` | `planCard`, `planCard__badge`, `planCard__name`, `planCard__description`, `planCard__price`, `planCard__features`, `planCard__feature`, `planCard__cta` |
+| `PlanCard` | `planCard`, `planCard__header`, `planCard__badge`, `planCard__name`, `planCard__description`, `planCard__price`, `planCard__features`, `planCard__feature`, `planCard__cta` |
 | `PlanComparison` | `planComparison`, `planComparison__table`, `planComparison__row`, `planComparison__cell` |
 | `CreditBalance`, `CreditHistory` | `creditBalance`, `creditBalance__amount`, `creditHistory`, `creditHistory__table`, `creditHistory__row` |
 | `UsageMeter`, `UsageDashboard`, `UsageAlert` | `usageMeter`, `usageMeter__label`, `usageMeter__value`, `usageMeter__track`, `usageMeter__fill`, `usageDashboard`, `usageAlert`, `usageAlert__dismiss` |
@@ -269,6 +269,7 @@ The components style themselves with inline styles, so a class name from `elemen
 | Gates and badges | `upgradePrompt`, `lockedOverlay`, `lockedOverlay__panel`, `planBadge`, `paymentMethod` |
 | `CurrentPlan` | `currentPlan`, `currentPlan__name`, `currentPlan__status`, `currentPlan__price`, `currentPlan__scheduled`, `currentPlan__notice`, `currentPlan__usage`, `currentPlan__details` |
 | `BillingPortal` | `billingPortal`, `billingPortal__section`, `billingPortal__card`, `billingPortal__table`, `billingPortal__error`, `cancellationControl`, `planChangeControl` |
+| `PoweredByNozle` | `poweredBy` |
 
 ## Stripe checkout
 
@@ -276,6 +277,9 @@ The components style themselves with inline styles, so a class name from `elemen
 
 ## Upgrading from 0.10
 
+- `@tanstack/react-query` 5 or later is a required peer dependency. Install it with `npm install @tanstack/react-query`.
+- `PlanCard` takes a catalog `plan` with `isCurrent`, `returnUrl`, `onSelect` and an optional `features` list, instead of `id`, `name`, `monthlyPrice`, `annualPrice`, `description`, `isAnnual` and `children`. The `Plan` type export is removed.
+- `PlanComparison` takes catalog `plans` and optional `features` rows keyed by plan `code`, not `id`.
 - Components no longer read shadcn's `--primary` and `--border` on their own. To follow a shadcn/ui theme, pass its variables: `variables: { colorPrimary: 'var(--primary)', colorPrimaryForeground: 'var(--primary-foreground)', colorCard: 'var(--card)', colorForeground: 'var(--foreground)', colorBorder: 'var(--border)', borderRadius: 'var(--radius)' }` (Tailwind v3: wrap each in `hsl()`).
 - Without a theme, the default primary is now `#4f46e5` everywhere; the portal's green is gone. Set `colorPrimary` to keep your colour.
 - The `nozlePreset` Tailwind export is deprecated and does nothing for current components.
