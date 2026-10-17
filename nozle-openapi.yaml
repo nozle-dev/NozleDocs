@@ -12690,9 +12690,11 @@ paths:
       description: |-
         Forwards the request to `https://api.openai.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
-        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
+        **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
+
+        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
         Example: `POST /proxy/openai/v1/chat/completions` is sent to `https://api.openai.com/v1/chat/completions`.
       operationId: engineProxyOpenAIPost
@@ -12712,6 +12714,13 @@ paths:
           schema:
             type: string
           example: cust_123
+        - name: X-Nozle-Subscription
+          in: header
+          required: false
+          description: External ID of the subscription to bill. It must be an active subscription of the customer, or the response is `422 active_subscription_not_found`. Required when the customer has several active subscriptions. Not forwarded to the provider.
+          schema:
+            type: string
+          example: sub_123
         - name: X-Nozle-Feature
           in: header
           required: false
@@ -12758,6 +12767,15 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '422':
+          description: No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+              example:
+                code: active_subscription_ambiguous
+                error: customer has multiple active subscriptions; set X-Nozle-Subscription
         '502':
           description: Engine could not reach the provider or read its response. The body is empty.
         '503':
@@ -12772,9 +12790,11 @@ paths:
       description: |-
         Forwards the request to `https://api.openai.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
-        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
+        **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
+
+        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
         Example: `POST /proxy/openai/v1/chat/completions` is sent to `https://api.openai.com/v1/chat/completions`.
       operationId: engineProxyOpenAIGet
@@ -12794,6 +12814,13 @@ paths:
           schema:
             type: string
           example: cust_123
+        - name: X-Nozle-Subscription
+          in: header
+          required: false
+          description: External ID of the subscription to bill. It must be an active subscription of the customer, or the response is `422 active_subscription_not_found`. Required when the customer has several active subscriptions. Not forwarded to the provider.
+          schema:
+            type: string
+          example: sub_123
         - name: X-Nozle-Feature
           in: header
           required: false
@@ -12828,6 +12855,15 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '422':
+          description: No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+              example:
+                code: active_subscription_ambiguous
+                error: customer has multiple active subscriptions; set X-Nozle-Subscription
         '502':
           description: Engine could not reach the provider or read its response. The body is empty.
         '503':
@@ -12850,9 +12886,11 @@ paths:
       description: |-
         Forwards the request to `https://api.anthropic.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
-        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
+        **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
+
+        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
         Example: `POST /proxy/anthropic/v1/messages` is sent to `https://api.anthropic.com/v1/messages`.
       operationId: engineProxyAnthropicPost
@@ -12872,6 +12910,13 @@ paths:
           schema:
             type: string
           example: cust_123
+        - name: X-Nozle-Subscription
+          in: header
+          required: false
+          description: External ID of the subscription to bill. It must be an active subscription of the customer, or the response is `422 active_subscription_not_found`. Required when the customer has several active subscriptions. Not forwarded to the provider.
+          schema:
+            type: string
+          example: sub_123
         - name: X-Nozle-Feature
           in: header
           required: false
@@ -12926,6 +12971,15 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '422':
+          description: No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+              example:
+                code: active_subscription_ambiguous
+                error: customer has multiple active subscriptions; set X-Nozle-Subscription
         '502':
           description: Engine could not reach the provider or read its response. The body is empty.
         '503':
@@ -12940,9 +12994,11 @@ paths:
       description: |-
         Forwards the request to `https://api.anthropic.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
-        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
+        **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
+
+        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
         Example: `POST /proxy/anthropic/v1/messages` is sent to `https://api.anthropic.com/v1/messages`.
       operationId: engineProxyAnthropicGet
@@ -12962,6 +13018,13 @@ paths:
           schema:
             type: string
           example: cust_123
+        - name: X-Nozle-Subscription
+          in: header
+          required: false
+          description: External ID of the subscription to bill. It must be an active subscription of the customer, or the response is `422 active_subscription_not_found`. Required when the customer has several active subscriptions. Not forwarded to the provider.
+          schema:
+            type: string
+          example: sub_123
         - name: X-Nozle-Feature
           in: header
           required: false
@@ -13003,6 +13066,15 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '422':
+          description: No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+              example:
+                code: active_subscription_ambiguous
+                error: customer has multiple active subscriptions; set X-Nozle-Subscription
         '502':
           description: Engine could not reach the provider or read its response. The body is empty.
         '503':

@@ -22,6 +22,12 @@ _Unreleased_
 - Checking out the same plan again reopens an abandoned new-subscription checkout; a different plan returns `409 subscription_checkout_in_progress`.
 - Stripe: a reused invoice checkout key returns `409 idempotency_key_reused`; a rejected webhook URL sends `payment_provider.error`; `payment_method.detached` clears the stored default. Razorpay credentials are checked when you connect.
 
+### Usage, credits and checkout fixes
+
+_Unreleased_
+
+- The [LLM proxy](/api/llm-proxy#subscription) finds the subscription to bill before it calls the provider, and its usage event carries that `external_subscription_id`, so proxy usage is billed. A customer with several active subscriptions needs the new `X-Nozle-Subscription` header, which is not forwarded. A customer with no matching active subscription returns `422 active_subscription_not_found`, several without the header `422 active_subscription_ambiguous`; the provider is not called.
+
 ### Link existing Stripe customers from the SDKs
 
 _October 14, 2026_
