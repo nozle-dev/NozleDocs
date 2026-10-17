@@ -1,0 +1,118 @@
+---
+title: "PoweredByNozle"
+description: "The \"Powered by Nozle\" badge, and the hook that says whether your Nozle plan shows it."
+keywords: ["powered by nozle", "branding", "badge", "react"]
+---
+
+`PoweredByNozle` renders "Powered by" and the Nozle logo, linking to nozle.dev. Several components add it for you on the free Nozle plan; use it yourself only in billing UI you build from the hooks.
+
+## What PoweredByNozle supports
+
+- The badge as a link that opens nozle.dev in a new tab.
+- `useNozleBranding()`, which returns whether your Nozle plan shows the badge.
+
+## Where to use PoweredByNozle
+
+- Under a pricing page or billing screen you build with the hooks instead of the components.
+
+You do not need it with `PricingTable`, `PlanComparison`, `CurrentPlan`, `Checkout`, `UpgradeModal` or `BillingPortal`: they show the badge themselves when your plan requires it. When one of them renders another, for example a dialog inside the portal, only the outer one shows it.
+
+## Importing PoweredByNozle
+
+```tsx
+import { PoweredByNozle, useNozleBranding, useAppearance } from '@nozle-js/react'
+```
+
+## Rendering PoweredByNozle
+
+Show it only when `useNozleBranding()` is `true`:
+
+```tsx
+import { PoweredByNozle, useNozleBranding } from '@nozle-js/react'
+
+export function CustomPricingFooter() {
+  const branded = useNozleBranding()
+  return branded ? <PoweredByNozle /> : null
+}
+```
+
+## Using live data
+
+Nozle decides on the server. The public plan catalog read with your publishable key returns `meta.nozle_branding`, and `useNozleBranding()` reads it from the same cached catalog request the components make. It returns `false` outside a `BillingProvider`, and until the catalog answers. Plans that include **Remove branding** return `false`.
+
+The badge takes its colours from the theme's CSS variables of the element it sits in. Inside a Nozle component it gets them from the component. On its own, wrap it in an element with the theme's variables from `useAppearance()`, or it uses the light defaults:
+
+```tsx
+import { PoweredByNozle, useAppearance, useNozleBranding } from '@nozle-js/react'
+
+export function ThemedBadge() {
+  const { vars } = useAppearance()
+  if (!useNozleBranding()) return null
+  return (
+    <div style={vars}>
+      <PoweredByNozle />
+    </div>
+  )
+}
+```
+
+## Options
+
+`PoweredByNozle` takes no props. Its look follows the `appearance` of the surrounding `BillingProvider`.
+
+| `useNozleBranding()` returns | Meaning |
+|---|---|
+| `true` | Your Nozle plan shows the badge. |
+| `false` | No badge: the plan removes branding, there is no `BillingProvider`, or the catalog has not answered. |
+
+### Appearance elements
+
+`poweredBy` (the link).
+
+## Themes
+
+Inside an element with the theme's variables, as above:
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/powered-by-nozle/light.png" alt="The Powered by Nozle badge, light theme" width="138" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/powered-by-nozle/dark.png" alt="The Powered by Nozle badge, dark theme" width="138" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/powered-by-nozle/minimal.png" alt="The Powered by Nozle badge, minimal theme" width="138" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/powered-by-nozle/neobrutal.png" alt="The Powered by Nozle badge, neobrutal theme" width="138" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/powered-by-nozle/nozle.png" alt="The Powered by Nozle badge, nozle theme" width="140" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/powered-by-nozle/nozle-dark.png" alt="The Powered by Nozle badge, nozleDark theme" width="140" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="PricingTable" icon="table-columns" href="/sdks/react/components/pricing-table">
+    Shows the badge below the plans.
+  </Card>
+  <Card title="Appearance" icon="palette" href="/sdks/react/styling">
+    Themes and the `poweredBy` element.
+  </Card>
+</Columns>

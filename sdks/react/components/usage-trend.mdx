@@ -1,0 +1,212 @@
+---
+title: "UsageTrend"
+description: "A bar chart of past billing periods: the amount of each period, or the units of one feature."
+keywords: ["usage trend", "past usage", "chart", "react"]
+---
+
+`UsageTrend` draws one bar per past billing period, oldest first, labelled with the period's start date and its amount or units.
+
+## What UsageTrend supports
+
+- The amount of each period, or with `featureCode` the units of one feature (zero where a period has none).
+- Periods in any order; they are sorted by start date.
+- Loading, error and empty states.
+
+## Where to use UsageTrend
+
+- A usage history section of your billing settings.
+- Beside [`UsageBreakdown`](/sdks/react/components/usage-breakdown) to compare this period with earlier ones.
+
+## Importing UsageTrend
+
+```tsx
+import { UsageTrend, type CustomerUsageData } from '@nozle-js/react'
+```
+
+## Rendering UsageTrend
+
+```tsx
+import { UsageTrend, type CustomerUsageData } from '@nozle-js/react'
+
+const period = (from: string, to: string, apiCalls: number): CustomerUsageData => ({
+  from_datetime: from,
+  to_datetime: to,
+  currency: 'USD',
+  amount_cents: Math.round(apiCalls * 0.04),
+  charges_usage: [
+    {
+      units: String(apiCalls),
+      amount_cents: Math.round(apiCalls * 0.04),
+      amount_currency: 'USD',
+      charge: { nozle_id: `chg_${from}`, charge_model: 'standard' },
+      feature: { nozle_id: 'ftr_api', code: 'api_calls', name: 'API calls' },
+    },
+  ],
+})
+
+const periods: CustomerUsageData[] = [
+  period('2026-07-01T00:00:00Z', '2026-07-31T23:59:59Z', 22100),
+  period('2026-08-01T00:00:00Z', '2026-08-31T23:59:59Z', 26400),
+  period('2026-09-01T00:00:00Z', '2026-09-30T23:59:59Z', 29800),
+]
+
+export function History() {
+  return (
+    <>
+      <UsageTrend periods={periods} />
+      <UsageTrend periods={periods} featureCode="api_calls" />
+    </>
+  )
+}
+```
+
+## Using live data
+
+[`useUsage({ period: 'past' })`](/sdks/react/hooks#the-hooks) reads past periods for the signed-in customer through your `billingEndpoint`; `periods` sets how many.
+
+```tsx
+import { UsageTrend, useUsage, type CustomerUsageData } from '@nozle-js/react'
+
+export function LiveTrend() {
+  const { data, isPending, error } = useUsage({ period: 'past', periods: 6 })
+  // With `period: 'past'` the data is the list of periods.
+  return <UsageTrend periods={data as CustomerUsageData[] | undefined} isLoading={isPending} error={error} />
+}
+```
+
+Without the hooks, read `GET https://api.nozle.app/core/api/v1/customers/{external_customer_id}/past_usage` on your backend with a secret key and pass its `usage_periods`. It takes `periods_count` and `feature_code`.
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `periods` | `CustomerUsageData[]` or `null` | none | The periods to chart. Empty or missing shows the empty message. |
+| `featureCode` | `string` | none | Charts the units of this feature instead of the amount. Bars read "29,800 api_calls". |
+| `isLoading` | `boolean` | `false` | Shows a loading placeholder. |
+| `error` | `Error`, `string` or `null` | `null` | Shows the message as an alert. |
+| `emptyMessage` | `string` | `'No past usage yet.'` | Shown when there are no periods. |
+| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
+
+Bars scale to the largest period; each bar has an accessible label with its date and value. Dates show in UTC in `en-US`.
+
+### Appearance elements
+
+`usageTrend` (root), `usageTrend__bar` (each bar).
+
+## Themes
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/usage-trend/light.png" alt="UsageTrend with five monthly bars from $7.20 to $17.32, light theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/usage-trend/dark.png" alt="UsageTrend with five monthly bars from $7.20 to $17.32, dark theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/usage-trend/minimal.png" alt="UsageTrend with five monthly bars from $7.20 to $17.32, minimal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/usage-trend/neobrutal.png" alt="UsageTrend with five monthly bars from $7.20 to $17.32, neobrutal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/usage-trend/nozle.png" alt="UsageTrend with five monthly bars from $7.20 to $17.32, nozle theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/usage-trend/nozle-dark.png" alt="UsageTrend with five monthly bars from $7.20 to $17.32, nozleDark theme" width="508" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+### Units of one feature
+
+`featureCode="api_calls"`:
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/usage-trend-feature/light.png" alt="UsageTrend with the API call units of five months, light theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/usage-trend-feature/dark.png" alt="UsageTrend with the API call units of five months, dark theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/usage-trend-feature/minimal.png" alt="UsageTrend with the API call units of five months, minimal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/usage-trend-feature/neobrutal.png" alt="UsageTrend with the API call units of five months, neobrutal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/usage-trend-feature/nozle.png" alt="UsageTrend with the API call units of five months, nozle theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/usage-trend-feature/nozle-dark.png" alt="UsageTrend with the API call units of five months, nozleDark theme" width="508" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+### Loading, empty and error
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/usage-trend-states/light.png" alt="UsageTrend loading placeholder, No past usage yet message, and an error message, light theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/usage-trend-states/dark.png" alt="UsageTrend loading placeholder, No past usage yet message, and an error message, dark theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/usage-trend-states/minimal.png" alt="UsageTrend loading placeholder, No past usage yet message, and an error message, minimal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/usage-trend-states/neobrutal.png" alt="UsageTrend loading placeholder, No past usage yet message, and an error message, neobrutal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/usage-trend-states/nozle.png" alt="UsageTrend loading placeholder, No past usage yet message, and an error message, nozle theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/usage-trend-states/nozle-dark.png" alt="UsageTrend loading placeholder, No past usage yet message, and an error message, nozleDark theme" width="1008" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="UsageBreakdown" icon="table" href="/sdks/react/components/usage-breakdown">
+    This period's units and amounts.
+  </Card>
+  <Card title="UsageDashboard" icon="gauge" href="/sdks/react/components/usage-dashboard">
+    Usage against limits.
+  </Card>
+</Columns>

@@ -1,0 +1,150 @@
+---
+title: "PaymentMethodDisplay"
+description: "The customer's saved card with brand, last four digits and expiry, and an update button."
+keywords: ["payment method", "card", "billing settings", "react"]
+---
+
+`PaymentMethodDisplay` shows one saved payment method and an "Update Payment Method" button. You pass the card details; the component does not read them.
+
+## What PaymentMethodDisplay supports
+
+- Brand name, `•••• 1234` and `Expires MM/YY`.
+- Readable names for `visa`, `mastercard`, `amex`, `discover`, `jcb`, `diners` and `unionpay`; another brand shows as sent.
+- "No payment method on file." when there is none.
+- An update button that calls your handler or opens a page.
+
+## Where to use PaymentMethodDisplay
+
+- The payment section of your billing settings page.
+- Next to a past-due notice, so the customer can fix the card.
+
+## Importing PaymentMethodDisplay
+
+```tsx
+import { PaymentMethodDisplay, type PaymentMethod } from '@nozle-js/react'
+```
+
+## Rendering PaymentMethodDisplay
+
+```tsx
+import { PaymentMethodDisplay, type PaymentMethod } from '@nozle-js/react'
+
+const card: PaymentMethod = { brand: 'visa', last4: '4242', expMonth: 8, expYear: 2029 }
+
+export function SavedCard({ openUpdate }: { openUpdate: () => void }) {
+  return <PaymentMethodDisplay paymentMethod={card} onUpdatePaymentMethod={openUpdate} />
+}
+```
+
+## Using live data
+
+No Nozle hook returns the saved payment method. Read it on your backend from your payment provider for the signed-in customer, and pass `brand`, `last4`, `expMonth` and `expYear`.
+
+```tsx
+import { useEffect, useState } from 'react'
+import { PaymentMethodDisplay, type PaymentMethod } from '@nozle-js/react'
+
+export function CardFromBackend() {
+  const [card, setCard] = useState<PaymentMethod | undefined>()
+  useEffect(() => {
+    void fetch('/api/billing/payment-method')
+      .then((response) => (response.ok ? response.json() : undefined))
+      .then(setCard)
+  }, [])
+  return <PaymentMethodDisplay paymentMethod={card} updateHref="/settings/billing/card" />
+}
+```
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `paymentMethod` | `PaymentMethod` | none | `brand`, `last4`, `expMonth` and `expYear` of the card. Without it the component shows "No payment method on file." |
+| `onUpdatePaymentMethod` | `() => void` | none | Called when "Update Payment Method" is clicked. |
+| `updateHref` | `string` | `'/billing/update-payment'` | Without `onUpdatePaymentMethod`, the button opens this URL in the same window. |
+| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
+
+### Appearance elements
+
+`paymentMethod` (root).
+
+## Themes
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/payment-method-display/light.png" alt="PaymentMethodDisplay with a Visa ending 4242 that expires 08/29, light theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/payment-method-display/dark.png" alt="PaymentMethodDisplay with a Visa ending 4242 that expires 08/29, dark theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/payment-method-display/minimal.png" alt="PaymentMethodDisplay with a Visa ending 4242 that expires 08/29, minimal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/payment-method-display/neobrutal.png" alt="PaymentMethodDisplay with a Visa ending 4242 that expires 08/29, neobrutal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/payment-method-display/nozle.png" alt="PaymentMethodDisplay with a Visa ending 4242 that expires 08/29, nozle theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/payment-method-display/nozle-dark.png" alt="PaymentMethodDisplay with a Visa ending 4242 that expires 08/29, nozleDark theme" width="508" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+### No payment method
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/payment-method-display-empty/light.png" alt="PaymentMethodDisplay with No payment method on file, light theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/payment-method-display-empty/dark.png" alt="PaymentMethodDisplay with No payment method on file, dark theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/payment-method-display-empty/minimal.png" alt="PaymentMethodDisplay with No payment method on file, minimal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/payment-method-display-empty/neobrutal.png" alt="PaymentMethodDisplay with No payment method on file, neobrutal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/payment-method-display-empty/nozle.png" alt="PaymentMethodDisplay with No payment method on file, nozle theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/payment-method-display-empty/nozle-dark.png" alt="PaymentMethodDisplay with No payment method on file, nozleDark theme" width="508" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="CurrentPlan" icon="circle-info" href="/sdks/react/components/current-plan">
+    Shows the overdue payment alert.
+  </Card>
+  <Card title="BillingPortal" icon="building-columns" href="/sdks/react/components/billing-portal">
+    Invoices and billing details for the customer.
+  </Card>
+</Columns>

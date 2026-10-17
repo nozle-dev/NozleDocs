@@ -1,0 +1,307 @@
+---
+title: "PlanChangeControl"
+description: "Plan picker for one subscription: exact quotes, paid upgrades, scheduled downgrades, withdrawal of a scheduled change and payment recovery."
+keywords: ["plan change", "upgrade", "downgrade", "self-service", "react"]
+---
+
+`PlanChangeControl` lets a customer move one subscription to another plan. It loads the plans the customer may change to from your backend, shows the exact quote, applies the change, collects payment for an upgrade, and recovers a payment after a reload.
+
+## What PlanChangeControl supports
+
+- A "Change plan" button that opens a plan list: name, price, interval, and whether each choice is an upgrade or a downgrade.
+- The plan's description and lines from the public catalog in each choice, when the control is inside a `BillingProvider`.
+- A review step with the quote in minor units: new plan charge, credits applied, due now, due at the effective date, effective and renewal dates, and a Back button.
+- Paid upgrades through [`Checkout`](/sdks/react/components/checkout), downgrades scheduled for renewal, and "Keep current plan" to withdraw a scheduled change.
+- Status checks every 5 seconds while a payment is pending, and safe retries with the same idempotency key.
+
+## Where to use PlanChangeControl
+
+- The subscription section of your billing settings page.
+- Inside [`BillingPortal`](/sdks/react/components/billing-portal), which renders it for you when you pass `planChangeActions`.
+
+## Importing PlanChangeControl
+
+```tsx
+import {
+  BillingPortalError,
+  PlanChangeControl,
+  type PlanChangeActions,
+  type PlanChangeState,
+} from '@nozle-js/react'
+```
+
+## Rendering PlanChangeControl
+
+`actions` calls your authenticated backend. Each callback receives the external `subscriptionId` and an `AbortSignal`; never send the signal in the request body.
+
+```tsx
+import { BillingPortalError, PlanChangeControl, type PlanChangeActions } from '@nozle-js/react'
+
+async function post<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(path, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal,
+  })
+  if (!response.ok) {
+    throw new BillingPortalError(
+      response.status === 401 || response.status === 403 ? 'unauthorized' : response.status === 409 ? 'changed' : 'request',
+    )
+  }
+  return response.json()
+}
+
+const actions: PlanChangeActions = {
+  load: ({ signal, ...body }) => post('/api/billing/plans/load', body, signal),
+  status: ({ signal, ...body }) => post('/api/billing/plans/status', body, signal),
+  preview: ({ signal, ...body }) => post('/api/billing/plans/preview', body, signal),
+  apply: ({ signal, ...body }) => post('/api/billing/plans/apply', body, signal),
+  withdraw: ({ signal, ...body }) => post('/api/billing/plans/withdraw', body, signal),
+  verifyCheckout: ({ signal, ...body }) => post('/api/billing/plans/checkout-verify', body, signal),
+  getCheckoutStatus: ({ signal, ...body }) => post('/api/billing/plans/checkout-status', body, signal),
+}
+
+export function ChangePlan({ subscriptionId, onChanged }: { subscriptionId: string; onChanged: () => void }) {
+  return (
+    <PlanChangeControl
+      subscriptionId={subscriptionId}
+      actions={actions}
+      onChanged={onChanged}
+      returnUrl="https://app.example.com/settings/billing"
+      locale="en-US"
+      timezone="America/New_York"
+    />
+  )
+}
+```
+
+`load` and `status` return a `PlanChangeState`:
+
+```tsx
+import type { PlanChangeState } from '@nozle-js/react'
+
+const state: PlanChangeState = {
+  subscriptionId: 'sub_123',
+  status: 'active',
+  currentPlan: { code: 'pro', name: 'Pro', amountCents: 2900, currency: 'USD', interval: 'monthly' },
+  endingAt: null,
+  pendingChange: null,
+  eligiblePlans: [
+    { code: 'scale', name: 'Scale', amountCents: 9900, currency: 'USD', interval: 'monthly', operation: 'upgrade' },
+    { code: 'free', name: 'Free', amountCents: 0, currency: 'USD', interval: 'monthly', operation: 'downgrade' },
+  ],
+  blockedReason: null,
+  checkout: null,
+  checkoutStatus: 'none',
+}
+```
+
+## Using live data
+
+Your backend fills the adapter with the Node, Python or Go SDK: it authenticates the customer, checks that the subscription is theirs, converts the SDK's snake_case responses into these camelCase types, and keeps quotes and idempotency keys. [Billing portal and self-service](/sdks/react/billing-portal#upgrade-downgrade-and-recover-payment) lists each callback's input and return value, and links runnable backends.
+
+| Callback | Receives, besides `subscriptionId` and `signal` | Returns |
+|---|---|---|
+| `load` | nothing | `PlanChangeState`, when the control mounts |
+| `status` | nothing | `PlanChangeState`, when the control re-reads state |
+| `preview` | `targetPlanCode` | `PlanChangePreview`: the quote, with `quoteToken` |
+| `apply` | `targetPlanCode`, `quoteToken`, `idempotencyKey`, `returnUrl` | `CheckoutResult` |
+| `withdraw` | `pendingChangeId`, `idempotencyKey` | Anything; the control re-reads state |
+| `verifyCheckout` | `checkoutId`, `verification` | `CheckoutStatus`; needed for Razorpay |
+| `getCheckoutStatus` | `checkoutId` | `CheckoutStatus`; needed to recover a payment |
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `subscriptionId` | `string` | required | The external subscription ID. A new ID resets the control. |
+| `actions` | `PlanChangeActions` | required | Your backend callbacks, above. Keep the object stable across renders; a new object reloads the control. |
+| `onChanged` | `() => void` | none | Called after a change took effect, was scheduled or was withdrawn, and when a re-read finds the plan or the scheduled change changed. Refresh the rest of your page here. |
+| `onError` | `(error: BillingPortalError) => void` | none | Called with a `BillingPortalError` (`unauthorized`, `request` or `changed`) when a request fails. |
+| `refreshKey` | `string` | none | Change it when something else updated this subscription; the control re-reads its state with `status`. |
+| `returnUrl` | `string` | The current page without query | Sent to `apply`, where the payment provider returns the customer. |
+| `locale` | `string` | `'en-US'` | Formats amounts and dates. The text is English. |
+| `timezone` | `string` | `'UTC'` | Time zone of the dates: an IANA name, or a Nozle `TZ_` name. |
+| `nonce` | `string` | none | CSP nonce for the control's `<style>` elements. |
+| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
+
+### What the customer sees
+
+| State | Shown |
+|---|---|
+| Loading | "Loading plan changes…" and a "Check subscription status" button. |
+| Active, with eligible plans | A "Change plan" button. |
+| A change is scheduled | "Current plan until &lt;date&gt;, then &lt;plan&gt; at &lt;price&gt; / &lt;interval&gt;." and "Keep current plan". |
+| Subscription is ending | "Keep your subscription before choosing another plan." |
+| `blockedReason` set | "Plan changes are currently unavailable. Contact support for your options." |
+| No eligible plans | "No other plans are available for this subscription." |
+| Payment pending | "Complete payment to change your plan." or "Your change is processing. Your current plan remains active until confirmation.", the payment form, and "Check subscription status". |
+| `needs_review` | "Payment needs review. Contact support before trying another payment." |
+| Payment failed or expired | "Payment did not complete. Your current plan is unchanged." |
+
+A request that takes over 30 seconds stops with "This request timed out. Check subscription status before retrying." A `changed` error returns to the plan list with "Your subscription or price changed. Check the latest details and confirm again." After a failed apply, "Review and retry change" retries with the same idempotency key.
+
+### Appearance elements
+
+`planChangeControl` (root, also class `nozle-plan-change`). The plan list and the review step use the [`UpgradeModal`](/sdks/react/components/upgrade-modal) elements `upgradeModal`, `upgradeModal__dialog` and `upgradeModal__actions`.
+
+## Themes
+
+The control on a subscription without a scheduled change:
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/plan-change-control/light.png" alt="The Change plan button, light theme" width="139" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/plan-change-control/dark.png" alt="The Change plan button, dark theme" width="139" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/plan-change-control/minimal.png" alt="The Change plan button, minimal theme" width="139" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/plan-change-control/neobrutal.png" alt="The Change plan button, neobrutal theme" width="141" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/plan-change-control/nozle.png" alt="The Change plan button, nozle theme" width="149" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/plan-change-control/nozle-dark.png" alt="The Change plan button, nozleDark theme" width="149" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+### Plan list
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-plans/light.png" alt="The Change plan dialog with Scale selected as an upgrade and Free as a downgrade, each with its price and lines, light theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-plans/dark.png" alt="The Change plan dialog with Scale selected as an upgrade and Free as a downgrade, each with its price and lines, dark theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-plans/minimal.png" alt="The Change plan dialog with Scale selected as an upgrade and Free as a downgrade, each with its price and lines, minimal theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-plans/neobrutal.png" alt="The Change plan dialog with Scale selected as an upgrade and Free as a downgrade, each with its price and lines, neobrutal theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-plans/nozle.png" alt="The Change plan dialog with Scale selected as an upgrade and Free as a downgrade, each with its price and lines, nozle theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-plans/nozle-dark.png" alt="The Change plan dialog with Scale selected as an upgrade and Free as a downgrade, each with its price and lines, nozleDark theme" width="512" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+### Review step
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-confirm/light.png" alt="The Confirm upgrade step with new plan charge, credits applied, due now, due at effective date, and the Back, Close and Confirm upgrade buttons, light theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-confirm/dark.png" alt="The Confirm upgrade step with new plan charge, credits applied, due now, due at effective date, and the Back, Close and Confirm upgrade buttons, dark theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-confirm/minimal.png" alt="The Confirm upgrade step with new plan charge, credits applied, due now, due at effective date, and the Back, Close and Confirm upgrade buttons, minimal theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-confirm/neobrutal.png" alt="The Confirm upgrade step with new plan charge, credits applied, due now, due at effective date, and the Back, Close and Confirm upgrade buttons, neobrutal theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-confirm/nozle.png" alt="The Confirm upgrade step with new plan charge, credits applied, due now, due at effective date, and the Back, Close and Confirm upgrade buttons, nozle theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-confirm/nozle-dark.png" alt="The Confirm upgrade step with new plan charge, credits applied, due now, due at effective date, and the Back, Close and Confirm upgrade buttons, nozleDark theme" width="512" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+### Scheduled change
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-scheduled/light.png" alt="A scheduled downgrade to Free with the Keep current plan button, light theme" width="411" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-scheduled/dark.png" alt="A scheduled downgrade to Free with the Keep current plan button, dark theme" width="411" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-scheduled/minimal.png" alt="A scheduled downgrade to Free with the Keep current plan button, minimal theme" width="411" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-scheduled/neobrutal.png" alt="A scheduled downgrade to Free with the Keep current plan button, neobrutal theme" width="411" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-scheduled/nozle.png" alt="A scheduled downgrade to Free with the Keep current plan button, nozle theme" width="385" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/plan-change-control-scheduled/nozle-dark.png" alt="A scheduled downgrade to Free with the Keep current plan button, nozleDark theme" width="385" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="CancellationControl" icon="ban" href="/sdks/react/components/cancellation-control">
+    Cancel at period end, or keep the subscription.
+  </Card>
+  <Card title="BillingPortal" icon="building-columns" href="/sdks/react/components/billing-portal">
+    The whole customer portal, with this control inside.
+  </Card>
+  <Card title="Billing portal and self-service" icon="book" href="/sdks/react/billing-portal">
+    Backend adapters and runnable examples.
+  </Card>
+  <Card title="UpgradeButton" icon="arrow-up" href="/sdks/react/components/upgrade-button">
+    A single upgrade with your own preview.
+  </Card>
+</Columns>

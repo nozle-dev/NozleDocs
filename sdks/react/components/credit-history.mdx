@@ -1,0 +1,163 @@
+---
+title: "CreditHistory"
+description: "A table of credit operations, newest first, with a Load more button for the next page."
+keywords: ["credit history", "credit operations", "ledger", "react"]
+---
+
+`CreditHistory` lists credit operations as a table: when, type, feature, credits and status.
+
+## What CreditHistory supports
+
+- One row per operation, with readable types: Used, Granted, Adjustment, Expired, Revoked, Refunded, Transfer.
+- Denied and reversed operations in muted text.
+- A "Load more" button for paging.
+- Loading, error and empty states.
+
+## Where to use CreditHistory
+
+- Below [`CreditBalance`](/sdks/react/components/credit-balance) in your billing settings.
+- A support or audit view of a customer's credit activity.
+
+## Importing CreditHistory
+
+```tsx
+import { CreditHistory, type CreditOperationData } from '@nozle-js/react'
+```
+
+## Rendering CreditHistory
+
+```tsx
+import { CreditHistory, type CreditOperationData } from '@nozle-js/react'
+
+const operations: CreditOperationData[] = [
+  { id: 'op_1', type: 'consume', status: 'succeeded', credit_amount: '-12', feature_code: 'ai_chat', occurred_at: '2026-10-16T08:40:00Z' },
+  { id: 'op_2', type: 'grant', status: 'succeeded', credit_amount: '500', feature_code: null, occurred_at: '2026-10-01T00:00:00Z' },
+  { id: 'op_3', type: 'consume', status: 'denied', credit_amount: '-900', feature_code: 'ai_video', occurred_at: '2026-09-28T11:12:00Z' },
+]
+
+export function Activity({ loadMore }: { loadMore: () => void }) {
+  return <CreditHistory operations={operations} hasMore onLoadMore={loadMore} />
+}
+```
+
+## Using live data
+
+[`useCreditHistory({ creditSystemCode?, limit? })`](/sdks/react/hooks#the-hooks) reads the signed-in customer's operations a page at a time through your `billingEndpoint`. `operations` holds every loaded page.
+
+```tsx
+import { CreditHistory, useCreditHistory } from '@nozle-js/react'
+
+export function LiveActivity() {
+  const history = useCreditHistory({ creditSystemCode: 'ai_credits', limit: 20 })
+  return (
+    <CreditHistory
+      operations={history.operations}
+      hasMore={history.hasNextPage}
+      onLoadMore={() => void history.fetchNextPage()}
+      isLoading={history.isPending || history.isFetchingNextPage}
+      error={history.error}
+    />
+  )
+}
+```
+
+Without the hooks, pass the SDK's `credits.operations` page and fetch the next page with its `next_cursor`.
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `operations` | `CreditOperationData[]` | `[]` | `id`, `type`, `status`, `credit_amount`, `feature_code` and `occurred_at` of each operation. |
+| `hasMore` | `boolean` | `false` | With `onLoadMore`, shows a "Load more" button under the table. |
+| `onLoadMore` | `() => void` | none | Called when "Load more" is clicked. |
+| `isLoading` | `boolean` | `false` | With no operations, shows a loading placeholder. With operations, the button reads "Loading…" and is disabled. |
+| `error` | `Error`, `string` or `null` | `null` | Shows the message as an alert instead of the table. |
+| `emptyMessage` | `string` | `'No credit activity yet.'` | Shown when there are no operations. |
+| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
+
+Times show in `en-US` in the browser's time zone ("Oct 16, 2026, 8:40 AM"). An operation without a feature shows "—". A wide table scrolls sideways inside its frame.
+
+### Appearance elements
+
+`creditHistory` (root), `creditHistory__table`, `creditHistory__row`.
+
+## Themes
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/credit-history/light.png" alt="CreditHistory with four operations and a Load more button, light theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/credit-history/dark.png" alt="CreditHistory with four operations and a Load more button, dark theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/credit-history/minimal.png" alt="CreditHistory with four operations and a Load more button, minimal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/credit-history/neobrutal.png" alt="CreditHistory with four operations and a Load more button, neobrutal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/credit-history/nozle.png" alt="CreditHistory with four operations and a Load more button, nozle theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/credit-history/nozle-dark.png" alt="CreditHistory with four operations and a Load more button, nozleDark theme" width="1008" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+### Loading, empty and error
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/credit-history-states/light.png" alt="CreditHistory loading placeholder, No credit activity yet message, and an error message, light theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/credit-history-states/dark.png" alt="CreditHistory loading placeholder, No credit activity yet message, and an error message, dark theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/credit-history-states/minimal.png" alt="CreditHistory loading placeholder, No credit activity yet message, and an error message, minimal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/credit-history-states/neobrutal.png" alt="CreditHistory loading placeholder, No credit activity yet message, and an error message, neobrutal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/credit-history-states/nozle.png" alt="CreditHistory loading placeholder, No credit activity yet message, and an error message, nozle theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/credit-history-states/nozle-dark.png" alt="CreditHistory loading placeholder, No credit activity yet message, and an error message, nozleDark theme" width="1008" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="CreditBalance" icon="coins" href="/sdks/react/components/credit-balance">
+    The credits available now.
+  </Card>
+  <Card title="Credits" icon="book" href="/guides/credits/overview">
+    How credit systems work.
+  </Card>
+</Columns>

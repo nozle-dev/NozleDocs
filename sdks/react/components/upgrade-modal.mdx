@@ -1,0 +1,204 @@
+---
+title: "UpgradeModal"
+description: "An accessible confirmation dialog for a plan change, with your open state and either provider checkout or your own submit action."
+keywords: ["upgrade modal", "plan change dialog", "confirm", "react"]
+---
+
+`UpgradeModal` is the confirmation dialog behind [`UpgradeButton`](/sdks/react/components/upgrade-button). Use it directly when your page owns the open state, or to confirm any billing action with your own `onSubmit`.
+
+## What UpgradeModal supports
+
+- A modal dialog with focus moved in on open and back on close, a focus trap, and Escape to close.
+- Optional amounts from `preview`, and any content you pass as `children`.
+- On confirm, either your `onSubmit`, or `createCheckout` on `BillingProvider` with the result handled for you.
+- A busy state, an error message, a Back button for a previous step, and your own title and labels.
+
+## Where to use UpgradeModal
+
+- A plan change confirmation opened from your own button or menu.
+- A confirm step that shows a quote you read with `useUpgradePreview`.
+- Any confirm-then-call flow on a billing page, without `BillingProvider`, through `onSubmit`.
+
+## Importing UpgradeModal
+
+```tsx
+import { UpgradeModal, type ProrationPreview } from '@nozle-js/react'
+```
+
+## Rendering UpgradeModal
+
+```tsx
+import { useState } from 'react'
+import { UpgradeModal, type ProrationPreview } from '@nozle-js/react'
+
+const preview: ProrationPreview = {
+  credit: 14.5,
+  debit: 49.5,
+  net: 35,
+  currency: 'USD',
+  nextBillingDate: '2026-11-01T00:00:00Z',
+}
+
+export function UpgradeFlow({ onClientSecret }: { onClientSecret: (secret: string) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>Upgrade to Scale</button>
+      <UpgradeModal
+        isOpen={open}
+        planCode="scale"
+        preview={preview}
+        onCancel={() => setOpen(false)}
+        onStripeClientSecret={onClientSecret}
+        onCheckoutStarted={() => setOpen(false)}
+        onCompleted={() => setOpen(false)}
+        onScheduled={() => setOpen(false)}
+      />
+    </>
+  )
+}
+```
+
+With `onSubmit`, the dialog runs your action instead of `createCheckout` and needs no `BillingProvider`:
+
+```tsx
+import { UpgradeModal } from '@nozle-js/react'
+
+export function ConfirmSeats({ open, close }: { open: boolean; close: () => void }) {
+  return (
+    <UpgradeModal
+      isOpen={open}
+      planCode="team"
+      title="Add 5 seats?"
+      confirmLabel="Add seats"
+      onSubmit={async () => {
+        const response = await fetch('/api/billing/seats', { method: 'POST', body: JSON.stringify({ add: 5 }) })
+        if (!response.ok) throw new Error('Seats could not be added')
+      }}
+      onConfirm={close}
+      onCancel={close}
+    >
+      <p>Your next invoice includes 5 more seats.</p>
+    </UpgradeModal>
+  )
+}
+```
+
+## Using live data
+
+`preview` is in major units with separate credit and debit. The quote from [`useUpgradePreview`](/sdks/react/hooks#the-hooks) is in minor units, so show it as `children` and pass its `quote_id`:
+
+```tsx
+import { UpgradeModal, useSubscription, useUpgradePreview } from '@nozle-js/react'
+
+function money(minor: number | string, currency: string) {
+  const format = new Intl.NumberFormat('en-US', { style: 'currency', currency })
+  const digits = format.resolvedOptions().maximumFractionDigits ?? 2
+  return format.format(Number(minor) / 10 ** digits)
+}
+
+export function QuotedUpgrade({ open, close }: { open: boolean; close: () => void }) {
+  const subscription = useSubscription()
+  const quote = useUpgradePreview(open ? 'scale' : undefined)
+  return (
+    <UpgradeModal
+      isOpen={open}
+      planCode="scale"
+      subscriptionId={subscription.data?.subscription?.external_id}
+      quoteId={quote.data?.quote_id}
+      confirmDisabled={!quote.data}
+      onCancel={close}
+      onCompleted={close}
+      onScheduled={close}
+    >
+      {quote.data && (
+        <p>
+          Due now: {money(quote.data.amount_due_now_cents, quote.data.currency)}. Effective{' '}
+          {new Date(quote.data.effective_at).toLocaleDateString('en-US')}.
+        </p>
+      )}
+    </UpgradeModal>
+  )
+}
+```
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `isOpen` | `boolean` | required | Shows the dialog. When `false` nothing renders. |
+| `planCode` | `string` | required | The plan sent to `createCheckout`. |
+| `onCancel` | `() => void` | none | Called by the Close button and by Escape (not while busy). Close the dialog here. |
+| `title` | `string` | `'Confirm plan change'` | The dialog title. |
+| `confirmLabel` | `string` | `'Confirm'` | Text of the confirm button. While busy it reads "Checking subscription…". |
+| `confirmDisabled` | `boolean` | `false` | Disables the confirm button. |
+| `busy` | `boolean` | `false` | Marks the dialog busy from outside: buttons disabled, Escape ignored. |
+| `preview` | `ProrationPreview` | none | Amounts in major units: `credit` (shown as "Credits applied" only when above 0), `debit` ("New plan charge"), `net` ("Due today"), `nextBillingDate` (an ISO date) and `currency` (default `USD`). |
+| `children` | `ReactNode` | none | Content below the amounts. |
+| `locale` | `string` | `'en-US'` for amounts | Formats the amounts and the next billing date. Without it the date uses the browser's locale. |
+| `onSubmit` | `() => Promise<void>` | none | From React `0.10.0`. Your action for the confirm button. When set, `createCheckout` is not called and `BillingProvider` is not needed. A rejection shows its message. |
+| `subscriptionId` | `string` | not sent | Sent to `createCheckout`. |
+| `quoteId` | `string` | not sent | Sent to `createCheckout`. |
+| `idempotencyKey` | `string` | not sent | Sent to `createCheckout`. |
+| `returnUrl` | `string` | The current URL | Sent to `createCheckout`. |
+| `onStripeClientSecret` | `(clientSecret: string) => void` | none | Receives the client secret of an embedded Stripe checkout. |
+| `onCheckoutStarted` | `() => void` | none | Called after the Stripe client secret was handed over. |
+| `onCompleted` | `() => void` | none | Called when the change completed, or a Razorpay payment was captured. |
+| `onScheduled` | `() => void` | none | Called for a `scheduled` result. |
+| `onConfirm` | `() => void` | none | Called after confirm finished without an error, by either path. |
+| `onBack` | `() => void` | none | Shows a Back button on the left of the actions. |
+| `onError` | `(error: Error) => void` | none | Called when confirm fails. The dialog shows the message. |
+| `nonce` | `string` | none | CSP nonce for the dialog's `<style>` element. |
+| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
+
+A `processing` checkout shows "Payment is processing. Confirmation may take a little while." in the dialog. On the free Nozle plan the dialog shows [Powered by Nozle](/sdks/react/components/powered-by-nozle), unless it is inside another component that already shows it.
+
+### Appearance elements
+
+`upgradeModal` (the backdrop, also class `nozle-upgrade-modal`), `upgradeModal__dialog`, `upgradeModal__actions`.
+
+## Themes
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/upgrade-modal/light.png" alt="UpgradeModal with credits applied, new plan charge, amount due today and next billing date, light theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/upgrade-modal/dark.png" alt="UpgradeModal with credits applied, new plan charge, amount due today and next billing date, dark theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/upgrade-modal/minimal.png" alt="UpgradeModal with credits applied, new plan charge, amount due today and next billing date, minimal theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/upgrade-modal/neobrutal.png" alt="UpgradeModal with credits applied, new plan charge, amount due today and next billing date, neobrutal theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/upgrade-modal/nozle.png" alt="UpgradeModal with credits applied, new plan charge, amount due today and next billing date, nozle theme" width="512" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/upgrade-modal/nozle-dark.png" alt="UpgradeModal with credits applied, new plan charge, amount due today and next billing date, nozleDark theme" width="512" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="UpgradeButton" icon="arrow-up" href="/sdks/react/components/upgrade-button">
+    A button that opens this dialog.
+  </Card>
+  <Card title="PlanChangeControl" icon="arrows-rotate" href="/sdks/react/components/plan-change-control">
+    Uses this dialog for its plan list and quote.
+  </Card>
+</Columns>

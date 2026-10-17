@@ -1,0 +1,163 @@
+---
+title: "BillingPortal"
+description: "A customer billing portal in your app: subscriptions, usage, wallets, billing details and invoices, with optional plan changes and cancellation."
+keywords: ["billing portal", "customer portal", "invoices", "self-service", "react"]
+---
+
+`BillingPortal` renders a full customer billing page inside your app. It reads the customer's data from Nozle with a short-lived, customer-scoped session that your backend issues.
+
+## What BillingPortal supports
+
+- Subscriptions with status, price, current period and usage details.
+- Wallets with their balance and a top-up form.
+- Billing information with an edit form.
+- Invoice history with search, pages and PDF downloads.
+- [`PlanChangeControl`](/sdks/react/components/plan-change-control) and [`CancellationControl`](/sdks/react/components/cancellation-control) on each subscription when you pass their actions.
+- No `BillingProvider` or Tailwind needed.
+
+## Where to use BillingPortal
+
+- A "Billing" page in your app's settings.
+- A link from [`CurrentPlan`](/sdks/react/components/current-plan) ("Manage billing").
+
+## Importing BillingPortal
+
+```tsx
+import {
+  BillingPortal,
+  BillingPortalError,
+  type BillingPortalSession,
+  type CreateBillingPortalSession,
+} from '@nozle-js/react'
+```
+
+## Rendering BillingPortal
+
+```tsx
+import { BillingPortal, type BillingPortalSession, type CreateBillingPortalSession } from '@nozle-js/react'
+
+const createSession: CreateBillingPortalSession = async ({ signal }) => {
+  const response = await fetch('/api/billing/session', { method: 'POST', credentials: 'same-origin', signal })
+  if (!response.ok) throw new Error(`Billing session failed: ${response.status}`)
+  const session: BillingPortalSession = await response.json() // { token, apiUrl }
+  return session
+}
+
+export function CustomerBilling({ accountId }: { accountId: string }) {
+  return (
+    <BillingPortal
+      key={accountId}
+      createSession={createSession}
+      locale="en-US"
+      onError={(error) => console.warn(error.code)}
+    />
+  )
+}
+```
+
+Any rejection of `createSession` shows as a `session` error. Keep `createSession` stable across renders: a new function starts a new session. Change `key` when the signed-in account changes.
+
+## Using live data
+
+Your backend issues the session. It reads the customer's portal URL from Core (`GET /api/v1/customers/{external_id}/portal_url`) with your secret key, takes the token from it, and returns `{ token, apiUrl }`. The portal then reads subscriptions, usage, wallets and invoices from Core's customer-portal GraphQL with that token. [Billing portal and self-service](/sdks/react/billing-portal#issue-the-portal-session) shows the backend step and the plan-change and cancellation adapters.
+
+```tsx
+import { BillingPortal, type CancellationActions, type CreateBillingPortalSession, type PlanChangeActions } from '@nozle-js/react'
+
+export function FullPortal(props: {
+  createSession: CreateBillingPortalSession
+  cancellationActions: CancellationActions
+  planChangeActions: PlanChangeActions
+}) {
+  return (
+    <BillingPortal
+      createSession={props.createSession}
+      cancellationActions={props.cancellationActions}
+      planChangeActions={props.planChangeActions}
+    />
+  )
+}
+```
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `createSession` | `CreateBillingPortalSession` | required | `({ signal }) => Promise<{ token, apiUrl? }>`. Called on mount, on "Reconnect" and on "Refresh portal". `apiUrl` is the Core base URL without `/graphql` and defaults to `https://api.nozle.app/core`. The token stays in memory. |
+| `planChangeActions` | `PlanChangeActions` | none | Shows [`PlanChangeControl`](/sdks/react/components/plan-change-control) on each subscription. Without it there are no plan changes. |
+| `cancellationActions` | `CancellationActions` | none | Shows [`CancellationControl`](/sdks/react/components/cancellation-control) on each subscription. Without it there is no Cancel or Keep. |
+| `locale` | `string` | `'en-US'` | Formats amounts and dates. The text is English. |
+| `onError` | `(error: BillingPortalError) => void` | none | Called with a `BillingPortalError` whose `code` is `session`, `unauthorized`, `request` or `changed`. The message never contains the token or response details. |
+| `className` | `string` | `''` | Class names on the root, after `nozle-billing-portal`. |
+| `style` | `CSSProperties` | none | Inline styles on the root. |
+| `nonce` | `string` | none | CSP nonce for the portal's `<style>` elements. |
+| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides, also applied to the controls and dialogs inside. The older `--nozle-portal-*` variables still work. See [Appearance](/sdks/react/styling). |
+
+### States
+
+| State | Shown |
+|---|---|
+| Starting | "Starting billing session…", then "Loading billing data…". |
+| Session failed or took over 20 seconds | "Could not start your billing session. Please try again." with "Try again". |
+| Session expired | "Your billing session has expired. Reconnect to continue." with "Reconnect". |
+| A request failed | "Could not complete this billing request. Please try again." with "Try again". |
+
+The portal shows [Powered by Nozle](/sdks/react/components/powered-by-nozle) when the session's organization is on the free Nozle plan.
+
+### Appearance elements
+
+`billingPortal` (root), `billingPortal__section`, `billingPortal__card` (subscription and wallet cards), `billingPortal__table` (usage and invoice tables), `billingPortal__error`.
+
+## Themes
+
+With `cancellationActions` and `planChangeActions`:
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/billing-portal/light.png" alt="BillingPortal with a Pro subscription, a prepaid credits wallet, billing information and two paid invoices, light theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/billing-portal/dark.png" alt="BillingPortal with a Pro subscription, a prepaid credits wallet, billing information and two paid invoices, dark theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/billing-portal/minimal.png" alt="BillingPortal with a Pro subscription, a prepaid credits wallet, billing information and two paid invoices, minimal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/billing-portal/neobrutal.png" alt="BillingPortal with a Pro subscription, a prepaid credits wallet, billing information and two paid invoices, neobrutal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/billing-portal/nozle.png" alt="BillingPortal with a Pro subscription, a prepaid credits wallet, billing information and two paid invoices, nozle theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/billing-portal/nozle-dark.png" alt="BillingPortal with a Pro subscription, a prepaid credits wallet, billing information and two paid invoices, nozleDark theme" width="1008" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="Billing portal and self-service" icon="book" href="/sdks/react/billing-portal">
+    Session, adapters and runnable backends.
+  </Card>
+  <Card title="PlanChangeControl" icon="arrows-rotate" href="/sdks/react/components/plan-change-control">
+    Plan changes on your own page.
+  </Card>
+  <Card title="CancellationControl" icon="ban" href="/sdks/react/components/cancellation-control">
+    Cancel and Keep on your own page.
+  </Card>
+  <Card title="CurrentPlan" icon="circle-info" href="/sdks/react/components/current-plan">
+    A compact plan summary.
+  </Card>
+</Columns>
