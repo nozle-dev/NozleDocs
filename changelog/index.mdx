@@ -27,6 +27,7 @@ _Unreleased_
 _Unreleased_
 
 - The [LLM proxy](/api/llm-proxy#subscription) finds the subscription to bill before it calls the provider, and its usage event carries that `external_subscription_id`, so proxy usage is billed. A customer with several active subscriptions needs the new `X-Nozle-Subscription` header, which is not forwarded. A customer with no matching active subscription returns `422 active_subscription_not_found`, several without the header `422 active_subscription_ambiguous`; the provider is not called.
+- `POST /events` and `/events/batch` accept `external_customer_id` without `external_subscription_id`: the event is billed to the customer's single active subscription. No or several active subscriptions return `422 active_subscription_not_found` or `422 active_subscription_ambiguous` (in a batch, under the event's position). An event with neither id returns `422 validation_errors` with `external_subscription_id: ["value_is_mandatory"]`. See [Events](/api/events).
 
 ### Link existing Stripe customers from the SDKs
 

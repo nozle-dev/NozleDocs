@@ -3223,7 +3223,30 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'The event was not stored. `validation_errors` for an invalid field, including `external_subscription_id: [value_is_mandatory]` when neither `external_subscription_id` nor `external_customer_id` is sent. `active_subscription_not_found` or `active_subscription_ambiguous` when only `external_customer_id` is sent and the customer has no active subscription (or is unknown) or several.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+              examples:
+                missing_subscription:
+                  summary: Neither id
+                  value:
+                    status: 422
+                    error: Unprocessable Entity
+                    code: validation_errors
+                    error_details:
+                      external_subscription_id:
+                        - value_is_mandatory
+                ambiguous:
+                  summary: Several active subscriptions
+                  value:
+                    status: 422
+                    error: Unprocessable Entity
+                    code: active_subscription_ambiguous
+                    error_details:
+                      external_customer_id:
+                        - active_subscription_ambiguous
       x-codeSamples:
         - lang: TypeScript
           label: Node.js
@@ -3337,7 +3360,19 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'The batch was not stored. `code` is `validation_errors` and `error_details` is keyed by the position of each failing event, with the same field errors as a single event, for example `{"0": {"external_customer_id": ["active_subscription_not_found"]}}`. An empty batch returns `events: [no_events]`, more than 100 events `events: [too_many_events]`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+              example:
+                status: 422
+                error: Unprocessable Entity
+                code: validation_errors
+                error_details:
+                  '0':
+                    external_customer_id:
+                      - active_subscription_not_found
       x-codeSamples:
         - lang: Go
           label: Go
@@ -23831,7 +23866,7 @@ components:
           type: string
           maxLength: 255
           example: sub_1234567890
-          description: External ID of the subscription the event is billed to. Ingestion does not check that it is present, but it is the only field that links the event to a customer, so always send it. The SDKs look it up when you pass only a customer.
+          description: 'External ID of the subscription the event is billed to. Send it or `external_customer_id`; with neither the response is `422 validation_errors` with `external_subscription_id: [value_is_mandatory]`. When it is given, `external_customer_id` is ignored.'
         code:
           type: string
           maxLength: 255
@@ -23866,8 +23901,8 @@ components:
             gb: 10
         external_customer_id:
           type: string
-          deprecated: true
-          description: 'Accepted and ignored: ingestion stores no customer ID. The SDKs send it and use it only to look up the subscription before sending the event.'
+          example: cust_123
+          description: 'Used only when `external_subscription_id` is blank. The event is billed to this customer''s single active subscription and stored with its `external_subscription_id`. An unknown customer or one with no active subscription returns `422 active_subscription_not_found`, and several active subscriptions return `422 active_subscription_ambiguous`, with `error_details` `{"external_customer_id": [code]}`.'
     CostEventInput:
       type: object
       required:
