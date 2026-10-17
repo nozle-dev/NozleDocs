@@ -205,6 +205,8 @@ For configured settlement policies, preview and apply with `SubscriptionTransiti
 
 ## Read usage
 
+From `v0.12.0`.
+
 ```go
 current, err := client.CurrentUsage(ctx, "cus_123", "")      // this billing period
 past, err := client.PastUsage(ctx, "cus_123", "", 6)          // newest first
@@ -212,9 +214,11 @@ past, err := client.PastUsage(ctx, "cus_123", "", 6)          // newest first
 
 Each period is a `CustomerUsage` with `FromDatetime`, `ToDatetime`, `Currency`, `AmountCents`, `TotalAmountCents` and `ChargesUsage` (units and amount per charge and feature). Pass a subscription ID instead of `""` to read a specific subscription.
 
-Without a subscription ID, the customer's one active subscription is used, and a customer with none or several gets an error.
+Without a subscription ID, the customer's one active subscription is used, and a customer with none or several gets an error. The client remembers that subscription, as `Track` does, and shares it between `Track`, `CurrentUsage` and `PastUsage`. `Checkout`, `CheckoutInvoice`, `CheckoutStatus`, `VerifyCheckout`, `Subscribe`, `CancelSubscription` and `ApplySubscriptionTransition` forget it. A change made elsewhere, such as in the dashboard, is not seen, so pass the subscription ID when that matters.
 
 ## Invoices
+
+From `v0.12.0`.
 
 ```go
 page, err := client.ListInvoices(ctx, "cus_123", nozle.ListInvoicesParams{Status: "finalized", Page: 1})
@@ -222,11 +226,28 @@ invoice, err := client.GetInvoice(ctx, page.Invoices[0].NozleID)
 pdf, err := client.InvoiceDownloadURL(ctx, invoice.NozleID)    // "" until the PDF exists
 ```
 
+`ListInvoicesParams` filters the list, newest first. Empty fields are not sent:
+
+| Field | Description |
+|---|---|
+| `Status` | `draft`, `finalized`, `voided`, `failed` or `pending`. |
+| `PaymentStatus` | `pending`, `succeeded` or `failed`. |
+| `PaymentOverdue` | `*bool`. `true` keeps only unpaid invoices past their due date; `false` keeps the others. |
+| `IssuingDateFrom`, `IssuingDateTo` | Inclusive issuing dates, `YYYY-MM-DD`. |
+| `Page`, `PerPage` | Page number and page size. |
+
+```go
+overdue := true
+unpaid, err := client.ListInvoices(ctx, "cus_123", nozle.ListInvoicesParams{PaymentOverdue: &overdue})
+```
+
 Pay an open invoice with `CheckoutInvoice`.
 
 A PDF is generated the first time it is asked for, so the download call returns no URL until it exists; ask again a few seconds later, or wait for the `invoice.generated` webhook.
 
 ## Alerts
+
+From `v0.12.0`.
 
 ```go
 target := nozle.AlertTarget{SubscriptionID: "sub_123"}
@@ -242,6 +263,11 @@ _, err = client.DeleteAlert(ctx, target, "api_calls_80")
 
 // Balance alerts belong to a wallet:
 wallet := nozle.AlertTarget{CustomerID: "cus_123", WalletCode: "main"}
+_, err = client.CreateAlert(ctx, wallet, nozle.AlertInput{
+	AlertType:  "wallet_credits_balance",
+	Code:       "low_credits",
+	Thresholds: []nozle.AlertThreshold{{Value: "100"}},
+})
 ```
 
 Usage alert types are `current_usage_amount`, `feature_current_usage_amount` and `feature_current_usage_units` (the `feature_*` ones need a feature code). Wallet alert types are `wallet_balance_amount`, `wallet_credits_balance`, `wallet_ongoing_balance_amount` and `wallet_credits_ongoing_balance`. Threshold values are cents, units or credits by type, and at most one threshold is recurring. Nozle sends the `alert.triggered` webhook when a threshold is crossed; [verify it](/api/receive-webhooks) before acting.

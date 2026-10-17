@@ -8,11 +8,11 @@ description: "Install and configure the typed Nozle Python SDK, synchronous or a
 Entity subscription APIs are introduced in `0.5.0`.
 
 ```bash
-pip install nozle-sdk==0.11.0
+pip install nozle-sdk==0.13.0
 ```
 
 <Info>
-Version `0.11.0` sends Feature Events through the Go Engine endpoint. Version `0.10.0` adds `NozleAPIError.code` and `has_code()`, richer checkout result types, and no longer requires `feature` in `check_and_deduct()`. Version `0.9.1` fixes Feature Event timestamp serialization, including events created by the OpenAI and Anthropic wrappers. Version `0.9.0` introduced subscription options, signed quotes, pending-change withdrawal, and scoped checkout recovery. See [subscription self-service](/sdks/python/billing#subscription-self-service) and the [release notes](/changelog#razorpay-and-stripe-guides-new-sdk-releases-api-fixes).
+Version `0.13.0` adds `AsyncNozle`, opt-in retries, the `host` argument, an optional `api_key` that reads `NOZLE_SECRET_KEY`, `request_id` and `retry_after` on `NozleAPIError`, usage capture for any httpx-based LLM client, Core usage reads, and the `invoices`, `alerts` and `webhooks` namespaces. Version `0.12.0` adds `billing_configuration` to `customers.upsert()`. Version `0.11.0` sends Feature Events through the Go Engine endpoint. Version `0.10.0` adds `NozleAPIError.code` and `has_code()`, richer checkout result types, and no longer requires `feature` in `check_and_deduct()`. Version `0.9.1` fixes Feature Event timestamp serialization, including events created by the OpenAI and Anthropic wrappers. Version `0.9.0` introduced subscription options, signed quotes, pending-change withdrawal, and scoped checkout recovery. See [subscription self-service](/sdks/python/billing#subscription-self-service) and the [release notes](/changelog#razorpay-and-stripe-guides-new-sdk-releases-api-fixes).
 </Info>
 
 ## Create a client
@@ -30,7 +30,7 @@ nozle = Nozle(
 
 | Argument | Type | Default | Description |
 |---|---|---|---|
-| `api_key` | `str` | `NOZLE_SECRET_KEY` environment variable | Organization credential. Protected operations require `sk_`. When you do not pass it, the client reads `NOZLE_SECRET_KEY`; if that is not set it raises `ValueError`. |
+| `api_key` | `str \| None` | `NOZLE_SECRET_KEY` environment variable | Organization credential. Protected operations require `sk_`. When you do not pass it, the client reads `NOZLE_SECRET_KEY`; if that is not set it raises `ValueError`. |
 | `host` | `str` | `https://api.nozle.app` | Keyword-only. Root API origin. The SDK sends Engine calls to `{host}/engine` and Core calls to `{host}/core`. Set only this for a local or self-hosted deployment behind one reverse proxy. |
 | `base_url` | `str` | `https://api.nozle.app/engine` | Engine API origin for `track()`, entitlements, credits, Entities, usage, and margin. Overrides the address derived from `host`. |
 | `events_url` | `str` | `https://api.nozle.app/core` | Core API origin for customer writes, billing resources, subscription discovery, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. Overrides the address derived from `host`. |
@@ -102,7 +102,11 @@ This is a backend SDK. Never expose an `sk_`, master key, or internal credential
 | Area | Methods |
 |---|---|
 | API | `ping()`, `plans()`, `track()`, `can()` |
+| Usage reads | `current_usage()`, `past_usage()` |
 | Billing | `checkout()`, `checkout_status()`, `verify_checkout()`, `checkout_invoice()`, `subscribe()`, `cancel_subscription()`, `subscription_options()`, `preview_subscription_change()`, `withdraw_pending_subscription_change()`, `preview_subscription_transition()`, `apply_subscription_transition()` |
+| Invoices | `invoices.list()`, `invoices.get()`, `invoices.download_url()` |
+| Alerts | `alerts.list()`, `alerts.get()`, `alerts.create()`, `alerts.update()`, `alerts.delete()` |
+| Webhooks | `webhooks.verify()` |
 | Customers | `customers.upsert()` |
 | Credit systems | `credit_systems.list()` |
 | Entities | `get()`, `list()`, `upsert()`, `activate()`, `suspend()`, `bulk_upsert()` |
@@ -111,7 +115,9 @@ This is a backend SDK. Never expose an `sk_`, master key, or internal credential
 | Usage | Advisory `check()` and atomic `track()` |
 | Cost events | `cost_events.track()` |
 | Margin | `summary()`, `by_customer()`, `by_metric()`, `by_plan()`, `by_model()`, `trend()` |
-| LLMs | `wrap_openai()`, `wrap_anthropic()` |
+| LLMs | `wrap_openai()`, `wrap_anthropic()`, `wrap_http_client()`, `capture_http_client()`, `capture_async_http_client()`, `record_usage()` |
+
+Usage reads, invoices, alerts, webhooks, `wrap_http_client()`, `capture_http_client()`, `capture_async_http_client()` and `record_usage()` require `0.13.0`.
 
 `check_and_deduct(customer_id, credits=5)` remains available for the legacy wallet path. The `feature` argument is deprecated and ignored.
 

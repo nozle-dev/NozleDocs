@@ -6,7 +6,7 @@ description: "Install and configure the typed, server-side Nozle Go SDK."
 The Go SDK requires Go 1.22 or later. Install it with:
 
 ```bash
-go get github.com/nozle-dev/nozle-go@v0.10.0
+go get github.com/nozle-dev/nozle-go@v0.12.0
 ```
 
 ## Create a client
@@ -33,10 +33,10 @@ client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"), nozle.WithHost("http://localh
 | API key | `NOZLE_SECRET_KEY` environment variable | Organization credential; protected operations require `sk_`. |
 | `WithHost` | `https://api.nozle.app` | Root API origin. Engine calls go to `host/engine` and Core calls to `host/core`. Use it alone for a deployment behind one reverse proxy. |
 | `WithBaseURL` | `https://api.nozle.app/engine` | `Track`, `Meter`, `TrackUsage`, `CheckUsage`, `Can`, `TrackCostEvent`, `Ping`, `Plans`, `Checkout`, `CheckoutStatus`, `Subscribe`, `CancelSubscription`, subscription options, previews, transitions and withdrawal, credit balances, Entity get and upsert, and margin. |
-| `WithEventsURL` | `https://api.nozle.app/core` | Subscription lookup for `Track`, customer upsert, credit-system list, and Entity subscription calls: ensure, get, list, checkout, bulk checkout (`CheckoutEntitySubscriptions`), and change plan. |
+| `WithEventsURL` | `https://api.nozle.app/core` | Subscription lookup for `Track`, customer upsert, credit-system list, and Entity subscription calls: ensure, get, list, checkout, bulk checkout (`CheckoutEntitySubscriptions`), and change plan. From `v0.12.0` also invoices, alerts, `CurrentUsage` and `PastUsage`, Nozle's webhook public key for `VerifyWebhook`, and the Feature check of `WrapHTTPClient`. |
 | `WithTimeout` | 10 seconds | The budget of each attempt, including any retries inside a custom HTTP client. |
 | `WithMaxRetries` | 0 | Extra attempts after a network error, timeout, `429` or `5xx`. 0 never retries. |
-| `WithRetryDelay` | 500 milliseconds | First retry delay. It doubles each retry up to 10 seconds, or `Retry-After` is used when sent. |
+| `WithRetryDelay` | 500 milliseconds | First retry delay. It doubles each retry up to 10 seconds, or `Retry-After` is used when sent, capped at 30 seconds. |
 | `WithHTTPClient` | default HTTP client | Inject an `*http.Client`, for example one that retries. |
 | `WithDebug` | off | Log `[nozle] METHOD url` for each request. |
 
@@ -82,8 +82,14 @@ client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"), nozle.WithHTTPClient(&http.Cl
 | Billing | `Checkout`, `Subscribe`, `CancelSubscription`, transition preview/apply, scoped checkout recovery |
 | Customers and Entities | `UpsertCustomer`, Entity reads and lifecycle, Entity subscriptions |
 | Credits and usage | Credit-system discovery, balances, history, transfers, `CheckUsage`, `TrackUsage` |
+| Usage reads | `CurrentUsage`, `PastUsage` |
+| Invoices | `ListInvoices`, `GetInvoice`, `InvoiceDownloadURL` |
+| Alerts | `ListAlerts`, `GetAlert`, `CreateAlert`, `UpdateAlert`, `DeleteAlert` |
+| Webhooks | `VerifyWebhook`, `WebhookHandler` |
 | Margin | Summary, customer, metric, plan, model, and trend queries |
-| LLMs | Automatic `WrapOpenAIHTTPClient`, `WrapAnthropicHTTPClient`; manual `CaptureOpenAIUsage`, `CaptureAnthropicUsage` |
+| LLMs | Automatic `WrapHTTPClient`, `WrapOpenAIHTTPClient`, `WrapAnthropicHTTPClient`; manual `RecordUsage`, `CaptureOpenAIUsage`, `CaptureAnthropicUsage` |
+
+Usage reads, invoices, alerts, webhooks, `WrapHTTPClient` and `RecordUsage` require `v0.12.0`.
 
 `Ping` returns a `PingResult` with `OK` and `Engine`.
 

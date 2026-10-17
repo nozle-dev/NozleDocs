@@ -36,7 +36,7 @@ Verify the **raw request body** before you parse it. A framework that parses and
 
 ### With the SDK
 
-The server SDKs check both formats and return the parsed event. For `jwt` they read Nozle's public key once with your secret key and cache it. For `hmac`, pass the signing secret.
+The server SDKs check both formats and return the parsed event. For `jwt` they read Nozle's public key once with your secret key and cache it. For `hmac`, pass the signing secret. Webhook verification requires `@nozle-js/node` `0.13.0`, `nozle-sdk` `0.13.0` or `github.com/nozle-dev/nozle-go` `v0.12.0`.
 
 <Tabs>
 <Tab title="Node.js">
@@ -45,7 +45,8 @@ import { Nozle, createWebhookHandler } from '@nozle-js/node'
 
 const nozle = new Nozle()
 
-// Next.js route handler, Remix, Hono, Bun or Deno: answers 200, or 400 when the request is not genuine.
+// Next.js route handler, Remix, Hono, Bun or Deno: answers 200, 400 when the request is not genuine,
+// 405 for a method other than POST, or 500 when onEvent throws.
 export const POST = createWebhookHandler(nozle, {
   hmacKey: process.env.NOZLE_WEBHOOK_HMAC_KEY, // only for hmac endpoints
   onEvent: async (event) => {
@@ -85,7 +86,7 @@ http.Handle("/nozle/webhooks", client.WebhookHandler(hmacKey, func(ctx context.C
 }))
 ```
 
-Or call `client.VerifyWebhook(ctx, body, r.Header, hmacKey)`; a forged request returns a `*nozle.WebhookVerificationError`.
+The handler answers 200, 400 when the request is not genuine, 405 for a method other than POST, or 500 when `onEvent` returns an error or Nozle's public key cannot be read. Or call `client.VerifyWebhook(ctx, body, r.Header, hmacKey)`; a forged request returns a `*nozle.WebhookVerificationError`.
 </Tab>
 </Tabs>
 

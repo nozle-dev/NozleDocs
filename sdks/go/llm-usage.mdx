@@ -5,6 +5,8 @@ description: "Record the token usage of every LLM call made through an *http.Cli
 
 `nozle.WrapHTTPClient` returns a copy of an `*http.Client` that records the token usage of every successful LLM response it carries. Pass it to any provider SDK that accepts an HTTP client, or use it for your own requests. Requests and responses pass through unchanged, and prompts and completions are never sent to Nozle.
 
+`WrapHTTPClient` and `RecordUsage` require `v0.12.0`. The [provider-specific wrappers](#provider-specific-wrappers) are available in earlier versions.
+
 Usage is recognised by the shape of the response, not by provider name: an OpenAI-style `usage` (OpenAI chat completions, the Responses API and any OpenAI-compatible API), an Anthropic `usage`, or Gemini `usageMetadata`, for JSON responses and streams.
 
 <Note>
@@ -94,7 +96,7 @@ Import `github.com/anthropics/anthropic-sdk-go` as `anthropic` and its `/option`
 | `CostMeterCode` | Optional Cost Event Meter for categorized token costs. |
 | `Feature` | Optional Feature Event property. |
 | `DeliveryTimeout` | Timeout for background telemetry; defaults to 15 seconds. |
-| `OnError` | Called with the Nozle delivery error when sending a captured event fails. It does not change the provider response. |
+| `OnError` | Called with the Nozle delivery error when sending a captured event fails. It does not change the provider response. These wrappers do not check that a Feature has the event code; only `WrapHTTPClient` reports a `*nozle.SetupError` with `Code` `feature_not_found`. |
 | `OnResult` | `func(error)`, called after every delivery attempt: with `nil` on success, with the error on failure. |
 
 The wrapper copies the supplied `*http.Client`; it does not mutate the original. It captures only request paths ending in `/chat/completions` (OpenAI) and `/messages` (Anthropic); other routes, such as `/v1/responses`, pass through without an event. Usage delivery runs in a goroutine after the provider response or stream completes, without delaying the provider result. Use `OnError` to log or queue failures. The wrapper does not automatically retry telemetry.

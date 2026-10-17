@@ -5,6 +5,8 @@ description: "Record the token usage of every LLM call from any httpx or httpx2 
 
 `nozle.wrap_http_client()` makes the HTTP client your LLM SDK uses record the token usage of every successful response. It works with any client built on httpx or its fork httpx2, sync or async, including the OpenAI and Anthropic SDKs. Requests and responses pass through unchanged, and prompts and completions are never sent to Nozle.
 
+`wrap_http_client()`, `capture_http_client()`, `capture_async_http_client()` and `record_usage()` require `nozle-sdk` `0.13.0`. The [client wrappers](#client-wrappers) are available in earlier versions.
+
 Usage is recognised by the shape of the response, not by provider name: an OpenAI-style `usage` (OpenAI chat completions, the Responses API and any OpenAI-compatible API such as OpenRouter, Groq, Azure OpenAI or vLLM), an Anthropic `usage`, or Gemini `usageMetadata`. JSON responses and streams are both read, including a stream your client closes at `[DONE]`.
 
 <Note>
@@ -55,7 +57,7 @@ client.chat.completions.create(
 | `include_stream_usage` | Default `True`: chat completion streams are sent with `stream_options.include_usage`. Set `False` for a server that rejects the field. |
 | `on_error` | Called with a recording failure, and once per event code with an error whose `code` is `feature_not_found` when no Feature has that code. Without it, a `NozleTrackingWarning` is emitted. The provider response is never affected. |
 
-Recording runs in a background thread after the response has been read.
+Recording runs in a background thread (with `AsyncNozle`, a task on the event loop) after the response has been read.
 
 ### Usage you read yourself
 

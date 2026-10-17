@@ -101,7 +101,7 @@ The policy defaults to `end_of_period` and also accepts `immediate`.
 ## Subscription self-service
 
 <Info>
-The following subscription-management methods are available in `nozle-sdk==0.10.0`. The matching hosted endpoints are available; see the [Python merchant example](https://github.com/nozle-dev/nozle-python/tree/v0.9.1/examples/billing_portal) for a complete integration.
+The following subscription-management methods are available from `nozle-sdk` `0.10.0`. The matching hosted endpoints are available; see the [Python merchant example](https://github.com/nozle-dev/nozle-python/tree/v0.9.1/examples/billing_portal) for a complete integration.
 </Info>
 
 These methods power [the React billing portal](/sdks/react/billing-portal). Derive `customer_id` from the authenticated application user and validate the selected external `subscription_id`. Do not substitute the Core internal UUID for that external identifier.
@@ -272,7 +272,7 @@ Every method requires an `sk_` key. See [Entity Subscriptions](/api/entity-subsc
 
 - `billing_time` accepts only `calendar` or `anniversary`.
 - Single Entity checkout also accepts free, trial, and pay-in-arrears plans. It returns `completed` with `payment_source: "none"`.
-- `change_plan()` needs a [transition policy](/api/plan-transition-policies) for the plan pair and takes no `billing_time`. It returns `scheduled` or `completed`, plus `external_entity_id` and `external_subscription_id`.
+- `change_plan()` needs a [transition policy](/api/plan-transition-policies) for the plan pair. From `0.13.0` it accepts `billing_time`; earlier versions take none. It returns `scheduled` or `completed`, plus `external_entity_id` and `external_subscription_id`.
 - `cancel()` requires `idempotency_key`. On a pay-in-arrears plan without `credit_action` it returns `422` with `credit_action: not_supported_for_pay_in_arrears`.
 - `remove()` on an Entity with billing history returns `403 entity_subscription_has_billing_history`.
 
@@ -340,6 +340,8 @@ See [Customers and Entities](/sdks/python/customers-entities) for lifecycle deta
 
 ## Read usage
 
+From `0.13.0`.
+
 ```python
 current = nozle.current_usage("cus_123")              # this billing period
 past = nozle.past_usage("cus_123", periods=6)         # newest first
@@ -351,10 +353,26 @@ Without a subscription ID, the customer's one active subscription is used, and a
 
 ## Invoices
 
+From `0.13.0`.
+
 ```python
 page = nozle.invoices.list("cus_123", status="finalized", page=1)    # {"invoices", "meta"}
 invoice = nozle.invoices.get(page["invoices"][0]["nozle_id"])
 pdf = nozle.invoices.download_url(invoice["nozle_id"])               # str or None
+```
+
+`invoices.list` returns the newest invoices first and takes these keyword filters:
+
+| Argument | Description |
+|---|---|
+| `status` | `draft`, `finalized`, `voided`, `failed` or `pending`. |
+| `payment_status` | `pending`, `succeeded` or `failed`. |
+| `payment_overdue` | `True` keeps only unpaid invoices past their due date; `False` keeps the others. |
+| `issuing_date_from`, `issuing_date_to` | Inclusive issuing dates, `YYYY-MM-DD`. |
+| `page`, `per_page` | Page number and page size. |
+
+```python
+overdue = nozle.invoices.list("cus_123", payment_overdue=True)
 ```
 
 Pay an open invoice with `checkout_invoice`.
@@ -362,6 +380,8 @@ Pay an open invoice with `checkout_invoice`.
 A PDF is generated the first time it is asked for, so the download call returns no URL until it exists; ask again a few seconds later, or wait for the `invoice.generated` webhook.
 
 ## Alerts
+
+From `0.13.0`.
 
 ```python
 nozle.alerts.create(
