@@ -119,11 +119,6 @@ tags:
     externalDocs:
       description: Find out more
       url: https://docs.nozle.dev/api-reference
-  - name: Payment Receipts
-    description: Everything about Payment receipts
-    externalDocs:
-      description: Find out more
-      url: https://docs.nozle.dev/api-reference
   - name: Payment Requests
     description: Everything about PaymentRequests
     externalDocs:
@@ -194,34 +189,6 @@ paths:
                       $ref: '#/components/schemas/BillingEntityObject'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-    post:
-      tags:
-        - Billing Entities
-      summary: Create a billing entity
-      description: This endpoint is used to create a new billing entity
-      operationId: createBillingEntity
-      requestBody:
-        description: The billing entity payload
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BillingEntityCreateInput'
-        required: true
-      responses:
-        '200':
-          description: Billing entity created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BillingEntityObject'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
   /billing_entities/{code}:
@@ -1452,14 +1419,6 @@ paths:
           schema:
             type: integer
             example: 100000
-        - name: self_billed
-          in: query
-          description: Filter credit notes belonging to a self billed invoice. Possible values are `true` or `false`.
-          required: false
-          explode: true
-          schema:
-            type: boolean
-            example: true
         - name: billing_entity_codes[]
           in: query
           description: Filter credit notes by billing entity codes.
@@ -1818,10 +1777,8 @@ paths:
               type: string
               enum:
                 - customer
-                - partner
             example:
               - customer
-              - partner
         - name: billing_entity_codes[]
           in: query
           description: Filter customers by billing entity codes.
@@ -2147,14 +2104,6 @@ paths:
           schema:
             type: integer
             example: 100000
-        - name: self_billed
-          in: query
-          description: Filter credit notes belonging to a self billed invoice. Possible values are `true` or `false`.
-          required: false
-          explode: true
-          schema:
-            type: boolean
-            example: true
       responses:
         '200':
           description: Credit notes
@@ -2259,7 +2208,7 @@ paths:
             example: true
         - name: invoice_type
           in: query
-          description: Filter invoices by invoice type. Possible values are `subscription`, `add_on`, `credit`, `one_off`, `advance_charges` or `progressive_billing`.
+          description: Filter invoices by invoice type. Possible values are `subscription`, `add_on`, `credit`, `one_off` or `advance_charges`.
           required: false
           explode: true
           schema:
@@ -2270,15 +2219,6 @@ paths:
               - credit
               - one_off
               - advance_charges
-              - progressive_billing
-        - name: self_billed
-          in: query
-          description: Filter invoices by self billed. Possible values are `true` or `false`.
-          required: false
-          explode: true
-          schema:
-            type: boolean
-            example: true
         - name: metadata[key]
           in: query
           description: Filter invoices by metadata. Replace `key` with the actual metadata key you want to match, and provide the corresponding value. Providing empty value will search for invoice without given metadata key. For example, `metadata[color]=blue`.
@@ -2953,15 +2893,6 @@ paths:
               type: string
             example:
               cloud: aws
-        - name: full_usage
-          in: query
-          description: |
-            When `true`, returns usage since subscription start instead of the current billing period. Requires one of `charge_id`, `charge_code`, `group` (or their deprecated `filter_by_*` equivalents) to be set.
-          required: false
-          schema:
-            type: boolean
-            default: false
-            example: true
         - name: filter_by_presentation
           in: query
           description: |
@@ -2980,51 +2911,6 @@ paths:
                 $ref: '#/components/schemas/CustomerUsage'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /customers/{external_customer_id}/projected_usage:
-    get:
-      tags:
-        - Customers
-      summary: Retrieve customer current and projected usage
-      description: This endpoint enables the retrieval of the usage-based billing data for a customer within the current period. It also returns the projected usage for the current period based on the current usage.
-      parameters:
-        - name: external_customer_id
-          in: path
-          description: The customer external unique identifier (provided by your own application).
-          required: true
-          schema:
-            type: string
-            example: 5eb02857-a71e-4ea2-bcf9-57d3a41bc6ba
-        - name: external_subscription_id
-          in: query
-          description: The unique identifier of the subscription within your application.
-          required: true
-          explode: true
-          schema:
-            type: string
-            example: sub_1234567890
-        - name: apply_taxes
-          in: query
-          description: |
-            Optional flag to determine if taxes should be applied. Defaults to `true` if not provided or if null.
-          required: false
-          schema:
-            type: boolean
-            default: true
-            example: true
-      operationId: findCustomerProjectedUsage
-      responses:
-        '200':
-          description: Customer usage
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CustomerProjectedUsage'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
   /customers/{external_customer_id}/past_usage:
@@ -4097,7 +3983,7 @@ paths:
             example: true
         - name: invoice_type
           in: query
-          description: Filter invoices by invoice type. Possible values are `subscription`, `add_on`, `credit`, `one_off`, `advance_charges` or `progressive_billing`.
+          description: Filter invoices by invoice type. Possible values are `subscription`, `add_on`, `credit`, `one_off` or `advance_charges`.
           required: false
           explode: true
           schema:
@@ -4108,15 +3994,6 @@ paths:
               - credit
               - one_off
               - advance_charges
-              - progressive_billing
-        - name: self_billed
-          in: query
-          description: Filter invoices by self billed. Possible values are `true` or `false`.
-          required: false
-          explode: true
-          schema:
-            type: boolean
-            example: true
         - name: billing_entity_codes[]
           in: query
           description: Filter invoices by billing entity codes. Possible values are the billing entity codes you have created.
@@ -4428,59 +4305,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-  /payment_receipts:
-    get:
-      tags:
-        - Payment Receipts
-      summary: List all payment receipts
-      description: This endpoint is used to list all existing payment receipts.
-      operationId: findAllPaymentReceipts
-      parameters:
-        - $ref: '#/components/parameters/page'
-        - $ref: '#/components/parameters/per_page'
-        - name: invoice_id
-          in: query
-          description: Filter payment receipts by invoice id.
-          required: false
-          explode: true
-          schema:
-            type: string
-            example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-      responses:
-        '200':
-          description: PaymentReceipts
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentReceiptsPaginated'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /payment_receipts/{id}:
-    parameters:
-      - name: id
-        in: path
-        description: Payment receipt ID
-        required: true
-        schema:
-          type: string
-          example: 5eb02857-a71e-4ea2-bcf9-57d3a41bc6ba
-    get:
-      tags:
-        - Payment Receipts
-      summary: Retrieve a payment receipt
-      description: This endpoint retrieves a specific payment receipt.
-      operationId: findPaymentReceipt
-      responses:
-        '200':
-          description: Payment receipt
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentReceipt'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
   /payment_requests:
     post:
       tags:
@@ -4687,7 +4511,7 @@ paths:
 
         **Publishable keys.** A publishable `pk_` key may call this endpoint and `GET /plans/{code}`, and nothing else. Any other request with a `pk_` key returns `403` with the code `publishable_key_not_allowed`.
 
-        With a `pk_` key you receive a trimmed plan, still with `charges`, `taxes`, `minimum_commitment`, `usage_thresholds`, `entitlements`, `credit_grant_rules`, `credit_pool_policies` and `metadata`. Invoice names, internal ids, margin settings, grant policies and timestamps are left out, and plans pending deletion are not returned. A secret key receives the whole plan.
+        With a `pk_` key you receive a trimmed plan, still with `charges`, `taxes`, `minimum_commitment`, `entitlements`, `credit_grant_rules`, `credit_pool_policies` and `metadata`. Invoice names, internal ids, margin settings, grant policies and timestamps are left out, and plans pending deletion are not returned. A secret key receives the whole plan.
 
         - All top-level plans of the organization are returned, newest first. There is no listed or public flag. Plans with a trial (`trial_period`) and pay-in-arrears plans (`pay_in_advance: false`) are included. Plans pending deletion (`pending_deletion: true`) are included for a secret key only. Per-customer override plans (`parent_id` set) are not.
         - Items do not include `fixed_charges`; use `GET /plans/{code}` for those.
@@ -4727,8 +4551,6 @@ paths:
                         pending_deletion: false
                         charges: []
                         entitlements: []
-                        usage_thresholds: []
-                        applicable_usage_thresholds: []
                         taxes: []
                         credit_grant_rules: []
                         credit_pool_policies: []
@@ -4760,7 +4582,6 @@ paths:
                             pay_in_advance: false
                             prorated: false
                             min_amount_cents: 0
-                            accepts_target_wallet: false
                             properties:
                               amount: '0'
                             applied_pricing_unit: null
@@ -4768,8 +4589,6 @@ paths:
                             filters: []
                             taxes: []
                         entitlements: []
-                        usage_thresholds: []
-                        applicable_usage_thresholds: []
                         taxes: []
                         credit_grant_rules:
                           - nozle_id: 00000000-0000-4000-8000-000000000005
@@ -4841,7 +4660,7 @@ paths:
       description: |-
         This endpoint retrieves a specific plan by code.
 
-        **Publishable keys.** A publishable `pk_` key may call this endpoint and `GET /plans`, and nothing else. It returns the same body as a secret key: the whole plan, including `charges`, `fixed_charges`, `taxes`, `minimum_commitment`, `usage_thresholds`, `entitlements`, `credit_grant_rules`, `credit_pool_policies` and `metadata`. Anyone who has the key can read all of it.
+        **Publishable keys.** A publishable `pk_` key may call this endpoint and `GET /plans`, and nothing else. It returns the same body as a secret key: the whole plan, including `charges`, `fixed_charges`, `taxes`, `minimum_commitment`, `entitlements`, `credit_grant_rules`, `credit_pool_policies` and `metadata`. Anyone who has the key can read all of it.
 
         This endpoint also returns a plan that is pending deletion (`pending_deletion: true`) and a plan with a trial or pay-in-arrears billing. An unknown code, or the code of a per-customer override plan, returns `404` with the code `plan_not_found`.
 
@@ -4889,7 +4708,6 @@ paths:
                           pay_in_advance: false
                           prorated: false
                           min_amount_cents: 0
-                          accepts_target_wallet: false
                           properties:
                             graduated_ranges:
                               - to_value: 1
@@ -5030,8 +4848,6 @@ paths:
                                   - community
                                   - standard
                                   - priority
-                      usage_thresholds: []
-                      applicable_usage_thresholds: []
                       taxes: []
                       credit_grant_rules:
                         - nozle_id: 00000000-0000-4000-8000-000000000014
@@ -5996,60 +5812,6 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-  /subscriptions/{external_id}/lifetime_usage:
-    parameters:
-      - name: external_id
-        in: path
-        description: External ID of the existing subscription
-        required: true
-        schema:
-          type: string
-          example: 5eb02857-a71e-4ea2-bcf9-57d3a41bc6ba
-    get:
-      tags:
-        - Subscriptions
-      summary: Retrieve subscription lifetime usage
-      description: This endpoint enables the retrieval of the lifetime usage of a subscription.
-      operationId: getSubscriptionLifetimeUsage
-      responses:
-        '200':
-          description: Subscription lifetime usage
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LifetimeUsage'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    put:
-      tags:
-        - Subscriptions
-      summary: Update a subscription lifetime usage
-      description: This endpoint allows you to update the lifetime usage of a subscription.
-      operationId: updateSubscriptionLifetimeUsage
-      requestBody:
-        description: Update the lifetime usage of a subscription
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LifetimeUsageInput'
-        required: true
-      responses:
-        '200':
-          description: Subscription lifetime usage updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LifetimeUsage'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
   /subscriptions/{external_id}/alerts:
     parameters:
       - name: external_id
@@ -6435,7 +6197,6 @@ paths:
         This endpoint creates or updates a charge override for a specific subscription.
         If the subscription does not have a plan override yet, one will be created automatically.
         The charge override allows customizing specific charge properties (invoice_display_name, min_amount_cents, properties, filters, taxes, applied_pricing_unit) without affecting the original plan charge.
-        This is a premium feature.
       operationId: overrideSubscriptionCharge
       requestBody:
         description: Charge override payload
@@ -6624,7 +6385,6 @@ paths:
         This endpoint creates or updates a fixed charge override for a subscription, without affecting the original plan fixed charge.
         When the body contains only `units` (and optionally `apply_units_immediately`), the change is recorded as a per-subscription unit override. When the body also sets `invoice_display_name`, `properties`, or `tax_codes`, it is applied as a full plan override for the subscription instead.
         With `apply_units_immediately: true` on a pay-in-advance fixed charge the change is billed mid-period; otherwise it takes effect at the next billing period.
-        This is a premium feature.
       operationId: overrideSubscriptionFixedCharge
       requestBody:
         description: Fixed charge override payload
@@ -7577,7 +7337,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: Engine refused the credential (publishable key, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
           content:
             application/json:
               schema:
@@ -7653,7 +7413,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: Engine refused the credential (publishable key, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
           content:
             application/json:
               schema:
@@ -7738,7 +7498,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: Engine refused the credential (publishable key, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
           content:
             application/json:
               schema:
@@ -7861,7 +7621,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: Engine refused the credential (publishable key, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
           content:
             application/json:
               schema:
@@ -7971,7 +7731,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: Engine refused the credential (publishable key, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
           content:
             application/json:
               schema:
@@ -8083,7 +7843,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: Engine refused the credential (publishable key, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
           content:
             application/json:
               schema:
@@ -8179,7 +7939,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: Engine refused the credential (publishable key, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
           content:
             application/json:
               schema:
@@ -8242,7 +8002,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: Engine refused the credential (publishable key, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
           content:
             application/json:
               schema:
@@ -8307,7 +8067,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: Engine refused the credential (publishable key, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
           content:
             application/json:
               schema:
@@ -8419,7 +8179,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: Engine refused the credential (publishable key, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
           content:
             application/json:
               schema:
@@ -8541,7 +8301,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: Engine refused the credential (publishable key, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
           content:
             application/json:
               schema:
@@ -8612,7 +8372,7 @@ paths:
       tags:
         - Plans
       summary: List transition policies of a plan
-      description: Lists every transition policy whose source is this plan, oldest first. Requires `plan_transition_policy:read` API permission.
+      description: Lists every transition policy whose source is this plan, oldest first.
       operationId: coreListPlanTransitionPolicies
       security:
         - bearerAuth: []
@@ -8645,7 +8405,7 @@ paths:
       tags:
         - Plans
       summary: Get a transition policy
-      description: Returns the policy for the plan pair. Requires `plan_transition_policy:read` API permission.
+      description: Returns the policy for the plan pair.
       operationId: coreGetPlanTransitionPolicy
       security:
         - bearerAuth: []
@@ -8698,7 +8458,7 @@ paths:
       tags:
         - Plans
       summary: Create or update a transition policy
-      description: 'Creates the policy for this source and target plan pair, or updates the existing one. On a new policy, omitted fields take their defaults; on an existing policy, omitted fields keep their current values. Core derives `policy` from the fields unless only `policy` is sent for a new policy. Returns `200` in both cases. Validation: `end_of_period` timing needs `proration_behavior: none` and `credit_action: none`; `reset_anchor` needs `immediate` timing; `refund_mode: full` needs `credit_action: refund`; `credit_action: offset` needs `final_invoice_action: generate`; source and target must differ. Requires `plan_transition_policy:write` API permission.'
+      description: 'Creates the policy for this source and target plan pair, or updates the existing one. On a new policy, omitted fields take their defaults; on an existing policy, omitted fields keep their current values. Core derives `policy` from the fields unless only `policy` is sent for a new policy. Returns `200` in both cases. Validation: `end_of_period` timing needs `proration_behavior: none` and `credit_action: none`; `reset_anchor` needs `immediate` timing; `refund_mode: full` needs `credit_action: refund`; `credit_action: offset` needs `final_invoice_action: generate`; source and target must differ.'
       operationId: coreUpsertPlanTransitionPolicy
       security:
         - bearerAuth: []
@@ -8779,7 +8539,7 @@ paths:
       tags:
         - Plans
       summary: Update a transition policy (PATCH)
-      description: 'Same Core action as the `PUT` operation (Rails `update` route), with the same create-or-update behaviour. Creates the policy for this source and target plan pair, or updates the existing one. On a new policy, omitted fields take their defaults; on an existing policy, omitted fields keep their current values. Core derives `policy` from the fields unless only `policy` is sent for a new policy. Returns `200` in both cases. Validation: `end_of_period` timing needs `proration_behavior: none` and `credit_action: none`; `reset_anchor` needs `immediate` timing; `refund_mode: full` needs `credit_action: refund`; `credit_action: offset` needs `final_invoice_action: generate`; source and target must differ. Requires `plan_transition_policy:write` API permission.'
+      description: 'Same Core action as the `PUT` operation (Rails `update` route), with the same create-or-update behaviour. Creates the policy for this source and target plan pair, or updates the existing one. On a new policy, omitted fields take their defaults; on an existing policy, omitted fields keep their current values. Core derives `policy` from the fields unless only `policy` is sent for a new policy. Returns `200` in both cases. Validation: `end_of_period` timing needs `proration_behavior: none` and `credit_action: none`; `reset_anchor` needs `immediate` timing; `refund_mode: full` needs `credit_action: refund`; `credit_action: offset` needs `final_invoice_action: generate`; source and target must differ.'
       operationId: corePatchPlanTransitionPolicy
       security:
         - bearerAuth: []
@@ -8860,7 +8620,7 @@ paths:
       tags:
         - Plans
       summary: Delete a transition policy
-      description: Deletes the policy for the plan pair and returns the deleted policy. Requires `plan_transition_policy:write` API permission.
+      description: Deletes the policy for the plan pair and returns the deleted policy.
       operationId: coreDeletePlanTransitionPolicy
       security:
         - bearerAuth: []
@@ -8899,7 +8659,7 @@ paths:
       tags:
         - Entity Subscriptions
       summary: List Entity subscriptions
-      description: Lists the subscription identities of every Entity of the customer, with current and pending plans. Requires a secret key (`403 secret_key_required` otherwise) with `subscription` permission (`payment` for checkout routes).
+      description: Lists the subscription identities of every Entity of the customer, with current and pending plans. Requires a secret key (`403 secret_key_required` otherwise).
       operationId: coreListEntitySubscriptions
       security:
         - bearerAuth: []
@@ -8945,7 +8705,7 @@ paths:
       tags:
         - Entity Subscriptions
       summary: Get an Entity subscription
-      description: Returns the Entity's subscription identity with its current and pending plans. Requires a secret key (`403 secret_key_required` otherwise) with `subscription` permission (`payment` for checkout routes).
+      description: Returns the Entity's subscription identity with its current and pending plans. Requires a secret key (`403 secret_key_required` otherwise).
       operationId: coreGetEntitySubscription
       security:
         - bearerAuth: []
@@ -9013,7 +8773,7 @@ paths:
       tags:
         - Entity Subscriptions
       summary: Ensure an Entity subscription identity
-      description: Idempotently creates the stable Entity-to-subscription identity. It does not select or activate a plan. The live Entity must exist and be active. Returns `201` when created and `200` when it already existed. Requires a secret key (`403 secret_key_required` otherwise) with `subscription` permission (`payment` for checkout routes).
+      description: Idempotently creates the stable Entity-to-subscription identity. It does not select or activate a plan. The live Entity must exist and be active. Returns `201` when created and `200` when it already existed. Requires a secret key (`403 secret_key_required` otherwise).
       operationId: coreEnsureEntitySubscription
       security:
         - bearerAuth: []
@@ -9076,7 +8836,7 @@ paths:
       tags:
         - Entity Subscriptions
       summary: Remove an unused Entity subscription identity
-      description: Removes the identity when it has no active, pending or incomplete subscription and no billing history. Requires a secret key (`403 secret_key_required` otherwise) with `subscription` permission (`payment` for checkout routes).
+      description: Removes the identity when it has no active, pending or incomplete subscription and no billing history. Requires a secret key (`403 secret_key_required` otherwise).
       operationId: coreDeleteEntitySubscription
       security:
         - bearerAuth: []
@@ -9128,7 +8888,7 @@ paths:
       tags:
         - Entity Subscriptions
       summary: Start an Entity subscription checkout
-      description: 'Starts or resumes checkout of a plan for one Entity. Same Core action and result types as plan checkout (`POST /checkout_sessions`), scoped to the Entity''s subscription identity, which is created when missing. Retrying an incomplete checkout for the same plan reuses its subscription and invoice; another plan replaces the abandoned checkout. An unpaid checkout expires after 23 hours: the subscription is canceled with `cancelation_reason: timeout`, the invoice is closed and the coupons, credit-note credits and wallet credits it used are returned. A plan with no up-front payment completes with `payment_source: none`. Requires a secret key (`403 secret_key_required` otherwise) with `subscription` permission (`payment` for checkout routes).'
+      description: 'Starts or resumes checkout of a plan for one Entity. Same Core action and result types as plan checkout (`POST /checkout_sessions`), scoped to the Entity''s subscription identity, which is created when missing. Retrying an incomplete checkout for the same plan reuses its subscription and invoice; another plan replaces the abandoned checkout. An unpaid checkout expires after 23 hours: the subscription is canceled with `cancelation_reason: timeout`, the invoice is closed and the coupons, credit-note credits and wallet credits it used are returned. A plan with no up-front payment completes with `payment_source: none`. Requires a secret key (`403 secret_key_required` otherwise).'
       operationId: coreCreateEntitySubscriptionCheckout
       security:
         - bearerAuth: []
@@ -9237,7 +8997,7 @@ paths:
       tags:
         - Entity Subscriptions
       summary: Change an Entity subscription plan
-      description: Changes the plan of the Entity's subscription. Routed to the same Core action as Entity checkout; the plan transition policy for the pair decides whether the change is immediate, payment-gated or scheduled. `billing_time` is accepted but only applies when a new subscription is created. Requires a secret key (`403 secret_key_required` otherwise) with `subscription` permission (`payment` for checkout routes).
+      description: Changes the plan of the Entity's subscription. Routed to the same Core action as Entity checkout; the plan transition policy for the pair decides whether the change is immediate, payment-gated or scheduled. `billing_time` is accepted but only applies when a new subscription is created. Requires a secret key (`403 secret_key_required` otherwise).
       operationId: coreChangeEntitySubscriptionPlan
       security:
         - bearerAuth: []
@@ -9342,7 +9102,7 @@ paths:
       tags:
         - Entity Subscriptions
       summary: Cancel an Entity subscription
-      description: 'Cancels the Entity''s current subscription with the same settlement service as `POST /subscription_transitions` (`operation: cancel`). Requires a secret key (`403 secret_key_required` otherwise) with `subscription` permission (`payment` for checkout routes).'
+      description: 'Cancels the Entity''s current subscription with the same settlement service as `POST /subscription_transitions` (`operation: cancel`). Requires a secret key (`403 secret_key_required` otherwise).'
       operationId: coreCancelEntitySubscription
       security:
         - bearerAuth: []
@@ -9428,7 +9188,7 @@ paths:
       tags:
         - Entity Subscriptions
       summary: Check out several Entity plans together
-      description: 'Creates one invoice and one Stripe or Razorpay checkout for 1 to 100 unique Entities. Every plan must need an up-front payment and share one currency and one interval; each Entity must be active and have no active, pending or incomplete subscription. Any item problem fails the whole basket. Replaying the same request with the same Idempotency-Key returns the same batch with `replayed: true`. Requires a secret key (`403 secret_key_required` otherwise) with `subscription` permission (`payment` for checkout routes).'
+      description: 'Creates one invoice and one Stripe or Razorpay checkout for 1 to 100 unique Entities. Every plan must need an up-front payment and share one currency and one interval; each Entity must be active and have no active, pending or incomplete subscription. Any item problem fails the whole basket. Replaying the same request with the same Idempotency-Key returns the same batch with `replayed: true`. Requires a secret key (`403 secret_key_required` otherwise).'
       operationId: coreCreateEntitySubscriptionCheckoutBatch
       security:
         - bearerAuth: []
@@ -9751,7 +9511,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: Engine refused the credential (publishable key, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
           content:
             application/json:
               schema:
@@ -9802,7 +9562,7 @@ paths:
   /customers/{customer_id}/credit-systems:
     get:
       summary: List customer credit balances
-      description: 'Lists the customer''s balance in every active Credit System of the organization, with active and scheduled sources. A system where the customer has no credit has `available: "0"` and no sources. Items are ordered by `credit_system` code. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `credit_system:read`. Publishable keys are rejected. Decimal amounts are strings without trailing zeros.'
+      description: 'Lists the customer''s balance in every active Credit System of the organization, with active and scheduled sources. A system where the customer has no credit has `available: "0"` and no sources. Items are ordered by `credit_system` code. Requires an organization secret key, or trusted internal authentication. Publishable keys are rejected. Decimal amounts are strings without trailing zeros.'
       operationId: engineListCustomerCreditBalances
       tags:
         - Credits
@@ -9866,7 +9626,7 @@ paths:
           description: Missing `Authorization` header, a header that is not `Bearer <key>`, an unknown key, or no organization context. Body has `error` only.
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: 'The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `credit_system:read`. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the customer in the request, the body is `{"code": "customer_scope_mismatch", ...}`.'
+          description: 'The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the customer in the request, the body is `{"code": "customer_scope_mismatch", ...}`.'
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`.
@@ -9917,7 +9677,7 @@ paths:
   /customers/{customer_id}/credit-systems/{credit_system_code}/balance:
     get:
       summary: Get customer credit balance
-      description: Returns the customer's balance in one Credit System of any status. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `credit_system:read`. Publishable keys are rejected. Decimal amounts are strings without trailing zeros.
+      description: Returns the customer's balance in one Credit System of any status. Requires an organization secret key, or trusted internal authentication. Publishable keys are rejected. Decimal amounts are strings without trailing zeros.
       operationId: engineGetCustomerCreditBalance
       tags:
         - Credits
@@ -9947,7 +9707,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: 'The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `credit_system:read`. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the customer in the request, the body is `{"code": "customer_scope_mismatch", ...}`.'
+          description: 'The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the customer in the request, the body is `{"code": "customer_scope_mismatch", ...}`.'
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`, `credit_system_not_found`.
@@ -9978,7 +9738,7 @@ paths:
   /customers/{customer_id}/credit-operations:
     get:
       summary: List customer credit operations
-      description: Pages through the customer's immutable credit operations (grants, consumes, denials, adjustments and others), with exact amounts, metric and rate snapshots and source allocations. A denied consume has no allocations. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `credit_system:read`. Publishable keys are rejected. Decimal amounts are strings without trailing zeros.
+      description: Pages through the customer's immutable credit operations (grants, consumes, denials, adjustments and others), with exact amounts, metric and rate snapshots and source allocations. A denied consume has no allocations. Requires an organization secret key, or trusted internal authentication. Publishable keys are rejected. Decimal amounts are strings without trailing zeros.
       operationId: engineListCustomerCreditOperations
       tags:
         - Credits
@@ -10053,7 +9813,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: 'The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `credit_system:read`. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the customer in the request, the body is `{"code": "customer_scope_mismatch", ...}`.'
+          description: 'The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the customer in the request, the body is `{"code": "customer_scope_mismatch", ...}`.'
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`.
@@ -10087,7 +9847,7 @@ paths:
   /customers/{customer_id}/entities/{entity_id}/credit-systems:
     get:
       summary: List Entity credit balances
-      description: Lists an Entity's balances with separate `entity_available`, `shared_available` and `effective_available` views. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `entity:read`. Publishable keys are rejected. Decimal amounts are strings without trailing zeros.
+      description: Lists an Entity's balances with separate `entity_available`, `shared_available` and `effective_available` views. Requires an organization secret key, or trusted internal authentication. Publishable keys are rejected. Decimal amounts are strings without trailing zeros.
       operationId: engineListEntityCreditBalances
       tags:
         - Entities
@@ -10154,7 +9914,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: 'The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `entity:read`. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the customer in the request, the body is `{"code": "customer_scope_mismatch", ...}`.'
+          description: 'The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the customer in the request, the body is `{"code": "customer_scope_mismatch", ...}`.'
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`, `entity_not_found`.
@@ -10185,7 +9945,7 @@ paths:
   /customers/{customer_id}/entities/{entity_id}/credit-systems/{credit_system_code}/balance:
     get:
       summary: Get Entity credit balance
-      description: Returns an Entity's balance in one Credit System. `effective_available` applies the current plan pool policy and is `0` when the Entity is inactive or no unambiguous policy exists. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `entity:read`. Publishable keys are rejected. Decimal amounts are strings without trailing zeros.
+      description: Returns an Entity's balance in one Credit System. `effective_available` applies the current plan pool policy and is `0` when the Entity is inactive or no unambiguous policy exists. Requires an organization secret key, or trusted internal authentication. Publishable keys are rejected. Decimal amounts are strings without trailing zeros.
       operationId: engineGetEntityCreditBalance
       tags:
         - Entities
@@ -10209,7 +9969,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: 'The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `entity:read`. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the customer in the request, the body is `{"code": "customer_scope_mismatch", ...}`.'
+          description: 'The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the customer in the request, the body is `{"code": "customer_scope_mismatch", ...}`.'
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`, `entity_not_found`, `credit_system_not_found`.
@@ -10240,7 +10000,7 @@ paths:
   /customers/{customer_id}/entities/{entity_id}/credit-operations:
     get:
       summary: List Entity credit operations
-      description: 'Pages through credit operations attributed to the Entity''s durable UUID: grants, transfers, consumes, denials, expiry, revocation, refunds and adjustments. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `entity:read`. Publishable keys are rejected. Decimal amounts are strings without trailing zeros.'
+      description: 'Pages through credit operations attributed to the Entity''s durable UUID: grants, transfers, consumes, denials, expiry, revocation, refunds and adjustments. Requires an organization secret key, or trusted internal authentication. Publishable keys are rejected. Decimal amounts are strings without trailing zeros.'
       operationId: engineListEntityCreditOperations
       tags:
         - Entities
@@ -10287,7 +10047,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: 'The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `entity:read`. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the customer in the request, the body is `{"code": "customer_scope_mismatch", ...}`.'
+          description: 'The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the customer in the request, the body is `{"code": "customer_scope_mismatch", ...}`.'
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`, `entity_not_found`.
@@ -10326,7 +10086,7 @@ paths:
   /customers/{customer_id}/entities:
     get:
       summary: List customer Entities
-      description: Lists the customer's Entities, optionally filtered by status. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `entity:read`. Publishable keys are rejected.
+      description: Lists the customer's Entities, optionally filtered by status. Requires an organization secret key, or trusted internal authentication. Publishable keys are rejected.
       operationId: engineListCustomerEntities
       tags:
         - Entities
@@ -10388,7 +10148,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `entity:read`. The body has `error` only (no `code`).
+          description: The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`).
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`.
@@ -10438,7 +10198,7 @@ paths:
   /customers/{customer_id}/entities/{entity_id}:
     get:
       summary: Get a customer Entity
-      description: Returns one Entity of the customer. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `entity:read`. Publishable keys are rejected.
+      description: Returns one Entity of the customer. Requires an organization secret key, or trusted internal authentication. Publishable keys are rejected.
       operationId: engineGetCustomerEntity
       tags:
         - Entities
@@ -10462,7 +10222,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `entity:read`. The body has `error` only (no `code`).
+          description: The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`).
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`, `entity_not_found`.
@@ -10511,7 +10271,7 @@ paths:
             entity, err := client.GetEntity(ctx, "cust_123", "user_42")
     put:
       summary: Create or update a customer Entity
-      description: Creates the Entity or replaces its name, status and metadata. The body is a complete snapshot. Entity lifecycle changes never create billing events. When the Entity becomes active (created, activated or reactivated), its credit grants are scheduled. The body is at most 128 KiB. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `entity:write`. Publishable keys are rejected.
+      description: Creates the Entity or replaces its name, status and metadata. The body is a complete snapshot. Entity lifecycle changes never create billing events. When the Entity becomes active (created, activated or reactivated), its credit grants are scheduled. The body is at most 128 KiB. Requires an organization secret key, or trusted internal authentication. Publishable keys are rejected.
       operationId: engineUpsertCustomerEntity
       tags:
         - Entities
@@ -10562,7 +10322,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `entity:write`. The body has `error` only (no `code`).
+          description: The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`).
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`.
@@ -10638,7 +10398,7 @@ paths:
             }, "upsert-user_42-v1")
     delete:
       summary: Delete a customer Entity
-      description: 'Moves the Entity to `deleted`. Deletion is not a financial cascade: sources, allocations, operations and audit rows are kept. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `entity:write`. Publishable keys are rejected.'
+      description: 'Moves the Entity to `deleted`. Deletion is not a financial cascade: sources, allocations, operations and audit rows are kept. Requires an organization secret key, or trusted internal authentication. Publishable keys are rejected.'
       operationId: engineDeleteCustomerEntity
       tags:
         - Entities
@@ -10681,7 +10441,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `entity:write`. The body has `error` only (no `code`).
+          description: The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`).
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`, `entity_not_found`.
@@ -10724,7 +10484,7 @@ paths:
   /customers/{customer_id}/entities/bulk-upsert:
     post:
       summary: Bulk upsert customer Entities
-      description: Creates or updates 1 to 500 Entities with unique `external_id` values in one request. Each item is a complete snapshot. The body is at most 2 MiB. Requires an organization secret key, or trusted internal authentication. When the organization has API permissions enabled, a secret key needs `entity:write`. Publishable keys are rejected.
+      description: Creates or updates 1 to 500 Entities with unique `external_id` values in one request. Each item is a complete snapshot. The body is at most 2 MiB. Requires an organization secret key, or trusted internal authentication. Publishable keys are rejected.
       operationId: engineBulkUpsertCustomerEntities
       tags:
         - Entities
@@ -10769,7 +10529,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `entity:write`. The body has `error` only (no `code`).
+          description: The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`).
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`.
@@ -10847,7 +10607,7 @@ paths:
   /customers/{customer_id}/entities/{entity_id}/credit-allocations:
     post:
       summary: Allocate credits to an Entity
-      description: Moves value from the customer's active paid top-up sources into `allocated_top_up` sources of the Entity, keeping parent source, payment provenance, priority and expiry. The body is at most 64 KiB and unknown fields are rejected. Requires an organization secret key, or trusted internal authentication; when API permissions are enabled a secret key needs `entity:write`.
+      description: Moves value from the customer's active paid top-up sources into `allocated_top_up` sources of the Entity, keeping parent source, payment provenance, priority and expiry. The body is at most 64 KiB and unknown fields are rejected. Requires an organization secret key, or trusted internal authentication.
       operationId: engineAllocateEntityCredits
       tags:
         - Entities
@@ -10977,7 +10737,7 @@ paths:
   /customers/{customer_id}/entities/{entity_id}/credit-deallocations:
     post:
       summary: Return Entity credits to the customer pool
-      description: Returns unused allocated top-up value from the Entity to each exact parent source. The body is at most 64 KiB and unknown fields are rejected. Requires an organization secret key, or trusted internal authentication; when API permissions are enabled a secret key needs `entity:write`.
+      description: Returns unused allocated top-up value from the Entity to each exact parent source. The body is at most 64 KiB and unknown fields are rejected. Requires an organization secret key, or trusted internal authentication.
       operationId: engineDeallocateEntityCredits
       tags:
         - Entities
@@ -11088,7 +10848,7 @@ paths:
   /customers/{customer_id}/credit-balance-imports:
     post:
       summary: Import an opening credit balance
-      description: Records the current spendable balance of an externally billed subscription that was imported through the Core billing-state import, without an invoice or a usage event. It marks the current plan grant as represented so the scheduler does not grant it again. Set `dry_run` to validate without writing. The body is at most 64 KiB and unknown fields are rejected. Requires an organization secret key, or trusted internal authentication; when API permissions are enabled a secret key needs `credit_system:write`.
+      description: Records the current spendable balance of an externally billed subscription that was imported through the Core billing-state import, without an invoice or a usage event. It marks the current plan grant as represented so the scheduler does not grant it again. Set `dry_run` to validate without writing. The body is at most 64 KiB and unknown fields are rejected. Requires an organization secret key, or trusted internal authentication.
       operationId: engineCreateCreditBalanceImport
       tags:
         - Credit Imports
@@ -11155,7 +10915,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `credit_system:write`. The body has `error` only (no `code`).
+          description: The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`).
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: '`code` is `customer_not_found`, `subscription_not_found`, `entity_not_found` or `credit_system_not_found`.'
@@ -11181,7 +10941,7 @@ paths:
   /credit-top-up-purchases:
     post:
       summary: Create a credit top-up purchase
-      description: Starts checkout for a fixed top-up package. The Engine forwards the request to Nozle Core and returns Core's status and body unchanged. Creating checkout does not grant credits; credits are added once the top-up invoice is fully paid, by a provider payment, a manual payment for the full amount, a payment request or marking the invoice paid. A partial payment grants nothing. The body is at most 64 KiB and unknown fields are rejected. Requires an organization secret key, or trusted internal authentication; when API permissions are enabled a secret key needs `credit_system:write`.
+      description: Starts checkout for a fixed top-up package. The Engine forwards the request to Nozle Core and returns Core's status and body unchanged. Creating checkout does not grant credits; credits are added once the top-up invoice is fully paid, by a provider payment, a manual payment for the full amount, a payment request or marking the invoice paid. A partial payment grants nothing. The body is at most 64 KiB and unknown fields are rejected. Requires an organization secret key, or trusted internal authentication.
       operationId: engineCreateCreditTopUpPurchase
       tags:
         - Credits
@@ -11278,7 +11038,7 @@ paths:
   /credits/{customer_id}/balance:
     get:
       summary: Get legacy wallet balance
-      description: Returns the customer's newest active legacy invoice wallet. This is not a product Credit System balance; use `GET /customers/{customer_id}/credit-systems` for those. Requires an organization secret key, or trusted internal authentication; when API permissions are enabled a secret key needs `credit_system:read`.
+      description: Returns the customer's newest active legacy invoice wallet. This is not a product Credit System balance; use `GET /customers/{customer_id}/credit-systems` for those. Requires an organization secret key, or trusted internal authentication.
       operationId: engineGetLegacyWalletBalance
       tags:
         - Credits
@@ -11310,7 +11070,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: 'The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `credit_system:read`. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the path, the body is `{"error": "customer_scope_mismatch"}` (the value is in `error`; there is no `code`).'
+          description: 'The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the path, the body is `{"error": "customer_scope_mismatch"}` (the value is in `error`; there is no `code`).'
         '404':
           description: No active wallet, or any database error while reading it.
           content:
@@ -11324,7 +11084,7 @@ paths:
   /credits/{customer_id}/transactions:
     get:
       summary: List legacy wallet transactions
-      description: Returns the 50 newest transactions of the customer's legacy invoice wallets, newest first. No paging. Requires an organization secret key, or trusted internal authentication; when API permissions are enabled a secret key needs `credit_system:read`.
+      description: Returns the 50 newest transactions of the customer's legacy invoice wallets, newest first. No paging. Requires an organization secret key, or trusted internal authentication.
       operationId: engineListLegacyWalletTransactions
       tags:
         - Credits
@@ -11356,7 +11116,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: 'The credential is not allowed. A publishable key is rejected; when the organization has API permissions enabled, a secret key needs `credit_system:read`. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the path, the body is `{"error": "customer_scope_mismatch"}` (the value is in `error`; there is no `code`).'
+          description: 'The credential is not allowed. A publishable key is rejected. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the path, the body is `{"error": "customer_scope_mismatch"}` (the value is in `error`; there is no `code`).'
         '500':
           description: The transactions could not be read.
           content:
@@ -11370,7 +11130,7 @@ paths:
   /usage/check:
     post:
       summary: Check credit usage
-      description: Calculates an advisory credit decision without changing any source or ledger row. Projected deductions follow the same ordering as an authoritative consume, but another request can spend credits first, so this is not authorization for irreversible work. Requires an organization secret key or trusted internal authentication; publishable keys are rejected. API permissions are not checked on this route.
+      description: Calculates an advisory credit decision without changing any source or ledger row. Projected deductions follow the same ordering as an authoritative consume, but another request can spend credits first, so this is not authorization for irreversible work. Requires an organization secret key or trusted internal authentication; publishable keys are rejected.
       operationId: engineCheckCreditUsage
       tags:
         - Usage
@@ -11469,7 +11229,7 @@ paths:
   /usage/track:
     post:
       summary: Track and consume credits
-      description: 'Atomically consumes credits and queues the matching billing event in one transaction. Insufficient credits return `200` with `allowed: false` and nothing consumed. A replay with the same key and body returns the original result, including a denial. Requires an organization secret key or trusted internal authentication; publishable keys are rejected. API permissions are not checked on this route.'
+      description: 'Atomically consumes credits and queues the matching billing event in one transaction. Insufficient credits return `200` with `allowed: false` and nothing consumed. A replay with the same key and body returns the original result, including a denial. Requires an organization secret key or trusted internal authentication; publishable keys are rejected.'
       operationId: engineTrackCreditUsage
       tags:
         - Usage
@@ -11594,7 +11354,7 @@ paths:
   /check-and-deduct:
     post:
       summary: Check and deduct legacy wallet credits
-      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet, and when its `credits_balance` covers `credits`, deducts them and records an outbound wallet transaction, in one database transaction. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; API permissions are not checked.'
+      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet, and when its `credits_balance` covers `credits`, deducts them and records an outbound wallet transaction, in one database transaction. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication.'
       operationId: engineCheckAndDeductCredits
       tags:
         - Credits
@@ -12417,7 +12177,7 @@ paths:
       description: |-
         Checks whether a customer may use a feature under its current subscription. Call it before running a metered or limited operation.
 
-        **Keys.** A secret `sk_` key or the trusted internal credential. When the organization has API permissions enabled, the secret key needs `customer_usage:read`. A publishable `pk_` key returns `403`.
+        **Keys.** A secret `sk_` key or the trusted internal credential. A publishable `pk_` key returns `403`.
 
         **Decision.** A denial is a `200` response with `allowed: false` and a `reason` code:
 
@@ -12725,7 +12485,7 @@ paths:
       description: |-
         Forwards the request to `https://api.openai.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
         **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
 
@@ -12825,7 +12585,7 @@ paths:
       description: |-
         Forwards the request to `https://api.openai.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
         **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
 
@@ -12921,7 +12681,7 @@ paths:
       description: |-
         Forwards the request to `https://api.anthropic.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
         **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
 
@@ -13029,7 +12789,7 @@ paths:
       description: |-
         Forwards the request to `https://api.anthropic.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
         **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
 
@@ -13673,84 +13433,6 @@ webhooks:
       responses:
         '200':
           description: Return a 200 status to indicate that the data was received successfully
-  customer_crm_provider_created:
-    post:
-      operationId: customerCrmProviderCreated
-      summary: A customer has been created in the CRM provider
-      description: A customer has been created in the CRM provider
-      parameters:
-        - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
-      requestBody:
-        description: Details of the customer
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - webhook_type
-                - object_type
-                - organization_id
-                - customer
-              properties:
-                webhook_type:
-                  type: string
-                  enum:
-                    - customer.crm_provider_created
-                object_type:
-                  type: string
-                  enum:
-                    - customer
-                organization_id:
-                  type: string
-                  format: uuid
-                  description: Unique identifier of the organization, created by Nozle.
-                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-                customer:
-                  $ref: '#/components/schemas/CustomerObject'
-      responses:
-        '200':
-          description: Return a 200 status to indicate that the data was received successfully
-  customer_crm_provider_error:
-    post:
-      operationId: customerCrmProviderError
-      summary: An error was encountered while syncing a customer to a CRM provider
-      description: An error was encountered while syncing a customer to a CRM provider
-      parameters:
-        - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
-      requestBody:
-        description: Details of the customer and of the CRM provider error
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - webhook_type
-                - object_type
-                - organization_id
-                - crm_provider_customer_error
-              properties:
-                webhook_type:
-                  type: string
-                  enum:
-                    - customer.crm_provider_error
-                object_type:
-                  type: string
-                  enum:
-                    - crm_provider_customer_error
-                organization_id:
-                  type: string
-                  format: uuid
-                  description: Unique identifier of the organization, created by Nozle.
-                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-                crm_provider_customer_error:
-                  $ref: '#/components/schemas/CustomerIntegratrionErrorObject'
-      responses:
-        '200':
-          description: Return a 200 status to indicate that the data was received successfully
   customer_payment_provider_created:
     post:
       operationId: customerPaymentProviderCreated
@@ -14055,45 +13737,6 @@ webhooks:
                     - credit_note_payment_provider_refund_error
                 credit_note_payment_provider_refund_error:
                   $ref: '#/components/schemas/CreditNotePaymentProviderRefundError'
-      responses:
-        '200':
-          description: Return a 200 status to indicate that the data was received successfully
-  dunning_campaign_finished:
-    post:
-      operationId: dunningCampaignFinished
-      summary: The dunning campaign has been completed for a customer
-      description: The dunning campaign has been completed for a customer
-      parameters:
-        - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
-      requestBody:
-        description: Details of the finished dunning campaign and the overdue balance
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - webhook_type
-                - object_type
-                - organization_id
-                - dunning_campaign
-              properties:
-                webhook_type:
-                  type: string
-                  enum:
-                    - dunning_campaign.finished
-                object_type:
-                  type: string
-                  enum:
-                    - dunning_campaign
-                organization_id:
-                  type: string
-                  format: uuid
-                  description: Unique identifier of the organization, created by Nozle.
-                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-                dunning_campaign:
-                  $ref: '#/components/schemas/DunningCampaignFinishedObject'
       responses:
         '200':
           description: Return a 200 status to indicate that the data was received successfully
@@ -14680,45 +14323,6 @@ webhooks:
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
                 payment_provider_invoice_payment_error:
                   $ref: '#/components/schemas/InvoicePaymentFailureObject'
-      responses:
-        '200':
-          description: Return a 200 status to indicate that the data was received successfully
-  invoice_resynced:
-    post:
-      operationId: invoiceResynced
-      summary: An invoice has been resynced with salesforce
-      description: An invoice has been resynced with salesforce
-      parameters:
-        - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
-      requestBody:
-        description: Details of the invoice
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - webhook_type
-                - object_type
-                - organization_id
-                - invoice
-              properties:
-                webhook_type:
-                  type: string
-                  enum:
-                    - invoice.resynced
-                object_type:
-                  type: string
-                  enum:
-                    - invoice
-                organization_id:
-                  type: string
-                  format: uuid
-                  description: Unique identifier of the organization, created by Nozle.
-                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-                invoice:
-                  $ref: '#/components/schemas/InvoiceObjectExtended'
       responses:
         '200':
           description: Return a 200 status to indicate that the data was received successfully
@@ -15382,45 +14986,6 @@ webhooks:
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
                 subscription:
                   $ref: '#/components/schemas/SubscriptionWithCustomerObject'
-      responses:
-        '200':
-          description: Return a 200 status to indicate that the data was received successfully
-  subscription_usage_threshold_reached:
-    post:
-      operationId: subscriptionUsageThresholdReached
-      summary: A usage threshold has been reached by a subscription
-      description: A usage threshold has been reached by a subscription
-      parameters:
-        - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
-      requestBody:
-        description: Details of the subscription and of the reached threshold
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - webhook_type
-                - object_type
-                - organization_id
-                - subscription
-              properties:
-                webhook_type:
-                  type: string
-                  enum:
-                    - subscription.usage_threshold_reached
-                object_type:
-                  type: string
-                  enum:
-                    - subscription
-                organization_id:
-                  type: string
-                  format: uuid
-                  description: Unique identifier of the organization, created by Nozle.
-                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-                subscription:
-                  $ref: '#/components/schemas/SubscriptionWithThresholdObject'
       responses:
         '200':
           description: Return a 200 status to indicate that the data was received successfully
@@ -16453,7 +16018,6 @@ components:
             enum:
               - invoice.finalized
               - credit_note.created
-              - payment_receipt.created
           description: The email notification settings for this billing entity
         eu_tax_management:
           type: boolean
@@ -16509,164 +16073,6 @@ components:
           example: validation_errors
         error_details:
           type: object
-    BillingEntityCreateInput:
-      type: object
-      description: Billing entity create input
-      required:
-        - billing_entity
-      properties:
-        billing_entity:
-          type: object
-          required:
-            - code
-            - name
-          properties:
-            code:
-              type: string
-              example: acme_corp
-              description: The unique code of the billing entity
-            name:
-              type: string
-              example: Acme Corp
-              description: The name of the billing entity
-            default_currency:
-              $ref: '#/components/schemas/Currency'
-              description: The default currency of the billing entity
-              example: USD
-            document_numbering:
-              type: string
-              enum:
-                - per_customer
-                - per_billing_entity
-              description: |-
-                The type of document numbering for this billing entity:
-                - `per_customer`: document numbers are unique per customer
-                - `per_billing_entity`: document numbers are unique per billing entity
-            document_number_prefix:
-              type:
-                - string
-                - 'null'
-              example: ABC-123
-              description: The prefix used in document numbers for this billing entity
-            finalize_zero_amount_invoice:
-              type: boolean
-              example: true
-              description: Whether to finalize invoices with zero amount for this billing entity
-            billing_configuration:
-              type: object
-              properties:
-                invoice_footer:
-                  type: string
-                  example: Thank you for your business
-                  description: The footer text to be displayed on invoices for this billing entity
-                document_locale:
-                  type: string
-                  example: en
-                  description: The language of the documents generated for this billing entity
-                invoice_grace_period:
-                  type: integer
-                  example: 0
-                  description: The grace period (in days) for invoice finalization
-                subscription_invoice_issuing_date_anchor:
-                  type: string
-                  description: Defines whether the issuing date follows the current billing period's end date or the next period starting date.
-                  enum:
-                    - current_period_end
-                    - next_period_start
-                  default: next_period_start
-                subscription_invoice_issuing_date_adjustment:
-                  type: string
-                  description: The logic applied on top of the subscription_invoice_issuing_date_anchor rule. You can opt to use the invoice finalization date, that includes any configured grace period.
-                  enum:
-                    - align_with_finalization_date
-                    - keep_anchor
-                  default: align_with_finalization_date
-            net_payment_term:
-              type: integer
-              example: 0
-              description: The net payment term (in days) for this billing entity
-            address_line1:
-              type:
-                - string
-                - 'null'
-              example: 5230 Penfield Ave
-              description: The first line of the billing address
-            address_line2:
-              type:
-                - string
-                - 'null'
-              example: Suite 100
-              description: The second line of the billing address
-            city:
-              type:
-                - string
-                - 'null'
-              example: Woodland Hills
-              description: The city of the billing address
-            state:
-              type:
-                - string
-                - 'null'
-              example: CA
-              description: The state of the billing address
-            country:
-              $ref: '#/components/schemas/Country'
-              description: The country code of the billing address
-              nullable: true
-            zipcode:
-              type:
-                - string
-                - 'null'
-              example: '91364'
-              description: The zipcode of the billing address
-            email:
-              type:
-                - string
-                - 'null'
-              format: email
-              example: billing@acme.com
-              description: The email address of the billing entity
-            legal_name:
-              type:
-                - string
-                - 'null'
-              example: Acme Corporation
-              description: The legal name of the billing entity
-            legal_number:
-              type:
-                - string
-                - 'null'
-              example: US123456789
-              description: The legal registration number of the billing entity
-            tax_identification_number:
-              type:
-                - string
-                - 'null'
-              example: EU123456789
-              description: The tax identification number of the billing entity
-            timezone:
-              $ref: '#/components/schemas/Timezone'
-              description: The timezone of the billing entity
-              example: UTC
-            email_settings:
-              type: array
-              items:
-                type: string
-                enum:
-                  - invoice.finalized
-                  - credit_note.created
-              description: The email notification settings for this billing entity
-            eu_tax_management:
-              type: boolean
-              example: false
-              description: Whether EU tax management is enabled for this billing entity
-            logo:
-              type:
-                - string
-                - 'null'
-              format: uri
-              example: data:image/png;base64,...
-              description: The base64 encoded logo image for the billing entity
     ApiErrorBadRequest:
       type: object
       required:
@@ -17900,16 +17306,15 @@ components:
               enum:
                 - coupon
                 - credit_note
-                - invoice
-              description: The type of credit applied. Possible values are `coupon`, `credit_note` or `invoice` (for `progressive_billing` invoice).
+              description: The type of credit applied. Possible values are `coupon` or `credit_note`.
               example: coupon
             code:
               type: string
-              description: The code of the credit applied. It can be the code of the coupon attached to the credit, the credit note's number or the `progressive_billing` invoice number.
+              description: The code of the credit applied. It can be the code of the coupon attached to the credit or the credit note's number.
               example: startup_deal
             name:
               type: string
-              description: The name of the credit applied. It can be the name of the coupon attached to the credit, the initial invoice's number linked to the credit note or the `progressive_billing` invoice number.
+              description: The name of the credit applied. It can be the name of the coupon attached to the credit or the initial invoice's number linked to the credit note.
               example: Startup Deal
         invoice:
           type: object
@@ -19248,10 +18653,6 @@ components:
         amount_details:
           $ref: '#/components/schemas/FeeAmountDetails'
           description: List of all unit amount details for calculating the fee.
-        self_billed:
-          type: boolean
-          example: false
-          description: Indicates if the fee belongs to self-billed invoice. Self-billing is a process where an organization creates the invoice on behalf of the partner.
         item:
           type: object
           description: Item attached to the fee
@@ -20047,12 +19448,8 @@ components:
           type: string
           enum:
             - customer
-            - partner
           example: customer
-          description: |-
-            The type of the account. It can have one of the following values:
-            - `customer`: the account is a customer.
-            - `partner`: the account is a partner.
+          description: The type of the account. The value is `customer`.
         customer_type:
           type:
             - string
@@ -20348,10 +19745,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CreditNoteAppliedTaxObject'
-        self_billed:
-          type: boolean
-          example: false
-          description: Indicates if the credit note belongs to self-billed invoice. Self-billing is a process where an organization creates the invoice on behalf of the partner.
         customer:
           $ref: '#/components/schemas/CustomerBaseObject'
         metadata:
@@ -20718,19 +20111,15 @@ components:
           description: A unique identifier for the integration customer object in the Nozle application.
         type:
           type: string
-          example: netsuite
+          example: anrok
           description: |-
             The integration type used for accounting and tax syncs.
-            Accepted values: `netsuite, anrok`.
+            Accepted values: `anrok`.
           enum:
-            - netsuite
             - anrok
-            - xero
-            - hubspot
-            - salesforce
         integration_code:
           type: string
-          example: netsuite-eu-1
+          example: anrok1
           description: Unique code used to identify an integration connection.
         external_customer_id:
           type: string
@@ -20742,22 +20131,6 @@ components:
             - 'null'
           example: true
           description: Set this field to `true` if you want to create a customer record in the integration's system. This option is applicable only when the `external_customer_id` is null and the `sync_with_provider` field is set to `true`. By default, the value is set to `false`
-        subsidiary_id:
-          type: string
-          example: '2'
-          description: This optional field is needed only when working with `netsuite` connection.
-        targeted_object:
-          type:
-            - string
-            - 'null'
-          example: contacts
-          description: This optional field is present only when working with `hubspot` connection.
-        email:
-          type:
-            - string
-            - 'null'
-          example: dinesh@piedpiper.test
-          description: This optional field is present only when working with `hubspot` connection.
     CustomerObject:
       allOf:
         - $ref: '#/components/schemas/CustomerBaseObject'
@@ -20916,19 +20289,6 @@ components:
                 - 'null'
               example: Belson
               description: Last name of the customer
-            account_type:
-              type:
-                - string
-                - 'null'
-              enum:
-                - customer
-                - partner
-                - null
-              example: customer
-              description: |-
-                The type of the account. It can have one of the following values:
-                - `customer`: the account is a customer, default value.
-                - `partner`: the account is a partner.
             customer_type:
               type:
                 - string
@@ -21010,17 +20370,15 @@ components:
                     description: A unique identifier for the integration customer object in the Nozle application.
                   integration_type:
                     type: string
-                    example: netsuite
+                    example: anrok
                     description: |-
                       The integration type used for accounting and tax syncs.
-                      Accepted values: `netsuite, anrok, xero`.
+                      Accepted values: `anrok`.
                     enum:
-                      - netsuite
                       - anrok
-                      - xero
                   integration_code:
                     type: string
-                    example: netsuite-eu-1
+                    example: anrok1
                     description: Unique code used to identify an integration connection.
                   external_customer_id:
                     type: string
@@ -21030,10 +20388,6 @@ components:
                     type: boolean
                     example: true
                     description: Set this field to `true` if you want to create a customer record in the integration's system. This option is applicable only when the `external_customer_id` is null and the `sync_with_provider` field is set to `true`. By default, the value is set to `false`
-                  subsidiary_id:
-                    type: string
-                    example: '2'
-                    description: This optional field is needed only when working with `netsuite` connection.
             metadata:
               type: array
               description: Set of key-value pairs that you can attach to a customer. This can be useful for storing additional information about the customer in a structured format
@@ -21097,7 +20451,6 @@ components:
         - taxes_amount_cents
         - sub_total_including_taxes_amount_cents
         - prepaid_credit_amount_cents
-        - progressive_billing_credit_amount_cents
         - total_amount_cents
         - version_number
         - created_at
@@ -21152,8 +20505,7 @@ components:
             - add_on
             - credit
             - one_off
-            - progressive_billing
-          description: The type of invoice issued. Possible values are `subscription`, `one-off`, `credit` or `progressive_billing`.
+          description: The type of invoice issued. Possible values are `subscription`, `one-off` or `credit`.
           example: subscription
         status:
           type: string
@@ -21237,10 +20589,6 @@ components:
             - 'null'
           description: The portion of prepaid credits discounted on the invoice that originated from purchased (paid) credits, expressed in cents. Only populated for invoices associated with traceable wallets.
           example: 0
-        progressive_billing_credit_amount_cents:
-          type: integer
-          description: The usage already billed in previous invoices. Only apply to `progressive_billing` and `subscription` invoices.
-          example: 0
         total_amount_cents:
           type: integer
           description: The sum of the amount and taxes amount on the invoice, expressed in cents. It calculates the total financial value of the invoice, including both the original amount and any applicable taxes.
@@ -21248,10 +20596,6 @@ components:
         version_number:
           type: integer
           example: 3
-        self_billed:
-          type: boolean
-          example: false
-          description: Indicates if the invoice is self-billed. Self-billing is a process where an organization creates the invoice on behalf of the partner. This field specifies whether the invoice is self-billed or not.
         file_url:
           type: string
           format: uri
@@ -21339,63 +20683,6 @@ components:
           format: date-time
           description: The date of the applied invoice custom section creation, represented in ISO 8601 datetime format and expressed in Coordinated Universal Time (UTC).
           example: '2023-07-06T14:35:58Z'
-    UsageThresholdObject:
-      type: object
-      required:
-        - nozle_id
-        - threshold_display_name
-        - amount_cents
-        - recurring
-        - created_at
-        - updated_at
-      properties:
-        nozle_id:
-          type: string
-          format: uuid
-          description: Unique identifier of the usage threshold created by Nozle.
-          example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        threshold_display_name:
-          type:
-            - string
-            - 'null'
-          description: The display name of the usage threshold.
-          example: Threshold 1
-        amount_cents:
-          type: integer
-          description: The amount to reach to trigger a `progressive_billing` invoice.
-          example: 10000
-        recurring:
-          type: boolean
-          description: This field when set to `true` indicates that a `progressive_billing` invoice will be created every time the lifetime usage increases by the specified amount.
-          example: true
-        created_at:
-          type: string
-          format: date-time
-          description: The date and time when the usage threshold was created. It is expressed in UTC format according to the ISO 8601 datetime standard.
-          example: '2023-06-27T19:43:42Z'
-        updated_at:
-          type: string
-          format: date-time
-          description: The date and time when the usage threshold was last updated. It is expressed in UTC format according to the ISO 8601 datetime standard.
-          example: '2023-06-27T19:43:42Z'
-    AppliedUsageThresholdObject:
-      type: object
-      required:
-        - lifetime_usage_amount_cents
-        - created_at
-        - usage_threshold
-      properties:
-        lifetime_usage_amount_cents:
-          type: integer
-          description: The amount of usage in cents that has been accumulated over the lifetime of the subscription.
-          example: 2000
-        created_at:
-          type: string
-          format: date-time
-          description: The date and time when the lifetime usage was computed. It is expressed in UTC format according to the ISO 8601 datetime standard.
-          example: '2025-03-31T12:31:44Z'
-        usage_threshold:
-          $ref: '#/components/schemas/UsageThresholdObject'
     InvoiceObject:
       allOf:
         - $ref: '#/components/schemas/InvoiceBaseObject'
@@ -21417,10 +20704,6 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/InvoiceAppliedInvoiceCustomSectionObject'
-            applied_usage_thresholds:
-              type: array
-              items:
-                $ref: '#/components/schemas/AppliedUsageThresholdObject'
     InvoicesPaginated:
       type: object
       required:
@@ -23368,284 +22651,6 @@ components:
       properties:
         customer_usage:
           $ref: '#/components/schemas/CustomerUsageObject'
-    CustomerProjectedChargeFiltersUsageObject:
-      type: array
-      description: Array of filter object, representing multiple dimensions for a charge item.
-      required:
-        - values
-        - units
-        - projected_units
-        - events_count
-        - amount_cents
-        - projected_amount_cents
-      items:
-        type: object
-        properties:
-          units:
-            type: string
-            pattern: ^[0-9]+.?[0-9]*$
-            example: '0.9'
-            description: The number of units consumed for a specific charge filter related to a charge item.
-          projected_units:
-            type: string
-            pattern: ^[0-9]+.?[0-9]*$
-            example: '1.8'
-            description: The projected number of units that can be consumed for a specific charge filter related to a charge item.
-          amount_cents:
-            type: integer
-            example: 1000
-            description: The amount in cents, tax excluded, consumed for a specific charge filter related to a charge item.
-          projected_amount_cents:
-            type: integer
-            example: 2000
-            description: The projected amount in cents, tax excluded, that can be consumed for a specific charge filter related to a charge item.
-          events_count:
-            type: integer
-            example: 10
-            description: The quantity of usage events that have been recorded for a particular charge filter during the specified time period. These events may also be referred to as the number of transactions in some contexts.
-          invoice_display_name:
-            type: string
-            description: Specifies the name that will be displayed on an invoice.
-            example: AWS eu-east-1
-          pricing_unit_details:
-            $ref: '#/components/schemas/UsagePricingUnitDetailsObject'
-          values:
-            type: object
-            description: List of filter values applied to the usage.
-            additionalProperties:
-              type: array
-              items:
-                type: string
-            example:
-              region:
-                - us-east-1
-          presentation_breakdowns:
-            $ref: '#/components/schemas/PresentationBreakdownsObject'
-          projected_presentation_breakdowns:
-            $ref: '#/components/schemas/PresentationBreakdownsObject'
-    CustomerProjectedChargeGroupedUsageObject:
-      type: array
-      description: Array of aggregated fees, grouped by the event properties defined in a `standard` charge model.
-      required:
-        - amount_cents
-        - projected_amount_cents
-        - events_count
-        - units
-        - projected_units
-        - grouped_by
-        - groups
-      items:
-        type: object
-        properties:
-          amount_cents:
-            type: integer
-            example: 1000
-            description: The amount in cents, tax excluded, consumed for a specific group related to a charge item.
-          projected_amount_cents:
-            type: integer
-            example: 2000
-            description: The projected amount in cents, tax excluded, that can be consumed for a specific group related to a charge item.
-          events_count:
-            type: integer
-            example: 10
-            description: The quantity of usage events that have been recorded for a particular charge during the specified time period. These events may also be referred to as the number of transactions in some contexts.
-          units:
-            type: string
-            pattern: ^[0-9]+.?[0-9]*$
-            example: '0.9'
-            description: The number of units consumed for a specific group related to a charge item.
-          projected_units:
-            type: string
-            pattern: ^[0-9]+.?[0-9]*$
-            example: '1.8'
-            description: The projected number of units that can be consumed for a specific group related to a charge item.
-          pricing_unit_details:
-            $ref: '#/components/schemas/UsagePricingUnitDetailsObject'
-          grouped_by:
-            type: object
-            description: Key value list of event properties aggregated by the charge model
-            additionalProperties:
-              type: string
-          filters:
-            $ref: '#/components/schemas/CustomerProjectedChargeFiltersUsageObject'
-          presentation_breakdowns:
-            $ref: '#/components/schemas/PresentationBreakdownsObject'
-          projected_presentation_breakdowns:
-            $ref: '#/components/schemas/PresentationBreakdownsObject'
-    CustomerProjectedChargeUsageObject:
-      type: object
-      required:
-        - units
-        - projected_units
-        - events_count
-        - amount_cents
-        - projected_amount_cents
-        - amount_currency
-        - charge
-        - feature
-        - groups
-      properties:
-        units:
-          type: string
-          pattern: ^[0-9]+.?[0-9]*$
-          example: '1.0'
-          description: The number of units consumed by the customer for a specific charge item.
-        projected_units:
-          type: string
-          pattern: ^[0-9]+.?[0-9]*$
-          example: '2.0'
-          description: The projected number of units that can be consumed by the customer for a specific charge item.
-        events_count:
-          type: integer
-          example: 10
-          description: The quantity of usage events that have been recorded for a particular charge during the specified time period. These events may also be referred to as the number of transactions in some contexts.
-        amount_cents:
-          type: integer
-          example: 123
-          description: The amount in cents, tax excluded, consumed by the customer for a specific charge item.
-        projected_amount_cents:
-          type: integer
-          example: 256
-          description: The projected amount in cents, tax excluded, that can be consumed by the customer for a specific charge item.
-        amount_currency:
-          $ref: '#/components/schemas/Currency'
-          description: The currency of a usage item consumed by the customer.
-          example: EUR
-        pricing_unit_details:
-          $ref: '#/components/schemas/UsagePricingUnitDetailsObject'
-        charge:
-          type: object
-          description: Object listing all the properties for a specific charge item.
-          required:
-            - nozle_id
-            - charge_model
-          properties:
-            nozle_id:
-              type: string
-              format: uuid
-              example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-              description: Unique identifier assigned to the charge within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the charge's record within the Nozle system.
-            charge_model:
-              type: string
-              description: The pricing model applied to this charge. Possible values are standard, `graduated`, `percentage`, `package` or `volume`.
-              enum:
-                - standard
-                - graduated
-                - package
-                - percentage
-                - volume
-              example: graduated
-            invoice_display_name:
-              type: string
-              description: Specifies the name that will be displayed on an invoice. If no value is set for this field, the name of the actual charge will be used as the default display name.
-              example: Setup
-        feature:
-          type: object
-          description: The related feature object.
-          required:
-            - nozle_id
-            - name
-            - code
-            - aggregation_type
-          properties:
-            nozle_id:
-              type: string
-              format: uuid
-              example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-              description: Unique identifier assigned to the feature within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the feature's record within the Nozle system.
-            name:
-              type: string
-              example: Storage
-              description: The name of the feature used for this charge.
-            code:
-              type: string
-              example: storage
-              description: The code of the feature used for this charge.
-            aggregation_type:
-              type: string
-              description: The aggregation type of the feature used for this charge. Possible values are `count_agg`, `sum_agg`, `max_agg` or `unique_count_agg`.
-              enum:
-                - count_agg
-                - sum_agg
-                - max_agg
-                - unique_count_agg
-                - weighted_sum_agg
-                - latest_agg
-              example: sum_agg
-        filters:
-          $ref: '#/components/schemas/CustomerProjectedChargeFiltersUsageObject'
-        grouped_usage:
-          $ref: '#/components/schemas/CustomerProjectedChargeGroupedUsageObject'
-        presentation_breakdowns:
-          $ref: '#/components/schemas/PresentationBreakdownsObject'
-        projected_presentation_breakdowns:
-          $ref: '#/components/schemas/PresentationBreakdownsObject'
-    CustomerProjectedUsageObject:
-      type: object
-      required:
-        - from_datetime
-        - to_datetime
-        - issuing_date
-        - amount_cents
-        - projected_amount_cents
-        - taxes_amount_cents
-        - total_amount_cents
-        - charges_usage
-      properties:
-        from_datetime:
-          type: string
-          format: date-time
-          description: The lower bound of the billing period, expressed in the ISO 8601 datetime format in Coordinated Universal Time (UTC).
-          example: '2022-07-01T00:00:00Z'
-        to_datetime:
-          type: string
-          format: date-time
-          description: The upper bound of the billing period, expressed in the ISO 8601 datetime format in Coordinated Universal Time (UTC).
-          example: '2022-07-31T23:59:59Z'
-        issuing_date:
-          type: string
-          format: date
-          description: The date of creation of the invoice.
-          example: '2022-08-01'
-        invoice_id:
-          type:
-            - string
-            - 'null'
-          format: uuid
-          example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-          description: A unique identifier associated with the invoice related to this particular usage record.
-        currency:
-          $ref: '#/components/schemas/Currency'
-          description: The currency of the customer's current usage.
-          example: EUR
-        amount_cents:
-          type: integer
-          description: The amount in cents, tax excluded.
-          example: 123
-        projected_amount_cents:
-          type: integer
-          description: The projected amount in cents, tax excluded.
-          example: 256
-        taxes_amount_cents:
-          type: integer
-          description: The tax amount in cents.
-          example: 200
-        total_amount_cents:
-          type: integer
-          description: The total amount in cents, tax included.
-          example: 123
-        charges_usage:
-          type: array
-          description: Array of charges that comprise the current usage. It contains detailed information about individual charge items associated with the usage.
-          items:
-            $ref: '#/components/schemas/CustomerProjectedChargeUsageObject'
-    CustomerProjectedUsage:
-      type: object
-      required:
-        - customer_projected_usage
-      properties:
-        customer_projected_usage:
-          $ref: '#/components/schemas/CustomerProjectedUsageObject'
     CustomerPastUsage:
       type: object
       required:
@@ -24809,7 +23814,6 @@ components:
             - subscription_terminating
             - in_advance_charge
             - in_advance_charge_periodic
-            - progressive_billing
           description: The reason explaining why this subscription appears on the invoice.
           example: subscription_starting
     InvoiceObjectExtended:
@@ -25040,26 +24044,6 @@ components:
                   - 'null'
                 description: Specifies the number of billing periods to which the coupon applies. This field is required only for coupons with a `recurring` frequency type
                 example: 6
-        subscriptions:
-          type: object
-          required:
-            - external_ids
-          properties:
-            external_ids:
-              type: array
-              items:
-                type: string
-                description: External identifiers of the customer's subscription.
-                example: 441edbe3-9136-4688-a763-e57b6f1dca82
-            plan_code:
-              type: string
-              description: The code of the plan. It serves as a unique identifier associated with the new plan to which the customer is upgrading or downgrading.
-              example: new_code
-            terminated_at:
-              type: string
-              description: The date and time when the subscription is terminated. It should defined in the future.
-              format: date-time
-              example: '2022-08-08T00:00:00Z'
         billing_entity_code:
           type: string
           description: The code of the billing entity to which will be associated a customer if the external_id is not provided. If billing_entity_code is not provided, default billing_entity of organization will be used.
@@ -25375,49 +24359,6 @@ components:
       properties:
         organization:
           $ref: '#/components/schemas/OrganizationObject'
-    PaymentReceiptObject:
-      type: object
-      required:
-        - nozle_id
-        - created_at
-        - number
-        - payment
-      properties:
-        nozle_id:
-          type: string
-          format: uuid
-          description: Unique identifier of the payment receipt, created by Nozle.
-          example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-        created_at:
-          type: string
-          format: date-time
-          description: The date and time when the payment receipt was created. It is expressed in UTC format according to the ISO 8601 datetime standard. This field provides the timestamp for the exact moment when the payment receipt was initially created.
-          example: '2022-04-29T08:59:51Z'
-        number:
-          type: string
-          description: The unique number assigned to the payment receipt.
-          example: LAG-1234-001-002
-        payment:
-          $ref: '#/components/schemas/PaymentObject'
-    PaymentReceiptsPaginated:
-      type: object
-      required:
-        - Payment Receipts
-        - meta
-      properties:
-        payment_receipts:
-          type: array
-          items:
-            $ref: '#/components/schemas/PaymentReceiptObject'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
-    PaymentReceipt:
-      type: object
-      required:
-        - payment_receipt
-      properties:
-        payment_receipt:
-          $ref: '#/components/schemas/PaymentReceiptObject'
     PaymentRequestCreateInput:
       type: object
       required:
@@ -25919,12 +24860,6 @@ components:
               type: string
               description: The conversion rate from pricing units to the plan's currency.
               example: '0.5'
-        accepts_target_wallet:
-          type:
-            - boolean
-            - 'null'
-          description: Specifies whether the charge accepts a target wallet for prepaid credits deduction.
-          example: false
         parent_id:
           type:
             - string
@@ -26234,7 +25169,7 @@ components:
 
         With a publishable `pk_` key, `GET /plans` and `GET /plans/{code}` return this whole object, including prices, charges, taxes, minimums, credit grants and `metadata`. Nothing is filtered or redacted. See "Publishable keys" on those operations.
 
-        `charges`, `entitlements`, `usage_thresholds`, `applicable_usage_thresholds`, `taxes`, `credit_grant_rules` and `credit_pool_policies` are always present in a plan returned by the plan endpoints. They are empty arrays when the plan has none.
+        `charges`, `entitlements`, `taxes`, `credit_grant_rules` and `credit_pool_policies` are always present in a plan returned by the plan endpoints. They are empty arrays when the plan has none.
       required:
         - nozle_id
         - name
@@ -26526,16 +25461,6 @@ components:
           description: Taxes applied to the plan itself. Charges, fixed charges and the minimum commitment carry their own `taxes`.
           items:
             $ref: '#/components/schemas/TaxObject'
-        usage_thresholds:
-          type: array
-          description: Usage thresholds that trigger a progressive billing invoice on this plan.
-          items:
-            $ref: '#/components/schemas/UsageThresholdObject'
-        applicable_usage_thresholds:
-          type: array
-          description: Usage thresholds that apply when this plan is used. Same as `usage_thresholds` for a regular plan; for an override plan it is the parent plan's list. Entries have no `nozle_id` or timestamps.
-          items:
-            $ref: '#/components/schemas/ApplicableUsageThreshold'
         entitlements:
           type: array
           description: Feature entitlements of the plan (boolean, config and metered features) with their privilege values. Each item is the entitlement itself; it is not wrapped in an `entitlement` key.
@@ -26786,26 +25711,6 @@ components:
           example:
             region:
               - us-east-1
-    UsageThresholdInput:
-      type: object
-      required:
-        - amount_cents
-      properties:
-        threshold_display_name:
-          type:
-            - string
-            - 'null'
-          description: The display name of the usage threshold.
-          example: Threshold 1
-        amount_cents:
-          type: integer
-          description: The amount to reach to trigger a `progressive_billing` invoice.
-          example: 10000
-        recurring:
-          type: boolean
-          description: This field when set to `true` indicates that a `progressive_billing` invoice will be created every time the lifetime usage increases by the specified amount.
-          example: true
-          default: false
     PlanCreateInput:
       type: object
       required:
@@ -26969,12 +25874,6 @@ components:
                           This rate determines how many currency units (in the plan's base currency) equal one pricing unit.
                           For example, if the plan uses USD and the conversion rate is 0.5, then 1 pricing unit = $0.50.
                         example: '0.5'
-                  accepts_target_wallet:
-                    type:
-                      - boolean
-                      - 'null'
-                    description: Specifies whether the charge accepts a target wallet for prepaid credits deduction.
-                    example: false
               example:
                 - feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
                   charge_model: package
@@ -27144,11 +26043,6 @@ components:
                         per_unit_amount: '1'
                         flat_amount: '0'
                   units: 50
-            usage_thresholds:
-              type: array
-              description: List of usage thresholds to apply to the plan.
-              items:
-                $ref: '#/components/schemas/UsageThresholdInput'
             metadata:
               $ref: '#/components/schemas/MetadataInput'
     Plan:
@@ -27312,12 +26206,6 @@ components:
                           This rate determines how many currency units (in the plan's base currency) equal one pricing unit.
                           For example, if the plan uses USD and the conversion rate is 0.5, then 1 pricing unit = $0.50 USD.
                         example: '0.5'
-                  accepts_target_wallet:
-                    type:
-                      - boolean
-                      - 'null'
-                    description: Specifies whether the charge accepts a target wallet for prepaid credits deduction.
-                    example: false
               example:
                 - feature_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
                   charge_model: package
@@ -27499,11 +26387,6 @@ components:
                         per_unit_amount: '1'
                         flat_amount: '0'
                   units: 50
-            usage_thresholds:
-              type: array
-              description: List of usage thresholds to apply to the plan.
-              items:
-                $ref: '#/components/schemas/UsageThresholdInput'
             cascade_updates:
               type: boolean
               description: This field determines whether the changes made to the plan should be cascaded to the children plans. When set to `true`, the changes will be cascaded into children. Conversely, when set to `false`, the changes will only be applied to the plan itself. If not defined in the request, default value is `false`.
@@ -28059,11 +26942,6 @@ components:
               tax_codes:
                 $ref: '#/components/schemas/TaxCodes'
                 description: List of taxes applied to the fixed charge.
-        usage_thresholds:
-          type: array
-          description: List of usage thresholds applied to the subscription.
-          items:
-            $ref: '#/components/schemas/UsageThresholdInput'
         metadata:
           $ref: '#/components/schemas/MetadataInput'
     SubscriptionActivationRuleInput:
@@ -28175,27 +27053,6 @@ components:
                 $ref: '#/components/schemas/SubscriptionActivationRuleInput'
               description: |
                 Optional list of activation rules that gate the subscription activation. When a `payment` rule is provided and the plan is paid in advance (and the subscription is not in a trial), the subscription is created in the `incomplete` state and is only activated once the gating payment succeeds. If the payment fails or the rule's `timeout_hours` elapses, the subscription is canceled.
-    ApplicableUsageThreshold:
-      type: object
-      required:
-        - threshold_display_name
-        - amount_cents
-        - recurring
-      properties:
-        threshold_display_name:
-          type:
-            - string
-            - 'null'
-          description: The display name of the usage threshold.
-          example: Threshold 1
-        amount_cents:
-          type: integer
-          description: The amount to reach to trigger a `progressive_billing` invoice.
-          example: 10000
-        recurring:
-          type: boolean
-          description: This field when set to `true` indicates that a `progressive_billing` invoice will be created every time the lifetime usage increases by the specified amount.
-          example: true
     SubscriptionObjectExtended:
       allOf:
         - $ref: '#/components/schemas/SubscriptionObject'
@@ -28203,11 +27060,6 @@ components:
           properties:
             plan:
               $ref: '#/components/schemas/PlanObject'
-            applicable_usage_thresholds:
-              type: array
-              items:
-                $ref: '#/components/schemas/ApplicableUsageThreshold'
-              description: List of usage thresholds applicable to this subscription.
     SubscriptionExtended:
       type: object
       required:
@@ -28283,104 +27135,6 @@ components:
       properties:
         subscription:
           $ref: '#/components/schemas/SubscriptionObject'
-    LifetimeUsageThresholdObject:
-      type: object
-      required:
-        - amount_cents
-        - completion_ratio
-        - reached_at
-      properties:
-        amount_cents:
-          type: integer
-          description: The usage threshold amount in cents.
-          example: 100
-        completion_ratio:
-          type: number
-          description: The completion ratio of the usage threshold.
-          example: 0.5
-        reached_at:
-          type:
-            - string
-            - 'null'
-          format: date-time
-          description: The date and time when the usage threshold was reached. The date and time must be in ISO 8601 format.
-          example: '2024-01-01T00:00:00Z'
-    LifetimeUsageObject:
-      type: object
-      required:
-        - nozle_id
-        - subscription_id
-        - external_subscription_id
-        - external_historical_usage_amount_cents
-        - invoiced_usage_amount_cents
-        - current_usage_amount_cents
-        - from_datetime
-        - to_datetime
-      properties:
-        nozle_id:
-          type: string
-          format: uuid
-          example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-          description: Unique identifier assigned to the lifetime usage record within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the lifetime usage record within the Nozle system
-        subscription_id:
-          type: string
-          format: uuid
-          example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-          description: Unique identifier assigned to the subscription record within the Nozle application. This ID is exclusively created by Nozle and serves as a unique identifier for the subscription record within the Nozle system
-        external_subscription_id:
-          type: string
-          example: 5eb02857-a71e-4ea2-bcf9-57d3a41bc6ba
-          description: The subscription external unique identifier (provided by your own application).
-        external_historical_usage_amount_cents:
-          type: integer
-          example: 100
-          description: The historical usage amount in cents for the subscription (provided by your own application).
-        invoiced_usage_amount_cents:
-          type: integer
-          example: 100
-          description: The total invoiced usage amount in cents for the subscription.
-        current_usage_amount_cents:
-          type: integer
-          example: 100
-          description: The current usage amount in cents for the subscription on the current billing period.
-        from_datetime:
-          type:
-            - string
-            - 'null'
-          format: date-time
-          example: '2024-01-01T00:00:00Z'
-          description: The recording start date and time of the subscription lifetime usage. The date and time must be in ISO 8601 format.
-        to_datetime:
-          type: string
-          format: date-time
-          example: '2024-12-31T23:59:59Z'
-          description: The recording end date and time of the subscription lifetime usage. The date and time must be in ISO 8601 format.
-        usage_thresholds:
-          type: array
-          description: Array of usage thresholds attached to the subscription's plan.
-          items:
-            $ref: '#/components/schemas/LifetimeUsageThresholdObject'
-    LifetimeUsage:
-      type: object
-      required:
-        - lifetime_usage
-      properties:
-        lifetime_usage:
-          $ref: '#/components/schemas/LifetimeUsageObject'
-    LifetimeUsageInput:
-      type: object
-      required:
-        - lifetime_usage
-      properties:
-        lifetime_usage:
-          type: object
-          required:
-            - external_historical_usage_amount_cents
-          properties:
-            external_historical_usage_amount_cents:
-              type: integer
-              example: 100
-              description: The historical usage amount in cents for the subscription (provided by your own application).
     AlertObject:
       type: object
       required:
@@ -28426,7 +27180,6 @@ components:
             - current_usage_amount
             - feature_current_usage_amount
             - feature_current_usage_units
-            - lifetime_usage_amount
           example: feature_current_usage_amount
         code:
           type: string
@@ -28498,7 +27251,6 @@ components:
                     - current_usage_amount
                     - feature_current_usage_amount
                     - feature_current_usage_units
-                    - lifetime_usage_amount
                   example: feature_current_usage_amount
                 code:
                   type: string
@@ -28534,7 +27286,6 @@ components:
                       - current_usage_amount
                       - feature_current_usage_amount
                       - feature_current_usage_units
-                      - lifetime_usage_amount
                     example: feature_current_usage_amount
                   code:
                     type: string
@@ -29320,7 +28071,6 @@ components:
             - current_usage_amount
             - feature_current_usage_amount
             - feature_current_usage_units
-            - lifetime_usage_amount
           example: feature_current_usage_amount
         alert_code:
           type: string
@@ -29374,17 +28124,12 @@ components:
           type: string
           enum:
             - anrok
-            - hubspot
-            - netsuite
-            - okta
-            - salesforce
-            - xero
           description: The type of accounting provider code
           example: anrok
         accounting_provider_code:
           type: string
           description: Code of the accounting provider
-          example: Netsuite Prod
+          example: Anrok Prod
         provider_error:
           oneOf:
             - type: string
@@ -29448,11 +28193,6 @@ components:
           type: string
           enum:
             - anrock
-            - hubspot
-            - netsuite
-            - okta
-            - salesforce
-            - xero
           description: The type of tax provider
           example: anrock
         tax_provider_code:
@@ -29520,30 +28260,6 @@ components:
             - type: string
             - type: object
               additionalProperties: true
-    DunningCampaignFinishedObject:
-      type: object
-      required:
-        - external_customer_id
-        - dunning_campaign_code
-        - overdue_balance_cents
-        - overdue_balance_currency
-      properties:
-        external_customer_id:
-          type: string
-          description: The customer external unique identifier (provided by your own application).
-          example: cus_0987654321
-        dunning_campaign_code:
-          type: string
-          description: Identifier of the dunning campaign.
-          example: dun_code_1234
-        overdue_balance_cents:
-          type: integer
-          description: The amount of the overdue balance, expressed in cents.
-          example: 120
-        overdue_balance_currency:
-          $ref: '#/components/schemas/Currency'
-          description: The currency of the balance.
-          example: EUR
     EventErrorsObject:
       type: object
       required:
@@ -29701,10 +28417,10 @@ components:
         provider:
           type: string
           description: The type of integration provider
-          example: netsuite
+          example: anrok
         provider_code:
           type: string
-          example: netsuite-eu-1
+          example: anrok1
           description: Unique code used to identify an integration connection.
         provider_error:
           oneOf:
@@ -29815,26 +28531,6 @@ components:
               $ref: '#/components/schemas/PlanObject'
             customer:
               $ref: '#/components/schemas/CustomerObject'
-    SubscriptionWithThresholdObject:
-      allOf:
-        - $ref: '#/components/schemas/SubscriptionObject'
-        - type: object
-          required:
-            - plan
-            - customer
-            - usage_threshold
-          properties:
-            plan:
-              $ref: '#/components/schemas/PlanObject'
-            customer:
-              $ref: '#/components/schemas/CustomerObject'
-            usage_threshold:
-              $ref: '#/components/schemas/UsageThresholdObject'
-            applicable_usage_thresholds:
-              type: array
-              items:
-                $ref: '#/components/schemas/ApplicableUsageThreshold'
-              description: List of usage thresholds applicable to this subscription.
     WalletTransactionObjectExtended:
       allOf:
         - $ref: '#/components/schemas/WalletTransactionObject'

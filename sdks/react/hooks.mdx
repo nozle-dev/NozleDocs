@@ -116,7 +116,7 @@ function PlanList() {
 
 The TypeScript type `CatalogPlan` declares `code`, `name`, `amount_cents`, `amount_currency` and `interval`, and the optional `description` (`string | null`), `entitlements`, `credit_grant_rules` and `charges`. Its plans pass to `PricingTable`, `PlanCard` and `PlanComparison` as they are.
 
-At runtime, each item in `plans` is the trimmed plan object the API returns to a publishable key. `usePlans` does not remove or rename fields. Besides the declared fields, a plan carries `nozle_id`, `trial_period`, `pay_in_advance`, `usage_thresholds`, `taxes`, `credit_pool_policies`, and `metadata` when set. Invoice names, internal ids, margin settings, grant policies and timestamps are not sent to a publishable key. See the [public plan catalog](/api/list-plans) for every field.
+At runtime, each item in `plans` is the trimmed plan object the API returns to a publishable key. `usePlans` does not remove or rename fields. Besides the declared fields, a plan carries `nozle_id`, `trial_period`, `pay_in_advance`, `taxes`, `credit_pool_policies`, and `metadata` when set. Invoice names, internal ids, margin settings, grant policies and timestamps are not sent to a publishable key. See the [public plan catalog](/api/list-plans) for every field.
 
 The list is not filtered. It includes trial plans and pay-in-arrears plans, and not plans that are pending deletion. Decide in your component which plans to show. To read an undeclared field, widen the type:
 

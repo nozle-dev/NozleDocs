@@ -128,14 +128,13 @@ Identifiers are named `nozle_id`. Amounts named `*_cents` are integers in cents 
 | `charges` | array | Usage charges. Empty when there are none. |
 | `fixed_charges` | array | Fixed charges. Only in `GET /plans/{code}`. |
 | `minimum_commitment` | object | Present only when the plan has one. |
-| `usage_thresholds` | array | Thresholds for progressive billing. |
 | `taxes` | array | Taxes applied to the plan. |
 | `entitlements` | array | Feature entitlements. |
 | `credit_grant_rules` | array | Active credit grant rules. |
 | `credit_pool_policies` | array | Active credit pool policies. |
 | `metadata` | object | Key-value pairs set on the plan. Absent when there is none. |
 
-**Only a secret key receives:** `invoice_display_name`, `parent_id`, `pending_deletion`, `created_at` and `applicable_usage_thresholds`.
+**Only a secret key receives:** `invoice_display_name`, `parent_id`, `pending_deletion` and `created_at`.
 
 ### Charge (`charges[]`)
 
@@ -155,7 +154,6 @@ Identifiers are named `nozle_id`. Amounts named `*_cents` are integers in cents 
 | `regroup_paid_fees` | string or `null` | `invoice` or `null`. |
 | `prorated` | boolean | Whether the charge is prorated in the billing period. |
 | `min_amount_cents` | integer | Minimum spend for the charge per period, in cents. `0` for none. |
-| `accepts_target_wallet` | boolean | Whether the charge accepts a target prepaid wallet. |
 | `applied_pricing_unit` | object or `null` | `{ "code", "conversion_rate" }` when the charge is priced in a pricing unit. |
 | `parent_id` | string (UUID) or `null` | Parent charge of an override. |
 
@@ -166,10 +164,6 @@ Only in `GET /plans/{code}`. Fields: `nozle_id`, `add_on_id`, `add_on_code`, `co
 ### Minimum commitment (`minimum_commitment`)
 
 Fields: `nozle_id`, `plan_code`, `commitment_type` (always `minimum_commitment`), `invoice_display_name`, `amount_cents` (per `interval`), `interval`, `created_at`, `updated_at` and `taxes`.
-
-### Usage threshold (`usage_thresholds[]`)
-
-Fields: `nozle_id`, `threshold_display_name`, `amount_cents` (usage amount in cents that triggers a progressive billing invoice), `recurring` (`true` repeats the invoice each time usage grows by `amount_cents`), `created_at` and `updated_at`.
 
 ### Tax (`taxes[]`)
 

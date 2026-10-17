@@ -10,7 +10,7 @@ Use this Core API when another system already bills the customer and Nozle shoul
 
 **Base URL:** `https://api.nozle.app/core/api/v1`
 
-**Auth:** secret key with `subscription:write` when API permissions are enabled. Publishable keys are rejected. `Idempotency-Key` is required.
+**Auth:** secret key only. Publishable keys are rejected. `Idempotency-Key` is required.
 
 ## Import the subscription
 
@@ -83,7 +83,7 @@ A new import returns `201 Created`. A dry run or a replay returns `200`.
 }
 ```
 
-Nozle creates no invoice, checkout, payment-provider customer, or payment request. Externally billed subscriptions are excluded from Nozle invoicing, upgrades, cancellation, dunning, and payment collection.
+Nozle creates no invoice, checkout, payment-provider customer, or payment request. Externally billed subscriptions are excluded from Nozle invoicing, upgrades, cancellation, and payment collection.
 
 If `credit_import_required` is `true`, import every opening Credit System balance before switching usage authority to Nozle. Scheduled plan grants remain paused until that import is complete.
 

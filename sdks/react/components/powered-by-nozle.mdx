@@ -1,6 +1,6 @@
 ---
 title: "PoweredByNozle"
-description: "The \"Powered by Nozle\" badge, and the hook that says whether your Nozle plan shows it."
+description: "The \"Powered by Nozle\" badge, and the hook that says whether to show it."
 keywords: ["powered by nozle", "branding", "badge", "react"]
 ---
 
@@ -9,9 +9,9 @@ keywords: ["powered by nozle", "branding", "badge", "react"]
 **When to use**
 
 - Under a pricing page or billing screen you build with the hooks instead of the components.
-- Together with `useNozleBranding()`, which returns whether your Nozle plan shows the badge.
+- Together with `useNozleBranding()`, which returns whether to show the badge.
 
-You do not need it with `PricingTable`, `PlanComparison`, `CurrentPlan`, `Checkout`, `UpgradeModal` or `BillingPortal`: they show the badge themselves on the free Nozle plan. When one of them renders another, for example a dialog inside the portal, only the outer one shows it.
+You do not need it with `PricingTable`, `PlanComparison`, `CurrentPlan`, `Checkout`, `UpgradeModal` or `BillingPortal`: they show the badge themselves. When one of them renders another, for example a dialog inside the portal, only the outer one shows it.
 
 <Tabs>
   <Tab title="Light">
@@ -69,14 +69,14 @@ The badge takes its look from the `appearance` of the surrounding `BillingProvid
 
 ### Live data
 
-Nozle decides on the server. The public plan catalog read with your publishable key returns `meta.nozle_branding`, and `useNozleBranding()` reads it from the same cached catalog request the components make. It returns `false` outside a `BillingProvider`, and until the catalog answers. Plans that include **Remove branding** return `false`.
+Nozle decides on the server. The public plan catalog read with your publishable key returns `meta.nozle_branding`, and `useNozleBranding()` reads it from the same cached catalog request the components make. It returns `false` outside a `BillingProvider`, and until the catalog answers.
 
 ## API reference
 
 `PoweredByNozle` takes no props.
 
 <ResponseField name="useNozleBranding()" type="boolean">
-  `true` when your Nozle plan shows the badge. `false` when the plan removes branding, there is no `BillingProvider`, or the catalog has not answered.
+  `true` when the catalog's `meta.nozle_branding` is `true`. `false` when it is `false`, there is no `BillingProvider`, or the catalog has not answered.
 </ResponseField>
 
 ### Appearance
