@@ -19,6 +19,12 @@ The React SDK separates public catalog and checkout orchestration from customer 
 
 These exports are available in React `0.10.2`. See [Billing portal and self-service](/sdks/react/billing-portal) for setup, props, callback contracts, standalone examples and installation instructions. The portal does not require `BillingProvider` or Tailwind.
 
+## Powered by Nozle
+
+On the free Nozle plan, `PricingTable`, `PlanComparison`, `CurrentPlan`, `Checkout`, `UpgradeModal` and `BillingPortal` show "Powered by" and the Nozle logo below their content, linking to nozle.dev. Plans that include **Remove branding** do not show it. Nozle decides this on the server: the publishable-key plan catalog returns `meta.nozle_branding`, and the billing portal reads it from its session. When one of these components renders another, for example a modal inside the portal, only the outer one shows the badge. Without a `BillingProvider`, only `BillingPortal` can show it.
+
+If you build your own billing UI from the hooks, `useNozleBranding()` returns the same answer and `<PoweredByNozle />` renders the badge.
+
 ## Pricing components
 
 ![React SDK pricing table](/images/react-sdk/pricing-table.png)
