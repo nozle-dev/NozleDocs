@@ -54,7 +54,7 @@ Each hook returns TanStack Query's result (`data`, `isPending`, `error`, `refetc
 | `useEntitlement(featureCode)` | `allowed`, `used`, `limit`, `remaining` (the `can()` result) | `FeatureGate`, `UsageMeter` |
 | `useCreditBalance(creditSystemCode?)` | One balance: the given credit system, else the first with credits | `<CreditBalance balance={data} />` |
 | `useCreditHistory({ creditSystemCode?, limit? })` | Paged operations; `operations` flattens the loaded pages | `<CreditHistory operations={operations} hasMore={hasNextPage} onLoadMore={fetchNextPage} />` |
-| `useUsage({ period })` | `period: "current"` (default): this period's usage; `"past"`: past periods | `<UsageBreakdown usage={data} />`, `<UsageTrend periods={data} />` |
+| `useUsage({ period })` | `period: "current"` (default): this period's usage, `CustomerUsageData \| null`; `"past"`: past periods, `CustomerUsageData[]` (`periods` sets how many) | `<UsageBreakdown usage={data} />` with `useUsage()`, `<UsageTrend periods={data} />` with `useUsage({ period: "past" })`; no cast needed |
 | `useUpgradePreview(planCode)` | The price of changing to `planCode`, now and at the effective date; waits until a plan is given | A confirm step before a plan change |
 | `useInvoices({ page })` | `{ invoices, meta }`: the customer's finalized invoices, newest first, 20 per page | An invoice history table |
 | `useInvoiceDownload()` | A function `(invoiceId) => Promise<string \| null>`: the PDF URL, or `null` while Nozle is still generating it | A download button |
@@ -110,9 +110,9 @@ function PlanList() {
 
 ### `CatalogPlan`: type versus runtime
 
-The TypeScript type `CatalogPlan` declares five fields: `code`, `name`, `amount_cents`, `amount_currency` and `interval`.
+The TypeScript type `CatalogPlan` declares `code`, `name`, `amount_cents`, `amount_currency` and `interval`, and the optional `description` (`string | null`), `entitlements`, `credit_grant_rules` and `charges`. Its plans pass to `PricingTable`, `PlanCard` and `PlanComparison` as they are.
 
-At runtime, each item in `plans` is the trimmed plan object the API returns to a publishable key. `usePlans` does not remove or rename fields. Besides the five declared fields, a plan carries `nozle_id`, `description`, `trial_period`, `pay_in_advance`, `charges`, `entitlements`, `usage_thresholds`, `taxes`, `credit_grant_rules`, `credit_pool_policies`, and `metadata` when set. Invoice names, internal ids, margin settings, grant policies and timestamps are not sent to a publishable key. See the [public plan catalog](/api/list-plans) for every field.
+At runtime, each item in `plans` is the trimmed plan object the API returns to a publishable key. `usePlans` does not remove or rename fields. Besides the declared fields, a plan carries `nozle_id`, `trial_period`, `pay_in_advance`, `usage_thresholds`, `taxes`, `credit_pool_policies`, and `metadata` when set. Invoice names, internal ids, margin settings, grant policies and timestamps are not sent to a publishable key. See the [public plan catalog](/api/list-plans) for every field.
 
 The list is not filtered. It includes trial plans and pay-in-arrears plans, and not plans that are pending deletion. Decide in your component which plans to show. To read an undeclared field, widen the type:
 

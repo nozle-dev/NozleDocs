@@ -4,171 +4,15 @@ description: "The payment step: Stripe Embedded Checkout or Payment Element for 
 keywords: ["checkout", "stripe", "payment element", "embedded checkout", "react"]
 ---
 
-`Checkout` renders the payment step of a checkout your backend created. Give it a Stripe client secret to mount Stripe's form, or a checkout result to get a pay button that opens Razorpay, redirects, or waits for confirmation.
+`Checkout` renders the payment step of a checkout your backend created: Stripe's form for a client secret, or a pay button for a checkout result.
 
-## What Checkout supports
-
-- A `cs_` Checkout Session secret, which Nozle returns for plan and invoice checkout, mounted with Stripe Embedded Checkout.
-- Any other Stripe secret mounted with Payment Element, themed from your `appearance`, with a loading placeholder and its own submit button.
-- A `checkout` result from `createCheckout`, rendered as a pay button that handles Razorpay, hosted, processing, completed and scheduled results.
-- Razorpay verification and status recovery through callbacks, with or without `BillingProvider`.
-
-## Where to use Checkout
+**When to use**
 
 - The step after [`CheckoutButton`](/sdks/react/components/checkout-button) or [`PricingTable`](/sdks/react/components/pricing-table) returns a Stripe client secret.
 - A payment page that resumes a checkout your backend already created.
+- A pay button for a Razorpay, hosted or processing checkout, with or without `BillingProvider`.
 
-## Importing Checkout
-
-```tsx
-import { Checkout, useCheckout, type CheckoutResult } from '@nozle-js/react'
-```
-
-## Rendering Checkout
-
-With a Stripe client secret and your Stripe publishable key:
-
-```tsx
-import { Checkout } from '@nozle-js/react'
-
-export function PayStep({ clientSecret }: { clientSecret: string }) {
-  return (
-    <Checkout
-      clientSecret={clientSecret}
-      publishableKey="pk_live_stripe..."
-      returnUrl="https://app.example.com/settings/billing"
-      submitLabel="Pay and subscribe"
-      onSuccess={(paymentIntentId) => console.log('paid', paymentIntentId)}
-      onError={(error) => console.error(error.message)}
-    />
-  )
-}
-```
-
-With a checkout result from your backend:
-
-```tsx
-import { Checkout, type CheckoutResult, type CheckoutStatus, type RazorpayVerification } from '@nozle-js/react'
-
-const result: CheckoutResult = {
-  type: 'razorpay',
-  checkout_id: 'chk_123',
-  key_id: 'rzp_live_...',
-  order_id: 'order_123',
-  amount_cents: 2900,
-  currency: 'INR',
-}
-
-const post = async (path: string, body: object): Promise<CheckoutStatus> => {
-  const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  if (!response.ok) throw new Error(`Request failed: ${response.status}`)
-  return response.json()
-}
-
-export function ResumePayment() {
-  return (
-    <Checkout
-      checkout={result}
-      submitLabel="Pay ₹29.00"
-      verifyCheckout={(checkoutId: string, verification: RazorpayVerification) =>
-        post('/api/billing/checkout/verify', { checkoutId, ...verification })
-      }
-      getCheckoutStatus={(checkoutId: string) => post('/api/billing/checkout/status', { checkoutId })}
-      onComplete={() => console.log('done')}
-      onDismiss={() => console.log('closed')}
-    />
-  )
-}
-```
-
-To place your own pay button in the Payment Element form, pass it as `children` and call `useCheckout()` in it. `children` replaces the built-in submit button.
-
-```tsx
-import { Checkout, useCheckout } from '@nozle-js/react'
-
-function PayButton() {
-  const { confirmPayment, isProcessing, error } = useCheckout()
-  return (
-    <>
-      <button type="button" onClick={() => void confirmPayment()} disabled={isProcessing}>
-        {isProcessing ? 'Paying…' : 'Pay now'}
-      </button>
-      {error && <p role="alert">{error.message}</p>}
-    </>
-  )
-}
-
-export function CustomPay({ clientSecret }: { clientSecret: string }) {
-  return (
-    <Checkout clientSecret={clientSecret} publishableKey="pk_live_stripe...">
-      <PayButton />
-    </Checkout>
-  )
-}
-```
-
-## Using live data
-
-The client secret comes from `onStripeClientSecret` of [`CheckoutButton`](/sdks/react/components/checkout-button), [`PricingTable`](/sdks/react/components/pricing-table) or [`UpgradeButton`](/sdks/react/components/upgrade-button), or from `fetchClientSecret` of [`useCheckoutSession`](/sdks/react/hooks#usecheckoutsession). Your Stripe publishable key is your own; Nozle does not return it.
-
-The `checkout` form reads `verifyCheckout` and `getCheckoutStatus` from its props first (React `0.10.0` and later), then from `BillingProvider`. A `stripe` result is mounted with Stripe only when it carries a client secret and `publishable_key`. Nozle does not return `publishable_key`, so pass a Stripe client secret with `clientSecret` and `publishableKey` instead; a `stripe` result without them shows "Payment setup is incomplete. Contact support to continue."
-
-<Warning>
-Stripe webhooks decide whether the subscription is active. `onSuccess`, `onComplete` and the return page are interface signals; reload billing status before you show success.
-</Warning>
-
-## Options
-
-`Checkout` takes one of two sets of props.
-
-### With a Stripe client secret
-
-| Prop | Type | Default | What it does |
-|---|---|---|---|
-| `clientSecret` | `string` | required | The Stripe client secret. A `cs_` Checkout Session secret mounts Embedded Checkout; any other secret mounts Payment Element. |
-| `publishableKey` | `string` | required | Your Stripe publishable key. |
-| `stripeAccount` | `string` | none | Stripe Connect account ID passed to Stripe. |
-| `returnUrl` | `string` | The current URL | Where Stripe returns the customer after a payment that needs a redirect (Payment Element). |
-| `submitLabel` | `string` | `'Pay now'` | Text of the Payment Element submit button. It reads "Processing..." while the payment is confirmed. |
-| `onSuccess` | `(paymentIntentId: string) => void` | none | Payment Element only. Called when the PaymentIntent succeeds without a redirect. |
-| `onComplete` | `() => void` | none | Embedded Checkout only. Called when the session completes without a redirect. It does not fire when the session redirects to its return URL, which is how Nozle creates sessions. |
-| `onError` | `(error: Error) => void` | none | Called with Stripe's error, or "Payment could not be confirmed. Check its status before retrying." when confirming throws. The message also shows under the form. |
-| `onReady` | `() => void` | none | Payment Element only. Called when the form can be used; a loading placeholder shows until then. |
-| `children` | `ReactNode` | A submit button | Payment Element only. Replaces the submit button. Call `useCheckout()` inside it. |
-| `className` | `string` | none | Class name on the root element. |
-| `style` | `CSSProperties` | none | Inline styles on the root element. |
-| `appearance` | `Appearance` | The provider's | Theme for the wrapper, also mapped onto Payment Element: primary, background, text and danger colours, corner radius and font. A dark card colour picks Stripe's `night` theme. Embedded Checkout uses the branding of your Stripe account. |
-
-### With a checkout result
-
-| Prop | Type | Default | What it does |
-|---|---|---|---|
-| `checkout` | `CheckoutResult` | required | A result from `createCheckout` or from a checkout status call. |
-| `submitLabel` | `string` | `'Pay now'` | Text of the pay button. It reads "Processing…" while it runs. |
-| `returnUrl` | `string` | The current URL | Passed on to Stripe when the result is mounted with Stripe. |
-| `verifyCheckout` | `(checkoutId, verification) => Promise<CheckoutStatus>` | The provider's | Checks a Razorpay payment on your backend. Required for Razorpay. |
-| `getCheckoutStatus` | `(checkoutId) => Promise<CheckoutStatus>` | The provider's | Reads the checkout status on your backend, polled up to 30 times, one second apart. Required for `processing` results. |
-| `onSuccess` | `(paymentId: string) => void` | none | Called with the payment ID when a Razorpay payment is captured and fulfilled; `onComplete` is called after it. |
-| `onComplete` | `() => void` | none | Called when the checkout completes, including `completed` and `scheduled` results. |
-| `onProcessing` | `(status: CheckoutStatus) => void` | none | Called while payment confirmation is pending. The form shows "Payment is processing. Confirmation may take a little while." |
-| `onDismiss` | `() => void` | none | Called when the customer closes Razorpay without paying. |
-| `onError` | `(error: Error) => void` | none | Called when the payment fails. The message also shows under the button. |
-| `className` | `string` | none | Class name on the root element. |
-| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
-
-### `useCheckout`
-
-Call `useCheckout()` only inside `children` of the Payment Element form. It returns `confirmPayment()`, `isProcessing` and `error`, and throws outside `Checkout`. It is not [`useCheckoutSession`](/sdks/react/hooks#usecheckoutsession), which creates a checkout.
-
-`Checkout` does not need `BillingProvider`. On the free Nozle plan it shows [Powered by Nozle](/sdks/react/components/powered-by-nozle) below the form, unless it is inside another component that already shows it.
-
-### Appearance elements
-
-`checkout` (root), `checkout__submit` (the submit or pay button), `checkout__error`.
-
-## Themes
-
-The pay button of a checkout result. Stripe's own form takes its look from Stripe and is not shown here.
+`Checkout` does not need `BillingProvider`.
 
 <Tabs>
   <Tab title="Light">
@@ -196,16 +40,295 @@ The pay button of a checkout result. Stripe's own form takes its look from Strip
       <img src="/images/react/components/checkout/nozle.png" alt="Checkout pay button for a checkout result, labelled Pay $29.00, nozle theme" width="156" />
     </Frame>
   </Tab>
-  <Tab title="Nozle dark">
+  <Tab title="Nozle Dark">
     <Frame>
       <img src="/images/react/components/checkout/nozle-dark.png" alt="Checkout pay button for a checkout result, labelled Pay $29.00, nozleDark theme" width="156" />
     </Frame>
   </Tab>
 </Tabs>
 
-## Related components
+The screenshots show the pay button of a checkout result. Stripe's own form takes its look from Stripe and is not shown.
 
-<Columns cols={2}>
+## Usage
+
+```tsx
+import { Checkout, useCheckout, type CheckoutResult } from '@nozle-js/react'
+```
+
+Pass a Stripe client secret and your Stripe publishable key:
+
+```tsx components/pay-step.tsx
+import { Checkout } from '@nozle-js/react'
+
+export function PayStep({ clientSecret }: { clientSecret: string }) {
+  return (
+    <Checkout
+      clientSecret={clientSecret}
+      publishableKey="pk_live_stripe..."
+      returnUrl="https://app.example.com/settings/billing"
+      onSuccess={(paymentIntentId) => console.log('paid', paymentIntentId)}
+      onError={(error) => console.error(error.message)}
+    />
+  )
+}
+```
+
+A `cs_` Checkout Session secret, which Nozle returns for plan and invoice checkout, mounts Stripe Embedded Checkout. Any other Stripe secret mounts Payment Element, themed from your `appearance`, with a loading placeholder and its own submit button.
+
+<Warning>
+Stripe webhooks decide whether the subscription is active. `onSuccess`, `onComplete` and the return page are interface signals; reload billing status before you show success.
+</Warning>
+
+## Data
+
+`Checkout` takes either a Stripe client secret or a `checkout` result in the `CheckoutResult` shape that `createCheckout` returns:
+
+```tsx
+import { Checkout, type CheckoutResult } from '@nozle-js/react'
+
+const result: CheckoutResult = {
+  type: 'razorpay',
+  checkout_id: 'chk_123',
+  key_id: 'rzp_live_...',
+  order_id: 'order_123',
+  amount_cents: 2900,
+  currency: 'INR',
+}
+
+export function ResumePayment() {
+  return <Checkout checkout={result} submitLabel="Pay ₹29.00" />
+}
+```
+
+See [checkout result types](/sdks/react/hooks#checkout-result-types).
+
+### Live data
+
+The client secret comes from `onStripeClientSecret` of [`CheckoutButton`](/sdks/react/components/checkout-button), [`PricingTable`](/sdks/react/components/pricing-table) or [`UpgradeButton`](/sdks/react/components/upgrade-button), or from `fetchClientSecret` of [`useCheckoutSession`](/sdks/react/hooks#usecheckoutsession). Your Stripe publishable key is your own; Nozle does not return it.
+
+```tsx
+import { useState } from 'react'
+import { Checkout, CheckoutButton } from '@nozle-js/react'
+
+export function BuyPro() {
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
+  if (clientSecret) return <Checkout clientSecret={clientSecret} publishableKey="pk_live_stripe..." />
+  return <CheckoutButton planCode="pro" onStripeClientSecret={setClientSecret} />
+}
+```
+
+A `stripe` result passed as `checkout` is mounted with Stripe only when it carries a client secret and `publishable_key`. Nozle does not return `publishable_key`, so pass a Stripe client secret with `clientSecret` and `publishableKey` instead; a `stripe` result without them shows "Payment setup is incomplete. Contact support to continue."
+
+## Examples
+
+### Pay button for a checkout result
+
+With `checkout`, the component renders a pay button that handles Razorpay, hosted, processing, completed and scheduled results. It reads `verifyCheckout` and `getCheckoutStatus` from its props first (React `0.10.0` and later), then from `BillingProvider`.
+
+<Frame>
+  <img src="/images/react/components/checkout/light.png" alt="Checkout pay button for a checkout result, labelled Pay $29.00, light theme" width="154" />
+</Frame>
+
+```tsx
+import { Checkout, type CheckoutResult, type CheckoutStatus, type RazorpayVerification } from '@nozle-js/react'
+
+const post = async (path: string, body: object): Promise<CheckoutStatus> => {
+  const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`)
+  return response.json()
+}
+
+export function ResumePayment({ result }: { result: CheckoutResult }) {
+  return (
+    <Checkout
+      checkout={result}
+      submitLabel="Pay ₹29.00"
+      verifyCheckout={(checkoutId: string, verification: RazorpayVerification) =>
+        post('/api/billing/checkout/verify', { checkoutId, ...verification })
+      }
+      getCheckoutStatus={(checkoutId: string) => post('/api/billing/checkout/status', { checkoutId })}
+      onComplete={() => console.log('done')}
+      onDismiss={() => console.log('closed')}
+    />
+  )
+}
+```
+
+### Your own pay button
+
+To place your own pay button in the Payment Element form, pass it as `children` and call `useCheckout()` in it. `children` replaces the built-in submit button.
+
+```tsx
+import { Checkout, useCheckout } from '@nozle-js/react'
+
+function PayButton() {
+  const { confirmPayment, isProcessing, error } = useCheckout()
+  return (
+    <>
+      <button type="button" onClick={() => void confirmPayment()} disabled={isProcessing}>
+        {isProcessing ? 'Paying…' : 'Pay now'}
+      </button>
+      {error && <p role="alert">{error.message}</p>}
+    </>
+  )
+}
+
+export function CustomPay({ clientSecret }: { clientSecret: string }) {
+  return (
+    <Checkout clientSecret={clientSecret} publishableKey="pk_live_stripe...">
+      <PayButton />
+    </Checkout>
+  )
+}
+```
+
+## API reference
+
+`Checkout` takes one of two sets of props.
+
+### With a Stripe client secret
+
+<ResponseField name="clientSecret" type="string" required>
+  The Stripe client secret. A `cs_` Checkout Session secret mounts Embedded Checkout; any other secret mounts Payment Element.
+</ResponseField>
+
+<ResponseField name="publishableKey" type="string" required>
+  Your Stripe publishable key.
+</ResponseField>
+
+<ResponseField name="stripeAccount" type="string">
+  Stripe Connect account ID passed to Stripe.
+</ResponseField>
+
+<ResponseField name="returnUrl" type="string">
+  Where Stripe returns the customer after a payment that needs a redirect (Payment Element). Defaults to the current URL.
+</ResponseField>
+
+<ResponseField name="submitLabel" type="string" default="Pay now">
+  Text of the Payment Element submit button. It reads "Processing..." while the payment is confirmed.
+</ResponseField>
+
+<ResponseField name="onSuccess" type="(paymentIntentId: string) => void">
+  Payment Element only. Fires when the PaymentIntent succeeds without a redirect and receives its ID.
+</ResponseField>
+
+<ResponseField name="onComplete" type="() => void">
+  Embedded Checkout only. Fires when the session completes without a redirect. It does not fire when the session redirects to its return URL, which is how Nozle creates sessions.
+</ResponseField>
+
+<ResponseField name="onError" type="(error: Error) => void">
+  Fires when the payment fails and receives Stripe's error, or "Payment could not be confirmed. Check its status before retrying." when confirming throws. The message also shows under the form.
+</ResponseField>
+
+<ResponseField name="onReady" type="() => void">
+  Payment Element only. Fires when the form can be used; a loading placeholder shows until then.
+</ResponseField>
+
+<ResponseField name="children" type="ReactNode">
+  Payment Element only. Replaces the submit button. Call `useCheckout()` inside it. Defaults to a submit button.
+</ResponseField>
+
+<ResponseField name="className" type="string">
+  Class name on the root element.
+</ResponseField>
+
+<ResponseField name="style" type="CSSProperties">
+  Inline styles on the root element.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme for the wrapper, also mapped onto Payment Element: primary, background, text and danger colours, corner radius and font. A dark card colour picks Stripe's `night` theme. Embedded Checkout uses the branding of your Stripe account. Defaults to the provider's.
+</ResponseField>
+
+### With a checkout result
+
+<ResponseField name="checkout" type="CheckoutResult" required>
+  A result from `createCheckout` or from a checkout status call.
+</ResponseField>
+
+<ResponseField name="submitLabel" type="string" default="Pay now">
+  Text of the pay button. It reads "Processing…" while it runs.
+</ResponseField>
+
+<ResponseField name="returnUrl" type="string">
+  Passed on to Stripe when the result is mounted with Stripe. Defaults to the current URL.
+</ResponseField>
+
+<ResponseField name="verifyCheckout" type="(checkoutId, verification) => Promise<CheckoutStatus>">
+  Checks a Razorpay payment on your backend. Required for Razorpay. Defaults to the provider's.
+</ResponseField>
+
+<ResponseField name="getCheckoutStatus" type="(checkoutId) => Promise<CheckoutStatus>">
+  Reads the checkout status on your backend, polled up to 30 times, one second apart. Required for `processing` results. Defaults to the provider's.
+</ResponseField>
+
+<ResponseField name="onSuccess" type="(paymentId: string) => void">
+  Fires when a Razorpay payment is captured and fulfilled and receives the payment ID; `onComplete` fires after it.
+</ResponseField>
+
+<ResponseField name="onComplete" type="() => void">
+  Fires when the checkout completes, including `completed` and `scheduled` results.
+</ResponseField>
+
+<ResponseField name="onProcessing" type="(status: CheckoutStatus) => void">
+  Fires while payment confirmation is pending and receives the status.
+</ResponseField>
+
+<ResponseField name="onDismiss" type="() => void">
+  Fires when the customer closes Razorpay without paying.
+</ResponseField>
+
+<ResponseField name="onError" type="(error: Error) => void">
+  Fires when the payment fails and receives the error. The message also shows under the button.
+</ResponseField>
+
+<ResponseField name="className" type="string">
+  Class name on the root element.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides. Defaults to the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### `useCheckout`
+
+Call `useCheckout()` only inside `children` of the Payment Element form; it throws outside `Checkout`. It is not [`useCheckoutSession`](/sdks/react/hooks#usecheckoutsession), which creates a checkout.
+
+<ResponseField name="confirmPayment" type="() => Promise<void>">
+  Confirms the payment.
+</ResponseField>
+
+<ResponseField name="isProcessing" type="boolean">
+  `true` while the payment is confirmed.
+</ResponseField>
+
+<ResponseField name="error" type="Error | null">
+  The last payment error.
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| Payment Element loading | A loading placeholder until the form can be used. |
+| Confirming the payment | "Processing..." on the submit button, or "Processing…" on the pay button. |
+| Waiting for payment confirmation | "Payment is processing. Confirmation may take a little while." |
+| Payment failed | The error message under the form or button. |
+| `stripe` result without client secret and `publishable_key` | "Payment setup is incomplete. Contact support to continue." |
+
+On the free Nozle plan `Checkout` shows [Powered by Nozle](/sdks/react/components/powered-by-nozle) below the form, unless it is inside another component that already shows it.
+
+### Appearance
+
+<Accordion title="Element keys">
+  `checkout` (root), `checkout__submit` (the submit or pay button), `checkout__error`.
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
   <Card title="CheckoutButton" icon="cart-shopping" href="/sdks/react/components/checkout-button">
     Starts checkout and returns the client secret.
   </Card>
@@ -218,4 +341,4 @@ The pay button of a checkout result. Stripe's own form takes its look from Strip
   <Card title="Razorpay" icon="indian-rupee-sign" href="/integrations/razorpay">
     Connect Razorpay to Nozle.
   </Card>
-</Columns>
+</CardGroup>

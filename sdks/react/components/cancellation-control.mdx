@@ -4,122 +4,15 @@ description: "Cancel a subscription at the end of its period, or keep it before 
 keywords: ["cancel subscription", "keep subscription", "self-service", "react"]
 ---
 
-`CancellationControl` renders "Cancel subscription" for an active subscription, or "Keep my subscription" for one that is ending. A dialog shows the date from your backend's preview before the customer confirms.
+`CancellationControl` renders "Cancel subscription" for an active subscription, or "Keep my subscription" for one that is ending, and confirms the date from your backend's preview in a dialog.
 
-## What CancellationControl supports
-
-- Cancellation at the end of the period, with the exact end date from your backend.
-- Keep (uncancel) before the end date, with the next renewal date.
-- A note that a scheduled plan change will be removed when the customer cancels.
-- Re-reading the subscription after every attempt, including a lost response, and "Check status / retry" with the same idempotency key.
-
-## Where to use CancellationControl
+**When to use**
 
 - The subscription section of your billing settings page.
-- Inside [`BillingPortal`](/sdks/react/components/billing-portal), which renders it when you pass `cancellationActions`.
+- Cancellation at the end of the period, with the exact end date from your backend.
+- Keeping (uncancelling) a subscription before its end date, with the next renewal date.
 
-## Importing CancellationControl
-
-```tsx
-import {
-  BillingPortalError,
-  CancellationControl,
-  type CancellationActions,
-  type CancellationSubscription,
-} from '@nozle-js/react'
-```
-
-## Rendering CancellationControl
-
-```tsx
-import { BillingPortalError, CancellationControl, type CancellationActions, type CancellationSubscription } from '@nozle-js/react'
-
-async function post<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(path, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal,
-  })
-  if (!response.ok) {
-    throw new BillingPortalError(response.status === 401 || response.status === 403 ? 'unauthorized' : 'request')
-  }
-  return response.json()
-}
-
-const actions: CancellationActions = {
-  preview: ({ signal, ...body }) => post('/api/billing/cancellation/preview', body, signal),
-  apply: ({ signal, ...body }) => post('/api/billing/cancellation', body, signal),
-}
-
-const subscription: CancellationSubscription = {
-  id: '6f1c2a4e-0000-4000-8000-000000000001',
-  externalId: 'sub_123',
-  name: 'Pro subscription',
-  status: 'active',
-  endingAt: null,
-  pendingPlanName: null,
-}
-
-export function CancelPlan({ onChanged }: { onChanged: () => void }) {
-  return (
-    <CancellationControl
-      subscription={subscription}
-      actions={actions}
-      refresh={(signal) => post<CancellationSubscription | null>('/api/billing/subscription', {}, signal)}
-      onChanged={onChanged}
-      locale="en-US"
-      timezone="UTC"
-    />
-  )
-}
-```
-
-## Using live data
-
-Your backend answers the two actions and `refresh` for the signed-in customer:
-
-| Callback | Receives | Returns |
-|---|---|---|
-| `preview` | `subscriptionId`, `operation` (`cancel` or `uncancel`), `signal` | `{ operation, effectiveAt, renewalAt }`, ISO dates; `renewalAt` may be null |
-| `apply` | the same, plus `idempotencyKey` and, for `cancel`, `expectedEffectiveAt` (the preview's date) | Anything |
-| `refresh` | `signal` | The subscription as `CancellationSubscription`, or `null` |
-
-Reject a changed end date on the server with HTTP 409. Use the subscription's external ID for these calls and keep its Core `id` for portal reads. See [Cancel and Keep](/sdks/react/billing-portal#cancel-and-keep) for the server side.
-
-## Options
-
-| Prop | Type | Default | What it does |
-|---|---|---|---|
-| `subscription` | `CancellationSubscription` | required | `id` (Core UUID), `externalId`, `name`, `status`, `endingAt` and optional `pendingPlanName`. The button shows only when `status` is `active` and `endingAt` has not passed. |
-| `actions` | `CancellationActions` | required | `preview` and `apply`, above. |
-| `refresh` | `(signal: AbortSignal) => Promise<CancellationSubscription \| null>` | required | Reads the saved subscription after every attempt; the control checks it to decide whether the change took effect. |
-| `onChanged` | `() => void` | none | Called after a cancellation or keep is confirmed by `refresh`. |
-| `onError` | `(error: BillingPortalError) => void` | none | Called when a request fails. |
-| `locale` | `string` | `'en-US'` | Formats the dates (long style, for example "November 1, 2026"). The text is English. |
-| `timezone` | `string` | `'UTC'` | Time zone of the dates: an IANA name, or a Nozle `TZ_` name. |
-| `nonce` | `string` | none | CSP nonce for the control's `<style>` element. |
-| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
-
-### What the customer sees
-
-| Step | Shown |
-|---|---|
-| Active subscription | "Cancel subscription". |
-| Ending subscription | "Keep my subscription". |
-| Dialog, loading | "Loading subscription details…". A failed preview shows "Could not load this change. Please try again." and "Try again". |
-| Cancel preview | "If you confirm, your subscription will end on &lt;date&gt;." and that invoices and usage charges still apply; "Confirm cancellation". |
-| Keep preview | "Your current plan will continue to renew on &lt;date&gt;."; "Confirm keep subscription". |
-| Done | "Cancellation scheduled." or "Your subscription will continue to renew." |
-
-A request that takes over 30 seconds stops with "This request timed out. Check its status before trying again." The dialog closes with Escape or Close, not while busy.
-
-### Appearance elements
-
-`cancellationControl` (root, also class `nozle-cancellation`).
-
-## Themes
+[`BillingPortal`](/sdks/react/components/billing-portal) renders this control for you when you pass `cancellationActions`.
 
 <Tabs>
   <Tab title="Light">
@@ -147,51 +40,247 @@ A request that takes over 30 seconds stops with "This request timed out. Check i
       <img src="/images/react/components/cancellation-control/nozle.png" alt="The Cancel subscription button, nozle theme" width="197" />
     </Frame>
   </Tab>
-  <Tab title="Nozle dark">
+  <Tab title="Nozle Dark">
     <Frame>
       <img src="/images/react/components/cancellation-control/nozle-dark.png" alt="The Cancel subscription button, nozleDark theme" width="197" />
     </Frame>
   </Tab>
 </Tabs>
 
+## Usage
+
+```tsx
+import {
+  BillingPortalError,
+  CancellationControl,
+  type CancellationActions,
+  type CancellationSubscription,
+} from '@nozle-js/react'
+```
+
+Pass the subscription, `actions` and `refresh`, which call your authenticated backend for the signed-in customer (see [Live data](#live-data)):
+
+```tsx components/cancel-plan.tsx
+'use client'
+import { CancellationControl, type CancellationActions, type CancellationSubscription } from '@nozle-js/react'
+
+export function CancelPlan(props: {
+  subscription: CancellationSubscription
+  actions: CancellationActions
+  refresh: (signal: AbortSignal) => Promise<CancellationSubscription | null>
+  onChanged: () => void
+}) {
+  return <CancellationControl {...props} locale="en-US" timezone="UTC" />
+}
+```
+
+After every attempt, including one whose response was lost, the control re-reads the subscription with `refresh`. "Check status / retry" retries with the same idempotency key.
+
+## Data
+
+`subscription` and `refresh` use the `CancellationSubscription` shape:
+
+```tsx
+import type { CancellationSubscription } from '@nozle-js/react'
+
+export const subscription: CancellationSubscription = {
+  id: '6f1c2a4e-0000-4000-8000-000000000001',
+  externalId: 'sub_123',
+  name: 'Pro subscription',
+  status: 'active',
+  endingAt: null,
+  pendingPlanName: null,
+}
+```
+
+### Live data
+
+Create `actions` and `refresh` once, outside the component:
+
+```tsx lib/cancellation-actions.ts
+import { BillingPortalError, type CancellationActions, type CancellationSubscription } from '@nozle-js/react'
+
+async function post<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(path, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal,
+  })
+  if (!response.ok) {
+    throw new BillingPortalError(response.status === 401 || response.status === 403 ? 'unauthorized' : 'request')
+  }
+  return response.json()
+}
+
+export const actions: CancellationActions = {
+  preview: ({ signal, ...body }) => post('/api/billing/cancellation/preview', body, signal),
+  apply: ({ signal, ...body }) => post('/api/billing/cancellation', body, signal),
+}
+
+export const refresh = (signal: AbortSignal) =>
+  post<CancellationSubscription | null>('/api/billing/subscription', {}, signal)
+```
+
+Your backend answers the two actions and `refresh` for the signed-in customer. Reject a changed end date on the server with HTTP 409. Use the subscription's external ID for these calls and keep its Core `id` for portal reads. See [Cancel and Keep](/sdks/react/billing-portal#cancel-and-keep) for the server side.
+
+### Data from the API
+
+| Callback | Receives | Returns |
+|---|---|---|
+| `preview` | `subscriptionId`, `operation` (`cancel` or `uncancel`), `signal` | `{ operation, effectiveAt, renewalAt }`, ISO dates; `renewalAt` may be null |
+| `apply` | the same, plus `idempotencyKey` and, for `cancel`, `expectedEffectiveAt` (the preview's date) | Anything |
+| `refresh` | `signal` | The subscription as `CancellationSubscription`, or `null` |
+
+## Examples
+
 ### Cancel dialog
 
-<Tabs>
-  <Tab title="Light">
-    <Frame>
-      <img src="/images/react/components/cancellation-control-dialog/light.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, light theme" width="472" />
-    </Frame>
-  </Tab>
-  <Tab title="Dark">
-    <Frame>
-      <img src="/images/react/components/cancellation-control-dialog/dark.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, dark theme" width="472" />
-    </Frame>
-  </Tab>
-  <Tab title="Minimal">
-    <Frame>
-      <img src="/images/react/components/cancellation-control-dialog/minimal.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, minimal theme" width="472" />
-    </Frame>
-  </Tab>
-  <Tab title="Neobrutal">
-    <Frame>
-      <img src="/images/react/components/cancellation-control-dialog/neobrutal.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, neobrutal theme" width="472" />
-    </Frame>
-  </Tab>
-  <Tab title="Nozle">
-    <Frame>
-      <img src="/images/react/components/cancellation-control-dialog/nozle.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, nozle theme" width="472" />
-    </Frame>
-  </Tab>
-  <Tab title="Nozle dark">
-    <Frame>
-      <img src="/images/react/components/cancellation-control-dialog/nozle-dark.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, nozleDark theme" width="472" />
-    </Frame>
-  </Tab>
-</Tabs>
+"Cancel subscription" opens a dialog with the end date from `preview`, a note that invoices and usage charges still apply, and "Confirm cancellation". When `pendingPlanName` is set, the dialog also says that the scheduled plan change will be removed and that keeping the subscription later will not restore it.
 
-## Related components
+<Frame>
+  <img src="/images/react/components/cancellation-control-dialog/light.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, light theme" width="472" />
+</Frame>
 
-<Columns cols={2}>
+```tsx
+import { CancellationControl, type CancellationActions, type CancellationSubscription } from '@nozle-js/react'
+
+const subscription: CancellationSubscription = {
+  id: '6f1c2a4e-0000-4000-8000-000000000001',
+  externalId: 'sub_123',
+  name: 'Pro subscription',
+  status: 'active',
+  endingAt: null,
+  pendingPlanName: 'Free',
+}
+
+export function CancelPlan({ actions, refresh }: {
+  actions: CancellationActions
+  refresh: (signal: AbortSignal) => Promise<CancellationSubscription | null>
+}) {
+  return <CancellationControl subscription={subscription} actions={actions} refresh={refresh} />
+}
+```
+
+### Keep an ending subscription
+
+When `endingAt` is set and has not passed, the button reads "Keep my subscription". Its dialog says "Your current plan will continue to renew on &lt;date&gt;." and offers "Confirm keep subscription".
+
+```tsx
+import { CancellationControl, type CancellationActions, type CancellationSubscription } from '@nozle-js/react'
+
+const subscription: CancellationSubscription = {
+  id: '6f1c2a4e-0000-4000-8000-000000000001',
+  externalId: 'sub_123',
+  name: 'Pro subscription',
+  status: 'active',
+  endingAt: '2026-11-01T00:00:00Z',
+}
+
+export function KeepPlan({ actions, refresh }: {
+  actions: CancellationActions
+  refresh: (signal: AbortSignal) => Promise<CancellationSubscription | null>
+}) {
+  return <CancellationControl subscription={subscription} actions={actions} refresh={refresh} />
+}
+```
+
+## API reference
+
+<ResponseField name="subscription" type="CancellationSubscription" required>
+  The subscription. The button shows only when `status` is `active` and `endingAt` has not passed.
+
+  <Expandable title="properties">
+    <ResponseField name="id" type="string" required>
+      Core UUID, distinct from the external subscription ID.
+    </ResponseField>
+    <ResponseField name="externalId" type="string" required>
+      External subscription ID, sent to `preview` and `apply` as `subscriptionId`.
+    </ResponseField>
+    <ResponseField name="name" type="string" required>
+      Shown under the dialog title.
+    </ResponseField>
+    <ResponseField name="status" type="string" required>
+      Subscription status, for example `active`.
+    </ResponseField>
+    <ResponseField name="endingAt" type="string | null" required>
+      End date of a cancelled subscription. When set, the control offers "Keep my subscription".
+    </ResponseField>
+    <ResponseField name="pendingPlanName" type="string | null">
+      Name of a scheduled plan change, which a cancellation removes.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="actions" type="CancellationActions" required>
+  Your backend callbacks.
+
+  <Expandable title="properties">
+    <ResponseField name="preview" type="(input: CancellationInput) => Promise<CancellationPreview>" required>
+      Fires when the dialog opens and receives `subscriptionId`, `operation` (`cancel` or `uncancel`) and `signal`. Returns `{ operation, effectiveAt, renewalAt }`.
+    </ResponseField>
+    <ResponseField name="apply" type="(input: CancellationApplyInput) => Promise<unknown>" required>
+      Fires on confirm and receives the same, plus `idempotencyKey` and, for `cancel`, `expectedEffectiveAt`. May return anything.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="refresh" type="(signal: AbortSignal) => Promise<CancellationSubscription | null>" required>
+  Reads the saved subscription before each preview and after every attempt; the control checks it to decide whether the change took effect.
+</ResponseField>
+
+<ResponseField name="onChanged" type="() => void">
+  Fires after a cancellation or keep is confirmed by `refresh`.
+</ResponseField>
+
+<ResponseField name="onError" type="(error: BillingPortalError) => void">
+  Fires when a request fails and receives the `BillingPortalError`.
+</ResponseField>
+
+<ResponseField name="locale" type="string" default="en-US">
+  Formats the dates (long style, for example "November 1, 2026"). The text is English.
+</ResponseField>
+
+<ResponseField name="timezone" type="string" default="UTC">
+  Time zone of the dates: an IANA name, or a Nozle `TZ_` name.
+</ResponseField>
+
+<ResponseField name="nonce" type="string">
+  CSP nonce for the control's `<style>` element.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides on top of the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| Active subscription | "Cancel subscription". |
+| Ending subscription | "Keep my subscription". |
+| Dialog, loading | "Loading subscription details…". A failed preview shows "Could not load this change. Please try again." and "Try again". |
+| Subscription changed since render | "Your subscription changed. Close this dialog and refresh your billing details." |
+| Cancel preview | "If you confirm, your subscription will end on &lt;date&gt;." and that invoices and usage charges still apply; "Confirm cancellation". |
+| Keep preview | "Your current plan will continue to renew on &lt;date&gt;."; "Confirm keep subscription". |
+| Confirming | "Confirming subscription status…". |
+| Done | "Cancellation scheduled." or "Your subscription will continue to renew." |
+| Request over 30 seconds | "This request timed out. Check its status before trying again." |
+
+The dialog closes with Escape or Close, not while busy.
+
+### Appearance
+
+<Accordion title="Element keys">
+  `cancellationControl` (root, also class `nozle-cancellation`).
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
   <Card title="PlanChangeControl" icon="arrows-rotate" href="/sdks/react/components/plan-change-control">
     Upgrades, downgrades and scheduled changes.
   </Card>
@@ -204,4 +293,4 @@ A request that takes over 30 seconds stops with "This request timed out. Check i
   <Card title="CurrentPlan" icon="circle-info" href="/sdks/react/components/current-plan">
     Shows "Ends &lt;date&gt;" for a cancelled subscription.
   </Card>
-</Columns>
+</CardGroup>

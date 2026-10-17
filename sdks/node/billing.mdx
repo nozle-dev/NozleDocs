@@ -40,7 +40,7 @@ const result = await nozle.checkout(
 
 A paid upgrade returns `plan_upgrade_intent_id` instead of `invoice_id` on `stripe` and `razorpay` results. On `scheduled`, `subscription_id` is the pending subscription. The `CheckoutResult` type declares `payment_source` on `completed` results. `pending_subscription_id` was removed from the type in `0.10.0` because the API never returns it; earlier versions declared it.
 
-Use the exported `CheckoutResult` union instead of a reduced local type. Do not treat every non-Stripe response as a scheduled downgrade. React's checkout components handle these result variants; see [checkout components](/sdks/react/components#checkout-components).
+Use the exported `CheckoutResult` union instead of a reduced local type. Do not treat every non-Stripe response as a scheduled downgrade. React's checkout components handle these result variants; see [checkout components](/sdks/react/components#checkout).
 
 Validate the exact HTTPS return origin on your server before passing it to Nozle.
 
