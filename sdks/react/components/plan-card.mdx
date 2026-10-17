@@ -4,111 +4,13 @@ description: "One plan from your catalog as a card with its price, what it inclu
 keywords: ["plan card", "pricing", "react"]
 ---
 
-`PlanCard` renders a single plan with its price, the lines read from the plan and a button. Use it when you lay out your pricing page yourself instead of using [`PricingTable`](/sdks/react/components/pricing-table).
+`PlanCard` renders a single plan with its price, the lines read from the plan and a button, for when you lay out your pricing page yourself instead of using [`PricingTable`](/sdks/react/components/pricing-table).
 
-## What PlanCard supports
-
-- Name, description, price with its interval, and the plan's lines from `planFeatures`.
-- A current-plan look with a disabled "Current Plan" button.
-- A "Get Started" button that calls your `onSelect` with the plan code and return URL.
-- The `card` and `panel` layouts of the theme.
-
-## Where to use PlanCard
+**When to use**
 
 - A custom pricing grid, carousel or comparison page.
 - A "recommended plan" box next to other content.
 - An upgrade prompt that shows the plan the customer would move to.
-
-## Importing PlanCard
-
-```tsx
-import { PlanCard, type CreateCheckoutInput, type PricingPlan } from '@nozle-js/react'
-```
-
-## Rendering PlanCard
-
-```tsx
-import { PlanCard, type CreateCheckoutInput, type PricingPlan } from '@nozle-js/react'
-
-const pro: PricingPlan = {
-  code: 'pro',
-  name: 'Pro',
-  amount_cents: 2900,
-  amount_currency: 'USD',
-  interval: 'monthly',
-  description: 'For growing teams',
-  entitlements: [
-    { feature_type: 'metered', code: 'api_calls', name: 'API calls', usage_limit: 50000 },
-    { feature_type: 'metered', code: 'seats', name: 'Seats', usage_limit: 10 },
-  ],
-  credit_grant_rules: [{ credit_system_code: 'ai_credits', amount: '500', interval: 'month' }],
-}
-
-export function ProCard({ currentPlanCode }: { currentPlanCode: string }) {
-  const select = ({ planCode, returnUrl }: CreateCheckoutInput) => {
-    window.location.assign(`/checkout?plan=${planCode}&return=${encodeURIComponent(returnUrl)}`)
-  }
-  return (
-    <PlanCard
-      plan={pro}
-      isCurrent={currentPlanCode === pro.code}
-      returnUrl="https://app.example.com/settings/billing"
-      onSelect={select}
-    />
-  )
-}
-```
-
-## Using live data
-
-Read the plans with [`usePlans`](/sdks/react/hooks#useplans) inside `BillingProvider`, and start checkout with [`useCheckoutSession`](/sdks/react/hooks#usecheckoutsession), which calls the provider's `createCheckout`. The catalog may return `description: null`, which `PricingPlan` does not accept, so map it.
-
-```tsx
-import { useState } from 'react'
-import { Checkout, PlanCard, useCheckoutSession, usePlans, type PricingPlan } from '@nozle-js/react'
-
-export function PlanCards({ currentPlanCode }: { currentPlanCode: string }) {
-  const { plans } = usePlans()
-  const { fetchClientSecret } = useCheckoutSession()
-  const [clientSecret, setClientSecret] = useState<string | null>(null)
-
-  if (clientSecret) {
-    return <Checkout clientSecret={clientSecret} publishableKey="pk_live_stripe..." />
-  }
-  return plans.map((plan) => {
-    const card: PricingPlan = { ...plan, description: plan.description ?? undefined }
-    return (
-      <PlanCard
-        key={plan.code}
-        plan={card}
-        isCurrent={plan.code === currentPlanCode}
-        onSelect={({ planCode, returnUrl }) => void fetchClientSecret(planCode, returnUrl).then(setClientSecret)}
-      />
-    )
-  })
-}
-```
-
-## Options
-
-| Prop | Type | Default | What it does |
-|---|---|---|---|
-| `plan` | `PricingPlan` | required | The plan to show: `code`, `name`, `amount_cents`, `amount_currency`, `interval`, and optional `description`, `entitlements`, `credit_grant_rules`, `charges`. |
-| `isCurrent` | `boolean` | required | Shows the card as the customer's plan: a primary-colour border, `aria-current="true"`, and a disabled "Current Plan" button. |
-| `features` | `string[]` | Lines from `planFeatures(plan)` | Replaces the lines read from the plan. |
-| `onSelect` | `(input: CreateCheckoutInput) => void` | none | Called with `{ planCode, returnUrl }` when the "Get Started" button is clicked. Without it the card has no button. |
-| `returnUrl` | `string` | The current URL | The `returnUrl` passed to `onSelect`. |
-| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
-
-The price is formatted in the plan's currency, without decimals for whole amounts (`$29`, `$14.99`). The interval reads `month`, `year`, `week`, `quarter` or `6 months`; other intervals show as sent. The root has `data-testid="plan-card-<code>"`.
-
-`PlanCard` does not fetch anything and does not show [Powered by Nozle](/sdks/react/components/powered-by-nozle).
-
-### Appearance elements
-
-`planCard` (root), `planCard__name`, `planCard__description`, `planCard__price`, `planCard__features`, `planCard__feature`, `planCard__cta`. In the [panel layout](/sdks/react/styling#plan-card-layout) also `planCard__header` and `planCard__badge`, which reads "Active" on the current plan.
-
-## Themes
 
 <Tabs>
   <Tab title="Light">
@@ -136,53 +38,190 @@ The price is formatted in the plan's currency, without decimals for whole amount
       <img src="/images/react/components/plan-card/nozle.png" alt="PlanCard for the Pro plan with its price, three lines and a Get Started button, nozle theme" width="508" />
     </Frame>
   </Tab>
-  <Tab title="Nozle dark">
+  <Tab title="Nozle Dark">
     <Frame>
       <img src="/images/react/components/plan-card/nozle-dark.png" alt="PlanCard for the Pro plan with its price, three lines and a Get Started button, nozleDark theme" width="508" />
     </Frame>
   </Tab>
 </Tabs>
 
+## Usage
+
+```tsx
+import { PlanCard, type CreateCheckoutInput, type PricingPlan } from '@nozle-js/react'
+```
+
+Pass a plan and an `onSelect` handler; the card calls it with the plan code and return URL when the "Get Started" button is clicked:
+
+```tsx components/pro-card.tsx
+import { PlanCard, type CreateCheckoutInput, type PricingPlan } from '@nozle-js/react'
+
+export function ProCard({ plan, currentPlanCode }: { plan: PricingPlan; currentPlanCode: string }) {
+  const select = ({ planCode, returnUrl }: CreateCheckoutInput) => {
+    window.location.assign(`/checkout?plan=${planCode}&return=${encodeURIComponent(returnUrl)}`)
+  }
+  return (
+    <PlanCard
+      plan={plan}
+      isCurrent={currentPlanCode === plan.code}
+      returnUrl="https://app.example.com/settings/billing"
+      onSelect={select}
+    />
+  )
+}
+```
+
+The card shows the name, description, price with its interval and the plan's lines from `planFeatures`. The price is formatted in the plan's currency, without decimals for whole amounts (`$29`, `$14.99`). The interval reads `month`, `year`, `week`, `quarter` or `6 months`; other intervals show as sent.
+
+`PlanCard` does not fetch anything and does not show [Powered by Nozle](/sdks/react/components/powered-by-nozle).
+
+## Data
+
+The card needs one plan in the `PricingPlan` shape the public catalog returns:
+
+```tsx
+import { PlanCard, type PricingPlan } from '@nozle-js/react'
+
+const pro: PricingPlan = {
+  code: 'pro',
+  name: 'Pro',
+  amount_cents: 2900,
+  amount_currency: 'USD',
+  interval: 'monthly',
+  description: 'For growing teams',
+  entitlements: [
+    { feature_type: 'metered', code: 'api_calls', name: 'API calls', usage_limit: 50000 },
+    { feature_type: 'metered', code: 'seats', name: 'Seats', usage_limit: 10 },
+  ],
+  credit_grant_rules: [{ credit_system_code: 'ai_credits', amount: '500', interval: 'month' }],
+}
+
+export function ProCard() {
+  return <PlanCard plan={pro} isCurrent={false} />
+}
+```
+
+### Live data
+
+Read the plans with [`usePlans`](/sdks/react/hooks#useplans) inside `BillingProvider`, and start checkout with [`useCheckoutSession`](/sdks/react/hooks#usecheckoutsession), which calls the provider's `createCheckout`:
+
+```tsx
+import { useState } from 'react'
+import { Checkout, PlanCard, useCheckoutSession, usePlans } from '@nozle-js/react'
+
+export function PlanCards({ currentPlanCode }: { currentPlanCode: string }) {
+  const { plans } = usePlans()
+  const { fetchClientSecret } = useCheckoutSession()
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
+
+  if (clientSecret) {
+    return <Checkout clientSecret={clientSecret} publishableKey="pk_live_stripe..." />
+  }
+  return plans.map((plan) => (
+    <PlanCard
+      key={plan.code}
+      plan={plan}
+      isCurrent={plan.code === currentPlanCode}
+      onSelect={({ planCode, returnUrl }) => void fetchClientSecret(planCode, returnUrl).then(setClientSecret)}
+    />
+  ))
+}
+```
+
+## Examples
+
 ### Current plan
 
-`isCurrent`:
+With `isCurrent`, the card gets a primary-colour border, `aria-current="true"` and a disabled "Current Plan" button.
 
-<Tabs>
-  <Tab title="Light">
-    <Frame>
-      <img src="/images/react/components/plan-card-current/light.png" alt="PlanCard for the current Free plan with a disabled Current Plan button, light theme" width="508" />
-    </Frame>
-  </Tab>
-  <Tab title="Dark">
-    <Frame>
-      <img src="/images/react/components/plan-card-current/dark.png" alt="PlanCard for the current Free plan with a disabled Current Plan button, dark theme" width="508" />
-    </Frame>
-  </Tab>
-  <Tab title="Minimal">
-    <Frame>
-      <img src="/images/react/components/plan-card-current/minimal.png" alt="PlanCard for the current Free plan with a disabled Current Plan button, minimal theme" width="508" />
-    </Frame>
-  </Tab>
-  <Tab title="Neobrutal">
-    <Frame>
-      <img src="/images/react/components/plan-card-current/neobrutal.png" alt="PlanCard for the current Free plan with a disabled Current Plan button, neobrutal theme" width="508" />
-    </Frame>
-  </Tab>
-  <Tab title="Nozle">
-    <Frame>
-      <img src="/images/react/components/plan-card-current/nozle.png" alt="PlanCard for the current Free plan with a disabled Current Plan button, nozle theme" width="508" />
-    </Frame>
-  </Tab>
-  <Tab title="Nozle dark">
-    <Frame>
-      <img src="/images/react/components/plan-card-current/nozle-dark.png" alt="PlanCard for the current Free plan with a disabled Current Plan button, nozleDark theme" width="508" />
-    </Frame>
-  </Tab>
-</Tabs>
+<Frame>
+  <img src="/images/react/components/plan-card-current/light.png" alt="PlanCard for the current Free plan with a disabled Current Plan button, light theme" width="508" />
+</Frame>
 
-## Related components
+```tsx
+import { PlanCard, type PricingPlan } from '@nozle-js/react'
 
-<Columns cols={2}>
+export function FreeCard({ plan }: { plan: PricingPlan }) {
+  return <PlanCard plan={plan} isCurrent onSelect={() => {}} />
+}
+```
+
+### Panel layout
+
+The themes `nozle` and `nozleDark` use the [panel card layout](/sdks/react/styling#plan-card-layout): the name in a header band, with a badge that reads "Active" on the current plan.
+
+<Frame>
+  <img src="/images/react/components/plan-card/nozle.png" alt="PlanCard for the Pro plan in the panel layout with a header band, nozle theme" width="508" />
+</Frame>
+
+```tsx
+import { PlanCard, type PricingPlan } from '@nozle-js/react'
+import { nozle } from '@nozle-js/react/themes'
+
+export function ProCard({ plan }: { plan: PricingPlan }) {
+  return <PlanCard plan={plan} isCurrent={false} onSelect={() => {}} appearance={{ theme: nozle }} />
+}
+```
+
+### Custom lines
+
+`features` replaces the lines read from the plan.
+
+```tsx
+import { PlanCard, type PricingPlan } from '@nozle-js/react'
+
+export function ProCard({ plan }: { plan: PricingPlan }) {
+  return <PlanCard plan={plan} isCurrent={false} features={['Unlimited projects', 'Priority support']} />
+}
+```
+
+## API reference
+
+<ResponseField name="plan" type="PricingPlan" required>
+  The plan to show: `code`, `name`, `amount_cents`, `amount_currency`, `interval`, and optional `description`, `entitlements`, `credit_grant_rules`, `charges`.
+</ResponseField>
+
+<ResponseField name="isCurrent" type="boolean" required>
+  Shows the card as the customer's plan: a primary-colour border, `aria-current="true"`, and a disabled "Current Plan" button.
+</ResponseField>
+
+<ResponseField name="features" type="string[]">
+  Replaces the lines read from the plan. Defaults to the lines from `planFeatures(plan)`.
+</ResponseField>
+
+<ResponseField name="onSelect" type="(input: CreateCheckoutInput) => void">
+  Fires when the "Get Started" button is clicked and receives `{ planCode, returnUrl }`. Without it the card has no button.
+</ResponseField>
+
+<ResponseField name="returnUrl" type="string">
+  The `returnUrl` passed to `onSelect`. Defaults to the current URL.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides. Defaults to the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| Not current | The "Get Started" button, when `onSelect` is set. |
+| Current plan | A primary-colour border and a disabled "Current Plan" button; in the panel layout, the "Active" badge. |
+| No `onSelect` | The card without a button. |
+
+The root has `data-testid="plan-card-<code>"`.
+
+### Appearance
+
+<Accordion title="Element keys">
+  `planCard` (root), `planCard__name`, `planCard__description`, `planCard__price`, `planCard__features`, `planCard__feature`, `planCard__cta`. In the [panel layout](/sdks/react/styling#plan-card-layout) also `planCard__header` and `planCard__badge`, which reads "Active" on the current plan.
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
   <Card title="PricingTable" icon="table-columns" href="/sdks/react/components/pricing-table">
     All plans with checkout built in.
   </Card>
@@ -195,4 +234,4 @@ The price is formatted in the plan's currency, without decimals for whole amount
   <Card title="PlanBadge" icon="tag" href="/sdks/react/components/plan-badge">
     The plan name as a small badge.
   </Card>
-</Columns>
+</CardGroup>

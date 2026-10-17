@@ -4,71 +4,12 @@ description: "The customer's saved card with brand, last four digits and expiry,
 keywords: ["payment method", "card", "billing settings", "react"]
 ---
 
-`PaymentMethodDisplay` shows one saved payment method and an "Update Payment Method" button. You pass the card details; the component does not read them.
+`PaymentMethodDisplay` shows one saved payment method you pass and an "Update Payment Method" button.
 
-## What PaymentMethodDisplay supports
-
-- Brand name, `•••• 1234` and `Expires MM/YY`.
-- Readable names for `visa`, `mastercard`, `amex`, `discover`, `jcb`, `diners` and `unionpay`; another brand shows as sent.
-- "No payment method on file." when there is none.
-- An update button that calls your handler or opens a page.
-
-## Where to use PaymentMethodDisplay
+**When to use**
 
 - The payment section of your billing settings page.
 - Next to a past-due notice, so the customer can fix the card.
-
-## Importing PaymentMethodDisplay
-
-```tsx
-import { PaymentMethodDisplay, type PaymentMethod } from '@nozle-js/react'
-```
-
-## Rendering PaymentMethodDisplay
-
-```tsx
-import { PaymentMethodDisplay, type PaymentMethod } from '@nozle-js/react'
-
-const card: PaymentMethod = { brand: 'visa', last4: '4242', expMonth: 8, expYear: 2029 }
-
-export function SavedCard({ openUpdate }: { openUpdate: () => void }) {
-  return <PaymentMethodDisplay paymentMethod={card} onUpdatePaymentMethod={openUpdate} />
-}
-```
-
-## Using live data
-
-No Nozle hook returns the saved payment method. Read it on your backend from your payment provider for the signed-in customer, and pass `brand`, `last4`, `expMonth` and `expYear`.
-
-```tsx
-import { useEffect, useState } from 'react'
-import { PaymentMethodDisplay, type PaymentMethod } from '@nozle-js/react'
-
-export function CardFromBackend() {
-  const [card, setCard] = useState<PaymentMethod | undefined>()
-  useEffect(() => {
-    void fetch('/api/billing/payment-method')
-      .then((response) => (response.ok ? response.json() : undefined))
-      .then(setCard)
-  }, [])
-  return <PaymentMethodDisplay paymentMethod={card} updateHref="/settings/billing/card" />
-}
-```
-
-## Options
-
-| Prop | Type | Default | What it does |
-|---|---|---|---|
-| `paymentMethod` | `PaymentMethod` | none | `brand`, `last4`, `expMonth` and `expYear` of the card. Without it the component shows "No payment method on file." |
-| `onUpdatePaymentMethod` | `() => void` | none | Called when "Update Payment Method" is clicked. |
-| `updateHref` | `string` | `'/billing/update-payment'` | Without `onUpdatePaymentMethod`, the button opens this URL in the same window. |
-| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
-
-### Appearance elements
-
-`paymentMethod` (root).
-
-## Themes
 
 <Tabs>
   <Tab title="Light">
@@ -96,55 +37,114 @@ export function CardFromBackend() {
       <img src="/images/react/components/payment-method-display/nozle.png" alt="PaymentMethodDisplay with a Visa ending 4242 that expires 08/29, nozle theme" width="508" />
     </Frame>
   </Tab>
-  <Tab title="Nozle dark">
+  <Tab title="Nozle Dark">
     <Frame>
       <img src="/images/react/components/payment-method-display/nozle-dark.png" alt="PaymentMethodDisplay with a Visa ending 4242 that expires 08/29, nozleDark theme" width="508" />
     </Frame>
   </Tab>
 </Tabs>
 
+## Usage
+
+```tsx
+import { PaymentMethodDisplay, type PaymentMethod } from '@nozle-js/react'
+```
+
+Pass the card and a handler for the update button:
+
+```tsx components/saved-card.tsx
+import { PaymentMethodDisplay, type PaymentMethod } from '@nozle-js/react'
+
+const card: PaymentMethod = { brand: 'visa', last4: '4242', expMonth: 8, expYear: 2029 }
+
+export function SavedCard({ openUpdate }: { openUpdate: () => void }) {
+  return <PaymentMethodDisplay paymentMethod={card} onUpdatePaymentMethod={openUpdate} />
+}
+```
+
+The card shows the brand name, `•••• 4242` and `Expires 08/29`. `visa`, `mastercard`, `amex`, `discover`, `jcb`, `diners` and `unionpay` get readable names; another brand shows as sent.
+
+## Data
+
+The component does not read the card; you pass a `PaymentMethod` with `brand`, `last4`, `expMonth` and `expYear`.
+
+### Live data
+
+No Nozle hook returns the saved payment method. Read it on your backend from your payment provider for the signed-in customer, and pass it in:
+
+```tsx
+import { useEffect, useState } from 'react'
+import { PaymentMethodDisplay, type PaymentMethod } from '@nozle-js/react'
+
+export function CardFromBackend() {
+  const [card, setCard] = useState<PaymentMethod | undefined>()
+  useEffect(() => {
+    void fetch('/api/billing/payment-method')
+      .then((response) => (response.ok ? response.json() : undefined))
+      .then(setCard)
+  }, [])
+  return <PaymentMethodDisplay paymentMethod={card} updateHref="/settings/billing/card" />
+}
+```
+
+## Examples
+
 ### No payment method
 
-<Tabs>
-  <Tab title="Light">
-    <Frame>
-      <img src="/images/react/components/payment-method-display-empty/light.png" alt="PaymentMethodDisplay with No payment method on file, light theme" width="508" />
-    </Frame>
-  </Tab>
-  <Tab title="Dark">
-    <Frame>
-      <img src="/images/react/components/payment-method-display-empty/dark.png" alt="PaymentMethodDisplay with No payment method on file, dark theme" width="508" />
-    </Frame>
-  </Tab>
-  <Tab title="Minimal">
-    <Frame>
-      <img src="/images/react/components/payment-method-display-empty/minimal.png" alt="PaymentMethodDisplay with No payment method on file, minimal theme" width="508" />
-    </Frame>
-  </Tab>
-  <Tab title="Neobrutal">
-    <Frame>
-      <img src="/images/react/components/payment-method-display-empty/neobrutal.png" alt="PaymentMethodDisplay with No payment method on file, neobrutal theme" width="508" />
-    </Frame>
-  </Tab>
-  <Tab title="Nozle">
-    <Frame>
-      <img src="/images/react/components/payment-method-display-empty/nozle.png" alt="PaymentMethodDisplay with No payment method on file, nozle theme" width="508" />
-    </Frame>
-  </Tab>
-  <Tab title="Nozle dark">
-    <Frame>
-      <img src="/images/react/components/payment-method-display-empty/nozle-dark.png" alt="PaymentMethodDisplay with No payment method on file, nozleDark theme" width="508" />
-    </Frame>
-  </Tab>
-</Tabs>
+Without `paymentMethod`, the component shows "No payment method on file." and the update button.
 
-## Related components
+<Frame>
+  <img src="/images/react/components/payment-method-display-empty/light.png" alt="PaymentMethodDisplay with No payment method on file, light theme" width="508" />
+</Frame>
 
-<Columns cols={2}>
+```tsx
+import { PaymentMethodDisplay } from '@nozle-js/react'
+
+export function NoCard() {
+  return <PaymentMethodDisplay updateHref="/settings/billing/card" />
+}
+```
+
+## API reference
+
+<ResponseField name="paymentMethod" type="PaymentMethod">
+  `brand`, `last4`, `expMonth` and `expYear` of the card. Without it the component shows "No payment method on file."
+</ResponseField>
+
+<ResponseField name="onUpdatePaymentMethod" type="() => void">
+  Fires when "Update Payment Method" is clicked.
+</ResponseField>
+
+<ResponseField name="updateHref" type="string" default="/billing/update-payment">
+  Without `onUpdatePaymentMethod`, the button opens this URL in the same window.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides on top of the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| Card passed | Brand, `•••• <last4>`, `Expires MM/YY` and the update button. |
+| No `paymentMethod` | "No payment method on file." and the update button. |
+
+### Appearance
+
+<Accordion title="Element keys">
+  `paymentMethod` (root).
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
   <Card title="CurrentPlan" icon="circle-info" href="/sdks/react/components/current-plan">
     Shows the overdue payment alert.
   </Card>
   <Card title="BillingPortal" icon="building-columns" href="/sdks/react/components/billing-portal">
     Invoices and billing details for the customer.
   </Card>
-</Columns>
+</CardGroup>

@@ -4,76 +4,14 @@ description: "Shows content only when the customer's plan is in a list of plans.
 keywords: ["plan gate", "access control", "react"]
 ---
 
-`PlanGate` renders its children when `currentPlan` is one of `allowedPlans`, and `fallback` otherwise. It has no look of its own and fetches nothing.
+`PlanGate` renders its children when `currentPlan` is one of `allowedPlans`, and `fallback` otherwise.
 
-## What PlanGate supports
-
-- An allowlist of plan codes, compared exactly.
-- A fallback for every other plan.
-
-## Where to use PlanGate
+**When to use**
 
 - Around a section sold as part of higher plans, when no single entitlement describes it.
-- Prefer [`FeatureGate`](/sdks/react/components/feature-gate) with an entitlement when one exists: it keeps working when you add plans.
+- When an allowlist of plan codes, compared exactly, decides access.
 
-Gates only change what the interface shows. Check access again on your server.
-
-## Importing PlanGate
-
-```tsx
-import { PlanGate, UpgradePrompt } from '@nozle-js/react'
-```
-
-## Rendering PlanGate
-
-```tsx
-import { PlanGate, UpgradePrompt } from '@nozle-js/react'
-
-export function TeamSettings({ planCode }: { planCode: string }) {
-  return (
-    <PlanGate currentPlan={planCode} allowedPlans={['pro', 'scale']} fallback={<UpgradePrompt planName="Pro" />}>
-      <section>{/* Team settings */}</section>
-    </PlanGate>
-  )
-}
-```
-
-## Using live data
-
-Take the plan code from [`useSubscription`](/sdks/react/hooks#the-hooks):
-
-```tsx
-import { PlanGate, UpgradePrompt, useSubscription } from '@nozle-js/react'
-
-export function Analytics() {
-  const { data, isPending } = useSubscription()
-  if (isPending) return null
-  return (
-    <PlanGate
-      currentPlan={data?.subscription?.plan_code ?? ''}
-      allowedPlans={['pro', 'scale']}
-      fallback={<UpgradePrompt planName="Pro" />}
-    >
-      <div>{/* Analytics */}</div>
-    </PlanGate>
-  )
-}
-```
-
-## Options
-
-| Prop | Type | Default | What it does |
-|---|---|---|---|
-| `currentPlan` | `string` | required | The customer's plan code. |
-| `allowedPlans` | `string[]` | required | Plan codes that may see `children`. |
-| `children` | `ReactNode` | required | The plan-gated content. |
-| `fallback` | `ReactNode` | `null` | Rendered for any plan not in `allowedPlans`. |
-
-`PlanGate` has no loading state and no `appearance`; render nothing yourself while the plan loads.
-
-## Themes
-
-The fallbacks of the three gates, each an [`UpgradePrompt`](/sdks/react/components/upgrade-prompt):
+Prefer [`FeatureGate`](/sdks/react/components/feature-gate) with an entitlement when one exists: it keeps working when you add plans. Gates only change what the interface shows. Check access again on your server.
 
 <Tabs>
   <Tab title="Light">
@@ -101,20 +39,119 @@ The fallbacks of the three gates, each an [`UpgradePrompt`](/sdks/react/componen
       <img src="/images/react/components/gates/nozle.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, nozle theme" width="508" />
     </Frame>
   </Tab>
-  <Tab title="Nozle dark">
+  <Tab title="Nozle Dark">
     <Frame>
       <img src="/images/react/components/gates/nozle-dark.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, nozleDark theme" width="508" />
     </Frame>
   </Tab>
 </Tabs>
 
-## Related components
+## Usage
 
-<Columns cols={2}>
+```tsx
+import { PlanGate, UpgradePrompt, type PlanGateProps } from '@nozle-js/react'
+```
+
+`PlanGate` has no look of its own and fetches nothing: you pass the customer's plan code.
+
+```tsx components/team-settings.tsx
+import { PlanGate, UpgradePrompt } from '@nozle-js/react'
+
+export function TeamSettings({ planCode }: { planCode: string }) {
+  return (
+    <PlanGate currentPlan={planCode} allowedPlans={['pro', 'scale']} fallback={<UpgradePrompt planName="Pro" />}>
+      <section>{/* Team settings */}</section>
+    </PlanGate>
+  )
+}
+```
+
+## Data
+
+The gate needs the customer's plan code as `currentPlan`. It has no loading state; render nothing yourself while the plan loads.
+
+### Live data
+
+Take the plan code from [`useSubscription`](/sdks/react/hooks#the-hooks):
+
+```tsx
+import { PlanGate, UpgradePrompt, useSubscription } from '@nozle-js/react'
+
+export function Analytics() {
+  const { data, isPending } = useSubscription()
+  if (isPending) return null
+  return (
+    <PlanGate
+      currentPlan={data?.subscription?.plan_code ?? ''}
+      allowedPlans={['pro', 'scale']}
+      fallback={<UpgradePrompt planName="Pro" />}
+    >
+      <div>{/* Analytics */}</div>
+    </PlanGate>
+  )
+}
+```
+
+## Examples
+
+### Upgrade prompt as fallback
+
+Any plan not in `allowedPlans` gets the fallback, usually an [`UpgradePrompt`](/sdks/react/components/upgrade-prompt). The screenshot shows the fallbacks of [`FeatureGate`](/sdks/react/components/feature-gate), `PlanGate` and [`UsageGate`](/sdks/react/components/usage-gate), each an `UpgradePrompt`.
+
+<Frame>
+  <img src="/images/react/components/gates/light.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, light theme" width="508" />
+</Frame>
+
+```tsx
+import { PlanGate, UpgradePrompt } from '@nozle-js/react'
+
+export function AuditLog({ planCode, openPlans }: { planCode: string; openPlans: () => void }) {
+  return (
+    <PlanGate currentPlan={planCode} allowedPlans={['scale']} fallback={<UpgradePrompt planName="Scale" onUpgrade={openPlans} />}>
+      <section>{/* Audit log */}</section>
+    </PlanGate>
+  )
+}
+```
+
+## API reference
+
+<ResponseField name="currentPlan" type="string" required>
+  The customer's plan code.
+</ResponseField>
+
+<ResponseField name="allowedPlans" type="string[]" required>
+  Plan codes that may see `children`, compared exactly.
+</ResponseField>
+
+<ResponseField name="children" type="ReactNode" required>
+  The plan-gated content.
+</ResponseField>
+
+<ResponseField name="fallback" type="ReactNode" default={null}>
+  Rendered for any plan not in `allowedPlans`.
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| `currentPlan` in `allowedPlans` | `children`. |
+| Any other plan | `fallback`, or nothing without one. |
+
+`PlanGate` has no loading state.
+
+### Appearance
+
+`PlanGate` takes no `appearance` and has no element keys; style the fallback you pass.
+
+## Related
+
+<CardGroup cols={2}>
   <Card title="FeatureGate" icon="lock" href="/sdks/react/components/feature-gate">
     Gate by entitlement.
   </Card>
   <Card title="PlanBadge" icon="tag" href="/sdks/react/components/plan-badge">
     Show the customer's plan.
   </Card>
-</Columns>
+</CardGroup>

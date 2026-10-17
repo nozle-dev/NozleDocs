@@ -4,27 +4,97 @@ description: "A table of your plans side by side, one row per entitlement and cr
 keywords: ["plan comparison", "feature table", "pricing", "react"]
 ---
 
-`PlanComparison` renders your plans as columns and what they include as rows, so customers see the real difference between plans. Put it under a [`PricingTable`](/sdks/react/components/pricing-table).
+`PlanComparison` renders your plans as columns and what they include as rows, so customers see the real difference between plans.
 
-## What PlanComparison supports
+**When to use**
 
-- One column per plan with its name and price, cheapest first.
-- One row per entitlement and per granted credit system, built from the catalog.
-- A check for an included feature, the limit or value where there is one, and a cross where a plan does not have it.
-- Your own rows with `features`, and your own order with `sort`.
-
-## Where to use PlanComparison
-
-- Below the plan cards on a pricing page.
+- Below the plan cards of a [`PricingTable`](/sdks/react/components/pricing-table) on a pricing page.
 - A "compare plans" page or dialog.
 
-## Importing PlanComparison
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/plan-comparison/light.png" alt="PlanComparison of Free, Pro and Scale with rows for API calls, seats and AI credits, light theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/plan-comparison/dark.png" alt="PlanComparison of Free, Pro and Scale with rows for API calls, seats and AI credits, dark theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/plan-comparison/minimal.png" alt="PlanComparison of Free, Pro and Scale with rows for API calls, seats and AI credits, minimal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/plan-comparison/neobrutal.png" alt="PlanComparison of Free, Pro and Scale with rows for API calls, seats and AI credits, neobrutal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/plan-comparison/nozle.png" alt="PlanComparison of Free, Pro and Scale with rows for API calls, seats and AI credits, nozle theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    <Frame>
+      <img src="/images/react/components/plan-comparison/nozle-dark.png" alt="PlanComparison of Free, Pro and Scale with rows for API calls, seats and AI credits, nozleDark theme" width="1008" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Usage
 
 ```tsx
-import { PlanComparison, type ComparisonFeature, type PricingPlan } from '@nozle-js/react'
+import { PlanComparison, comparisonRows, type ComparisonFeature, type PricingPlan } from '@nozle-js/react'
 ```
 
-## Rendering PlanComparison
+Pass the plans; the table builds one column per plan and one row per entitlement and per granted credit system:
+
+```tsx components/compare-plans.tsx
+import { PlanComparison, type PricingPlan } from '@nozle-js/react'
+
+export function ComparePlans({ plans }: { plans: PricingPlan[] }) {
+  return <PlanComparison plans={plans} />
+}
+```
+
+Each column shows the plan's name and price, cheapest first. A cell shows a check for an included feature, the limit or value where there is one, and a cross where a plan does not have it. A wide table scrolls sideways inside its frame.
+
+## Data
+
+The table needs plans in the `PricingPlan` shape the public catalog returns. The rows come from their `entitlements` and `credit_grant_rules`:
+
+```tsx
+import { PlanComparison, type PricingPlan } from '@nozle-js/react'
+
+const plans: PricingPlan[] = [
+  {
+    code: 'free',
+    name: 'Free',
+    amount_cents: 0,
+    amount_currency: 'USD',
+    interval: 'monthly',
+    entitlements: [{ feature_type: 'metered', code: 'api_calls', name: 'API calls', usage_limit: 1000 }],
+  },
+  {
+    code: 'pro',
+    name: 'Pro',
+    amount_cents: 2900,
+    amount_currency: 'USD',
+    interval: 'monthly',
+    entitlements: [{ feature_type: 'metered', code: 'api_calls', name: 'API calls', usage_limit: 50000 }],
+    credit_grant_rules: [{ credit_system_code: 'ai_credits', amount: '500', interval: 'month' }],
+  },
+]
+
+export function ComparePlans() {
+  return <PlanComparison plans={plans} />
+}
+```
+
+<Accordion title="Full example data">
 
 ```tsx
 import { PlanComparison, type PricingPlan } from '@nozle-js/react'
@@ -60,7 +130,40 @@ export function ComparePlans() {
 }
 ```
 
-To write the rows yourself, pass `features`. `values` is keyed by plan code; `true` shows a check, `false` a cross, and a string is shown as written.
+</Accordion>
+
+### Live data
+
+Pass the plans of [`usePlans`](/sdks/react/hooks#useplans). `comparisonRows(plans)` returns the generated rows, so you can add or remove rows before passing them as `features`:
+
+```tsx
+import { PlanComparison, comparisonRows, usePlans } from '@nozle-js/react'
+
+export function LiveComparison() {
+  const { plans, isLoading } = usePlans()
+  if (isLoading) return null
+  const rows = comparisonRows(plans).filter((row) => row.key !== 'entitlement:internal_flag')
+  return <PlanComparison plans={plans} features={rows} />
+}
+```
+
+### Data from the API
+
+Generated row keys are `entitlement:<feature code>` and `credit:<credit system code>`. A cell shows:
+
+| Plan has | Cell |
+|---|---|
+| A metered entitlement with a `usage_limit` | The limit, for example `50,000` |
+| A boolean entitlement, or a metered one without a limit | A check |
+| A `config` entitlement | Its privilege values, comma-separated |
+| A credit grant rule | `500 ai credits every month` |
+| Nothing for that row | A cross |
+
+## Examples
+
+### Your own rows
+
+Pass `features` to write the rows yourself. `values` is keyed by plan code; `true` shows a check, `false` a cross, and a string is shown as written.
 
 ```tsx
 import { PlanComparison, type ComparisonFeature, type PricingPlan } from '@nozle-js/react'
@@ -80,89 +183,61 @@ export function ComparePlans() {
 }
 ```
 
-## Using live data
+### Your own column order
 
-Pass the plans of [`usePlans`](/sdks/react/hooks#useplans). `comparisonRows(plans)` returns the generated rows, so you can add or remove rows before passing them as `features`. The catalog may return `description: null`, which `PricingPlan` does not accept, so map it.
+`sort` orders the columns, for example most expensive first.
 
 ```tsx
-import { PlanComparison, comparisonRows, usePlans, type PricingPlan } from '@nozle-js/react'
+import { PlanComparison, type PricingPlan } from '@nozle-js/react'
 
-export function LiveComparison() {
-  const { plans, isLoading } = usePlans()
-  if (isLoading) return null
-  const shown: PricingPlan[] = plans.map((plan) => ({ ...plan, description: plan.description ?? undefined }))
-  const rows = comparisonRows(shown).filter((row) => row.key !== 'entitlement:internal_flag')
-  return <PlanComparison plans={shown} features={rows} />
+export function ComparePlans({ plans }: { plans: PricingPlan[] }) {
+  return <PlanComparison plans={plans} sort={(a, b) => b.amount_cents - a.amount_cents} />
 }
 ```
 
-Generated row keys are `entitlement:<feature code>` and `credit:<credit system code>`. A cell shows:
+## API reference
 
-| Plan has | Cell |
+<ResponseField name="plans" type="PricingPlan[]" required>
+  The plans to compare. The rows are built from their `entitlements` and `credit_grant_rules`.
+</ResponseField>
+
+<ResponseField name="features" type="ComparisonFeature[]">
+  Replaces the rows. Each row is `{ key, label, values }`; `values` maps a plan code to `true`, `false` or a string. A plan missing from `values` shows `—`. Defaults to `comparisonRows(plans)`.
+</ResponseField>
+
+<ResponseField name="sort" type="(a: PricingPlan, b: PricingPlan) => number">
+  Orders the columns. Defaults to cheapest first with `sortPlansByPrice`: by base price, with plans in different currencies grouped.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides. Defaults to the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+| State | What shows |
 |---|---|
-| A metered entitlement with a `usage_limit` | The limit, for example `50,000` |
-| A boolean entitlement, or a metered one without a limit | A check |
-| A `config` entitlement | Its privilege values, comma-separated |
-| A credit grant rule | `500 ai credits every month` |
-| Nothing for that row | A cross |
+| Plan includes the row | A check, or the limit or value. |
+| Plan does not include the row | A cross. |
+| Plan missing from a custom row's `values` | `—`. |
 
-## Options
+On the free Nozle plan the table shows [Powered by Nozle](/sdks/react/components/powered-by-nozle) below it.
 
-| Prop | Type | Default | What it does |
-|---|---|---|---|
-| `plans` | `PricingPlan[]` | required | The plans to compare. The rows are built from their `entitlements` and `credit_grant_rules`. |
-| `features` | `ComparisonFeature[]` | `comparisonRows(plans)` | Replaces the rows. Each row is `{ key, label, values }`; `values` maps a plan code to `true`, `false` or a string. A plan missing from `values` shows `—`. |
-| `sort` | `(a: PricingPlan, b: PricingPlan) => number` | Cheapest first | Orders the columns. The default is `sortPlansByPrice`: by base price, with plans in different currencies grouped. |
-| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
+### Appearance
 
-A wide table scrolls sideways inside its frame. On the free Nozle plan the table shows [Powered by Nozle](/sdks/react/components/powered-by-nozle) below it.
+<Accordion title="Element keys">
+  `planComparison` (root), `planComparison__table`, `planComparison__row`, `planComparison__cell` (header and body cells).
 
-### Appearance elements
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
 
-`planComparison` (root), `planComparison__table`, `planComparison__row`, `planComparison__cell` (header and body cells).
+## Related
 
-## Themes
-
-<Tabs>
-  <Tab title="Light">
-    <Frame>
-      <img src="/images/react/components/plan-comparison/light.png" alt="PlanComparison of Free, Pro and Scale with rows for API calls, seats and AI credits, light theme" width="1008" />
-    </Frame>
-  </Tab>
-  <Tab title="Dark">
-    <Frame>
-      <img src="/images/react/components/plan-comparison/dark.png" alt="PlanComparison of Free, Pro and Scale with rows for API calls, seats and AI credits, dark theme" width="1008" />
-    </Frame>
-  </Tab>
-  <Tab title="Minimal">
-    <Frame>
-      <img src="/images/react/components/plan-comparison/minimal.png" alt="PlanComparison of Free, Pro and Scale with rows for API calls, seats and AI credits, minimal theme" width="1008" />
-    </Frame>
-  </Tab>
-  <Tab title="Neobrutal">
-    <Frame>
-      <img src="/images/react/components/plan-comparison/neobrutal.png" alt="PlanComparison of Free, Pro and Scale with rows for API calls, seats and AI credits, neobrutal theme" width="1008" />
-    </Frame>
-  </Tab>
-  <Tab title="Nozle">
-    <Frame>
-      <img src="/images/react/components/plan-comparison/nozle.png" alt="PlanComparison of Free, Pro and Scale with rows for API calls, seats and AI credits, nozle theme" width="1008" />
-    </Frame>
-  </Tab>
-  <Tab title="Nozle dark">
-    <Frame>
-      <img src="/images/react/components/plan-comparison/nozle-dark.png" alt="PlanComparison of Free, Pro and Scale with rows for API calls, seats and AI credits, nozleDark theme" width="1008" />
-    </Frame>
-  </Tab>
-</Tabs>
-
-## Related components
-
-<Columns cols={2}>
+<CardGroup cols={2}>
   <Card title="PricingTable" icon="table-columns" href="/sdks/react/components/pricing-table">
     Plan cards with checkout.
   </Card>
   <Card title="PlanCard" icon="id-card" href="/sdks/react/components/plan-card">
     One plan card for your own layout.
   </Card>
-</Columns>
+</CardGroup>

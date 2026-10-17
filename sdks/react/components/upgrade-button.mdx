@@ -4,111 +4,15 @@ description: "A button that opens a confirmation dialog for a plan change and th
 keywords: ["upgrade button", "plan change", "react"]
 ---
 
-`UpgradeButton` opens an [`UpgradeModal`](/sdks/react/components/upgrade-modal) for one target plan. When the customer confirms, it calls `createCheckout` on `BillingProvider` and closes once checkout starts, the upgrade completes or a downgrade is scheduled.
+`UpgradeButton` opens an [`UpgradeModal`](/sdks/react/components/upgrade-modal) for one target plan and, when the customer confirms, starts the change through `createCheckout` on `BillingProvider`.
 
-## What UpgradeButton supports
-
-- A confirmation step with the price difference you pass in `preview`.
-- Plan changes through `createCheckout`, with the subscription, quote and idempotency key you pass.
-- Every checkout result: Stripe client secret, Razorpay, hosted, processing, completed and scheduled.
-- Separate callbacks for an upgrade that completed, a downgrade that was scheduled, and a checkout that started.
-
-## Where to use UpgradeButton
+**When to use**
 
 - Next to the current plan in billing settings ("Upgrade to Scale").
 - In an [`UpgradePrompt`](/sdks/react/components/upgrade-prompt) or usage notice that names the next plan.
+- A plan change that needs a confirmation step with the price difference.
 
 For a full plan picker with exact quotes, use [`PlanChangeControl`](/sdks/react/components/plan-change-control).
-
-## Importing UpgradeButton
-
-```tsx
-import { UpgradeButton, type ProrationPreview } from '@nozle-js/react'
-```
-
-## Rendering UpgradeButton
-
-`preview` amounts are in major units (dollars, not cents).
-
-```tsx
-import { UpgradeButton, type ProrationPreview } from '@nozle-js/react'
-
-const preview: ProrationPreview = {
-  credit: 14.5,
-  debit: 49.5,
-  net: 35,
-  currency: 'USD',
-  nextBillingDate: '2026-11-01T00:00:00Z',
-}
-
-export function UpgradeToScale({ onClientSecret, reload }: { onClientSecret: (secret: string) => void; reload: () => void }) {
-  return (
-    <UpgradeButton
-      planCode="scale"
-      label="Upgrade to Scale"
-      subscriptionId="sub_123"
-      preview={preview}
-      onStripeClientSecret={onClientSecret}
-      onUpgraded={reload}
-      onDowngradeScheduled={reload}
-      onError={(error) => console.error(error.message)}
-    />
-  )
-}
-```
-
-Render it inside a `BillingProvider` with `createCheckout`; see [Configure BillingProvider](/sdks/react/installation#configure-billingprovider).
-
-## Using live data
-
-[`useUpgradePreview(planCode)`](/sdks/react/hooks#the-hooks) reads the quote for a plan change from your `billingEndpoint`. Its amounts are minor units and it has no separate credit and debit, so it does not fit `ProrationPreview`. Pass its `quote_id` as `quoteId`, and show its amounts in an [`UpgradeModal`](/sdks/react/components/upgrade-modal#using-live-data) you control, or use [`PlanChangeControl`](/sdks/react/components/plan-change-control), which shows the exact quote.
-
-```tsx
-import { UpgradeButton, useBillingRefresh, useSubscription, useUpgradePreview } from '@nozle-js/react'
-
-export function UpgradeWithQuote() {
-  const subscription = useSubscription()
-  const quote = useUpgradePreview('scale')
-  const refresh = useBillingRefresh()
-  return (
-    <UpgradeButton
-      planCode="scale"
-      subscriptionId={subscription.data?.subscription?.external_id}
-      quoteId={quote.data?.quote_id}
-      onUpgraded={() => void refresh()}
-      onDowngradeScheduled={() => void refresh()}
-    />
-  )
-}
-```
-
-## Options
-
-| Prop | Type | Default | What it does |
-|---|---|---|---|
-| `planCode` | `string` | required | The plan to change to, sent to `createCheckout`. |
-| `label` | `string` | `'Upgrade'` | Button text. |
-| `preview` | `ProrationPreview` | none | Amounts shown in the dialog, in major units: `credit`, `debit`, `net`, `nextBillingDate` and optional `currency` (default `USD`). See [`UpgradeModal`](/sdks/react/components/upgrade-modal#options). |
-| `subscriptionId` | `string` | not sent | The customer's external subscription ID, sent to `createCheckout` to change that subscription. `subscriptionId`, `quoteId` and `idempotencyKey` need React `0.10.0` or later. |
-| `quoteId` | `string` | not sent | A server-issued quote the customer saw, sent to `createCheckout`. |
-| `idempotencyKey` | `string` | not sent | Sent to `createCheckout`. Reuse the same key when retrying the same change. |
-| `returnUrl` | `string` | The current URL | Sent to `createCheckout`. |
-| `onStripeClientSecret` | `(clientSecret: string) => void` | none | Receives the client secret of an embedded Stripe checkout; render [`Checkout`](/sdks/react/components/checkout) with it. Without it the dialog closes and the secret is not used. |
-| `onCheckoutStarted` | `() => void` | none | Called after a Stripe client secret was handed over. The dialog closes. |
-| `onUpgraded` | `() => void` | none | Called when the change completed, or a Razorpay payment was captured. The dialog closes. |
-| `onDowngradeScheduled` | `() => void` | none | Called for a `scheduled` result. The dialog closes. |
-| `onError` | `(error: Error) => void` | none | Called when the change fails. The dialog stays open and shows the message. |
-| `className` | `string` | none | Class name on the button. |
-| `style` | `CSSProperties` | none | Inline styles on the button. |
-| `appearance` | `Appearance` | The provider's | Used for the button and the dialog. See [Appearance](/sdks/react/styling). |
-
-Without `createCheckout` on the provider, confirming shows "BillingProvider createCheckout callback is required for checkout" in the dialog.
-
-### Appearance elements
-
-`upgradeButton` (the button), and the dialog's `upgradeModal`, `upgradeModal__dialog`, `upgradeModal__actions`.
-
-## Themes
 
 <Tabs>
   <Tab title="Light">
@@ -136,51 +40,196 @@ Without `createCheckout` on the provider, confirming shows "BillingProvider crea
       <img src="/images/react/components/upgrade-button/nozle.png" alt="UpgradeButton labelled Upgrade to Scale, nozle theme" width="202" />
     </Frame>
   </Tab>
-  <Tab title="Nozle dark">
+  <Tab title="Nozle Dark">
     <Frame>
       <img src="/images/react/components/upgrade-button/nozle-dark.png" alt="UpgradeButton labelled Upgrade to Scale, nozleDark theme" width="202" />
     </Frame>
   </Tab>
 </Tabs>
 
-The dialog it opens:
+## Usage
 
-<Tabs>
-  <Tab title="Light">
-    <Frame>
-      <img src="/images/react/components/upgrade-modal/light.png" alt="The confirmation dialog with credits applied, new plan charge, amount due today and next billing date, light theme" width="512" />
-    </Frame>
-  </Tab>
-  <Tab title="Dark">
-    <Frame>
-      <img src="/images/react/components/upgrade-modal/dark.png" alt="The confirmation dialog with credits applied, new plan charge, amount due today and next billing date, dark theme" width="512" />
-    </Frame>
-  </Tab>
-  <Tab title="Minimal">
-    <Frame>
-      <img src="/images/react/components/upgrade-modal/minimal.png" alt="The confirmation dialog with credits applied, new plan charge, amount due today and next billing date, minimal theme" width="512" />
-    </Frame>
-  </Tab>
-  <Tab title="Neobrutal">
-    <Frame>
-      <img src="/images/react/components/upgrade-modal/neobrutal.png" alt="The confirmation dialog with credits applied, new plan charge, amount due today and next billing date, neobrutal theme" width="512" />
-    </Frame>
-  </Tab>
-  <Tab title="Nozle">
-    <Frame>
-      <img src="/images/react/components/upgrade-modal/nozle.png" alt="The confirmation dialog with credits applied, new plan charge, amount due today and next billing date, nozle theme" width="512" />
-    </Frame>
-  </Tab>
-  <Tab title="Nozle dark">
-    <Frame>
-      <img src="/images/react/components/upgrade-modal/nozle-dark.png" alt="The confirmation dialog with credits applied, new plan charge, amount due today and next billing date, nozleDark theme" width="512" />
-    </Frame>
-  </Tab>
-</Tabs>
+```tsx
+import { UpgradeButton, type ProrationPreview } from '@nozle-js/react'
+```
 
-## Related components
+Render it inside a `BillingProvider` with `createCheckout` (see [Configure BillingProvider](/sdks/react/installation#configure-billingprovider)) and reload billing data when the change is done:
 
-<Columns cols={2}>
+```tsx components/upgrade-to-scale.tsx
+import { UpgradeButton, useBillingRefresh } from '@nozle-js/react'
+
+export function UpgradeToScale({ onClientSecret }: { onClientSecret: (secret: string) => void }) {
+  const refresh = useBillingRefresh()
+  return (
+    <UpgradeButton
+      planCode="scale"
+      label="Upgrade to Scale"
+      subscriptionId="sub_123"
+      onStripeClientSecret={onClientSecret}
+      onUpgraded={() => void refresh()}
+      onDowngradeScheduled={() => void refresh()}
+      onError={(error) => console.error(error.message)}
+    />
+  )
+}
+```
+
+### What a confirm does
+
+The button calls `createCheckout` with the plan code, return URL and the `subscriptionId`, `quoteId` and `idempotencyKey` you pass, then handles every checkout result: Stripe client secret, Razorpay, hosted, processing, completed and scheduled. The dialog closes and:
+
+- calls `onCheckoutStarted` after a Stripe client secret was handed to `onStripeClientSecret`,
+- calls `onUpgraded` when the change completed, or a Razorpay payment was captured,
+- calls `onDowngradeScheduled` for a `scheduled` result.
+
+When the change fails, the dialog stays open and shows the message. See [checkout result types](/sdks/react/hooks#checkout-result-types).
+
+## Data
+
+`preview` holds the amounts shown in the dialog, in major units (dollars, not cents):
+
+```tsx
+import { UpgradeButton, type ProrationPreview } from '@nozle-js/react'
+
+const preview: ProrationPreview = {
+  credit: 14.5,
+  debit: 49.5,
+  net: 35,
+  currency: 'USD',
+  nextBillingDate: '2026-11-01T00:00:00Z',
+}
+
+export function UpgradeToScale() {
+  return <UpgradeButton planCode="scale" label="Upgrade to Scale" preview={preview} />
+}
+```
+
+### Live data
+
+[`useUpgradePreview(planCode)`](/sdks/react/hooks#the-hooks) reads the quote for a plan change from your `billingEndpoint`. Its amounts are minor units and it has no separate credit and debit, so it does not fit `ProrationPreview`. Pass its `quote_id` as `quoteId`, and show its amounts in an [`UpgradeModal`](/sdks/react/components/upgrade-modal#live-data) you control, or use [`PlanChangeControl`](/sdks/react/components/plan-change-control), which shows the exact quote.
+
+```tsx
+import { UpgradeButton, useBillingRefresh, useSubscription, useUpgradePreview } from '@nozle-js/react'
+
+export function UpgradeWithQuote() {
+  const subscription = useSubscription()
+  const quote = useUpgradePreview('scale')
+  const refresh = useBillingRefresh()
+  return (
+    <UpgradeButton
+      planCode="scale"
+      subscriptionId={subscription.data?.subscription?.external_id}
+      quoteId={quote.data?.quote_id}
+      onUpgraded={() => void refresh()}
+      onDowngradeScheduled={() => void refresh()}
+    />
+  )
+}
+```
+
+## Examples
+
+### The confirmation dialog
+
+A click opens the dialog with the amounts from `preview`: credits applied, the new plan charge, the amount due today and the next billing date.
+
+<Frame>
+  <img src="/images/react/components/upgrade-modal/light.png" alt="The confirmation dialog with credits applied, new plan charge, amount due today and next billing date, light theme" width="512" />
+</Frame>
+
+```tsx
+import { UpgradeButton, type ProrationPreview } from '@nozle-js/react'
+
+const preview: ProrationPreview = { credit: 14.5, debit: 49.5, net: 35, currency: 'USD', nextBillingDate: '2026-11-01T00:00:00Z' }
+
+export function UpgradeToScale() {
+  return <UpgradeButton planCode="scale" label="Upgrade to Scale" preview={preview} />
+}
+```
+
+## API reference
+
+<ResponseField name="planCode" type="string" required>
+  The plan to change to, sent to `createCheckout`.
+</ResponseField>
+
+<ResponseField name="label" type="string" default="Upgrade">
+  Button text.
+</ResponseField>
+
+<ResponseField name="preview" type="ProrationPreview">
+  Amounts shown in the dialog, in major units: `credit`, `debit`, `net`, `nextBillingDate` and optional `currency` (defaults to `USD`). See [`UpgradeModal`](/sdks/react/components/upgrade-modal#api-reference).
+</ResponseField>
+
+<ResponseField name="subscriptionId" type="string">
+  The customer's external subscription ID, sent to `createCheckout` to change that subscription. Not sent when left out. `subscriptionId`, `quoteId` and `idempotencyKey` need React `0.10.0` or later.
+</ResponseField>
+
+<ResponseField name="quoteId" type="string">
+  A server-issued quote the customer saw, sent to `createCheckout`. Not sent when left out.
+</ResponseField>
+
+<ResponseField name="idempotencyKey" type="string">
+  Sent to `createCheckout`. Reuse the same key when retrying the same change. Not sent when left out.
+</ResponseField>
+
+<ResponseField name="returnUrl" type="string">
+  Sent to `createCheckout`. Defaults to the current URL.
+</ResponseField>
+
+<ResponseField name="onStripeClientSecret" type="(clientSecret: string) => void">
+  Fires for an embedded Stripe checkout and receives its client secret; render [`Checkout`](/sdks/react/components/checkout) with it. Without it the dialog closes and the secret is not used.
+</ResponseField>
+
+<ResponseField name="onCheckoutStarted" type="() => void">
+  Fires after a Stripe client secret was handed over. The dialog closes.
+</ResponseField>
+
+<ResponseField name="onUpgraded" type="() => void">
+  Fires when the change completed, or a Razorpay payment was captured. The dialog closes.
+</ResponseField>
+
+<ResponseField name="onDowngradeScheduled" type="() => void">
+  Fires for a `scheduled` result. The dialog closes.
+</ResponseField>
+
+<ResponseField name="onError" type="(error: Error) => void">
+  Fires when the change fails and receives the error. The dialog stays open and shows the message.
+</ResponseField>
+
+<ResponseField name="className" type="string">
+  Class name on the button.
+</ResponseField>
+
+<ResponseField name="style" type="CSSProperties">
+  Inline styles on the button.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Used for the button and the dialog. Defaults to the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| Closed | The button. |
+| Open | The confirmation dialog, with the `preview` amounts when set. |
+| Confirming | "Checking subscription…" on the dialog's confirm button. |
+| Change failed | The message in the dialog, which stays open. |
+| No `createCheckout` on the provider | "BillingProvider createCheckout callback is required for checkout" in the dialog after confirm. |
+
+### Appearance
+
+<Accordion title="Element keys">
+  `upgradeButton` (the button), and the dialog's `upgradeModal`, `upgradeModal__dialog`, `upgradeModal__actions`.
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
   <Card title="UpgradeModal" icon="window-maximize" href="/sdks/react/components/upgrade-modal">
     The dialog on its own, with your open state.
   </Card>
@@ -193,4 +242,4 @@ The dialog it opens:
   <Card title="Checkout" icon="credit-card" href="/sdks/react/components/checkout">
     The Stripe payment step.
   </Card>
-</Columns>
+</CardGroup>
