@@ -117,8 +117,8 @@ This is a backend SDK. Never expose an `sk_`, master key, or internal credential
 
 ## Transport behavior
 
-- The SDK does not automatically retry requests.
-- Mutations therefore execute at most once per SDK call.
+- Retries are off by default (`max_retries=0`), so a mutation executes at most once per SDK call.
+- With `max_retries` set, reads are retried, and a write is retried only when it is idempotent or carries an idempotency key.
 - Connection and timeout failures raise `NozleTransportError`.
 - Non-2xx responses raise structured `NozleAPIError`.
 - Sensitive values in API error payloads are redacted.
