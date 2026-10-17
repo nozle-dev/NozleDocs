@@ -7,7 +7,7 @@ description: Product and developer-platform updates from Nozle
 
 ### Node.js SDK 0.13.0
 
-_Unreleased_
+_October 17, 2026_
 
 - [`@nozle-js/node` 0.13.0](https://github.com/nozle-dev/nozle-js/releases/tag/node-v0.13.0): `new Nozle()` reads `NOZLE_SECRET_KEY` when you pass no `apiKey`. The `host` option (default `https://api.nozle.app`) fills in `baseUrl` and `eventsUrl`. Opt-in retries with `maxRetries` and `retryDelayMs` repeat only requests that are safe to repeat. See [Installation](/sdks/node/installation).
 - Every call that gets a non-2xx response throws `NozleApiError`, which now carries `requestId` and `retryAfter`. The message keeps its `<operation> failed: <status> <statusText>` form and the class still extends `Error`. See [Errors and retries](/sdks/node/errors).
@@ -23,7 +23,7 @@ _Unreleased_
 
 ### React SDK 0.11.0
 
-_Unreleased_
+_October 17, 2026_
 
 - [`@nozle-js/react` 0.11.0](https://github.com/nozle-dev/nozle-js/releases/tag/react-v0.11.0) adds customer billing hooks built on TanStack Query: `useSubscription`, `useEntitlement`, `useCreditBalance`, `useCreditHistory`, `useUsage`, `useUpgradePreview`, `useBillingRefresh`, `useInvoices` and `useInvoiceDownload`. They read your backend route set as `BillingProvider` `billingEndpoint` (served by `createBillingHandler` from `@nozle-js/node` `0.13.0`), so the browser never holds a secret key. See [Provider and hooks](/sdks/react/hooks).
 - New components: [`CurrentPlan`](/sdks/react/components/current-plan), [`CreditBalance`](/sdks/react/components/credit-balance), [`CreditHistory`](/sdks/react/components/credit-history), [`UsageBreakdown`](/sdks/react/components/usage-breakdown), [`UsageTrend`](/sdks/react/components/usage-trend) and [`PoweredByNozle`](/sdks/react/components/powered-by-nozle).
@@ -38,7 +38,7 @@ _Unreleased_
 
 ### Python SDK 0.13.0
 
-_Unreleased_
+_October 17, 2026_
 
 - [`nozle-sdk` 0.13.0](https://github.com/nozle-dev/nozle-python/releases/tag/v0.13.0) adds `AsyncNozle` for asyncio apps, with the same arguments, namespaces and methods as `Nozle`, awaited. See [Installation](/sdks/python/installation#async-client).
 - `Nozle()` reads `NOZLE_SECRET_KEY` when you pass no `api_key`. The `host` argument (default `https://api.nozle.app`) fills in `base_url` and `events_url`. Opt-in retries with `max_retries` and `retry_delay` repeat only requests that are safe to repeat. `NozleAPIError` adds `request_id` and `retry_after`.
@@ -52,7 +52,7 @@ _Unreleased_
 
 ### Go SDK v0.12.0
 
-_Unreleased_
+_October 17, 2026_
 
 - [`github.com/nozle-dev/nozle-go` v0.12.0](https://github.com/nozle-dev/nozle-go/releases/tag/v0.12.0): `New` reads `NOZLE_SECRET_KEY` when the key argument is blank. `WithHost` (default `https://api.nozle.app`) fills in the Engine and Core URLs. Opt-in retries with `WithMaxRetries` and `WithRetryDelay` repeat only calls that are safe to repeat. `APIError` adds `RequestID` and `RetryAfter`. See [Installation](/sdks/go/installation).
 - `WrapHTTPClient` records the token usage of any LLM SDK that takes an `*http.Client`, and `RecordUsage` records usage your code read itself. See [LLM usage capture](/sdks/go/llm-usage).
@@ -65,14 +65,14 @@ _Unreleased_
 
 ### React themes
 
-_Unreleased_
+_October 17, 2026_
 
 - `@nozle-js/react` `0.11.0` adds `appearance` on `BillingProvider` and every component, with predefined themes from `@nozle-js/react/themes`: `light`, `dark`, `minimal`, `neobrutal`, `nozle` and `nozleDark`, and every colour adjustable. `PricingTable` adds `highlightStyle` (`outline` or `filled`) and `highlightLabel`. See [Appearance](/sdks/react/styling).
 - Components render without Tailwind. `PricingTable` marks contact-sales plans from `contactSalesPlans` instead of their names. Upgrade notes are on the Appearance page.
 
 ### Error statuses and checkout fixes
 
-_Unreleased_
+_October 17, 2026_
 
 - **Breaking:** a request that the resource's current state refuses now returns `422` instead of `405`, with the same `code` (for example `not_voidable` or `plan_transition_policy_required`). A conflict with another operation in progress returns `409`. The SDKs branch on `code`, so their behavior is unchanged. See [Errors](/api/errors).
 - Bad bodies and unreachable dependencies return JSON errors with a `code` instead of `500`: `400 bad_request`, `502 upstream_unavailable`.
@@ -82,7 +82,7 @@ _Unreleased_
 
 ### Usage, credits and checkout fixes
 
-_Unreleased_
+_October 17, 2026_
 
 - The [LLM proxy](/api/llm-proxy#subscription) finds the subscription to bill before it calls the provider, and its usage event carries that `external_subscription_id`, so proxy usage is billed. A customer with several active subscriptions needs the new `X-Nozle-Subscription` header, which is not forwarded. A customer with no matching active subscription returns `422 active_subscription_not_found`, several without the header `422 active_subscription_ambiguous`; the provider is not called.
 - `POST /events` and `/events/batch` accept `external_customer_id` without `external_subscription_id`: the event is billed to the customer's single active subscription. No or several active subscriptions return `422 active_subscription_not_found` or `422 active_subscription_ambiguous` (in a batch, under the event's position). An event with neither id returns `422 validation_errors` with `external_subscription_id: ["value_is_mandatory"]`. See [Events](/api/events).
