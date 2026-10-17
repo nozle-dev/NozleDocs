@@ -1,6 +1,6 @@
 ---
 title: "Installation"
-description: "Install and configure the typed, synchronous Nozle Python SDK."
+description: "Install and configure the typed Nozle Python SDK, synchronous or async."
 ---
 
 `nozle-sdk` supports Python 3.9 through 3.13, uses `requests`, and includes a `py.typed` marker.
@@ -49,7 +49,7 @@ flowchart LR
 
 ## Manage the HTTP session
 
-The client is synchronous and owns a reusable `requests.Session`. Use it as a context manager when its lifetime is scoped:
+`Nozle` is synchronous and owns a reusable `requests.Session`. Use it as a context manager when its lifetime is scoped:
 
 ```python
 from nozle import Nozle
@@ -63,6 +63,29 @@ with Nozle(
 ```
 
 For an application-wide singleton, call `nozle.close()` during shutdown.
+
+## Async client
+
+Version `0.14.0` adds `AsyncNozle` for asyncio applications such as FastAPI, so SDK calls do not block the event loop. It takes the same arguments as `Nozle` and has the same namespaces and methods; every method that calls the API is awaited. It sends requests with `httpx.AsyncClient`, so install the `httpx` extra:
+
+```bash
+pip install "nozle-sdk[httpx]"
+```
+
+```python
+from nozle import AsyncNozle
+
+async with AsyncNozle(max_retries=2) as nozle:  # reads NOZLE_SECRET_KEY
+    decision = await nozle.can("customer-123", "export")
+    await nozle.usage.track("customer-123", "emails", idempotency_key=message_id)
+    invoices = await nozle.invoices.list("customer-123")
+```
+
+- Validation, `NozleAPIError` (with `request_id` and `retry_after`), retries and idempotency keys behave exactly as in `Nozle`. Retries wait with `asyncio.sleep`.
+- For an application-wide client, call `await nozle.aclose()` during shutdown.
+- `events.create_transaction_id()` and `cost_events.create_cost_event_id()` make no request and are not awaited.
+- `await nozle.webhooks.verify(body, headers)` is awaited, because a `jwt` endpoint reads Nozle's public key once.
+- For [LLM auto-capture](/sdks/python/llm-auto-capture), use `nozle.capture_async_http_client(...)` or wrap an `httpx.AsyncClient`. `AsyncNozle` does not wrap a synchronous `httpx.Client`; use `Nozle` there.
 
 ## Authentication model
 
@@ -94,8 +117,8 @@ This is a backend SDK. Never expose an `sk_`, master key, or internal credential
 
 ## Transport behavior
 
-- The SDK does not automatically retry requests.
-- Mutations therefore execute at most once per SDK call.
+- Retries are off by default (`max_retries=0`), so a mutation executes at most once per SDK call.
+- With `max_retries` set, reads are retried, and a write is retried only when it is idempotent or carries an idempotency key.
 - Connection and timeout failures raise `NozleTransportError`.
 - Non-2xx responses raise structured `NozleAPIError`.
 - Sensitive values in API error payloads are redacted.
