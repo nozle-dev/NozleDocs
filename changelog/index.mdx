@@ -5,6 +5,15 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Nozle Agent Kit 1.0.4
+
+_October 18, 2026_
+
+- [Agent Kit 1.0.4](https://github.com/nozle-dev/nozle-agent-kit/releases/tag/v1.0.4) follows the SDK releases of October 17. On Node, the agent captures LLM usage with `captureFetch()` for any client that accepts a custom `fetch`, including the Vercel AI SDK, LangChain and Gemini. On Python and Go, it captures through the provider's HTTP client. It serves billing screens through `createBillingHandler()` and the React billing hooks, verifies webhooks with the SDK helpers, and reads errors by `NozleApiError` status and code.
+- It also follows the current API: plan families, `change_at` and pay-first plan changes, 422 for an event that matches no active subscription or several, and `null` limits from `can()`.
+- The guards block a client file that imports `@nozle-js/node`, and treat capture helpers like the LLM wrappers when they check for double billing.
+- To update, see [Install and update](/guides/agent-kit/install#update). Codex CLI users run the `hosts codex --write` command again in each app, because the hook path contains the version.
+
 ### Node.js SDK 0.13.0
 
 _October 17, 2026_
