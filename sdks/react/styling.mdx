@@ -34,6 +34,36 @@ Every component takes its look from `appearance`. Set it once on `BillingProvide
     <BillingProvider publishableKey="pk_..." appearance={{ theme: dark }}>
     ```
   </Tab>
+  <Tab title="Nozle">
+    The Nozle dashboard look: flat panels with fine borders, pill buttons, and a hard ink shadow on the primary button only. Plan cards use the [panel layout](#plan-card-layout).
+
+    <Frame>
+      <img src="/images/react/themes/nozle.png" alt="The components in the nozle theme" />
+    </Frame>
+
+    ```tsx
+    import { nozle } from '@nozle-js/react/themes'
+
+    <BillingProvider publishableKey="pk_..." appearance={{ theme: nozle }}>
+    ```
+
+    The theme uses the Nunito and JetBrains Mono fonts, which your app loads, for example with `next/font/google` or a Google Fonts `<link>`. Without them the system fonts are used.
+  </Tab>
+  <Tab title="Nozle Dark">
+    The dark version of `nozle`. Put the components on a dark page background.
+
+    <Frame>
+      <img src="/images/react/themes/nozle-dark.png" alt="The components in the nozleDark theme" />
+    </Frame>
+
+    ```tsx
+    import { nozleDark } from '@nozle-js/react/themes'
+
+    <BillingProvider publishableKey="pk_..." appearance={{ theme: nozleDark }}>
+    ```
+
+    The theme uses the Nunito and JetBrains Mono fonts, which your app loads, for example with `next/font/google` or a Google Fonts `<link>`. Without them the system fonts are used.
+  </Tab>
   <Tab title="Minimal">
     Flat: no shadows, small corners, a near-black primary.
 
@@ -60,25 +90,6 @@ Every component takes its look from `appearance`. Set it once on `BillingProvide
     <BillingProvider publishableKey="pk_..." appearance={{ theme: neobrutal }}>
     ```
   </Tab>
-  <Tab title="Nozle">
-    The Nozle dashboard look: flat panels with fine borders, pill buttons, and a hard ink shadow on the primary button only. Plan cards use the [panel layout](#plan-card-layout). `nozle` is light; `nozleDark` is dark and needs a dark page background.
-
-    <Frame>
-      <img src="/images/react/themes/nozle.png" alt="The components in the nozle theme" />
-    </Frame>
-
-    <Frame>
-      <img src="/images/react/themes/nozle-dark.png" alt="The components in the nozleDark theme" />
-    </Frame>
-
-    ```tsx
-    import { nozle, nozleDark } from '@nozle-js/react/themes'
-
-    <BillingProvider publishableKey="pk_..." appearance={{ theme: nozle }}>
-    ```
-
-    The theme uses the Nunito and JetBrains Mono fonts, which your app loads, for example with `next/font/google` or a Google Fonts `<link>`. Without them the system fonts are used.
-  </Tab>
 </Tabs>
 
 Every colour, the font, corner radius, border width and shadow can be changed on top of a theme with `variables` (full list below):
@@ -92,33 +103,95 @@ Every colour, the font, corner radius, border width and shadow can be changed on
 
 ## Highlighted plan
 
-`highlightPlan` on `PricingTable` marks one plan: its border and its button take the highlight colour (`colorHighlight`, by default the primary colour), with the label from `highlightLabel` (default "Most Popular"; `null` for none). `highlightStyle` picks how the card stands out:
+`highlightPlan` on `PricingTable` marks one plan: its border and its button take the highlight colour (`colorHighlight`, by default the primary colour), with the label from `highlightLabel` (default "Most Popular"; `null` for none). `highlightStyle` picks how the card stands out. The tabs follow the theme you picked above:
 
 <Tabs>
-  <Tab title="Outline (default)">
+  <Tab title="Light">
+    Outline (default):
+
     <Frame>
-      <img src="/images/react/themes/light.png" alt="The highlighted Pro card with a coloured outline" />
+      <img src="/images/react/themes/highlight-light-outline.png" alt="PricingTable in the light theme with the Pro card outlined" />
     </Frame>
 
-    ```tsx
-    <PricingTable highlightPlan="pro" />
-    ```
+    Filled:
+
+    <Frame>
+      <img src="/images/react/themes/highlight-light-filled.png" alt="PricingTable in the light theme with the Pro card filled" />
+    </Frame>
   </Tab>
-  <Tab title="Filled">
-    The card takes the highlight colour, and its text and button switch to the highlight text colour.
+  <Tab title="Dark">
+    Outline (default):
 
     <Frame>
-      <img src="/images/react/themes/light-filled.png" alt="The highlighted Pro card filled with the highlight colour" />
-    </Frame>
-    <Frame>
-      <img src="/images/react/themes/dark-filled.png" alt="The filled highlight in the dark theme" />
+      <img src="/images/react/themes/highlight-dark-outline.png" alt="PricingTable in the dark theme with the Pro card outlined" />
     </Frame>
 
-    ```tsx
-    <PricingTable highlightPlan="pro" highlightStyle="filled" />
-    ```
+    Filled:
+
+    <Frame>
+      <img src="/images/react/themes/highlight-dark-filled.png" alt="PricingTable in the dark theme with the Pro card filled" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    Outline (default):
+
+    <Frame>
+      <img src="/images/react/themes/highlight-nozle-outline.png" alt="PricingTable in the nozle theme with the Pro card outlined" />
+    </Frame>
+
+    Filled:
+
+    <Frame>
+      <img src="/images/react/themes/highlight-nozle-filled.png" alt="PricingTable in the nozle theme with the Pro card filled" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    Outline (default):
+
+    <Frame>
+      <img src="/images/react/themes/highlight-nozle-dark-outline.png" alt="PricingTable in the nozleDark theme with the Pro card outlined" />
+    </Frame>
+
+    Filled:
+
+    <Frame>
+      <img src="/images/react/themes/highlight-nozle-dark-filled.png" alt="PricingTable in the nozleDark theme with the Pro card filled" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    Outline (default):
+
+    <Frame>
+      <img src="/images/react/themes/highlight-minimal-outline.png" alt="PricingTable in the minimal theme with the Pro card outlined" />
+    </Frame>
+
+    Filled:
+
+    <Frame>
+      <img src="/images/react/themes/highlight-minimal-filled.png" alt="PricingTable in the minimal theme with the Pro card filled" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    Outline (default):
+
+    <Frame>
+      <img src="/images/react/themes/highlight-neobrutal-outline.png" alt="PricingTable in the neobrutal theme with the Pro card outlined" />
+    </Frame>
+
+    Filled:
+
+    <Frame>
+      <img src="/images/react/themes/highlight-neobrutal-filled.png" alt="PricingTable in the neobrutal theme with the Pro card filled" />
+    </Frame>
   </Tab>
 </Tabs>
+
+With `filled`, the card takes the highlight colour, and its text and button switch to the highlight text colour.
+
+```tsx
+<PricingTable highlightPlan="pro" />
+<PricingTable highlightPlan="pro" highlightStyle="filled" />
+```
 
 Set the colours with `colorHighlight` and `colorHighlightForeground`; they default to the primary colours. Change the badge text with `highlightLabel`, or pass `highlightLabel={null}` for no badge.
 
