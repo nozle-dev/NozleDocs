@@ -163,6 +163,34 @@ A component's own `appearance` goes on top of the provider's:
 
 The order, highest first: the component's `variables`, the component's `theme`, the provider's `variables`, the provider's `theme`, `--nozle-*` CSS variables set by your app, then the light values.
 
+## Text
+
+All text in the components uses one of eight roles. Each role is a CSS `font` shorthand (weight, size, line height and family) plus a colour. Change a role and every element in it changes, in every component. Every component sets the body role on its root, so no text takes its size, font or colour from your page.
+
+| Role | Variable | Default | Colour | What it styles | `nozle` and `nozleDark` |
+|---|---|---|---|---|---|
+| Title | `fontTitle` | `700 20px/1.25` | text | The billing portal title, dialog titles | `900 20px/1.15` |
+| Heading | `fontHeading` | `600 16px/1.35` | text | Plan names, the `CurrentPlan` header and plan name, the credit balance name, portal section and card headings | `900 14px/1.25` |
+| Metric | `fontMetric` | `700 28px/1.1`, numbers font, tabular figures | text | Plan prices, the credit balance, portal prices, balances and usage totals | `800 24px/1` in Nunito |
+| Body | `fontBody` | `400 14px/1.5` | text | Features, table cells, meter labels and values, notices, errors and other sentences | `400 13px/1.5` |
+| Secondary | `fontBody` | as body | muted | Descriptions, plan prices in `CurrentPlan`, card number, empty messages, the usage period | as body |
+| Meta | `fontMeta` | `400 12px/1.4` | muted | Price intervals, "As of" dates, chart labels, card expiry, detail labels, the portal footer | `400 11.5px/1.4` |
+| Label | `labelFont` | `600 12px/1.4` | muted | Table headers, plan card badges, status pills, `PlanBadge`, the portal status badge | `800 10.5px/1.4` JetBrains Mono, uppercase |
+| Action | `fontAction` | `600 14px/1.4` | the button's colour | Buttons, links, the billing toggle | `800 14px/1.4` |
+
+The defaults are in `fontFamily`; the metric default is in `fontFamilyNumbers` when it is set. `neobrutal` sets title and heading to weight `800`. The other themes keep the defaults. `labelTextTransform` and `labelLetterSpacing` apply with the label role.
+
+```tsx
+appearance={{
+  variables: {
+    fontHeading: '700 18px/1.3 Inter, sans-serif',
+    fontMetric: '600 32px/1 Inter, sans-serif',
+  },
+}}
+```
+
+Muted text follows `colorForeground`: when `colorMutedForeground` is not set, it is `colorForeground` mixed 62% into `colorCard`, so a new text colour also recolours descriptions, dates, labels and table headers. Set `colorMutedForeground` to choose it yourself. Error, warning and success text is the status colour mixed with `colorForeground`, so it stays readable on its tinted background.
+
 ## Variables
 
 | Variable | CSS variable | Light | Dark |
@@ -173,7 +201,7 @@ The order, highest first: the component's `variables`, the component's `theme`, 
 | `colorCard` | `--nozle-card` | `#ffffff` | `#111827` |
 | `colorForeground` | `--nozle-foreground` | `#111827` | `#f3f4f6` |
 | `colorMuted` | `--nozle-muted` | `#f3f4f6` | `#1f2937` |
-| `colorMutedForeground` | `--nozle-muted-foreground` | `#6b7280` | `#9ca3af` |
+| `colorMutedForeground` | `--nozle-muted-foreground` | `colorForeground` mixed 62% into `colorCard` | same |
 | `colorAccent` | `--nozle-accent` | `#eef2ff` | `#1e1b4b` |
 | `colorAccentForeground` | `--nozle-accent-foreground` | `#3730a3` | `#c7d2fe` |
 | `colorBorder` | `--nozle-border` | `#e5e7eb` | `#374151` |
@@ -189,6 +217,12 @@ The order, highest first: the component's `variables`, the component's `theme`, 
 | `labelFont` | `--nozle-label-font` | `600 12px/1.4` in `fontFamily` | same |
 | `labelTextTransform` | `--nozle-label-transform` | `none` | same |
 | `labelLetterSpacing` | `--nozle-label-spacing` | `normal` | same |
+| `fontTitle` | `--nozle-font-title` | `700 20px/1.25` in `fontFamily` | same |
+| `fontHeading` | `--nozle-font-heading` | `600 16px/1.35` in `fontFamily` | same |
+| `fontMetric` | `--nozle-font-metric` | `700 28px/1.1` in `fontFamilyNumbers`, else `fontFamily` | same |
+| `fontBody` | `--nozle-font-body` | `400 14px/1.5` in `fontFamily` | same |
+| `fontMeta` | `--nozle-font-meta` | `400 12px/1.4` in `fontFamily` | same |
+| `fontAction` | `--nozle-font-action` | `600 14px/1.4` in `fontFamily` | same |
 | `borderRadius` | `--nozle-radius` | `12px` | same |
 | `borderWidth` | `--nozle-border-width` | `1px` | same |
 | `shadow` | `--nozle-shadow` | soft shadow | darker shadow |
@@ -196,11 +230,11 @@ The order, highest first: the component's `variables`, the component's `theme`, 
 | `buttonBorderWidth` | `--nozle-button-border-width` | `borderWidth` | same |
 | `buttonBorderColor` | `--nozle-button-border` | the primary button's fill | same |
 | `buttonShadow` | `--nozle-button-shadow` | none | none |
+| `colorScheme` | `color-scheme` | `light` | `dark` |
 
 `buttonBorderColor` and `buttonShadow` apply to primary buttons only, so one action per view stands out. Secondary buttons take `colorSecondary` as their fill and `colorInput` as their border.
 
-The `label*` variables style small labels: table headers and the status label of a panel plan card. `nozle` uses small uppercase JetBrains Mono, `neobrutal` bold uppercase. Numbers in tables are right-aligned in tabular figures, in `fontFamilyNumbers`.
-| `colorScheme` | `color-scheme` | `light` | `dark` |
+The `font*` and `label*` variables are the text roles described in [Text](#text). Numbers in tables are right-aligned in tabular figures, in `fontFamilyNumbers`.
 
 Any CSS value works, including `var(...)` and `oklch(...)`. Warning and error tints are mixed from `colorWarning` and `colorDanger`.
 
