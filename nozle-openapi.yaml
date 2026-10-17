@@ -11594,7 +11594,7 @@ paths:
   /check-and-deduct:
     post:
       summary: Check and deduct legacy wallet credits
-      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet, and when its `credits_balance` covers `credits`, deducts them and records an outbound wallet transaction, in one database transaction. It does not apply Feature conversion rates or the product-credit source ledger, and it does not update the wallet''s `balance_cents`. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; API permissions are not checked.'
+      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet, and when its `credits_balance` covers `credits`, deducts them and records an outbound wallet transaction, in one database transaction. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; API permissions are not checked.'
       operationId: engineCheckAndDeductCredits
       tags:
         - Credits
@@ -32282,7 +32282,7 @@ components:
         balance_cents:
           type: integer
           format: int64
-          description: Money balance as last recorded by Core. `POST /check-and-deduct` does not update it.
+          description: Money balance in the smallest unit of the currency. `POST /check-and-deduct` lowers it with the credits it deducts.
         currency:
           type: string
         credits_balance:
@@ -32296,7 +32296,7 @@ components:
       example:
         wallet_id: 09b4f6d3-f463-4f4f-ac75-27e36bc2a296
         name: Prepaid wallet
-        balance_cents: 2000
+        balance_cents: 1600
         currency: USD
         credits_balance: '16.00000'
         status: active
@@ -32327,10 +32327,10 @@ components:
             - unknown
         amount:
           type: string
-          description: Decimal text.
+          description: Money amount in the wallet currency, as decimal text. For a check-and-deduct transaction it is the credits × the wallet rate.
         credit_amount:
           type: string
-          description: Decimal text.
+          description: Credits, as decimal text.
         settled_at:
           type:
             - string
