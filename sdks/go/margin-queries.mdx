@@ -4,6 +4,10 @@ description: "Query summary, customer, metric, plan, model, and trend margin dat
 ---
 
 ```go
+import nozle "github.com/nozle-dev/nozle-go"
+
+client := nozle.New("") // reads NOZLE_SECRET_KEY
+
 filters := url.Values{"from_date": {"2026-07-01"}, "to_date": {"2026-07-31"}}
 summary, err := client.MarginSummary(ctx, filters)
 trend, err := client.MarginTrend(ctx, "day", filters)

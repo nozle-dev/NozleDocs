@@ -1,0 +1,191 @@
+---
+title: "LockedOverlay"
+description: "Blurs a feature the customer cannot use and shows an upgrade prompt over it."
+keywords: ["locked overlay", "blur", "upsell", "access control", "react"]
+---
+
+`LockedOverlay` shows a blurred, non-interactive preview of its children with an [`UpgradePrompt`](/sdks/react/components/upgrade-prompt) on top.
+
+**When to use**
+
+- A dashboard widget or report that a higher plan unlocks, so customers see what they would get.
+- A settings panel available on another plan.
+- Instead of [`FeatureGate`](/sdks/react/components/feature-gate) when you want to show the feature blurred rather than hide it.
+
+The blurred content is still in the page. Do not put data the customer must not see inside it, and enforce access on your server.
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/locked-overlay/light.png" alt="LockedOverlay over a blurred analytics card, with Upgrade to Scale to access this feature and an Upgrade button, light theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/locked-overlay/dark.png" alt="LockedOverlay over a blurred analytics card, with Upgrade to Scale to access this feature and an Upgrade button, dark theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/locked-overlay/minimal.png" alt="LockedOverlay over a blurred analytics card, with Upgrade to Scale to access this feature and an Upgrade button, minimal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/locked-overlay/neobrutal.png" alt="LockedOverlay over a blurred analytics card, with Upgrade to Scale to access this feature and an Upgrade button, neobrutal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/locked-overlay/nozle.png" alt="LockedOverlay over a blurred analytics card, with Upgrade to Scale to access this feature and an Upgrade button, nozle theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    <Frame>
+      <img src="/images/react/components/locked-overlay/nozle-dark.png" alt="LockedOverlay over a blurred analytics card, with Upgrade to Scale to access this feature and an Upgrade button, nozleDark theme" width="508" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Importing LockedOverlay
+
+```tsx
+import {
+  LockedOverlay,
+  type LockedOverlayProps,
+} from '@nozle-js/react'
+```
+
+## Rendering LockedOverlay
+
+Wrap the content and pass `locked`. When `locked` is false the children render as they are, with no wrapper at all.
+
+```tsx components/analytics-preview.tsx
+export function AnalyticsPreview({ locked, openPlans }: { locked: boolean; openPlans: () => void }) {
+  return (
+    <LockedOverlay locked={locked} upgradePlanName="Scale" onUpgrade={openPlans}>
+      <div style={{ padding: 24 }}>
+        <strong>Advanced analytics</strong>
+        <p>Revenue by cohort, retention curves and exports.</p>
+      </div>
+    </LockedOverlay>
+  )
+}
+```
+
+### What locking does
+
+- The children get a 4px blur, with clicks, selection and screen readers kept out of them.
+- A panel covers the content in the theme's background colour, with the upgrade message and button.
+- The panel is a `role="dialog"` labelled "Feature locked — upgrade required".
+- The root is an `inline-block`, sized by its children.
+
+## Data
+
+The overlay needs one boolean, `locked`.
+
+### Live data
+
+Lock it from the customer's entitlement with [`useEntitlement`](/sdks/react/hooks#the-hooks):
+
+```tsx
+import { useEntitlement } from '@nozle-js/react'
+
+export function CohortReport() {
+  const { data } = useEntitlement('advanced_analytics')
+  return (
+    <LockedOverlay locked={!data?.allowed} upgradePlanName="Scale" onUpgrade={() => window.location.assign('/plans')}>
+      <section>{/* Sample report with placeholder data */}</section>
+    </LockedOverlay>
+  )
+}
+```
+
+## Examples
+
+### Locked with a plan name
+
+`upgradePlanName` gives the prompt "Upgrade to &lt;plan&gt; to access this feature".
+
+<Frame>
+  <img src="/images/react/components/locked-overlay/light.png" alt="LockedOverlay over a blurred analytics card, with Upgrade to Scale to access this feature and an Upgrade button, light theme" width="508" />
+</Frame>
+
+```tsx
+export function LockedAnalytics({ openPlans }: { openPlans: () => void }) {
+  return (
+    <LockedOverlay locked upgradePlanName="Scale" onUpgrade={openPlans}>
+      <div style={{ padding: 24 }}>
+        <strong>Advanced analytics</strong>
+        <p>Revenue by cohort, retention curves and exports.</p>
+      </div>
+    </LockedOverlay>
+  )
+}
+```
+
+### Your own text
+
+Without `upgradePlanName`, `upgradeText` is the message.
+
+```tsx
+export function LockedExports({ openPlans }: { openPlans: () => void }) {
+  return (
+    <LockedOverlay locked upgradeText="Exports are part of the Pro plan" onUpgrade={openPlans}>
+      <button type="button">Export CSV</button>
+    </LockedOverlay>
+  )
+}
+```
+
+## API reference
+
+<ResponseField name="locked" type="boolean" required>
+  `true` blurs the children and shows the prompt; `false` renders the children only.
+</ResponseField>
+
+<ResponseField name="children" type="ReactNode" required>
+  The content to preview.
+</ResponseField>
+
+<ResponseField name="upgradePlanName" type="string">
+  Passed to `UpgradePrompt` as `planName`: "Upgrade to &lt;plan&gt; to access this feature".
+</ResponseField>
+
+<ResponseField name="upgradeText" type="string">
+  Passed to `UpgradePrompt` as `text`, used when `upgradePlanName` is not set. Defaults to `UpgradePrompt`'s default, "Upgrade to access this feature".
+</ResponseField>
+
+<ResponseField name="onUpgrade" type="() => void">
+  Fires when "Upgrade" is clicked. Defaults to opening `/upgrade`.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides on top of the provider's, also passed to the prompt. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| `locked` is true | The blurred children with the upgrade panel on top. |
+| `locked` is false | The children only, with no wrapper. |
+
+### Appearance
+
+<Accordion title="Element keys">
+  `lockedOverlay` (root), `lockedOverlay__panel`, and `upgradePrompt` for the prompt.
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="UpgradePrompt" icon="arrow-up" href="/sdks/react/components/upgrade-prompt">
+    The prompt on its own.
+  </Card>
+  <Card title="FeatureGate" icon="lock" href="/sdks/react/components/feature-gate">
+    Hide the feature instead of blurring it.
+  </Card>
+</CardGroup>

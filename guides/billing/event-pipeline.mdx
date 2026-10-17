@@ -12,8 +12,6 @@ import { Nozle } from '@nozle-js/node'
 
 const nozle = new Nozle({
   apiKey: process.env.NOZLE_SECRET_KEY!,
-  baseUrl: 'https://api.nozle.app/engine',
-  eventsUrl: 'https://api.nozle.app/core',
 })
 
 await nozle.track(
@@ -34,8 +32,6 @@ from nozle import Nozle
 
 nozle = Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
-    base_url="https://api.nozle.app/engine",
-    events_url="https://api.nozle.app/core",
 )
 
 nozle.track(
@@ -49,6 +45,8 @@ nozle.track(
 ```
 
 ```go title="Go"
+import nozle "github.com/nozle-dev/nozle-go"
+
 client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"))
 err := client.Track(ctx, nozle.TrackParams{
   CustomerID: "customer_123",

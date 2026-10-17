@@ -1,0 +1,389 @@
+---
+title: "PricingTable"
+description: "Plan cards for a pricing page, read from your public plan catalog, with checkout on each card."
+keywords: ["pricing table", "plans", "react", "checkout"]
+---
+
+`PricingTable` renders one card per plan with its price, what it includes and a button that starts checkout.
+
+**When to use**
+
+- A public pricing page.
+- The plans page inside your app, with the customer's current plan marked.
+- An upgrade screen that a gate or a usage limit sends the customer to.
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/pricing-table/light.png" alt="PricingTable with Free, Pro, Scale and Enterprise plans, the Monthly/Annual toggle, Free as the current plan and Pro highlighted, light theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/pricing-table/dark.png" alt="PricingTable with Free, Pro, Scale and Enterprise plans, the Monthly/Annual toggle, Free as the current plan and Pro highlighted, dark theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/pricing-table/minimal.png" alt="PricingTable with Free, Pro, Scale and Enterprise plans, the Monthly/Annual toggle, Free as the current plan and Pro highlighted, minimal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/pricing-table/neobrutal.png" alt="PricingTable with Free, Pro, Scale and Enterprise plans, the Monthly/Annual toggle, Free as the current plan and Pro highlighted, neobrutal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/pricing-table/nozle.png" alt="PricingTable with Free, Pro, Scale and Enterprise plans, the Monthly/Annual toggle, Free as the current plan and Pro highlighted, nozle theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    <Frame>
+      <img src="/images/react/components/pricing-table/nozle-dark.png" alt="PricingTable with Free, Pro, Scale and Enterprise plans, the Monthly/Annual toggle, Free as the current plan and Pro highlighted, nozleDark theme" width="1008" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Importing PricingTable
+
+```tsx
+import {
+  BillingProvider,
+  PricingTable,
+  planFeatures,
+  type PricingPlan,
+} from '@nozle-js/react'
+```
+
+## Rendering PricingTable
+
+Inside a `BillingProvider`, the table reads your plans from the public catalog and starts checkout through the provider's `createCheckout`:
+
+```tsx app/pricing/page.tsx
+'use client'
+import type { CheckoutResult } from '@nozle-js/react'
+
+// Your route creates the checkout with your secret key.
+async function createCheckout(input: { planCode: string; returnUrl: string }): Promise<CheckoutResult> {
+  const response = await fetch('/api/billing/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error('Checkout could not be started')
+  return response.json()
+}
+
+export default function PricingPage() {
+  return (
+    <BillingProvider publishableKey="pk_live_..." createCheckout={createCheckout}>
+      <PricingTable highlightPlan="pro" />
+    </BillingProvider>
+  )
+}
+```
+
+Plans are sorted cheapest first. When at least one plan is yearly, a Monthly/Annual toggle appears.
+
+### What a click does
+
+With `onSelect`, a click calls it with the plan and nothing else. Without it, the table calls `createCheckout({ planCode, returnUrl })` and then:
+
+- opens Razorpay for a `razorpay` result (with the provider's `verifyCheckout`),
+- shows "Payment is processing. Confirmation may take a little while." and polls with `getCheckoutStatus` for a `processing` result,
+- redirects to the URL of a `hosted` result or a result with `url`,
+- passes the secret of a `stripe` result to `onStripeClientSecret`,
+- does nothing more for `completed` and `scheduled` results; read them in `onCheckoutResult`.
+
+See [checkout result types](/sdks/react/hooks#checkout-result-types).
+
+## Data
+
+Each plan has the `PricingPlan` shape that the public catalog returns. Pass `plans` to render your own list instead of the catalog:
+
+```tsx
+const plans: PricingPlan[] = [
+  {
+    code: 'pro',
+    name: 'Pro',
+    amount_cents: 2900,
+    amount_currency: 'USD',
+    interval: 'monthly',
+    description: 'For growing teams',
+    entitlements: [{ feature_type: 'metered', code: 'api_calls', name: 'API calls', usage_limit: 50000 }],
+    credit_grant_rules: [{ credit_system_code: 'ai_credits', amount: '500', interval: 'month' }],
+  },
+]
+
+export function Pricing() {
+  return <PricingTable plans={plans} />
+}
+```
+
+<Accordion title="Full example data">
+
+```tsx
+const plans: PricingPlan[] = [
+  {
+    code: 'free',
+    name: 'Free',
+    amount_cents: 0,
+    amount_currency: 'USD',
+    interval: 'monthly',
+    description: 'For trying things out',
+    entitlements: [{ feature_type: 'metered', code: 'api_calls', name: 'API calls', usage_limit: 1000 }],
+  },
+  {
+    code: 'pro',
+    name: 'Pro',
+    amount_cents: 2900,
+    amount_currency: 'USD',
+    interval: 'monthly',
+    description: 'For growing teams',
+    entitlements: [{ feature_type: 'metered', code: 'api_calls', name: 'API calls', usage_limit: 50000 }],
+    credit_grant_rules: [{ credit_system_code: 'ai_credits', amount: '500', interval: 'month' }],
+  },
+  {
+    code: 'enterprise',
+    name: 'Enterprise',
+    amount_cents: 0,
+    amount_currency: 'USD',
+    interval: 'monthly',
+    entitlements: [{ feature_type: 'boolean', code: 'sso', name: 'Single sign-on' }],
+  },
+]
+
+// Your merchant route creates the checkout with your secret key.
+async function createCheckout(input: { planCode: string; returnUrl: string }): Promise<CheckoutResult> {
+  const response = await fetch('/api/billing/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error('Checkout could not be started')
+  return response.json()
+}
+
+export function PricingPage({ onClientSecret }: { onClientSecret: (secret: string) => void }) {
+  return (
+    <BillingProvider publishableKey="pk_live_..." createCheckout={createCheckout}>
+      <PricingTable
+        plans={plans}
+        currentPlanCode="free"
+        highlightPlan="pro"
+        contactSalesPlans={['enterprise']}
+        enterpriseEmail="sales@example.com"
+        onStripeClientSecret={onClientSecret}
+        onCheckoutError={(error) => console.error(error.message)}
+      />
+    </BillingProvider>
+  )
+}
+```
+
+</Accordion>
+
+### Live data
+
+Leave `plans` out and the table reads `GET /api/v1/plans` itself through the `publishableKey` of `BillingProvider`. It shares one cached request with [`usePlans`](/sdks/react/hooks#useplans).
+
+To filter plans, or to show your own loading and error UI, read them with `usePlans` and pass them in:
+
+```tsx
+import { usePlans } from '@nozle-js/react'
+
+export function MonthlyPricing() {
+  const { plans, isLoading, error } = usePlans()
+  if (isLoading) return <p>Loading plans…</p>
+  if (error) return <p role="alert">Plans could not be loaded.</p>
+  return <PricingTable plans={plans.filter((plan) => plan.interval === 'monthly')} showToggle={false} />
+}
+```
+
+### Data from the API
+
+Each card's lines come from `planFeatures(plan)`, which you can also call for your own layout:
+
+| Catalog item | Line |
+|---|---|
+| Metered entitlement with a `usage_limit` | `100,000 API calls` |
+| Metered entitlement without a limit, and boolean entitlements | The entitlement name |
+| `config` entitlement | `Support: priority`, one line per privilege value |
+| Credit grant rule | `500 ai credits every month`, `10 credits (one time)` |
+| `standard` usage charge | `$0.01 per api calls` |
+| `graduated`, `volume`, `graduated_percentage` charges | One line per range, for example `0 to 1,000 emails: free` |
+| `package` charge | `$5.00 per 100 sms, first 50 free` |
+| `percentage` charge | `2.9% of each payment + $0.30 per payment` |
+
+A `custom` or `dynamic` charge gives no line; pass `features` for a plan that needs one.
+
+## Examples
+
+### Current and highlighted plan
+
+The current plan's card shows "Current Plan" and a disabled button. The highlighted plan gets an outline and the "Most Popular" badge.
+
+<Frame>
+  <img src="/images/react/components/pricing-table/light.png" alt="PricingTable with Free as the current plan and Pro outlined with the Most Popular badge, light theme" width="1008" />
+</Frame>
+
+```tsx
+export function Pricing() {
+  return <PricingTable currentPlanCode="free" highlightPlan="pro" />
+}
+```
+
+### Filled highlight
+
+`filled` paints the highlighted card in `colorHighlight`. See [highlighted plan](/sdks/react/styling#highlighted-plan).
+
+<Frame>
+  <img src="/images/react/components/pricing-table-filled/light.png" alt="PricingTable with the Pro card filled with the highlight colour, light theme" width="1008" />
+</Frame>
+
+```tsx
+export function Pricing() {
+  return <PricingTable highlightPlan="pro" highlightStyle="filled" highlightLabel="Best value" />
+}
+```
+
+### Panel layout
+
+The themes `nozle` and `nozleDark` use the [panel card layout](/sdks/react/styling#plan-card-layout): the name in a header band, with `ACTIVE` on the current plan.
+
+<Frame>
+  <img src="/images/react/components/pricing-table/nozle.png" alt="PricingTable in the panel layout with header bands, nozle theme" width="1008" />
+</Frame>
+
+```tsx
+import { nozle } from '@nozle-js/react/themes'
+
+export function Pricing() {
+  return <PricingTable currentPlanCode="free" highlightPlan="pro" appearance={{ theme: nozle }} />
+}
+```
+
+### Contact sales
+
+Plans in `contactSalesPlans` show "Custom" instead of a price and a "Contact Sales" button, and go last. With `enterpriseEmail` the button opens a mail to that address.
+
+```tsx
+export function Pricing() {
+  return <PricingTable contactSalesPlans={['enterprise']} enterpriseEmail="sales@example.com" />
+}
+```
+
+### Catalog error
+
+When the catalog request fails, the table shows the reason instead of the cards.
+
+<Frame>
+  <img src="/images/react/components/pricing-table-error/light.png" alt="The PricingTable message when the catalog request fails, light theme" width="260" />
+</Frame>
+
+## API reference
+
+<ResponseField name="plans" type="PricingPlan[]">
+  The plans to show. When set, the table does not fetch. Defaults to the plans read from the catalog.
+</ResponseField>
+
+<ResponseField name="currentPlanCode" type="string">
+  Code of the customer's plan. Its card shows "Current Plan" and its button is disabled. Plans priced above it, in the same currency, get the primary button; cheaper plans get the secondary one.
+</ResponseField>
+
+<ResponseField name="highlightPlan" type="string">
+  Code of the plan to stand out. Without `currentPlanCode`, only this plan gets the primary button.
+</ResponseField>
+
+<ResponseField name="highlightStyle" type="'outline' | 'filled'" default="outline">
+  `outline` draws the card border in `colorHighlight`; `filled` paints the card in `colorHighlight` and its text and button in `colorHighlightForeground`. See [highlighted plan](/sdks/react/styling#highlighted-plan).
+</ResponseField>
+
+<ResponseField name="highlightLabel" type="string | null" default="Most Popular">
+  Badge on the highlighted card. `null` shows no badge. On the current plan the badge reads "Current Plan".
+</ResponseField>
+
+<ResponseField name="showToggle" type="boolean" default={true}>
+  Shows the Monthly/Annual toggle when at least one plan has `interval: 'yearly'`. While the toggle shows, only plans with the selected interval (`monthly` or `yearly`) and contact-sales plans are listed.
+</ResponseField>
+
+<ResponseField name="contactSalesPlans" type="string[]">
+  Codes of plans sold on request. Their card shows "Custom" instead of a price and a "Contact Sales" button, and they are placed last. From React `0.11.0`; earlier versions guessed these plans from their names.
+</ResponseField>
+
+<ResponseField name="enterpriseEmail" type="string">
+  The "Contact Sales" button opens a mail to this address with the subject "Enterprise Plan Inquiry". Without it, the button selects the plan like any other card.
+</ResponseField>
+
+<ResponseField name="features" type="string[][] | Record<string, string[]>">
+  Replaces the lines of a card: an array in the order the cards are rendered (after sorting and the toggle), or an object keyed by plan code. Defaults to the lines from `planFeatures`.
+</ResponseField>
+
+<ResponseField name="sort" type="(a: PricingPlan, b: PricingPlan) => number">
+  Orders the plans. The default, cheapest first, is `sortPlansByPrice` with contact-sales plans last; plans in different currencies stay grouped.
+</ResponseField>
+
+<ResponseField name="onSelect" type="(plan: PricingPlan) => void">
+  Fires when a plan's button is clicked and receives that plan. When set, the table does not call `createCheckout`; without it, a click starts checkout.
+</ResponseField>
+
+<ResponseField name="returnUrl" type="string">
+  Sent to `createCheckout` with the plan code. Defaults to the current URL. The table sends no idempotency key; only `CheckoutButton` does.
+</ResponseField>
+
+<ResponseField name="onCheckoutResult" type="(result: CheckoutResult) => void">
+  Fires for every result `createCheckout` returns, before the table handles it, and receives that result.
+</ResponseField>
+
+<ResponseField name="onStripeClientSecret" type="(clientSecret: string) => void">
+  Fires for an embedded Stripe checkout and receives its client secret; render [`Checkout`](/sdks/react/components/checkout) with it. Without it a Stripe result shows "onStripeClientSecret is required for embedded Stripe checkout".
+</ResponseField>
+
+<ResponseField name="onCheckoutError" type="(error: Error) => void">
+  Fires when checkout fails and receives the error. The message also shows above the cards. Catalog load errors are not passed to it.
+</ResponseField>
+
+<ResponseField name="className" type="string">
+  Class name on the root element.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides on top of the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| Loading the catalog | Three skeleton cards. |
+| Catalog request failed | `Plans could not be loaded: <reason>` in a `role="alert"` message, for example `HTTP 404`. From React `0.10.2`; earlier versions rendered an empty grid. |
+| No `plans` and no `BillingProvider` | `BillingProvider with a publishableKey is required to load plans`. |
+| Checkout failed | The error message in red above the cards. |
+
+The table shows [Powered by Nozle](/sdks/react/components/powered-by-nozle) below the cards.
+
+### Appearance
+
+<Accordion title="Element keys">
+  `pricingTable`, `pricingTable__toggle`, `pricingTable__toggleButton`, `pricingTable__grid`, and for each card `planCard`, `planCard__header` (panel layout only), `planCard__badge`, `planCard__name`, `planCard__description`, `planCard__price`, `planCard__features`, `planCard__feature`, `planCard__cta`.
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="PlanCard" icon="id-card" href="/sdks/react/components/plan-card">
+    One plan card for your own layout.
+  </Card>
+  <Card title="PlanComparison" icon="table" href="/sdks/react/components/plan-comparison">
+    The plans side by side, feature by feature.
+  </Card>
+  <Card title="Checkout" icon="credit-card" href="/sdks/react/components/checkout">
+    Collects the payment for a Stripe client secret.
+  </Card>
+  <Card title="Appearance" icon="palette" href="/sdks/react/styling">
+    Themes, variables and element overrides.
+  </Card>
+</CardGroup>

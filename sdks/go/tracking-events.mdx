@@ -6,6 +6,10 @@ description: "Send idempotent metered events and control subscription attributio
 ## Send an event
 
 ```go
+import nozle "github.com/nozle-dev/nozle-go"
+
+client := nozle.New("") // reads NOZLE_SECRET_KEY
+
 err := client.Track(ctx, nozle.TrackParams{
   CustomerID: "workspace_123", Event: "api_calls",
   SubscriptionID: "workspace_123_subscription",
@@ -35,7 +39,7 @@ _ = err
 
 ## Subscription resolution
 
-When `SubscriptionID` is empty, the SDK requests the customer's active subscriptions before it sends the event. It does this on every call, with no cache: two `Track` calls make four requests. The customer must have exactly one active subscription; otherwise `Track` returns `nozle: track: exactly one active subscription required; supply SubscriptionID`. Subscribing a customer to a second plan adds a second active subscription rather than replacing the first, so a lookup that worked before can start failing. Resolve the subscription once, store it, and pass `SubscriptionID` on every call.
+When `SubscriptionID` is empty, the SDK requests the customer's active subscriptions before it sends the event. From `v0.12.0` it remembers the result for the life of the `Client`, so two `Track` calls make three requests (before `v0.12.0` every call looked it up). `Checkout`, `CheckoutInvoice`, `CheckoutStatus`, `VerifyCheckout`, `Subscribe`, `CancelSubscription` and `ApplySubscriptionTransition` forget the entry, so the next call looks it up again. A change made elsewhere, for example in the dashboard, is not seen by a running `Client`; pass `SubscriptionID` when that matters. The customer must have exactly one active subscription; otherwise `Track` returns `nozle: track: exactly one active subscription required; supply SubscriptionID`. Subscribing a customer to a second plan adds a second active subscription rather than replacing the first, so a lookup that worked before can start failing. Resolve the subscription once, store it, and pass `SubscriptionID` on every call.
 
 ## Timestamps
 

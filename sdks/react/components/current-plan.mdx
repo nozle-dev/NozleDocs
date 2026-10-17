@@ -1,0 +1,326 @@
+---
+title: "CurrentPlan"
+description: "The customer's plan at a glance: name, status, price, a scheduled change, usage against the plan's limits and payment notices."
+keywords: ["current plan", "subscription", "usage", "billing settings", "react"]
+---
+
+`CurrentPlan` shows the customer's subscription in one card, read through your `billingEndpoint` or from data you pass. From React `0.11.0`.
+
+**When to use**
+
+- The top of your billing settings page.
+- A dashboard card that links to plan changes or the billing portal.
+- Showing usage against the plan's metered limits next to the plan itself.
+- Warning the customer about an overdue invoice or a nearly used limit.
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/current-plan/light.png" alt="CurrentPlan for Pro with a change to Scale scheduled, an 82% notice for API calls, two meters and two detail rows, light theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/current-plan/dark.png" alt="CurrentPlan for Pro with a change to Scale scheduled, an 82% notice for API calls, two meters and two detail rows, dark theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/current-plan/minimal.png" alt="CurrentPlan for Pro with a change to Scale scheduled, an 82% notice for API calls, two meters and two detail rows, minimal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/current-plan/neobrutal.png" alt="CurrentPlan for Pro with a change to Scale scheduled, an 82% notice for API calls, two meters and two detail rows, neobrutal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/current-plan/nozle.png" alt="CurrentPlan for Pro with a change to Scale scheduled, an 82% notice for API calls, two meters and two detail rows, nozle theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    <Frame>
+      <img src="/images/react/components/current-plan/nozle-dark.png" alt="CurrentPlan for Pro with a change to Scale scheduled, an 82% notice for API calls, two meters and two detail rows, nozleDark theme" width="1008" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Importing CurrentPlan
+
+```tsx
+import {
+  CurrentPlan,
+  currentPlanMeters,
+  type BillingSubscription,
+  type CurrentPlanDetail,
+  type UsageDashboardFeature,
+} from '@nozle-js/react'
+```
+
+## Rendering CurrentPlan
+
+Inside a `BillingProvider` with `billingEndpoint`, the card reads the subscription, the plan's limits and this period's usage itself:
+
+```tsx app/settings/billing/page.tsx
+'use client'
+import { BillingProvider } from '@nozle-js/react'
+
+export default function BillingSettings() {
+  return (
+    <BillingProvider publishableKey="pk_live_..." billingEndpoint="/api/nozle">
+      <CurrentPlan actions={<a href="/settings/billing/portal">Manage billing</a>} />
+    </BillingProvider>
+  )
+}
+```
+
+The card shows the plan name, a status label, the price and interval, "Changes to &lt;plan&gt; on &lt;date&gt;" for a scheduled change, and one meter per metered limit, filled with this period's usage.
+
+## Data
+
+Pass `subscription` (the shape `useSubscription` returns) and `usage` to render your own data:
+
+```tsx
+const subscription: BillingSubscription = {
+  subscription: {
+    external_id: 'sub_123',
+    plan_code: 'pro',
+    status: 'active',
+    ending_at: null,
+    plan: { code: 'pro', name: 'Pro', amount_cents: 2900, currency: 'USD', interval: 'monthly' },
+  },
+  pending_change: { plan_code: 'scale', name: 'Scale', effective_at: '2026-11-01T00:00:00Z' },
+  past_due: false,
+}
+
+const usage: UsageDashboardFeature[] = [{ key: 'api_calls', label: 'API calls', used: 41200, limit: 50000 }]
+
+export function PlanSummary() {
+  return <CurrentPlan subscription={subscription} usage={usage} />
+}
+```
+
+<Accordion title="Full example data">
+
+```tsx
+const subscription: BillingSubscription = {
+  subscription: {
+    external_id: 'sub_123',
+    plan_code: 'pro',
+    status: 'active',
+    ending_at: null,
+    plan: { code: 'pro', name: 'Pro', amount_cents: 2900, currency: 'USD', interval: 'monthly' },
+  },
+  pending_change: { plan_code: 'scale', name: 'Scale', effective_at: '2026-11-01T00:00:00Z' },
+  past_due: false,
+}
+
+const usage: UsageDashboardFeature[] = [
+  { key: 'api_calls', label: 'API calls', used: 41200, limit: 50000 },
+  { key: 'seats', label: 'Seats', used: 6, limit: 10 },
+]
+
+const details: CurrentPlanDetail[] = [
+  { label: 'Renews', value: 'Nov 1, 2026' },
+  { label: 'AI credits included', value: '500 / month' },
+]
+
+export function PlanSummary() {
+  return (
+    <CurrentPlan
+      subscription={subscription}
+      usage={usage}
+      details={details}
+      actions={<a href="/settings/billing/portal">Manage billing</a>}
+    />
+  )
+}
+```
+
+</Accordion>
+
+### Live data
+
+Leave `subscription` out and, inside a `BillingProvider` with `billingEndpoint`, `CurrentPlan` reads:
+
+- the subscription with [`useSubscription`](/sdks/react/hooks#the-hooks),
+- the plan's metered limits from the public catalog with `usePlans`,
+- this period's units with `useUsage`, joined to the limits by feature code.
+
+Serve `billingEndpoint` with `createBillingHandler` from `@nozle-js/node`; see [Serve the hooks from your backend](/sdks/react/hooks#serve-the-hooks-from-your-backend).
+
+<Note>
+Without `subscription`, `CurrentPlan` needs `BillingProvider` with `billingEndpoint`, or it throws "Billing hooks need BillingProvider billingEndpoint, a backend route served by createBillingHandler".
+</Note>
+
+### Meters from your own data
+
+`currentPlanMeters(entitlements, usage)` joins a plan's metered entitlements with a period's `charges_usage` and returns `usage` rows:
+
+```tsx
+import { usePlans, useSubscription, useUsage } from '@nozle-js/react'
+
+export function PlanWithMeters() {
+  const subscription = useSubscription()
+  const { plans } = usePlans()
+  const usage = useUsage()
+  const plan = plans.find((entry) => entry.code === subscription.data?.subscription?.plan_code)
+  return (
+    <CurrentPlan
+      subscription={subscription.data ?? null}
+      usage={currentPlanMeters(plan?.entitlements, usage.data)}
+      isLoading={subscription.isPending}
+      error={subscription.error}
+    />
+  )
+}
+```
+
+## Examples
+
+### Overdue and ending
+
+`past_due: true` shows `pastDueMessage` as an alert, and `ending_at` turns the label into "Ends &lt;date&gt;" for a subscription cancelled at the end of its period.
+
+<Frame>
+  <img src="/images/react/components/current-plan-past-due/light.png" alt="CurrentPlan with the overdue payment alert and the Ends Nov 1, 2026 label, light theme" width="1008" />
+</Frame>
+
+```tsx
+const subscription: BillingSubscription = {
+  subscription: {
+    external_id: 'sub_123',
+    plan_code: 'pro',
+    status: 'active',
+    ending_at: '2026-11-01T00:00:00Z',
+    plan: { code: 'pro', name: 'Pro', amount_cents: 2900, currency: 'USD', interval: 'monthly' },
+  },
+  pending_change: null,
+  past_due: true,
+}
+
+export function PlanSummary() {
+  return <CurrentPlan subscription={subscription} usage={[]} />
+}
+```
+
+### Loading, empty and error
+
+`isLoading` shows a placeholder, `subscription={null}` shows `emptyMessage`, and `error` shows its message as an alert.
+
+<Frame>
+  <img src="/images/react/components/current-plan-states/light.png" alt="CurrentPlan loading placeholder, No active plan message, and an error message, light theme" width="1008" />
+</Frame>
+
+```tsx
+export function PlanStates() {
+  return (
+    <>
+      <CurrentPlan subscription={null} isLoading />
+      <CurrentPlan subscription={null} />
+      <CurrentPlan subscription={null} error="Subscription could not be loaded." />
+    </>
+  )
+}
+```
+
+## API reference
+
+<ResponseField name="subscription" type="BillingSubscription | null">
+  The subscription, plan, `ending_at`, scheduled change and `past_due`. `null` shows the empty message. Defaults to the subscription read through `billingEndpoint`.
+</ResponseField>
+
+<ResponseField name="usage" type="UsageDashboardFeature[]">
+  One meter per row: `{ key, label, used, limit }`. `limit: null` shows "Unlimited". Each meter is labelled "&lt;label&gt; used this period". Defaults to the plan's metered limits joined with this period's units.
+</ResponseField>
+
+<ResponseField name="details" type="CurrentPlanDetail[]">
+  Extra `{ label, value }` rows under the meters, for example a renewal date. `value` can be any React node.
+</ResponseField>
+
+<ResponseField name="actions" type="ReactNode">
+  Shown on the right of the header, for example a link to the billing portal.
+</ResponseField>
+
+<ResponseField name="warningPercent" type="number | null" default={80}>
+  A meter at or above this percentage shows "You have used N% of the &lt;label&gt; included in &lt;plan&gt;." `null` turns these notices off.
+</ResponseField>
+
+<ResponseField name="pastDueMessage" type="string" default="A payment is overdue. Pay the open invoice to keep your plan active.">
+  Shown as an alert when `past_due` is true.
+</ResponseField>
+
+<ResponseField name="title" type="string" default="Current plan">
+  The header text.
+</ResponseField>
+
+<ResponseField name="emptyMessage" type="string" default="No active plan.">
+  Shown when there is no subscription.
+</ResponseField>
+
+<ResponseField name="isLoading" type="boolean" default={false}>
+  Shows a loading placeholder.
+</ResponseField>
+
+<ResponseField name="error" type="Error | string | null" default={null}>
+  Shows the message as an alert.
+</ResponseField>
+
+<ResponseField name="locale" type="string" default="en-US">
+  Formats the dates.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides on top of the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| Loading | A loading placeholder. |
+| No subscription | `emptyMessage`, "No active plan." by default. |
+| Error | The error message as an alert. |
+| `past_due` | `pastDueMessage` as an alert. |
+| Meter at or above `warningPercent` | "You have used N% of the &lt;label&gt; included in &lt;plan&gt;." |
+
+The status label depends on the subscription:
+
+| Subscription | Label | Colour |
+|---|---|---|
+| `active`, no `ending_at` | Active | Success |
+| `ending_at` set | Ends &lt;date&gt; | Warning |
+| `pending` | Pending | Warning |
+| `incomplete` | Awaiting payment | Warning |
+| `canceled` | Canceled | Muted |
+| `terminated` | Ended | Muted |
+
+Another status is shown as sent.
+
+The card shows [Powered by Nozle](/sdks/react/components/powered-by-nozle).
+
+### Appearance
+
+<Accordion title="Element keys">
+  `currentPlan` (root), `currentPlan__name`, `currentPlan__status`, `currentPlan__price`, `currentPlan__scheduled`, `currentPlan__notice`, `currentPlan__usage`, `currentPlan__details`. The meters take the [`UsageMeter`](/sdks/react/components/usage-meter) elements.
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="UsageDashboard" icon="gauge" href="/sdks/react/components/usage-dashboard">
+    Usage meters on their own.
+  </Card>
+  <Card title="PlanChangeControl" icon="arrows-rotate" href="/sdks/react/components/plan-change-control">
+    Lets the customer change the plan.
+  </Card>
+  <Card title="PlanBadge" icon="tag" href="/sdks/react/components/plan-badge">
+    The plan name as a small badge.
+  </Card>
+  <Card title="BillingPortal" icon="building-columns" href="/sdks/react/components/billing-portal">
+    Subscriptions, invoices and billing details.
+  </Card>
+</CardGroup>

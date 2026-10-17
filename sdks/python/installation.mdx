@@ -1,6 +1,6 @@
 ---
 title: "Installation"
-description: "Install and configure the typed, synchronous Nozle Python SDK."
+description: "Install and configure the typed Nozle Python SDK, synchronous or async."
 ---
 
 `nozle-sdk` supports Python 3.9 through 3.13, uses `requests`, and includes a `py.typed` marker.
@@ -8,36 +8,37 @@ description: "Install and configure the typed, synchronous Nozle Python SDK."
 Entity subscription APIs are introduced in `0.5.0`.
 
 ```bash
-pip install nozle-sdk==0.11.0
+pip install nozle-sdk==0.13.0
 ```
 
 <Info>
-Version `0.11.0` sends Feature Events through the Go Engine endpoint. Version `0.10.0` adds `NozleAPIError.code` and `has_code()`, richer checkout result types, and no longer requires `feature` in `check_and_deduct()`. Version `0.9.1` fixes Feature Event timestamp serialization, including events created by the OpenAI and Anthropic wrappers. Version `0.9.0` introduced subscription options, signed quotes, pending-change withdrawal, and scoped checkout recovery. See [subscription self-service](/sdks/python/billing#subscription-self-service) and the [release notes](/changelog#razorpay-and-stripe-guides-new-sdk-releases-api-fixes).
+Version `0.13.0` adds `AsyncNozle`, opt-in retries, the `host` argument, an optional `api_key` that reads `NOZLE_SECRET_KEY`, `request_id` and `retry_after` on `NozleAPIError`, usage capture for any httpx-based LLM client, Core usage reads, and the `invoices`, `alerts` and `webhooks` namespaces. Version `0.12.0` adds `billing_configuration` to `customers.upsert()`. Version `0.11.0` sends Feature Events through the Go Engine endpoint. Version `0.10.0` adds `NozleAPIError.code` and `has_code()`, richer checkout result types, and no longer requires `feature` in `check_and_deduct()`. Version `0.9.1` fixes Feature Event timestamp serialization, including events created by the OpenAI and Anthropic wrappers. Version `0.9.0` introduced subscription options, signed quotes, pending-change withdrawal, and scoped checkout recovery. See [subscription self-service](/sdks/python/billing#subscription-self-service) and the [release notes](/changelog#razorpay-and-stripe-guides-new-sdk-releases-api-fixes).
 </Info>
 
 ## Create a client
 
 ```python
 import os
-
 from nozle import Nozle
+
 
 nozle = Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
-    base_url="https://api.nozle.app/engine",
-    events_url="https://api.nozle.app/core",
     timeout=10,
 )
 ```
 
 | Argument | Type | Default | Description |
 |---|---|---|---|
-| `api_key` | `str` | required | Organization credential. Protected operations require `sk_`. |
-| `base_url` | `str` | `https://api.nozle.app/engine` | Engine API origin for `track()`, entitlements, credits, Entities, usage, and margin. |
-| `events_url` | `str` | `https://api.nozle.app/core` | Core API origin for customer writes, billing resources, subscription discovery, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. |
-| `timeout` | `float` | `10` | Per-request timeout in seconds. |
+| `api_key` | `str \| None` | `NOZLE_SECRET_KEY` environment variable | Organization credential. Protected operations require `sk_`. When you do not pass it, the client reads `NOZLE_SECRET_KEY`; if that is not set it raises `ValueError`. |
+| `host` | `str` | `https://api.nozle.app` | Keyword-only. Root API origin. The SDK sends Engine calls to `{host}/engine` and Core calls to `{host}/core`. Set only this for a local or self-hosted deployment behind one reverse proxy. |
+| `base_url` | `str` | `https://api.nozle.app/engine` | Engine API origin for `track()`, entitlements, credits, Entities, usage, and margin. Overrides the address derived from `host`. |
+| `events_url` | `str` | `https://api.nozle.app/core` | Core API origin for customer writes, billing resources, subscription discovery, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. Overrides the address derived from `host`. |
+| `timeout` | `float` | `10` | Per-attempt timeout in seconds. |
+| `max_retries` | `int` | `0` | Keyword-only. Extra attempts after a network error, timeout, `429` or `5xx`. `0` never retries. See [errors and retries](/sdks/python/errors). |
+| `retry_delay` | `float` | `0.5` | Keyword-only. First retry delay in seconds. It doubles each retry up to 10 seconds, or the `Retry-After` header is used when sent. |
 
-The client defaults to these public service bases. Set both URLs explicitly for local or self-hosted deployments. Trailing slashes are removed automatically.
+The client defaults to the public service bases under `https://api.nozle.app`. For a local or self-hosted deployment behind one proxy, set `host`. Set `base_url` or `events_url` only when the two services live at unrelated addresses; each one you set wins over `host`. If you set only one of them, the other service still uses `host` (by default production), so set `host` too. Trailing slashes are removed automatically.
 
 ```mermaid
 flowchart LR
@@ -48,11 +49,9 @@ flowchart LR
 
 ## Manage the HTTP session
 
-The client is synchronous and owns a reusable `requests.Session`. Use it as a context manager when its lifetime is scoped:
+`Nozle` is synchronous and owns a reusable `requests.Session`. Use it as a context manager when its lifetime is scoped:
 
 ```python
-from nozle import Nozle
-
 with Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
     base_url="https://api.nozle.app/engine",
@@ -62,6 +61,29 @@ with Nozle(
 ```
 
 For an application-wide singleton, call `nozle.close()` during shutdown.
+
+## Async client
+
+Version `0.13.0` adds `AsyncNozle` for asyncio applications such as FastAPI, so SDK calls do not block the event loop. It takes the same arguments as `Nozle` and has the same namespaces and methods; every method that calls the API is awaited. It sends requests with `httpx.AsyncClient`, so install the `httpx` extra:
+
+```bash
+pip install "nozle-sdk[httpx]"
+```
+
+```python
+from nozle import AsyncNozle
+
+async with AsyncNozle(max_retries=2) as nozle:  # reads NOZLE_SECRET_KEY
+    decision = await nozle.can("customer-123", "export")
+    await nozle.usage.track("customer-123", "emails", idempotency_key=message_id)
+    invoices = await nozle.invoices.list("customer-123")
+```
+
+- Validation, `NozleAPIError` (with `request_id` and `retry_after`), retries and idempotency keys behave exactly as in `Nozle`. Retries wait with `asyncio.sleep`.
+- For an application-wide client, call `await nozle.aclose()` during shutdown.
+- `events.create_transaction_id()` and `cost_events.create_cost_event_id()` make no request and are not awaited.
+- `await nozle.webhooks.verify(body, headers)` is awaited, because a `jwt` endpoint reads Nozle's public key once.
+- For [LLM auto-capture](/sdks/python/llm-auto-capture), use `nozle.capture_async_http_client(...)` or wrap an `httpx.AsyncClient`. `AsyncNozle` does not wrap a synchronous `httpx.Client`; use `Nozle` there.
 
 ## Authentication model
 
@@ -78,7 +100,11 @@ This is a backend SDK. Never expose an `sk_`, master key, or internal credential
 | Area | Methods |
 |---|---|
 | API | `ping()`, `plans()`, `track()`, `can()` |
+| Usage reads | `current_usage()`, `past_usage()` |
 | Billing | `checkout()`, `checkout_status()`, `verify_checkout()`, `checkout_invoice()`, `subscribe()`, `cancel_subscription()`, `subscription_options()`, `preview_subscription_change()`, `withdraw_pending_subscription_change()`, `preview_subscription_transition()`, `apply_subscription_transition()` |
+| Invoices | `invoices.list()`, `invoices.get()`, `invoices.download_url()` |
+| Alerts | `alerts.list()`, `alerts.get()`, `alerts.create()`, `alerts.update()`, `alerts.delete()` |
+| Webhooks | `webhooks.verify()` |
 | Customers | `customers.upsert()` |
 | Credit systems | `credit_systems.list()` |
 | Entities | `get()`, `list()`, `upsert()`, `activate()`, `suspend()`, `bulk_upsert()` |
@@ -87,14 +113,16 @@ This is a backend SDK. Never expose an `sk_`, master key, or internal credential
 | Usage | Advisory `check()` and atomic `track()` |
 | Cost events | `cost_events.track()` |
 | Margin | `summary()`, `by_customer()`, `by_metric()`, `by_plan()`, `by_model()`, `trend()` |
-| LLMs | `wrap_openai()`, `wrap_anthropic()` |
+| LLMs | `wrap_openai()`, `wrap_anthropic()`, `wrap_http_client()`, `capture_http_client()`, `capture_async_http_client()`, `record_usage()` |
+
+Usage reads, invoices, alerts, webhooks, `wrap_http_client()`, `capture_http_client()`, `capture_async_http_client()` and `record_usage()` require `0.13.0`.
 
 `check_and_deduct(customer_id, credits=5)` remains available for the legacy wallet path. The `feature` argument is deprecated and ignored.
 
 ## Transport behavior
 
-- The SDK does not automatically retry requests.
-- Mutations therefore execute at most once per SDK call.
+- Retries are off by default (`max_retries=0`), so a mutation executes at most once per SDK call.
+- With `max_retries` set, reads are retried, and a write is retried only when it is idempotent or carries an idempotency key.
 - Connection and timeout failures raise `NozleTransportError`.
 - Non-2xx responses raise structured `NozleAPIError`.
 - Sensitive values in API error payloads are redacted.

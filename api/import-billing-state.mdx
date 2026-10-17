@@ -10,7 +10,7 @@ Use this Core API when another system already bills the customer and Nozle shoul
 
 **Base URL:** `https://api.nozle.app/core/api/v1`
 
-**Auth:** secret key with `subscription:write` when API permissions are enabled. Publishable keys are rejected. `Idempotency-Key` is required.
+**Auth:** secret key with `subscription:write`. Publishable keys are rejected. `Idempotency-Key` is required.
 
 ## Import the subscription
 
@@ -57,6 +57,8 @@ The referenced customer, plan, and optional Entity must already exist in the aut
 
 ## Response
 
+A new import returns `201 Created`. A dry run or a replay returns `200`.
+
 ```json
 {
   "billing_state_import": {
@@ -91,7 +93,9 @@ For an Entity import, save the `external_subscription_id` returned in this respo
 
 Set `dry_run` to `true` to run the same idempotency, Entity ownership, subscription-slot, grant-scope, and period checks as execution without writing subscription state.
 
-Retry an uncertain response with the same idempotency key and identical payload. A replay returns the original result. Reusing the key with a different request is rejected.
+A dry run returns `status: "validated"` and `dry_run: true`. It has no top-level `id`, and its `subscription` has no `id` because no subscription is created. A dry run with the key and payload of an import that already completed returns that import as `validated`, with its `id` and `replayed: true`.
+
+Retry an uncertain response with the same idempotency key and identical payload. A replay returns the original result with `replayed: true`. Reusing the key with a different request returns `422` with `idempotency_key: ["idempotency_key_reused"]`.
 
 <Warning>
 This endpoint does not transfer billing authority to Nozle. Adopting payment collection later requires a separate explicit migration flow.

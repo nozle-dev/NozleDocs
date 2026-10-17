@@ -24,4 +24,6 @@ AI products often bill per request, token, workflow, or model while serving cost
 **Access:**
 All margin endpoints require a secret key (sk_). Margin data is server-side only — it should not be exposed to customers.
 
+The `/margin/*` endpoints aggregate stored margin events only. Each event carries its own revenue, cost and margin, and the endpoints sum those values. The other views listed above are not part of the `/margin/*` responses. See [Dashboard](/guides/margin/dashboard).
+
 The `can()` endpoint can return a labelled decimal `economics` estimate so your backend can log warnings or apply a versioned merchant policy. Calling `/can` never writes usage or financial ledger entries.

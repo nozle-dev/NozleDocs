@@ -25,7 +25,7 @@ PUT /customers/workspace_123/entities/user_42/subscription
 Authorization: Bearer sk_...
 ```
 
-This operation is idempotent. It creates the stable Entity-to-subscription identity but does not select or activate a plan.
+This operation is idempotent. It creates the stable Entity-to-subscription identity but does not select or activate a plan. It returns `201` when it creates the identity and `200` when the identity already exists, with the identity under `entity_subscription`.
 
 ## Read subscriptions
 
@@ -43,29 +43,34 @@ GET /customers/workspace_123/entity-subscriptions
 Authorization: Bearer sk_...
 ```
 
-The response reports the current and pending plans independently for each Entity:
+Reading one Entity returns the subscription under `entity_subscription`. The list returns an `entity_subscriptions` array, ordered by `external_entity_id`. Each item reports the current and pending plans independently:
 
 ```json
 {
-  "external_customer_id": "workspace_123",
-  "external_entity_id": "user_42",
-  "external_subscription_id": "entity-sub-7e1782f4-...",
-  "status": "active",
-  "current_plan": {
-    "code": "pro_monthly",
-    "name": "Pro",
-    "interval": "monthly",
-    "amount_cents": 1499,
-    "amount_currency": "USD",
-    "status": "active"
-  },
-  "pending_plan": null,
-  "billing_time": "anniversary",
-  "cancel_at_period_end": false
+  "entity_subscription": {
+    "external_customer_id": "workspace_123",
+    "external_entity_id": "user_42",
+    "external_subscription_id": "entity-sub-7e1782f4-...",
+    "status": "active",
+    "current_plan": {
+      "code": "pro_monthly",
+      "name": "Pro",
+      "interval": "monthly",
+      "amount_cents": 1499,
+      "amount_currency": "USD",
+      "status": "active",
+      "effective_at": "2026-10-01T00:00:00Z"
+    },
+    "pending_plan": null,
+    "billing_time": "anniversary",
+    "cancel_at_period_end": false
+  }
 }
 ```
 
-While a change is pending, `pending_plan` has the same fields as `current_plan` plus `effective_at`. Today that `effective_at` is the start date of the pending subscription, not the date the change takes effect. This is a known Core defect that is being fixed. Read the date from the `effective_at` of the change-plan result, or from `pending_change.effective_at` in [subscription options](/api/subscription-management#read-state-and-eligible-plans).
+Each item also has `billing_authority`, `credit_import_completed_at`, `subscription_at`, `started_at`, `current_period_start`, `current_period_end`, `ending_at`, `canceled_at`, `created_at` and `updated_at`. `status` is `unsubscribed` when the Entity has no current or incomplete subscription.
+
+`current_plan` and `pending_plan` have the same fields. Their `effective_at` is the subscription's scheduled change time when one is set, otherwise its start date. An unknown Entity returns `404 entity_subscription_not_found`.
 
 ## Start checkout
 
@@ -82,7 +87,7 @@ Content-Type: application/json
 }
 ```
 
-`billing_time` accepts `anniversary` or `calendar` for the initial subscription. Paid plans remain incomplete until verified payment succeeds. Retrying an incomplete checkout for the same plan reuses its subscription and invoice instead of creating another charge.
+`billing_time` accepts `anniversary` or `calendar` for the initial subscription. Paid plans remain incomplete until verified payment succeeds. Retrying an incomplete checkout for the same plan reuses its subscription and invoice instead of creating another charge. A different plan replaces the abandoned checkout; `409 entity_subscription_checkout_in_progress` remains only while the provider is still processing a payment for it. An unpaid checkout expires after 23 hours: the subscription is canceled with `cancelation_reason: timeout`, the invoice is closed and the credits it used are returned. See [Unpaid checkout expiry](/api/create-checkout#unpaid-checkout-expiry).
 
 ## Purchase multiple Entity plans together
 
@@ -115,8 +120,8 @@ The Python SDK exposes the same backend operation:
 
 ```python
 import os
-
 from nozle import Nozle
+
 
 nozle = Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
@@ -138,6 +143,10 @@ checkout = nozle.entity_subscriptions.checkout_many(
 The Go SDK exposes the grouped checkout result with typed Entity items:
 
 ```go
+import nozle "github.com/nozle-dev/nozle-go"
+
+client := nozle.New("") // reads NOZLE_SECRET_KEY
+
 checkout, err := client.CheckoutEntitySubscriptions(ctx, "workspace_123", []nozle.EntitySubscriptionCheckoutItem{
   {ExternalEntityID: "seat_pro_001", PlanCode: "pro_monthly"},
   {ExternalEntityID: "seat_max_001", PlanCode: "max_monthly"},
@@ -206,13 +215,19 @@ Item problems fail the whole basket with `422` and the reason in `error_details.
 | `items: ["mixed_currencies"]`, `items: ["mixed_intervals"]` | Plans differ in currency or interval. |
 | `items: ["duplicate_external_entity_id"]` | The same Entity appears twice. |
 | `items: ["value_is_mandatory"]`, `items: ["value_is_too_large"]` | No items, or more than 100. |
+| `items: ["value_is_invalid"]` | `items` is not a list, or an item has an empty `plan_code` or an empty or over-255-byte `external_entity_id`. |
+| `items: ["entity_subscription_already_exists"]` | An Entity already has an active, pending, or incomplete subscription. |
+| `billing_time: ["value_is_invalid"]` | `billing_time` is not `anniversary` or `calendar`. When it is omitted, the organization's billing alignment is used. |
+| `idempotency_key: ["value_is_mandatory"]`, `idempotency_key: ["value_is_too_long"]` | The header is missing, or longer than 255 bytes. |
+| `idempotency_key: ["idempotency_key_reused"]` | The key was used for a different basket. |
+| `checkout: ["payment_provider_changed"]` | A replayed Razorpay batch, but the customer is now assigned to another payment connection. |
 | `currency: ["customer_currency_mismatch"]` | The plans' currency differs from the customer's. |
 | `checkout: ["billing_anchor_checkout_in_progress"]` | A first paid checkout for this customer is still open. |
 | `checkout: ["checkout_not_available"]` | A replay of a batch that has failed or expired. Start a new checkout with a new key. |
 
 Create each Entity first with [Customer Entities](/api/customer-entities). An Entity that does not exist currently makes the request fail with a bare `500`, not a `404`; this is a known defect.
 
-Without a connected payment provider the request returns `405 payment_provider_required`. A single Entity checkout without a provider returns `422 payment_provider_required` instead.
+An unknown customer or plan returns `404` (`customer_not_found`, `plan_not_found`). Without a connected payment provider the request returns `422 payment_provider_required`, as a single Entity checkout does; `422 stripe_customer_required` means Nozle could not create the customer in Stripe.
 
 ```json
 {
@@ -251,7 +266,7 @@ Nozle supports these result types:
 A bulk Razorpay checkout answers first with `type: "processing"`, `status: "open"`, `client_secret: null` and a `checkout_id`, because Nozle creates the Razorpay order in the background. Either poll `GET /checkout/{checkout_id}` until its nested `checkout` is `{"type": "razorpay", "key_id", "order_id", ...}`, or replay the same request with the same `Idempotency-Key`: once the order exists the replay returns `type: "razorpay"` with `checkout_id`, `key_id` and `order_id`. Then open the modal. After the payment, status goes `succeeded` with `fulfillment_status` `processing`, then `succeeded`, and every Entity subscription in the basket becomes active.
 </Info>
 
-The idempotency key covers the customer, billing mode, return URL, Entity IDs, and plans. Retry the exact request with the same key: Nozle returns the same batch with `replayed: true` and reuses the open Stripe session. A different basket with the same key returns `idempotency_key_reused`.
+The idempotency key covers the customer, billing mode, return URL, Entity IDs, and plans. Retry the exact request with the same key: Nozle returns the same batch with `replayed: true` and reuses the open Stripe session. A different basket with the same key returns `422` with `idempotency_key: ["idempotency_key_reused"]`. The result also carries `clientSecret`, a camel-case alias of `client_secret`.
 
 ## Shared customer billing anchor
 
@@ -283,7 +298,7 @@ Content-Type: application/json
 }
 ```
 
-The [plan transition policy](/api/plan-transition-policies) for the current and target plans determines whether the change is immediate, payment-gated, or scheduled for the renewal boundary. Without a policy for the pair the request returns `405 plan_transition_policy_required` (a change from a free plan to a paid plan uses the organization's free-to-paid policy instead). Change-plan takes no `billing_time`. Changing one Entity never changes another Entity's subscription.
+The [plan transition policy](/api/plan-transition-policies) for the current and target plans determines whether the change is immediate, payment-gated, or scheduled for the renewal boundary. Without a policy for the pair the request returns `422 plan_transition_policy_required` (a change from a free plan to a paid plan uses the organization's free-to-paid policy instead). Change-plan takes no `billing_time`. Changing one Entity never changes another Entity's subscription.
 
 The result is a checkout result with `external_entity_id` and `external_subscription_id` added. A scheduled change:
 
@@ -301,7 +316,7 @@ The result is a checkout result with `external_entity_id` and `external_subscrip
 }
 ```
 
-`effective_at` carries the customer's timezone offset, for example `2026-11-01T00:00:00.000000+05:30`. Changing again while a scheduled change is pending replaces the pending change. A paid upgrade does not replace or withdraw a pending downgrade: withdraw it first, as described in [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits). The target being the current plan returns `422 plan_already_active`.
+`effective_at` carries the customer's timezone offset, for example `2026-11-01T00:00:00.000000+05:30`. Changing again while a scheduled change is pending replaces the pending change. A paid upgrade does not replace or withdraw a pending downgrade: it is refused with `409 subscription_change_pending`, so withdraw it first, as described in [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits). The target being the current plan returns `422 plan_already_active`.
 
 ## Cancel
 
@@ -319,6 +334,8 @@ Content-Type: application/json
 
 Cancellation supports the same settlement controls as customer subscriptions. Send `credit_action` explicitly: for a plan billed in arrears, a request without it returns `422` with `credit_action: not_supported_for_pay_in_arrears`. `timing` accepts `immediate` or `end_of_period`. Prefer `end_of_period` unless the merchant explicitly intends to terminate access immediately.
 
+The `Idempotency-Key` header is required (at most 255 characters); without it the request returns `422` with `idempotency_key: value_is_mandatory`. The response has the updated identity under `entity_subscription` and the recorded cancellation under `subscription_transition`, with its `id` and `replayed`. An identity with no current subscription returns `404 subscription_not_found`.
+
 ## Remove an unused identity
 
 ```http
@@ -326,7 +343,7 @@ DELETE /customers/workspace_123/entities/user_42/subscription
 Authorization: Bearer sk_...
 ```
 
-Removal is allowed only when the identity has no active, pending, or incomplete subscription. An identity with billing history returns `403 entity_subscription_has_billing_history`, and one with no subscription returns `404 entity_subscription_not_found`. Historical billing records remain immutable.
+Removal is allowed only when the identity has no active, pending, or incomplete subscription. It then returns `204` with no body, including for an identity that never had a subscription. An identity with an active, pending, or incomplete subscription returns `403 entity_subscription_has_billing_history`. An identity that does not exist returns `404 entity_subscription_not_found`. Historical billing records remain immutable.
 
 <Warning>
 Payment provider webhooks (Stripe, or Razorpay together with your verify call) are authoritative for paid activation. Do not grant paid access from a browser redirect or checkout callback alone.

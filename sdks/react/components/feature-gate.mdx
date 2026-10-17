@@ -1,0 +1,178 @@
+---
+title: "FeatureGate"
+description: "Shows content when the customer has a feature, and a fallback when they do not."
+keywords: ["feature gate", "entitlement", "access control", "react"]
+---
+
+`FeatureGate` renders its children when `allowed` is true and `fallback` when it is false.
+
+**When to use**
+
+- Around a feature that only some plans include, such as SSO settings or exports.
+- Around a menu item or button that leads to such a feature.
+- When the entitlement decision is still loading and you want nothing to show until it arrives.
+
+Gates only change what the interface shows. Check the entitlement again on your server before doing the protected work.
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/gates/light.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, light theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/gates/dark.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, dark theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/gates/minimal.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, minimal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/gates/neobrutal.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, neobrutal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/gates/nozle.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, nozle theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    <Frame>
+      <img src="/images/react/components/gates/nozle-dark.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, nozleDark theme" width="508" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Importing FeatureGate
+
+```tsx
+import {
+  FeatureGate,
+  UpgradePrompt,
+  type FeatureGateProps,
+} from '@nozle-js/react'
+```
+
+## Rendering FeatureGate
+
+`FeatureGate` has no look of its own and fetches nothing: you pass the entitlement decision.
+
+```tsx components/sso-settings.tsx
+export function SsoSettings({ allowed }: { allowed: boolean }) {
+  return (
+    <FeatureGate allowed={allowed} fallback={<UpgradePrompt text="SSO needs the Scale plan" />}>
+      <form>{/* SSO settings */}</form>
+    </FeatureGate>
+  )
+}
+```
+
+## Data
+
+The gate needs one boolean, `allowed`, and optionally `loading` while you read it.
+
+### Live data
+
+[`useEntitlement(featureCode)`](/sdks/react/hooks#the-hooks) returns the customer's `can()` result through your `billingEndpoint`:
+
+```tsx
+import { useEntitlement } from '@nozle-js/react'
+
+export function Exports() {
+  const entitlement = useEntitlement('data_exports')
+  return (
+    <FeatureGate
+      allowed={entitlement.data?.allowed ?? false}
+      loading={entitlement.isPending}
+      fallback={<UpgradePrompt planName="Pro" />}
+    >
+      <button type="button">Export CSV</button>
+    </FeatureGate>
+  )
+}
+```
+
+## Examples
+
+### Upgrade prompt as fallback
+
+An [`UpgradePrompt`](/sdks/react/components/upgrade-prompt) is the usual fallback. The screenshot shows the fallbacks of `FeatureGate`, [`PlanGate`](/sdks/react/components/plan-gate) and [`UsageGate`](/sdks/react/components/usage-gate), each an `UpgradePrompt`.
+
+<Frame>
+  <img src="/images/react/components/gates/light.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, light theme" width="508" />
+</Frame>
+
+```tsx
+export function Exports({ allowed, openPlans }: { allowed: boolean; openPlans: () => void }) {
+  return (
+    <FeatureGate allowed={allowed} fallback={<UpgradePrompt planName="Pro" onUpgrade={openPlans} />}>
+      <button type="button">Export CSV</button>
+    </FeatureGate>
+  )
+}
+```
+
+### While the decision loads
+
+With `loading`, the gate renders nothing, so the fallback does not flash before the decision arrives.
+
+```tsx
+export function Exports({ allowed, loading }: { allowed: boolean; loading: boolean }) {
+  return (
+    <FeatureGate allowed={allowed} loading={loading} fallback={<UpgradePrompt planName="Pro" />}>
+      <button type="button">Export CSV</button>
+    </FeatureGate>
+  )
+}
+```
+
+## API reference
+
+<ResponseField name="allowed" type="boolean" required>
+  `true` renders `children`; `false` renders `fallback`.
+</ResponseField>
+
+<ResponseField name="children" type="ReactNode" required>
+  The protected content.
+</ResponseField>
+
+<ResponseField name="fallback" type="ReactNode" default={null}>
+  Rendered when `allowed` is false.
+</ResponseField>
+
+<ResponseField name="loading" type="boolean" default={false}>
+  Renders nothing while true, so the fallback does not flash before the decision arrives.
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| `loading` is true | Nothing. |
+| `allowed` is true | `children`. |
+| `allowed` is false | `fallback`, or nothing without one. |
+
+### Appearance
+
+`FeatureGate` takes no `appearance` and has no element keys; style the fallback you pass.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="PlanGate" icon="lock" href="/sdks/react/components/plan-gate">
+    Gate by plan code.
+  </Card>
+  <Card title="UsageGate" icon="lock" href="/sdks/react/components/usage-gate">
+    Gate by usage and limit.
+  </Card>
+  <Card title="LockedOverlay" icon="eye-slash" href="/sdks/react/components/locked-overlay">
+    Show a blurred preview instead of hiding.
+  </Card>
+  <Card title="Feature gates" icon="book" href="/sdks/react/gates">
+    Combining gates with backend state.
+  </Card>
+</CardGroup>

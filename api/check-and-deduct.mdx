@@ -6,12 +6,12 @@ api: "POST https://api.nozle.app/engine/api/v1/check-and-deduct"
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
 <Warning>
-Legacy wallet adapter. It does not apply Feature conversion rates or the product-credit source ledger. New integrations must use [Track and Consume Credits](/api/usage-track).
+Deprecated. Use [Track and Consume Credits](/api/usage-track) (`POST /usage/track`) instead. This is a legacy wallet adapter. It does not apply Feature conversion rates or the product-credit source ledger. New integrations must use [Track and Consume Credits](/api/usage-track).
 </Warning>
 
-Atomically check whether a customer's wallet has enough credits and deduct them in a single database transaction. The customer's newest active wallet is locked while it is read, so concurrent requests cannot overspend it. A successful deduction also records a wallet transaction.
+Atomically check whether a customer's wallet has enough credits and deduct them in a single database transaction. The customer's newest active wallet is locked while it is read, so concurrent requests cannot overspend it. A successful deduction moves the wallet's money balance with the credits and records a wallet transaction.
 
-**Auth:** `sk_` only
+**Auth:** `sk_` only. Publishable keys are rejected with `403`. API key permissions are not checked on this endpoint.
 
 <ParamField body="customer_id" type="string" required>
   External customer ID
@@ -58,7 +58,8 @@ curl -X POST https://api.nozle.app/engine/api/v1/check-and-deduct \
 | `400` | `{ "error": "customer_id and positive credits are required" }` | `customer_id` is empty or missing, or `credits` is zero, negative or missing. |
 | `400` | `{ "error": "invalid request body" }` | The body is not valid JSON, or a field has the wrong type, for example `credits` sent as a string. |
 | `404` | `{ "code": "wallet_not_found", "error": "No active wallet found for this customer." }` | The customer does not exist, or has no active wallet. |
+| `500` | `{ "error": "could not deduct wallet credits" }` | The deduction failed. Nothing was deducted. |
 
 <Note>
-This endpoint updates `credits_balance` and records a wallet transaction. It does not update the wallet's money balance (`balance_cents`) in Core. See [Credit balance](/api/credit-balance).
+The deducted amount is `credits` × the wallet's rate, rounded to the wallet currency. The deduction lowers `credits_balance` and the ongoing credit balance by `credits`, lowers `balance_cents` and the ongoing balance by that amount, and adds both to the consumed credits and consumed amount. The wallet transaction records the money amount and the credits. See [Credit balance](/api/credit-balance).
 </Note>

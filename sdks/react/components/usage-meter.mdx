@@ -1,0 +1,206 @@
+---
+title: "UsageMeter"
+description: "A progress bar for one feature's usage against its limit, coloured by how close it is."
+keywords: ["usage meter", "progress bar", "limit", "react"]
+---
+
+`UsageMeter` shows how much of one limit is used: a label, `used / limit`, and a bar that turns amber at 80% and red at 95%.
+
+**When to use**
+
+- Next to a feature that has a monthly limit ("API calls this month").
+- In a settings page, one row per limit.
+- Anywhere you need the same warning colours as the meter, through `getUsageMeterColor`.
+
+For several limits at once, use [`UsageDashboard`](/sdks/react/components/usage-dashboard).
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/usage-meter/light.png" alt="Four UsageMeters: normal at 42%, warning at 86%, critical at 98%, and unlimited, light theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/usage-meter/dark.png" alt="Four UsageMeters: normal at 42%, warning at 86%, critical at 98%, and unlimited, dark theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/usage-meter/minimal.png" alt="Four UsageMeters: normal at 42%, warning at 86%, critical at 98%, and unlimited, minimal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/usage-meter/neobrutal.png" alt="Four UsageMeters: normal at 42%, warning at 86%, critical at 98%, and unlimited, neobrutal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/usage-meter/nozle.png" alt="Four UsageMeters: normal at 42%, warning at 86%, critical at 98%, and unlimited, nozle theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    <Frame>
+      <img src="/images/react/components/usage-meter/nozle-dark.png" alt="Four UsageMeters: normal at 42%, warning at 86%, critical at 98%, and unlimited, nozleDark theme" width="508" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Importing UsageMeter
+
+```tsx
+import {
+  UsageMeter,
+  getUsageMeterColor,
+  type UsageMeterProps,
+} from '@nozle-js/react'
+```
+
+## Rendering UsageMeter
+
+Pass the usage so far and the limit:
+
+```tsx components/api-calls-meter.tsx
+export function ApiCallsMeter() {
+  return <UsageMeter label="API calls" used={4200} limit={10000} />
+}
+```
+
+The bar fills to the share of the limit used, capped at 100%. It uses the primary colour below 80%, the warning colour from 80% and the danger colour from 95%; the `used / limit` text takes the same colour.
+
+## Data
+
+The meter needs two numbers: `used` and `limit`. A `limit` of `null` means the feature has no limit.
+
+```tsx
+export function Meters() {
+  return (
+    <>
+      <UsageMeter label="API calls" used={4200} limit={10000} />
+      <UsageMeter label="Seats" used={9} limit={10} />
+      <UsageMeter label="Projects" used={12} limit={null} />
+      <UsageMeter used={9800} limit={10000} />
+    </>
+  )
+}
+```
+
+### Live data
+
+[`useEntitlement(featureCode)`](/sdks/react/hooks#the-hooks) returns the `can()` result for the signed-in customer through your `billingEndpoint`, with `used` and `limit`:
+
+```tsx
+import { useEntitlement } from '@nozle-js/react'
+
+export function ApiCallsMeter() {
+  const { data } = useEntitlement('api_calls')
+  if (!data) return null
+  return <UsageMeter label="API calls" used={data.used ?? 0} limit={data.limit} />
+}
+```
+
+## Examples
+
+### Warning and danger colours
+
+From 80% the bar and the numbers turn amber; from 95% they turn red.
+
+<Frame>
+  <img src="/images/react/components/usage-meter/light.png" alt="Four UsageMeters: normal at 42%, warning at 86%, critical at 98%, and unlimited, light theme" width="508" />
+</Frame>
+
+```tsx
+export function Meters() {
+  return (
+    <>
+      <UsageMeter label="Normal" used={4200} limit={10000} />
+      <UsageMeter label="Warning" used={8600} limit={10000} />
+      <UsageMeter label="Critical" used={9800} limit={10000} />
+    </>
+  )
+}
+```
+
+### Unlimited
+
+With `limit` set to `null` or left out, the text reads "Unlimited" and the bar stays empty.
+
+```tsx
+export function ProjectsMeter() {
+  return <UsageMeter label="Projects" used={12} limit={null} />
+}
+```
+
+### Bar only
+
+Without `label`, only the bar shows.
+
+```tsx
+export function CompactMeter() {
+  return <UsageMeter used={9800} limit={10000} />
+}
+```
+
+### The meter colour in your own UI
+
+`getUsageMeterColor(percentage)` returns the fill colour for a percentage, as a CSS value: `colorDanger` at 95 or more, `colorWarning` at 80 or more, otherwise `colorPrimary`.
+
+```tsx
+export function UsagePercent({ percentage }: { percentage: number }) {
+  return <span style={{ color: getUsageMeterColor(percentage) }}>{percentage}% used</span>
+}
+```
+
+## API reference
+
+<ResponseField name="used" type="number" required>
+  The usage so far.
+</ResponseField>
+
+<ResponseField name="limit" type="number | null">
+  The limit. `null` or no value means unlimited: the text reads "Unlimited" and the bar stays empty. A limit of `0` shows an empty bar.
+</ResponseField>
+
+<ResponseField name="label" type="string">
+  Text above the bar. Without it, only the bar shows.
+</ResponseField>
+
+<ResponseField name="showText" type="boolean" default={true}>
+  Shows `used / limit` on the right of the label. Numbers use the browser's locale.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides. Defaults to the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| Below 80% | The bar in the primary colour. |
+| 80% to 94% | The bar and numbers in the warning colour. |
+| 95% or more | The bar and numbers in the danger colour. |
+| No limit | "Unlimited" and an empty bar. |
+
+### Appearance
+
+<Accordion title="Element keys">
+  `usageMeter` (root), `usageMeter__label`, `usageMeter__value`, `usageMeter__track`, `usageMeter__fill`.
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="UsageDashboard" icon="gauge" href="/sdks/react/components/usage-dashboard">
+    Several meters in one card.
+  </Card>
+  <Card title="UsageAlert" icon="triangle-exclamation" href="/sdks/react/components/usage-alert">
+    A warning when a limit is close.
+  </Card>
+  <Card title="UsageGate" icon="lock" href="/sdks/react/components/usage-gate">
+    Hides a feature at the limit.
+  </Card>
+</CardGroup>

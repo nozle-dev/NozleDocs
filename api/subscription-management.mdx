@@ -5,7 +5,7 @@ description: "Select a subscription, preview a signed quote, recover checkout, a
 
 Base URL: `https://api.nozle.app/engine/api/v1`. All routes below require a secret key and an authenticated merchant backend. The backend derives `customer_id`; the selected **external** `subscription_id` must belong to that customer and organization.
 
-These hosted endpoints are available. Use their SDK wrappers and controls with React `0.10.2`, Node `0.10.0`, Python `0.10.0`, or Go `v0.9.1`; see [the billing portal integration](/sdks/react/billing-portal).
+These hosted endpoints are available. Use their SDK wrappers and controls with React `0.10.2`, Node `0.10.0`, Python `0.10.0`, or Go `v0.9.1`, or later; see [the billing portal integration](/sdks/react/billing-portal).
 
 ## Endpoint map
 
@@ -49,9 +49,13 @@ Send `customer_id`, `subscription_id`, and `plan_code` to `POST /subscriptions/p
 }
 ```
 
+This route needs the `invoice:read` API permission, not a `subscription` permission. `subscription_id` is optional, but without it a customer with several active subscriptions gets `409 subscription_selection_required`.
+
 The response includes `quote_id`, `transition_direction`, `timing`, `currency`, `credit_amount_cents`, `debit_amount_cents`, `net_amount_cents`, `amount_due_now_cents`, `amount_due_at_effective_cents`, `effective_at`, and nullable `renewal_at`.
 
-Previewing a change between two plans with no [transition policy](/api/plan-transition-policies) returns `405 plan_transition_policy_required` (except from a free plan to a paid plan). The response also echoes the policy it applied: `transition_policy`, `billing_anchor`, `proration_behavior`, `credit_action`, `refund_mode`, and `final_invoice_action`.
+It also includes `subscription_id` (Core's internal UUID of the current subscription), `external_subscription_id`, `invoice_issuing_date`, and `next_billing_date` with its camel-case alias `nextBillingDate`. `credit`, `debit`, and `net` repeat the three cent amounts in major units (for example `12.5`); use the `*_cents` fields for exact values.
+
+Previewing a change between two plans with no [transition policy](/api/plan-transition-policies) returns `422 plan_transition_policy_required` (except from a free plan to a paid plan). The response also echoes the policy it applied: `transition_policy`, `billing_anchor`, `proration_behavior`, `credit_action`, `refund_mode`, and `final_invoice_action`.
 
 Quotes expire after five minutes. Show the returned amounts and dates for confirmation, and forward the opaque `quote_id` unchanged. State, policy or amount changes invalidate the quote with HTTP 409. Refresh and obtain a new confirmation instead of silently applying a different price.
 
@@ -91,7 +95,7 @@ The existing transition result is nested under `subscription_transition`. Reload
 
 Preview `operation: "cancel"` with `timing: "end_of_period"` through `/subscriptions/transitions/preview`. Send the same parameters to `/subscriptions/transitions` with `expected_effective_at` set to the exact preview's `subscription_transition.effective_at`, plus an `Idempotency-Key` header. A stale date returns HTTP 409 before cancellation.
 
-Keep uses `operation: "uncancel"`, the customer/subscription identifiers and an `Idempotency-Key`. It accepts no settlement overrides. Keep is available only before the ending is due; it does not restart a terminated subscription. Cancellation removes a pending downgrade, and Keep does not recreate it.
+Keep uses `operation: "uncancel"`, the customer/subscription identifiers and an `Idempotency-Key`. It accepts no settlement overrides. Keep is available only before the ending is due; it does not restart a terminated subscription. Cancellation removes a pending downgrade and cancels an open paid upgrade checkout, and Keep does not recreate them.
 
 ## Withdraw a pending downgrade
 
@@ -107,7 +111,7 @@ Read and retain `pending_change.id` from options when the customer opens the con
 
 `pending_subscription_id` is the pending internal UUID, not the active subscription's external ID. Core, called directly at `POST /subscription_transitions/withdraw`, names the other two fields `external_customer_id` and `external_subscription_id`. The response contains `subscription`, `withdrawn_pending_subscription_id` and `replayed`. A stale owned pending ID returns `409 pending_subscription_changed`; an unknown or unowned resource returns `404 pending_subscription_not_found`. The same idempotency key returns the original result with `replayed: true`. The active subscription remains in place.
 
-A new scheduled change while a change is pending replaces that change and creates a new pending ID. Re-read `pending_change.id` from options before you withdraw. A paid upgrade checkout does not replace or withdraw it: withdraw the pending downgrade first, or the upgrade payment ends in `needs_review` with `plan_upgrade_subscription_changed`. See [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits).
+A new scheduled change while a change is pending replaces that change and creates a new pending ID. Re-read `pending_change.id` from options before you withdraw. A paid upgrade checkout is refused with `409 subscription_change_pending` while a downgrade or cancellation is scheduled: withdraw the pending downgrade, or keep the subscription, first. Scheduling a change or cancelling at period end cancels an open upgrade checkout. See [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits).
 
 ## Payment status and recovery
 

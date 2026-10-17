@@ -1,0 +1,218 @@
+---
+title: "CreditBalance"
+description: "One credit balance: credits available, the time of the reading, and where the credits come from."
+keywords: ["credit balance", "credits", "wallet", "react"]
+---
+
+`CreditBalance` shows how many credits a customer has in one credit system, and the grants and top-ups they come from. From React `0.11.0`.
+
+**When to use**
+
+- Next to an AI or credit-metered feature, so customers see what is left.
+- The credits section of your billing settings, with [`CreditHistory`](/sdks/react/components/credit-history) below it.
+- Any place that shows what remains of each grant or top-up and when it expires.
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/credit-balance/light.png" alt="CreditBalance with 1,240 AI credits from a plan grant and a top-up, light theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/credit-balance/dark.png" alt="CreditBalance with 1,240 AI credits from a plan grant and a top-up, dark theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/credit-balance/minimal.png" alt="CreditBalance with 1,240 AI credits from a plan grant and a top-up, minimal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/credit-balance/neobrutal.png" alt="CreditBalance with 1,240 AI credits from a plan grant and a top-up, neobrutal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/credit-balance/nozle.png" alt="CreditBalance with 1,240 AI credits from a plan grant and a top-up, nozle theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    <Frame>
+      <img src="/images/react/components/credit-balance/nozle-dark.png" alt="CreditBalance with 1,240 AI credits from a plan grant and a top-up, nozleDark theme" width="1008" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Importing CreditBalance
+
+```tsx
+import {
+  CreditBalance,
+  useCreditBalance,
+  type CreditBalanceData,
+  type CreditBalanceSource,
+} from '@nozle-js/react'
+```
+
+## Rendering CreditBalance
+
+Inside a `BillingProvider` with `billingEndpoint`, read the balance with `useCreditBalance` and pass it in:
+
+```tsx app/billing/credits/page.tsx
+'use client'
+import { BillingProvider } from '@nozle-js/react'
+
+function AiCredits() {
+  const { data, isPending, error } = useCreditBalance('ai_credits')
+  return <CreditBalance balance={data} isLoading={isPending} error={error} />
+}
+
+export default function CreditsPage() {
+  return (
+    <BillingProvider publishableKey="pk_live_..." billingEndpoint="/api/nozle">
+      <AiCredits />
+    </BillingProvider>
+  )
+}
+```
+
+The card shows the available credits with the unit name, singular for exactly 1 ("1 credit available", "1,240 credits available"), and "As of &lt;date&gt;" for the time of the reading. Below it, one line per source shows what remains and when it expires.
+
+## Data
+
+`balance` is a `CreditBalanceData`. Credit amounts are decimal strings.
+
+```tsx
+const balance: CreditBalanceData = {
+  credit_system_name: 'AI credits',
+  unit_name: 'credit',
+  available: '1240',
+  as_of: '2026-10-16T09:00:00Z',
+  sources: [
+    { id: 'grant_1', type: 'subscription_grant', remaining: '500', expires_at: '2026-11-01T00:00:00Z' },
+    { id: 'topup_1', type: 'top_up', remaining: '740', expires_at: null },
+  ],
+}
+
+export function Credits() {
+  return <CreditBalance balance={balance} />
+}
+```
+
+### Live data
+
+Inside a `BillingProvider` with `billingEndpoint`, [`useCreditBalance(creditSystemCode?)`](/sdks/react/hooks#the-hooks) returns one balance of the signed-in customer: the given credit system, else the first one with credits, else the first one.
+
+```tsx
+export function AiCredits() {
+  const { data, isPending, error } = useCreditBalance('ai_credits')
+  return <CreditBalance balance={data} isLoading={isPending} error={error} />
+}
+```
+
+Without the hooks, pass one entry of the SDK's `credits.balance` result, read on your backend.
+
+### Source types
+
+Each source's `type` sets its label. A source type the component does not know shows as sent. Sources whose `remaining` is `"0"` are hidden.
+
+| `type` | Label |
+|---|---|
+| `subscription_grant` | Plan grant |
+| `top_up` | Top-up |
+| `manual_grant` | Granted |
+| `adjustment` | Adjustment |
+| `allocated_top_up` | Allocated top-up |
+
+## Examples
+
+### Loading, empty and error
+
+`isLoading` shows a loading placeholder, no `balance` shows `emptyMessage`, and `error` shows the message as an alert.
+
+<Frame>
+  <img src="/images/react/components/credit-balance-states/light.png" alt="CreditBalance loading placeholder, No credit balance yet message, and an error message, light theme" width="1008" />
+</Frame>
+
+```tsx
+export function BalanceStates() {
+  return (
+    <>
+      <CreditBalance isLoading />
+      <CreditBalance balance={null} />
+      <CreditBalance error="Credits could not be loaded." />
+    </>
+  )
+}
+```
+
+## API reference
+
+<ResponseField name="balance" type="CreditBalanceData | null">
+  `null` or no value shows the empty message.
+
+  <Expandable title="properties">
+    <ResponseField name="credit_system_name" type="string" required>
+      Heading of the card.
+    </ResponseField>
+    <ResponseField name="unit_name" type="string" required>
+      Singular unit name, for example `credit`. An `s` is added unless `available` is exactly 1.
+    </ResponseField>
+    <ResponseField name="available" type="string" required>
+      Credits available, as a decimal string.
+    </ResponseField>
+    <ResponseField name="as_of" type="string" required>
+      Time of the reading, shown as "As of &lt;date&gt;".
+    </ResponseField>
+    <ResponseField name="sources" type="CreditBalanceSource[]">
+      Where the credits come from: `id`, `type`, `remaining` and `expires_at`. See [Source types](#source-types).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="isLoading" type="boolean" default={false}>
+  Shows a loading placeholder.
+</ResponseField>
+
+<ResponseField name="error" type="Error | string | null">
+  Shows the message as an alert. Defaults to `null`.
+</ResponseField>
+
+<ResponseField name="emptyMessage" type="string" default="No credit balance yet.">
+  Shown when there is no balance.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides. Defaults to the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+Dates show in `en-US` ("Oct 16, 2026").
+
+### States
+
+| State | What shows |
+|---|---|
+| `isLoading` | A skeleton placeholder with `role="status"`. |
+| `error` set | The message in a `role="alert"` card, in the danger text colour. |
+| No `balance` | `emptyMessage`. |
+
+### Appearance
+
+<Accordion title="Element keys">
+  `creditBalance` (root), `creditBalance__amount` (the large number).
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="CreditHistory" icon="clock-rotate-left" href="/sdks/react/components/credit-history">
+    How credits were used and granted.
+  </Card>
+  <Card title="Credits" icon="coins" href="/guides/credits/overview">
+    How credit systems work.
+  </Card>
+</CardGroup>

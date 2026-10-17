@@ -6,7 +6,7 @@ description: Start checkout for a fixed product-credit package
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-**Auth:** secret key only. Publishable keys are rejected. `Idempotency-Key` is required.
+**Auth:** secret key only. The key requires `credit_system:write`. Publishable keys are rejected. `Idempotency-Key` is required and must not exceed 255 bytes.
 
 ```json
 {
@@ -16,16 +16,22 @@ Base URL: `https://api.nozle.app/engine/api/v1`.
 }
 ```
 
-The response returns the pending purchase snapshot and hosted `payment_url`. Navigate the same page to that URL. For a customer on [Stripe](/integrations/stripe#credit-top-ups), `payment_url` is a Stripe-hosted `checkout.stripe.com` page that is valid for 24 hours, and the customer must already be linked to a Stripe customer. For a customer on [Razorpay](/integrations/razorpay#credit-top-ups), `payment_url` is an `rzp.io` payment link, `payment_provider` is `razorpay`, and the package must be priced in INR. The purchase object carries `payment_status`. A Razorpay top-up has no checkout ID to poll.
+All three fields are required. Unknown fields return `400`.
+
+The Engine forwards the request to Nozle Core and returns Core's status and body unchanged. The body is `{ "credit_top_up_purchase": { ... } }`. The response returns the pending purchase snapshot and hosted `payment_url`. Navigate the same page to that URL. For a customer on [Stripe](/integrations/stripe#credit-top-ups), `payment_url` is a Stripe-hosted `checkout.stripe.com` page that is valid for 24 hours, and the customer must already be linked to a Stripe customer. For a customer on [Razorpay](/integrations/razorpay#credit-top-ups), `payment_url` is an `rzp.io` payment link, `payment_provider` is `razorpay`, and the package must be priced in INR. The purchase object carries `payment_status`. A Razorpay top-up has no checkout ID to poll.
 
 <Warning>
-Creating checkout does not grant credits. Credits are materialized only after Nozle records and validates a confirmed successful payment.
+Creating checkout does not grant credits. Credits are materialized once the top-up invoice is fully paid, by any route: a card or provider payment, a manual payment for the full amount, a payment request, or marking the invoice paid. A partial manual payment grants nothing until the invoice is fully paid.
 </Warning>
 
 ## Errors
 
 | Status | Code | Cause |
 | --- | --- | --- |
+| `400` | none; `{"error": "invalid request body"}` | The body is not valid JSON or has an unknown field. |
+| `400` | none; `{"error": "customer_id, credit_system_code, and top_up_package_code are required"}` | A required field is missing. |
+| `400` | none; `{"error": "a valid Idempotency-Key header is required"}` | `Idempotency-Key` is missing or over 255 bytes. |
+| `502` | none; `{"error": "failed to reach billing service"}` | The Engine could not reach Core. |
 | `422` | `validation_errors` with `customer_currency_mismatch` in `error_details.currency` | The customer has a currency that differs from the package currency. |
 | `422` | `validation_errors` with `razorpay_requires_inr` | A Razorpay customer and a package that is not priced in INR. |
 | `422` | `validation_errors` with `no_linked_payment_provider` | The customer has no payment provider. |

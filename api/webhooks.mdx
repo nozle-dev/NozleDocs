@@ -26,12 +26,6 @@ Nozle processes payment webhooks for each connected Stripe account and for each 
 | charge.refund.updated | Updates the credit-note refund status |
 | charge.dispute.closed | Marks the invoice's dispute lost when the dispute is lost |
 
-**Plan features provisioned on subscription:**
-
-Starter plan: base features only
-Growth plan: revenue_analytics, remove_branding_watermark, auto_dunning, progressive_billing, lifetime_usage
-Scale plan: everything in Growth PLUS netsuite, xero, hubspot, salesforce, okta, avalara, api_permissions, custom_roles, forecasted_usage, security_logs, from_email, issue_receipts, manual_payments, multi_entities_pro
-
 **Setup:**
 
 Nozle registers the Stripe webhook automatically in a background job right after you connect Stripe. The target is:
@@ -40,7 +34,7 @@ Nozle registers the Stripe webhook automatically in a background job right after
 https://api.nozle.app/core/webhooks/stripe/{organization_id}?code={stripe_provider_code}
 ```
 
-Your Stripe account must allow webhook endpoint creation, and your public Nozle API URL must be reachable by Stripe. Registration is not retried. Nozle sends a `payment_provider.error` webhook only for an authentication or permission error and for Stripe's limit of 16 test-mode endpoints. When Stripe rejects the URL, for example a non-public host, no webhook is sent and the job stops, so check your Stripe dashboard for the endpoint to confirm registration. See the [Stripe integration](/integrations/stripe#webhook-setup) for the events, recovery and limits.
+Your Stripe account must allow webhook endpoint creation, and your public Nozle API URL must be reachable by Stripe. Registration is not retried. When Stripe refuses it (a key without permission, the limit of 16 test-mode endpoints, or a URL that is not public), Nozle sends a `payment_provider.error` webhook with Stripe's message. Check your Stripe dashboard for the endpoint to confirm registration. See the [Stripe integration](/integrations/stripe#webhook-setup) for the events, recovery and limits.
 
 ## Razorpay
 

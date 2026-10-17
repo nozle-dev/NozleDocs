@@ -1,0 +1,223 @@
+---
+title: "UsageBreakdown"
+description: "A table of the current billing period's usage: units and amount per feature, and the total."
+keywords: ["usage breakdown", "current usage", "billing period", "react"]
+---
+
+`UsageBreakdown` shows one billing period's usage as a table: each feature's units and amount, largest amount first, and the period total. From React `0.11.0`.
+
+**When to use**
+
+- A "Usage this period" section of your billing settings.
+- Next to [`CurrentPlan`](/sdks/react/components/current-plan), to explain the next invoice.
+- Any place that needs the period's dates, one row per charge and a total row.
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/usage-breakdown/light.png" alt="UsageBreakdown for October 2026 with API calls, seats and a total of $17.88, light theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/usage-breakdown/dark.png" alt="UsageBreakdown for October 2026 with API calls, seats and a total of $17.88, dark theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/usage-breakdown/minimal.png" alt="UsageBreakdown for October 2026 with API calls, seats and a total of $17.88, minimal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/usage-breakdown/neobrutal.png" alt="UsageBreakdown for October 2026 with API calls, seats and a total of $17.88, neobrutal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/usage-breakdown/nozle.png" alt="UsageBreakdown for October 2026 with API calls, seats and a total of $17.88, nozle theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    <Frame>
+      <img src="/images/react/components/usage-breakdown/nozle-dark.png" alt="UsageBreakdown for October 2026 with API calls, seats and a total of $17.88, nozleDark theme" width="508" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Importing UsageBreakdown
+
+```tsx
+import {
+  UsageBreakdown,
+  useUsage,
+  type CustomerUsageData,
+} from '@nozle-js/react'
+```
+
+## Rendering UsageBreakdown
+
+Inside a `BillingProvider` with `billingEndpoint`, read the current period with `useUsage` and pass it in:
+
+```tsx app/billing/usage/page.tsx
+'use client'
+import { BillingProvider } from '@nozle-js/react'
+
+function ThisPeriod() {
+  const { data, isPending, error } = useUsage()
+  return <UsageBreakdown usage={data} isLoading={isPending} error={error} />
+}
+
+export default function UsagePage() {
+  return (
+    <BillingProvider publishableKey="pk_live_..." billingEndpoint="/api/nozle">
+      <ThisPeriod />
+    </BillingProvider>
+  )
+}
+```
+
+Each row shows the charge's invoice name when set, otherwise the feature name. Units show as exact decimals, up to six places, and amounts in the period's currency. Dates show in UTC in `en-US` ("Oct 1, 2026 to Oct 31, 2026").
+
+## Data
+
+`usage` is the `customer_usage` object of Core's current-usage endpoint. Amounts are in cents; `units` is a decimal string.
+
+```tsx
+const usage: CustomerUsageData = {
+  from_datetime: '2026-10-01T00:00:00Z',
+  to_datetime: '2026-10-31T23:59:59Z',
+  currency: 'USD',
+  amount_cents: 1248,
+  charges_usage: [
+    {
+      units: '31200',
+      amount_cents: 1248,
+      amount_currency: 'USD',
+      charge: { nozle_id: 'chg_api', charge_model: 'standard', invoice_display_name: null },
+      feature: { nozle_id: 'ftr_api', code: 'api_calls', name: 'API calls' },
+    },
+  ],
+}
+
+export function ThisPeriod() {
+  return <UsageBreakdown usage={usage} />
+}
+```
+
+<Accordion title="Full example data">
+
+```tsx
+const usage: CustomerUsageData = {
+  from_datetime: '2026-10-01T00:00:00Z',
+  to_datetime: '2026-10-31T23:59:59Z',
+  currency: 'USD',
+  amount_cents: 1788,
+  charges_usage: [
+    {
+      units: '31200',
+      amount_cents: 1248,
+      amount_currency: 'USD',
+      charge: { nozle_id: 'chg_api', charge_model: 'standard', invoice_display_name: null },
+      feature: { nozle_id: 'ftr_api', code: 'api_calls', name: 'API calls' },
+    },
+    {
+      units: '9',
+      amount_cents: 540,
+      amount_currency: 'USD',
+      charge: { nozle_id: 'chg_seats', charge_model: 'standard', invoice_display_name: 'Seats' },
+      feature: { nozle_id: 'ftr_seats', code: 'seats', name: 'Seats' },
+    },
+  ],
+}
+
+export function ThisPeriod() {
+  return <UsageBreakdown usage={usage} />
+}
+```
+
+</Accordion>
+
+### Live data
+
+Inside a `BillingProvider` with `billingEndpoint`, [`useUsage()`](/sdks/react/hooks#the-hooks) reads the current period for the signed-in customer. Its `data` passes to `usage` directly:
+
+```tsx
+export function LiveBreakdown() {
+  const { data, isPending, error } = useUsage()
+  return <UsageBreakdown usage={data} isLoading={isPending} error={error} />
+}
+```
+
+Without the hooks, read `GET https://api.nozle.app/core/api/v1/customers/{external_customer_id}/current_usage` on your backend with a secret key and pass its `customer_usage`. Add `external_subscription_id` when the customer has more than one subscription.
+
+## Examples
+
+### Loading, empty and error
+
+`isLoading` shows a loading placeholder, a period without charges shows `emptyMessage`, and `error` shows the message as an alert.
+
+<Frame>
+  <img src="/images/react/components/usage-breakdown-states/light.png" alt="UsageBreakdown loading placeholder, No usage in this period yet message, and an error message, light theme" width="1008" />
+</Frame>
+
+```tsx
+export function BreakdownStates() {
+  return (
+    <>
+      <UsageBreakdown isLoading />
+      <UsageBreakdown usage={null} />
+      <UsageBreakdown error="Usage could not be loaded." />
+    </>
+  )
+}
+```
+
+## API reference
+
+<ResponseField name="usage" type="CustomerUsageData | null">
+  The period: `from_datetime`, `to_datetime`, `currency`, `amount_cents` and `charges_usage`. Without charges it shows the empty message.
+</ResponseField>
+
+<ResponseField name="isLoading" type="boolean" default={false}>
+  Shows a loading placeholder.
+</ResponseField>
+
+<ResponseField name="error" type="Error | string | null">
+  Shows the message as an alert. Defaults to `null`.
+</ResponseField>
+
+<ResponseField name="emptyMessage" type="string" default="No usage in this period yet.">
+  Shown when there is no usage.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides. Defaults to the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| `isLoading` | A skeleton placeholder with `role="status"`. |
+| `error` set | The message in a `role="alert"` card, in the danger text colour. |
+| No `usage`, or no charges | `emptyMessage`. |
+
+### Appearance
+
+<Accordion title="Element keys">
+  `usageBreakdown` (root), `usageBreakdown__row` (each charge row).
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="UsageTrend" icon="chart-column" href="/sdks/react/components/usage-trend">
+    Past periods as bars.
+  </Card>
+  <Card title="UsageDashboard" icon="gauge" href="/sdks/react/components/usage-dashboard">
+    Usage against limits.
+  </Card>
+</CardGroup>

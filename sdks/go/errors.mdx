@@ -11,8 +11,14 @@ The Go SDK exposes `ValidationError`, `AuthenticationError`, `TransportError`, a
 | `AuthenticationError` | Wrong key type, detected before any request (for example a `pk_` key on `TrackUsage`: `nozle: usage.track: secret sk_ key required`). `errors.As` to `*ValidationError` does not match it. |
 | `TransportError` | No HTTP response due to a connection or timeout failure. |
 | `APIError` | Non-success response or invalid JSON success payload. |
+| `WebhookVerificationError` | `VerifyWebhook` found the request not genuine. `Code` is `missing_signature`, `unsupported_algorithm`, `missing_hmac_key`, `invalid_signature` or `invalid_payload`. From `v0.12.0`. |
+| `SetupError` | Passed to `WrapHTTPClient`'s `OnError` with `Code` `feature_not_found` when no Feature has the event code: the usage is stored but not billed. From `v0.12.0`. |
 
 ```go
+import nozle "github.com/nozle-dev/nozle-go"
+
+client := nozle.New("") // reads NOZLE_SECRET_KEY
+
 _, err := client.Ping(ctx)
 var apiErr *nozle.APIError
 if errors.As(err, &apiErr) {
@@ -24,8 +30,8 @@ Check `AuthenticationError` separately when handling key type errors; a `*Valida
 
 Not every local failure is typed. `Meter` with 0 or more than 100 events returns the plain error `nozle: batch size must be 1-100` without sending a request; it is not a `*ValidationError`.
 
-`nozle.AsAPIError(err, &apiErr)` is a shortcut for `errors.As` and fills `StatusCode`, `Operation`, `Path`, and `Body`. `nozle.WithDebug(true)` logs one `[nozle] METHOD url` line per request through `log.Printf`; it does not log the key or request and response bodies.
+`nozle.AsAPIError(err, &apiErr)` is a shortcut for `errors.As` and fills `StatusCode`, `Operation`, `Path`, `Body`, `RequestID` and `RetryAfter`. `RequestID` is the `X-Request-Id` response header (Core sends it, the Engine does not yet) and is empty when absent; quote it when you contact support. `RetryAfter` is a `time.Duration` read from the `Retry-After` header as seconds or an HTTP date, and is zero when absent. `nozle.WithDebug(true)` logs one `[nozle] METHOD url` line per request through `log.Printf`; it does not log the key or request and response bodies.
 
 ## Retry behavior
 
-The SDK does not retry requests automatically. To add retries, inject a retrying `*http.Client` with `WithHTTPClient` (see [Installation](/sdks/go/installation)). Reuse the same event transaction ID or mutation idempotency key and payload after an uncertain outcome. Decide whether to retry reads within your request budget. Automatic LLM capture preserves the provider result and reports telemetry failures through `OnError`; manual capture returns them. Queue failed telemetry when durable delivery matters.
+By default the SDK does not retry. Pass `WithMaxRetries(n)` (and optionally `WithRetryDelay(d)`) to retry network errors, timeouts, `429` and `5xx` with backoff, or after `APIError.RetryAfter` (at most 30 seconds) when the service sent `Retry-After`. Only requests that are safe to repeat are retried: reads, calls that carry an idempotency key (such as `TrackUsage`), `Track`, `Meter`, `TrackCostEvent`, `UpsertCustomer`, `InvoiceDownloadURL`, and the read-only `CheckUsage`, `PreviewSubscriptionChange` and `PreviewSubscriptionTransition`. `Subscribe`, `Checkout` and other writes without a key are never retried. You can still inject a retrying `*http.Client` with `WithHTTPClient` (see [Installation](/sdks/go/installation)). Reuse the same event transaction ID or mutation idempotency key and payload after an uncertain outcome. Decide whether to retry reads within your request budget. Automatic LLM capture preserves the provider result and reports telemetry failures through `OnError`; manual capture returns them. Queue failed telemetry when durable delivery matters.

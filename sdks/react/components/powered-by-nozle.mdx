@@ -1,0 +1,99 @@
+---
+title: "PoweredByNozle"
+description: "The \"Powered by Nozle\" badge, and the hook that says whether to show it."
+keywords: ["powered by nozle", "branding", "badge", "react"]
+---
+
+`PoweredByNozle` renders "Powered by" and the Nozle logo as a link that opens nozle.dev in a new tab. From React `0.11.0`.
+
+**When to use**
+
+- Under a pricing page or billing screen you build with the hooks instead of the components.
+- Together with `useNozleBranding()`, which returns whether to show the badge.
+
+You do not need it with `PricingTable`, `PlanComparison`, `CurrentPlan`, `Checkout`, `UpgradeModal` or `BillingPortal`: they show the badge themselves. When one of them renders another, for example a dialog inside the portal, only the outer one shows it.
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/powered-by-nozle/light.png" alt="The Powered by Nozle badge, light theme" width="138" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/powered-by-nozle/dark.png" alt="The Powered by Nozle badge, dark theme" width="138" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/powered-by-nozle/minimal.png" alt="The Powered by Nozle badge, minimal theme" width="138" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/powered-by-nozle/neobrutal.png" alt="The Powered by Nozle badge, neobrutal theme" width="138" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/powered-by-nozle/nozle.png" alt="The Powered by Nozle badge, nozle theme" width="140" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    <Frame>
+      <img src="/images/react/components/powered-by-nozle/nozle-dark.png" alt="The Powered by Nozle badge, nozleDark theme" width="140" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Importing PoweredByNozle
+
+```tsx
+import { PoweredByNozle, useNozleBranding } from '@nozle-js/react'
+```
+
+## Rendering PoweredByNozle
+
+Show the badge only when `useNozleBranding()` is `true`:
+
+```tsx components/pricing-footer.tsx
+export function PricingFooter() {
+  const branded = useNozleBranding()
+  return branded ? <PoweredByNozle /> : null
+}
+```
+
+The badge takes its look from the `appearance` of the surrounding `BillingProvider`, also when you render it on its own.
+
+## Data
+
+### Live data
+
+Nozle decides on the server. The public plan catalog read with your publishable key returns `meta.nozle_branding`, and `useNozleBranding()` reads it from the same cached catalog request the components make. It returns `false` outside a `BillingProvider`, and until the catalog answers.
+
+## API reference
+
+`PoweredByNozle` takes no props.
+
+<ResponseField name="useNozleBranding()" type="boolean">
+  `true` when the catalog's `meta.nozle_branding` is `true`. `false` when it is `false`, there is no `BillingProvider`, or the catalog has not answered.
+</ResponseField>
+
+### Appearance
+
+<Accordion title="Element keys">
+  `poweredBy` (the link).
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="PricingTable" icon="table-columns" href="/sdks/react/components/pricing-table">
+    Shows the badge below the plans.
+  </Card>
+  <Card title="Appearance" icon="palette" href="/sdks/react/styling">
+    Themes and the `poweredBy` element.
+  </Card>
+</CardGroup>

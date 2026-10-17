@@ -13,6 +13,10 @@ Entitlements control what a customer can do based on subscription and usage stat
 ## Server-side enforcement
 
 ```ts
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
 const check = await nozle.can('customer_123', 'api_calls')
 
 if (!check.allowed) {
@@ -32,6 +36,8 @@ Call `can()` immediately before protected work. The response can include usage a
 Fetch entitlement state through your authenticated backend and pass it into presentational gates:
 
 ```tsx
+import { FeatureGate, UpgradePrompt } from '@nozle-js/react'
+
 <FeatureGate
   allowed={entitlement.allowed}
   loading={entitlement.loading}

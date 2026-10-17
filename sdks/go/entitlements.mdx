@@ -4,6 +4,10 @@ description: "Check feature access, usage limits, and margin estimates from a tr
 ---
 
 ```go
+import nozle "github.com/nozle-dev/nozle-go"
+
+client := nozle.New("") // reads NOZLE_SECRET_KEY
+
 result, err := client.Can(ctx, "workspace_123", "agent_execution")
 if err == nil && result.Allowed {
   // Run the permitted operation.

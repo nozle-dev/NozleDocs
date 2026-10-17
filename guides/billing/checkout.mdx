@@ -18,7 +18,7 @@ Nozle collects plan payments through the payment provider connected to your orga
 Plan checkout is payment-gated: a paid plan change is not applied until the payment provider confirms payment. If prepaid credits reduce the exact amount due to zero, Nozle applies the change transactionally and returns `type: "completed"` without creating a provider session.
 </Info>
 
-A customer whose provider is not connected cannot pay: checkout returns `payment_provider_required`. A customer with no assigned provider is assigned one at checkout: the Razorpay connection if the customer uses one, otherwise the organization's Stripe connection, and Nozle creates the provider customer. Setting `billing_configuration.payment_provider` when you create a customer through the API has no effect unless the same object has `sync_with_provider: true` or a `provider_customer_id`; see the [Razorpay](/integrations/razorpay#assign-the-connection-to-customers) and [Stripe](/integrations/stripe#assign-the-connection-to-customers) guides. At checkout Nozle creates the customer in Stripe when it is missing, and returns `422 stripe_customer_required` if it cannot.
+A customer whose provider is not connected cannot pay: checkout returns `payment_provider_required`. Checkout charges only through the connection assigned to the customer and never picks another one; a customer with no assigned connection also gets `payment_provider_required`. Assign the connection in the dashboard, or send `billing_configuration.payment_provider` and `payment_provider_code` when you create the customer through the API; see the [Razorpay](/integrations/razorpay#assign-the-connection-to-customers) and [Stripe](/integrations/stripe#assign-the-connection-to-customers) guides. At checkout Nozle creates the customer in Stripe when it is missing, and returns `422 stripe_customer_required` if it cannot.
 
 ## Stripe
 
@@ -49,7 +49,7 @@ Nozle subscribes to these eight events only. Without this webhook, Stripe may co
 
 A new-subscription Stripe checkout returns no checkout ID to poll. After Embedded Checkout completes, reload the subscription or wait for your `subscription.started` webhook. A paid upgrade returns `plan_upgrade_intent_id`; poll its status with [`GET /checkout/{id}`](/api/subscription-management) and the subscription scope.
 
-Retrying a new-subscription checkout while its subscription is still incomplete returns `422 validation_errors` with `error_details.subscription: ["subscription_incomplete"]`, even with the same `Idempotency-Key`. Recover with an invoice checkout for the `invoice_id` of the first response. See [Retry a new-subscription checkout](/integrations/stripe#retry-a-new-subscription-checkout).
+Retrying a new-subscription checkout for the same plan while its subscription is still incomplete reopens the first checkout. A different plan replaces the abandoned checkout and returns the new one; `409 subscription_checkout_in_progress` remains only while the provider is still processing a payment for the old checkout. An unpaid plan or single Entity checkout expires after 23 hours: the subscription is canceled with `cancelation_reason: timeout`, the invoice is closed and the credits it used are returned. See [Unpaid checkout expiry](/api/create-checkout#unpaid-checkout-expiry).
 
 ## Razorpay
 
@@ -75,7 +75,7 @@ A Razorpay checkout runs in four steps:
 
 The nested `checkout` of the status response is present while the checkout is `awaiting_payment` and also for an `expired` unpaid order. For the expired order it is `{"type": "processing", "status": "ready"}`, so do not reopen the modal for it. A status call without a customer and subscription scope needs a secret key; an unknown ID returns `404 checkout_session_not_found`. The React [`CheckoutButton`](/sdks/react/components) runs steps 2 to 4 for you when `BillingProvider` has `verifyCheckout` and `getCheckoutStatus` callbacks; it polls 30 times, one second apart.
 
-To retry a new-subscription checkout, do not call checkout again: while the first order is unpaid it returns `422 validation_errors` with `error_details.subscription: ["subscription_incomplete"]`, even with the same `Idempotency-Key`. Reopen the modal on the same order with the checkout that status returns while `awaiting_payment`, or call an invoice checkout for the `invoice_id` of the first response. The React "Payment failed. You can retry checkout." button calls checkout again, so for a new subscription use the stored checkout instead. See [Retry a new-subscription checkout](/integrations/razorpay#retry-a-new-subscription-checkout).
+To retry a new-subscription checkout, call checkout again for the same plan: while the first order is unpaid it returns that same order. The React "Payment failed. You can retry checkout." button does this. See [Retry a new-subscription checkout](/integrations/razorpay#retry-a-new-subscription-checkout).
 
 `POST /checkout` never returns `type: "hosted"` for Razorpay. A Razorpay payment link comes from an invoice payment URL (`POST /invoices/{id}/payment_url`) or a credit top-up purchase, as an `rzp.io` `payment_url` with no checkout ID to poll. Redirect the customer to it; the `payment_link.paid` webhook settles it.
 
@@ -137,13 +137,15 @@ Scheduled transition response:
 
 `effective_at` uses the customer's timezone offset, for example `2026-11-01T00:00:00.000000+05:30`.
 
-Changing an existing subscription needs a [plan transition policy](/api/plan-transition-policies) for that pair of plans. Without one, checkout returns `405 plan_transition_policy_required`. See [Create checkout](/api/create-checkout) for every result type and error.
+Changing an existing subscription needs a [plan transition policy](/api/plan-transition-policies) for that pair of plans. Without one, checkout returns `422 plan_transition_policy_required`. See [Create checkout](/api/create-checkout) for every result type and error.
 
 ## React implementation
 
 ### Option A -- CheckoutButton (simplest)
 
 ```tsx
+import { CheckoutButton } from '@nozle-js/react'
+
 <CheckoutButton
   planCode="growth"
   returnUrl="https://app.example.com/settings/billing"
@@ -155,6 +157,8 @@ Changing an existing subscription needs a [plan transition policy](/api/plan-tra
 ### Option B -- Custom flow with `useCheckoutSession`
 
 ```tsx
+import { Checkout, useCheckoutSession } from '@nozle-js/react'
+
 const { fetchClientSecret, isLoading } = useCheckoutSession();
 
 const handleCheckout = async () => {
@@ -183,6 +187,10 @@ const handleCheckout = async () => {
 For B2B scenarios where payment is already handled outside embedded checkout:
 
 ```typescript
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
 await nozle.customers.upsert({ externalId: 'customer_123', name: 'Acme' });
 const result = await nozle.subscribe('customer_123', 'growth');
 // { subscription_id: 'sub_...', status: 'active' }

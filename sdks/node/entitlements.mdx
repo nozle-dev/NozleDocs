@@ -4,6 +4,10 @@ description: "Check feature access, usage limits, and margin state with nozle.ca
 ---
 
 ```ts
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
 const check = await nozle.can('workspace_123', 'api_calls')
 
 if (!check.allowed) {
@@ -16,6 +20,8 @@ if (!check.allowed) {
 ## Signature
 
 ```ts
+import type { CanResult } from '@nozle-js/node'
+
 can(
   customerId: string,
   feature: string,
@@ -38,8 +44,8 @@ const check = await nozle.can('workspace_123', 'model_access', {
 | `feature_type` | `string?` | Type of the feature. |
 | `reason` | `string?` | Denial or decision reason. Present only when it applies. |
 | `used` | `number` | Current measured usage. |
-| `limit` | `number?` | Configured usage limit. |
-| `remaining` | `number?` | Remaining allowance. |
+| `limit` | `number \| null` | Configured usage limit. `null` when the feature has no limit. |
+| `remaining` | `number \| null` | Remaining allowance. `null` when the feature has no limit. |
 | `overage` | `boolean?` | Whether usage is in overage. Present only when it applies. |
 | `policy` | `object?` | Configured policy. Present only when configured. |
 | `configuration` | `Record<string, string>?` | Feature configuration. Present only when configured. |

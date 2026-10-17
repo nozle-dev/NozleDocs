@@ -13,12 +13,9 @@ All SDK exceptions derive from `NozleError`.
 | `NozleAPIError` | Nozle returned a non-2xx response or an invalid JSON success payload. |
 
 ```python
-from nozle import (
-    NozleAPIError,
-    NozleAuthenticationError,
-    NozleTransportError,
-    NozleValidationError,
-)
+from nozle import Nozle, NozleAPIError, NozleAuthenticationError, NozleTransportError, NozleValidationError
+
+nozle = Nozle()  # reads NOZLE_SECRET_KEY
 
 try:
     result = nozle.usage.track(
@@ -48,8 +45,10 @@ Catch `NozleAuthenticationError` before `NozleValidationError` if the branches n
 `NozleAPIError` exposes:
 
 - `operation`;
-- `status_code`; and
-- `response_details`.
+- `status_code`;
+- `response_details`;
+- `request_id`, the `X-Request-Id` response header (Core sends it, the Engine does not yet), or `None`. Quote it when you contact support; and
+- `retry_after`, the seconds from the `Retry-After` header (a number or an HTTP date), or `None`.
 
 `status_code` is not always an HTTP error status. When `track()` resolves the subscription itself and the customer has no active subscription, or more than one, it raises `NozleAPIError` with `status_code` 200. The message gives the cause: `no active subscription for customer '…'` or `has 2 active subscriptions; specify subscription_id`. Do not treat 200 as success. See [subscription resolution](/sdks/python/tracking-events#subscription-resolution).
 
@@ -57,7 +56,7 @@ The transport redacts known secret, token, authorization, and key fields and rep
 
 ## Retry behavior
 
-The SDK configures zero automatic HTTP retries. This avoids replaying mutations without application context.
+By default the SDK does not retry, so a mutation is never replayed without application context. Set `max_retries` (and optionally `retry_delay`) to retry network errors, timeouts, `429` and `5xx` with backoff, or after `NozleAPIError.retry_after` seconds when the service sent `Retry-After`. Only requests that are safe to repeat are retried: reads, calls that carry an idempotency key (such as `usage.track`), event, cost event and customer writes, and the read-only usage check and transition preview. `subscribe`, `checkout` and other writes without a key are never retried.
 
 - For idempotent Entity, credit-transfer, and usage mutations, retry with the same idempotency key and payload.
 - For `track()`, retry the same event with the same transaction ID.
@@ -72,8 +71,8 @@ The warning text names only the exception type, not the cause, for example `Nozl
 
 ```python
 import warnings
-
 from nozle import NozleTrackingWarning
+
 
 warnings.simplefilter("always", NozleTrackingWarning)
 ```

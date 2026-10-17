@@ -5,115 +5,21 @@ description: "Render UI from entitlement, usage, and plan state supplied by your
 
 Gate components are presentational. They never fetch customer data and never receive a customer ID. Load entitlement, usage, and plan state through your authenticated backend, then pass the result into the gate.
 
-![Feature gates and upgrade prompt](/images/react-sdk/gates.png)
+| Component | Renders |
+|---|---|
+| [`FeatureGate`](/sdks/react/components/feature-gate) | `children` when `allowed` is true, `fallback` when it is false, nothing while `loading`. |
+| [`PlanGate`](/sdks/react/components/plan-gate) | `children` when `currentPlan` is in `allowedPlans`, else `fallback`. |
+| [`UsageGate`](/sdks/react/components/usage-gate) | `children` while `usage < limit`, else `fallback`. Reaching the limit counts as used up. |
+| [`UpgradePrompt`](/sdks/react/components/upgrade-prompt) | An upgrade message and button, for fallbacks. |
+| [`LockedOverlay`](/sdks/react/components/locked-overlay) | Blurred children with an `UpgradePrompt` on top when `locked`. |
 
-## `FeatureGate`
-
-Renders `children` when `allowed` is true, `fallback` when it is false, and `null` while `loading` is true.
-
-```tsx
-import { FeatureGate, UpgradePrompt } from '@nozle-js/react'
-
-<FeatureGate
-  allowed={entitlement.allowed}
-  loading={entitlement.loading}
-  fallback={<UpgradePrompt planName="Growth" />}
->
-  <AnalyticsDashboard />
-</FeatureGate>
-```
-
-| Prop | Type | Default | Description |
-|---|---|---|---|
-| `allowed` | `boolean` | required | Whether children may render. |
-| `loading` | `boolean` | `false` | Returns `null` while customer state loads. |
-| `fallback` | `ReactNode` | `null` | Rendered when access is denied. |
-| `children` | `ReactNode` | required | Protected content. |
-
-## `UsageGate`
-
-Renders children while `usage < limit`. Equality is treated as exhausted.
-
-```tsx
-<UsageGate
-  usage={8_200}
-  limit={10_000}
-  fallback={<span>Monthly limit reached</span>}
->
-  <ApiCallForm />
-</UsageGate>
-```
-
-| Prop | Type | Default | Description |
-|---|---|---|---|
-| `usage` | `number` | required | Current usage. |
-| `limit` | `number` | required | Usage ceiling. |
-| `fallback` | `ReactNode` | `null` | Rendered when usage is at or above the limit. |
-| `children` | `ReactNode` | required | Content available below the limit. |
-
-## `PlanGate`
-
-Checks whether `currentPlan` is included in `allowedPlans`.
-
-```tsx
-<PlanGate
-  currentPlan={billing.planCode}
-  allowedPlans={['growth', 'scale']}
-  fallback={<UpgradePrompt planName="Growth" />}
->
-  <AdvancedSettings />
-</PlanGate>
-```
-
-| Prop | Type | Default | Description |
-|---|---|---|---|
-| `currentPlan` | `string` | required | Current plan identifier. |
-| `allowedPlans` | `string[]` | required | Plans that may render children. |
-| `fallback` | `ReactNode` | `null` | Rendered for a plan outside the allowlist. |
-| `children` | `ReactNode` | required | Plan-gated content. |
-
-## `UpgradePrompt`
-
-Displays an upgrade message and button. Without `onUpgrade`, the button navigates to `/upgrade`.
-
-```tsx
-<UpgradePrompt
-  planName="Scale"
-  onUpgrade={() => router.push('/settings/billing')}
-/>
-```
-
-| Prop | Type | Default | Description |
-|---|---|---|---|
-| `text` | `string` | `Upgrade to access this feature` | Message used when `planName` is absent. |
-| `planName` | `string` | — | Produces “Upgrade to [plan] to access this feature.” |
-| `onUpgrade` | `() => void` | Navigate to `/upgrade` | Upgrade action. |
-
-## `LockedOverlay`
-
-Shows an upgrade prompt over blurred, non-interactive content when `locked` is true. When unlocked, it returns the children without a wrapper.
-
-```tsx
-<LockedOverlay
-  locked={!entitlement.allowed}
-  upgradePlanName="Scale"
-  onUpgrade={() => setUpgradeOpen(true)}
->
-  <AnalyticsPreview />
-</LockedOverlay>
-```
-
-| Prop | Type | Default | Description |
-|---|---|---|---|
-| `locked` | `boolean` | required | Enables the blur and overlay. |
-| `upgradeText` | `string` | — | Custom prompt text. |
-| `upgradePlanName` | `string` | — | Plan name passed to `UpgradePrompt`. |
-| `onUpgrade` | `() => void` | Navigate to `/upgrade` | Upgrade action. |
-| `children` | `ReactNode` | required | Preview content. |
+Each component page lists every option and shows the component in all themes.
 
 ## Backend-driven composition
 
 ```tsx
+import { FeatureGate, PlanGate, UpgradePrompt, UsageGate } from '@nozle-js/react'
+
 function ReportingSection() {
   const { data, loading } = useMerchantBillingState()
 

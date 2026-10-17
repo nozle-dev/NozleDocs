@@ -8,6 +8,10 @@ Product-credit amounts are exact decimal strings. Keep them as `str`; do not con
 ## List credit systems
 
 ```python
+from nozle import Nozle
+
+nozle = Nozle()  # reads NOZLE_SECRET_KEY
+
 systems = nozle.credit_systems.list()
 
 for system in systems:
@@ -156,7 +160,7 @@ if not result["allowed"]:
 `timestamp` is optional in the SDK, which fills in the current time; the API itself requires it. Pass RFC 3339 with an offset or `Z`, or Unix seconds as a numeric string (the latter from the Engine release that includes the broader timestamp forms). A date only, an offset-less value, and zero or negative seconds return `400 invalid_request`.
 
 <Warning>
-**Retrying `usage.track`.** Pass the same `idempotency_key` **and the same `timestamp`** on every retry. If you omit `timestamp`, the SDK uses the current time, the request no longer matches the first one, and the API returns `409 idempotency_key_reused`. Store one time per unit of work (RFC 3339 with an offset, for example `2026-10-12T16:00:00.000Z`) and reuse it. A matching replay returns the original `operation_id`, and the balance changes once. The event time must fall after the credit rate became effective. A `409` means the first call was committed: do not retry.
+**Retrying `usage.track`.** Pass the same `idempotency_key` **and the same `timestamp`** on every retry. If you omit `timestamp`, the SDK fills in the current time once per idempotency key and reuses it when the same key is sent again on the same client (it remembers the last 1,000 keys). A retry from another process, or after a restart, gets a new time, no longer matches the first request, and the API returns `409 idempotency_key_reused`; pass a fixed `timestamp` there. Store one time per unit of work (RFC 3339 with an offset, for example `2026-10-12T16:00:00.000Z`) and reuse it. A matching replay returns the original `operation_id`, and the balance changes once. The event time must fall after the credit rate became effective. A `409` means the first call was committed: do not retry.
 </Warning>
 
 ## Legacy wallet adapter

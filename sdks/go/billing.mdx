@@ -8,6 +8,10 @@ description: "List plans, create payment-aware checkouts, and manage customer or
 `Plans` accepts `pk_` or `sk_`; other billing methods require a server-side `sk_`. `Plan` includes code, name, amount in cents, currency, and interval; the Go struct drops every other field of the API response. The list itself includes trial, pay-in-arrears and pending-deletion plans, and with a `pk_` key the full plans are readable by anyone who has the key. See the [public plan catalog](/api/list-plans). Upsert the customer with `UpsertCustomer` before billing.
 
 ```go
+import nozle "github.com/nozle-dev/nozle-go"
+
+client := nozle.New("") // reads NOZLE_SECRET_KEY
+
 plans, err := client.Plans(ctx)
 checkout, err := client.Checkout(ctx, nozle.CheckoutParams{
   CustomerID: "workspace_123", PlanCode: "pro_monthly",
@@ -32,7 +36,7 @@ Validate the exact HTTPS return origin before using a browser-supplied URL. Brow
 
 A paid upgrade returns `plan_upgrade_intent_id` instead of `invoice_id` on `stripe` and `razorpay` results. On `scheduled`, `SubscriptionID` is the pending subscription. In `v0.9.1`, `URL`, `PublishableKey`, `StripeAccount` and `PendingSubscriptionID` were removed from `CheckoutResult` because checkout never returned them; code that reads them no longer compiles. `CheckoutResult` decodes `expires_at`, `customer_id`, `recurring`, `mandate_max_amount_cents`, `plan_upgrade_intent_id`, `plan_code`, `payment_source`, `transition_direction`, `transition_policy`, `external_entity_id` and `external_subscription_id`.
 
-Checkout errors: `400 invalid_return_url` when the `return_url` origin is not allowed (checked before anything else); `404 plan_not_found` or `customer_not_found`; `409 subscription_selection_required` when the customer has several active subscriptions and no `SubscriptionID` was given; `422 checkout_not_required` when the plan needs no up-front payment (free, trial, or pay-in-arrears) and the customer has no subscription, so use `Subscribe` instead; `422 payment_provider_required` when no payment provider is connected; `422 plan_already_active` when the customer is already on that plan; `422 validation_errors` with `error_details.subscription` set to `subscription_incomplete` when a new-subscription checkout is retried while its first payment is pending, even with the same idempotency key (use `CheckoutInvoice` with the `invoice_id` of the first result, or `CheckoutStatus` for a Razorpay `checkout_id`).
+Checkout errors: `400 invalid_return_url` when the `return_url` origin is not allowed (checked before anything else); `404 plan_not_found` or `customer_not_found`; `409 subscription_selection_required` when the customer has several active subscriptions and no `SubscriptionID` was given; `422 checkout_not_required` when the plan needs no up-front payment (free, trial, or pay-in-arrears) and the customer has no subscription, so use `Subscribe` instead; `422 payment_provider_required` when no payment provider is connected; `422 plan_already_active` when the customer is already on that plan; `409 subscription_checkout_in_progress` when a payment for the customer's new-subscription checkout on a different plan is still processing, or it was paid (an abandoned checkout is replaced instead, and the same plan reopens it).
 
 ## Direct subscription and cancellation
 
@@ -56,7 +60,7 @@ The customer must already exist, so call `UpsertCustomer` first; an unknown cust
 
 Derive the customer from the authenticated application user and validate ownership of the selected **external** subscription ID. Do not pass Core's internal UUID. These methods support [the React billing portal](/sdks/react/billing-portal).
 
-Changing an existing subscription's plan needs a [transition policy](/api/plan-transition-policies) for that source and target plan pair. Without one, preview, checkout, and transitions return `405 plan_transition_policy_required`. Exception: from a \$0 plan to a paid plan, the organization's free-to-paid default applies without a pair policy.
+Changing an existing subscription's plan needs a [transition policy](/api/plan-transition-policies) for that source and target plan pair. Without one, preview, checkout, and transitions return `422 plan_transition_policy_required`. Exception: from a \$0 plan to a paid plan, the organization's free-to-paid default applies without a pair policy.
 
 ### Load options and preview a quote
 
@@ -91,7 +95,7 @@ _ = err
 
 Quotes expire after five minutes or when their bound state changes. On HTTP 409, request a fresh preview and confirmation. Retry an uncertain accepted request with the same payload and key.
 
-A \$0 to \$0 immediate upgrade returns `completed` with `payment_source: "credits"` and creates a \$0 invoice. An upgrade checkout to a pay-in-arrears plan returns `405 plan_upgrade_invoice_missing`.
+A \$0 to \$0 immediate upgrade returns `completed` with `payment_source: "credits"` and creates a \$0 invoice. An upgrade checkout to a pay-in-arrears plan returns `422 plan_upgrade_invoice_missing`.
 
 ### Schedule or withdraw a downgrade
 
@@ -115,9 +119,9 @@ _ = err
 
 Reload options after scheduling. The withdraw result is `{subscription: {id, external_id, plan_code, status}, withdrawn_pending_subscription_id, replayed}`; the same key returns the same body with `replayed: true`.
 
-A new scheduled change while a change is pending replaces it with a new pending ID. A paid upgrade checkout does not replace or withdraw a pending downgrade: withdraw it first, or the upgrade payment ends in `needs_review` with `plan_upgrade_subscription_changed`. Withdrawing the replaced ID returns `409 pending_subscription_changed`. An unknown ID returns `404 pending_subscription_not_found`.
+A new scheduled change while a change is pending replaces it with a new pending ID. A paid upgrade checkout is refused with `409 subscription_change_pending` while a downgrade or cancellation is scheduled: withdraw the downgrade, or keep the subscription, first. Scheduling a change or cancelling at period end cancels an open upgrade checkout. Withdrawing the replaced ID returns `409 pending_subscription_changed`. An unknown ID returns `404 pending_subscription_not_found`.
 
-`PreviewSubscriptionTransition` and `ApplySubscriptionTransition` use the `Timing` you pass even when the pair's transition policy says otherwise; `Checkout` always follows the policy. A `downgrade` on a pair whose policy direction is `upgrade` returns `405 target_plan_is_not_a_downgrade`.
+`PreviewSubscriptionTransition` and `ApplySubscriptionTransition` use the `Timing` you pass even when the pair's transition policy says otherwise; `Checkout` always follows the policy. A `downgrade` on a pair whose policy direction is `upgrade` returns `422 target_plan_is_not_a_downgrade`.
 
 ### Cancel at period end and Keep
 
@@ -195,10 +199,79 @@ The arguments after the items are the return URL, billing time, and idempotency 
 
 Send 1 to 100 unique Entities. The idempotency key is required, up to 255 bytes, and sent as the `Idempotency-Key` header. The same key and request returns `Replayed: true` and reuses the open session; replaying a `failed` or `expired` batch returns `checkout_not_available`. The checkout expires after 23 hours.
 
-Every plan must require up-front payment: pay in advance with an amount above 0 and no trial, or pay-in-advance fixed charges. Otherwise the whole batch fails with `422 validation_errors` and `error_details.items: ["paid_plan_required"]`. Other item errors are `mixed_currencies` and `mixed_intervals`. An untrusted return URL returns `422` with `return_url: invalid_or_untrusted`. With no payment provider connected, the call returns `405 payment_provider_required` (single checkout returns `422`).
+Every plan must require up-front payment: pay in advance with an amount above 0 and no trial, or pay-in-advance fixed charges. Otherwise the whole batch fails with `422 validation_errors` and `error_details.items: ["paid_plan_required"]`. Other item errors are `mixed_currencies` and `mixed_intervals`. An untrusted return URL returns `422` with `return_url: invalid_or_untrusted`. With no payment provider connected, the call returns `422 payment_provider_required`, as single checkout does.
 
 See [Entity subscriptions](/api/entity-subscriptions) for lifecycle and payment behavior, and [bulk Entity checkout](/api/entity-subscriptions#purchase-multiple-entity-plans-together).
 
 ## Settlement transitions
 
 For configured settlement policies, preview and apply with `SubscriptionTransitionParams`. Apply keys are limited to 255 UTF-8 bytes. See [Subscriptions](/guides/billing/subscriptions) for valid combinations.
+
+## Read usage
+
+From `v0.12.0`.
+
+```go
+current, err := client.CurrentUsage(ctx, "cus_123", "")      // this billing period
+past, err := client.PastUsage(ctx, "cus_123", "", 6)          // newest first
+```
+
+Each period is a `CustomerUsage` with `FromDatetime`, `ToDatetime`, `Currency`, `AmountCents`, `TotalAmountCents` and `ChargesUsage` (units and amount per charge and feature). Pass a subscription ID instead of `""` to read a specific subscription.
+
+Without a subscription ID, the customer's one active subscription is used, and a customer with none or several gets an error. The client remembers that subscription, as `Track` does, and shares it between `Track`, `CurrentUsage` and `PastUsage`. `Checkout`, `CheckoutInvoice`, `CheckoutStatus`, `VerifyCheckout`, `Subscribe`, `CancelSubscription` and `ApplySubscriptionTransition` forget it. A change made elsewhere, such as in the dashboard, is not seen, so pass the subscription ID when that matters.
+
+## Invoices
+
+From `v0.12.0`.
+
+```go
+page, err := client.ListInvoices(ctx, "cus_123", nozle.ListInvoicesParams{Status: "finalized", Page: 1})
+invoice, err := client.GetInvoice(ctx, page.Invoices[0].NozleID)
+pdf, err := client.InvoiceDownloadURL(ctx, invoice.NozleID)    // "" until the PDF exists
+```
+
+`ListInvoicesParams` filters the list, newest first. Empty fields are not sent:
+
+| Field | Description |
+|---|---|
+| `Status` | `draft`, `finalized`, `voided`, `failed` or `pending`. |
+| `PaymentStatus` | `pending`, `succeeded` or `failed`. |
+| `PaymentOverdue` | `*bool`. `true` keeps only unpaid invoices past their due date; `false` keeps the others. |
+| `IssuingDateFrom`, `IssuingDateTo` | Inclusive issuing dates, `YYYY-MM-DD`. |
+| `Page`, `PerPage` | Page number and page size. |
+
+```go
+overdue := true
+unpaid, err := client.ListInvoices(ctx, "cus_123", nozle.ListInvoicesParams{PaymentOverdue: &overdue})
+```
+
+Pay an open invoice with `CheckoutInvoice`.
+
+A PDF is generated the first time it is asked for, so the download call returns no URL until it exists; ask again a few seconds later, or wait for the `invoice.generated` webhook.
+
+## Alerts
+
+From `v0.12.0`.
+
+```go
+target := nozle.AlertTarget{SubscriptionID: "sub_123"}
+_, err := client.CreateAlert(ctx, target, nozle.AlertInput{
+	AlertType:   "feature_current_usage_units",
+	Code:        "api_calls_80",
+	FeatureCode: "api_calls",
+	Thresholds:  []nozle.AlertThreshold{{Value: "40000"}, {Value: "10000", Recurring: true}},
+})
+alerts, err := client.ListAlerts(ctx, target, 0)
+_, err = client.UpdateAlert(ctx, target, "api_calls_80", nozle.AlertInput{Name: "API calls at 80%"})
+_, err = client.DeleteAlert(ctx, target, "api_calls_80")
+
+// Balance alerts belong to a wallet:
+wallet := nozle.AlertTarget{CustomerID: "cus_123", WalletCode: "main"}
+_, err = client.CreateAlert(ctx, wallet, nozle.AlertInput{
+	AlertType:  "wallet_credits_balance",
+	Code:       "low_credits",
+	Thresholds: []nozle.AlertThreshold{{Value: "100"}},
+})
+```
+
+Usage alert types are `current_usage_amount`, `feature_current_usage_amount` and `feature_current_usage_units` (the `feature_*` ones need a feature code). Wallet alert types are `wallet_balance_amount`, `wallet_credits_balance`, `wallet_ongoing_balance_amount` and `wallet_credits_ongoing_balance`. Threshold values are cents, units or credits by type, and at most one threshold is recurring. Nozle sends the `alert.triggered` webhook when a threshold is crossed; [verify it](/api/receive-webhooks) before acting.

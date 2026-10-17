@@ -5,7 +5,7 @@ api: "GET https://api.nozle.app/engine/api/v1/billing/status"
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-Get the current billing status for a customer, including their active subscription and plan details. This is the primary endpoint for checking what plan a customer is on.
+Get the plan of a customer's active subscription. If the customer has several active subscriptions, Nozle uses the one that started most recently.
 
 **Auth:** secret key only. Publishable keys are always rejected.
 
@@ -15,7 +15,47 @@ Get the current billing status for a customer, including their active subscripti
 
 ### Response
 
-Returns the customer's current billing state including subscription and plan information.
+```json
+{
+  "plan": "pro",
+  "planName": "pro",
+  "status": "active",
+  "interval": "monthly",
+  "amount_cents": 4900,
+  "currency": "USD"
+}
+```
+
+<ResponseField name="plan" type="string" required>
+  Plan code of the active subscription.
+</ResponseField>
+
+<ResponseField name="planName" type="string" required>
+  The plan code again, not the plan's display name. Kept for older clients.
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Always `active`. Only active subscriptions are read.
+</ResponseField>
+
+<ResponseField name="interval" type="string" required>
+  Always `monthly`. The value is fixed and does not reflect the plan's interval.
+</ResponseField>
+
+<ResponseField name="amount_cents" type="integer" required>
+  The plan's base amount, in the currency's smallest unit.
+</ResponseField>
+
+<ResponseField name="currency" type="string" required>
+  The plan's currency.
+</ResponseField>
+
+### Errors
+
+| Status | Meaning |
+|--------|---------|
+| `400` | `customer_id` is missing. |
+| `404` | The customer has no active subscription, or the lookup failed. |
 
 <Note>
   Also available as `GET /subscriptions/current` (alias).

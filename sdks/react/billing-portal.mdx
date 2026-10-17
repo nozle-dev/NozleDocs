@@ -5,32 +5,34 @@ description: "Add subscription cancellation, paid upgrades, scheduled downgrades
 
 `BillingPortal` displays subscriptions, usage, invoice history/PDFs, billing details, and wallets. Add `cancellationActions` for Cancel/Keep and `planChangeActions` for upgrades, scheduled downgrades, and withdrawal of a pending change. These controls also work independently on a custom billing page.
 
+This page covers the backend setup. For every option and screenshots in each theme, see the component reference: [`BillingPortal`](/sdks/react/components/billing-portal), [`PlanChangeControl`](/sdks/react/components/plan-change-control) and [`CancellationControl`](/sdks/react/components/cancellation-control).
+
 <Info>
-Available in **`@nozle-js/react@0.10.2`**, **`@nozle-js/node@0.10.0`**, **`nozle-sdk==0.10.0`**, and **`github.com/nozle-dev/nozle-go@v0.9.1`**. Earlier React `0.9.0` and Node/Python server SDK `0.8.0` releases do not include these additions. The matching hosted backend endpoints are available.
+Available in **`@nozle-js/react` `0.10.2`**, **`@nozle-js/node` `0.10.0`**, **`nozle-sdk` `0.10.0`**, and **`github.com/nozle-dev/nozle-go` `v0.9.1`** or later. Earlier React `0.9.0` and Node/Python server SDK `0.8.0` releases do not include these additions. The matching hosted backend endpoints are available.
 </Info>
 
 ## Install
 
 ```bash
-npm install @nozle-js/react@0.10.2 react react-dom @stripe/stripe-js @stripe/react-stripe-js
+npm install @nozle-js/react@0.11.0 @tanstack/react-query react react-dom @stripe/stripe-js @stripe/react-stripe-js
 ```
 
 On your Node.js merchant backend:
 
 ```bash
-npm install @nozle-js/node@0.10.0
+npm install @nozle-js/node@0.13.0
 ```
 
 Or on your Python merchant backend:
 
 ```bash
-pip install nozle-sdk==0.10.0
+pip install nozle-sdk==0.13.0
 ```
 
 Or on your Go merchant backend:
 
 ```bash
-go get github.com/nozle-dev/nozle-go@v0.9.1
+go get github.com/nozle-dev/nozle-go@v0.12.0
 ```
 
 ## How requests flow
@@ -55,15 +57,9 @@ Serve these example merchant routes on the same HTTPS origin as your app, or pro
 
 ```tsx
 'use client';
+import { BillingPortal, BillingPortalError } from '@nozle-js/react'
+import type { BillingPortalSession, CancellationActions, CreateBillingPortalSession, PlanChangeActions } from '@nozle-js/react'
 
-import {
-  BillingPortal,
-  BillingPortalError,
-  type BillingPortalSession,
-  type CancellationActions,
-  type CreateBillingPortalSession,
-  type PlanChangeActions,
-} from '@nozle-js/react';
 
 async function post<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {
@@ -144,7 +140,7 @@ On the authenticated merchant backend, call Core's `GET /api/v1/customers/{exter
 | `session` | A rejected `createSession`, a missing session or token, an `http` `apiUrl` that is not localhost, an `sk_` or `pk_` token, or credentials in the URL. These checks run before any request. `http://localhost` is allowed. |
 | `changed` | Only in the plan-change flow: "Your subscription changed. Review its latest details before confirming again." |
 
-Customize with `--nozle-portal-accent`, `--nozle-portal-background`, `--nozle-portal-text`, `--nozle-portal-muted`, `--nozle-portal-muted-background`, and `--nozle-portal-border`.
+Theme the portal with `appearance`, on the portal or on `BillingProvider`; see [Appearance](/sdks/react/styling). The older `--nozle-portal-*` variables still work.
 
 ## Cancel and Keep
 
@@ -173,6 +169,8 @@ The merchant adapter converts SDK responses into the exported React types:
 
 The SDK responses use snake_case while these React adapters use camelCase. The runnable merchant examples below implement that mapping, eligible-plan validation, cancellation guards, checkout reconciliation and replay storage. Do not return an unmodified `SubscriptionOptions` object as `PlanChangeState`.
 
+The customer picks the new plan from a list. Each choice shows the plan name, price and interval, and whether it is an upgrade or a downgrade. Inside a `BillingProvider`, each choice also shows the plan's description and features from the public catalog. After **Review change**, the confirmation shows the quote, with **Back** to return to the list.
+
 For each confirmed change:
 
 1. Load policy-authorized targets for the selected subscription. The public catalog alone does not establish eligibility.
@@ -189,10 +187,8 @@ A Razorpay payment must be captured before the upgrade is fulfilled. A Stripe ca
 Import `CancellationControl` and `PlanChangeControl` for your own billing layout. The cancellation control needs both the current subscription and a persisted-state `refresh`; the plan control loads its state through the adapter.
 
 ```tsx
-import {
-  CancellationControl, PlanChangeControl,
-  type CancellationActions, type CancellationSubscription, type PlanChangeActions,
-} from '@nozle-js/react';
+import { CancellationControl, PlanChangeControl } from '@nozle-js/react'
+import type { CancellationSubscription } from '@nozle-js/react'
 
 export function SubscriptionControls(props: {
   accountId: string;
@@ -221,6 +217,6 @@ export function SubscriptionControls(props: {
 - [Python merchant server](https://github.com/nozle-dev/nozle-python/tree/v0.9.1/examples/billing_portal)
 - [Node method reference](/sdks/node/billing#subscription-self-service), [Python method reference](/sdks/python/billing#subscription-self-service), and [Go method reference](/sdks/go/billing)
 
-Install React `0.10.2` with Node `0.10.0`, Python `0.10.0`, or Go `v0.9.1` for your integration. The linked Node and Python examples use the source checkout; build it as their READMEs describe when running those demos. Follow the examples' READMEs for TLS and environment setup. Their demo login and single-process file replay store must be replaced with your application's authentication and transactional shared storage before serving production customers. Browser sessions use Secure, HttpOnly cookies over HTTPS.
+Use React `0.10.2` or later with Node `0.10.0`, Python `0.10.0`, or Go `v0.9.1` or later for your integration. The linked Node and Python examples use the source checkout; build it as their READMEs describe when running those demos. Follow the examples' READMEs for TLS and environment setup. Their demo login and single-process file replay store must be replaced with your application's authentication and transactional shared storage before serving production customers. Browser sessions use Secure, HttpOnly cookies over HTTPS.
 
 The portal changes billing state. Enforce feature access on your application's server using Nozle entitlement checks. The hosted Engine observes cancellation at the saved ending boundary and Keep after commit, without waiting for its old subscription-cache refresh.

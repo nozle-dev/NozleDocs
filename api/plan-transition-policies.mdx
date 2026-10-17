@@ -6,11 +6,11 @@ api: "PUT https://api.nozle.app/core/api/v1/plans/{plan_code}/transition-policie
 
 Base URL: `https://api.nozle.app/core/api/v1`.
 
-**Auth:** secret key only.
+**Auth:** secret key only. Reads need `plan_transition_policy:read` and changes need `plan_transition_policy:write`.
 
 A plan transition policy tells Nozle how to move a subscription from one plan (the source) to another (the target). Policies are stored per pair of plans: `starter` to `growth` and `growth` to `starter` are two separate policies. Nozle does not infer the direction from the prices; you set it.
 
-Changing an existing subscription's plan needs a policy for that exact pair. Without one, these calls return `405 plan_transition_policy_required`:
+Changing an existing subscription's plan needs a policy for that exact pair. Without one, these calls return `422 plan_transition_policy_required`:
 
 - [Checkout](/api/create-checkout) for a customer that already has an active subscription, including Entity subscription checkout and change-plan
 - [Subscription change preview](/api/subscription-management) (`POST /subscriptions/preview`)
@@ -22,7 +22,7 @@ Withdrawing a pending change does not need a policy. Subscription options leave 
 One fallback exists. When the current plan is free and the target plan is paid, Nozle uses the organization's free-to-paid policy (Settings, General, "Checkout & billing policy" in the dashboard) as an upgrade. Every other pair, including paid to paid, paid to free, and free to free, needs its own policy. The dashboard sets only the free-to-paid default; create pair policies with this API.
 </Info>
 
-## Create or replace a policy
+## Create or update a policy
 
 ```http
 PUT /plans/starter/transition-policies/growth
@@ -42,7 +42,7 @@ Content-Type: application/json
 }
 ```
 
-`PUT` creates the policy or replaces the existing one for the pair. Fields you leave out take their defaults.
+`PUT` creates the policy for the pair, or updates the existing one. It returns `200` in both cases. On a new policy, fields you leave out take their defaults. On an existing policy, fields you leave out keep their current values. To return a field to its default, send the default value. `PATCH` on the same path does the same thing.
 
 | Field | Values | Default | Meaning |
 | --- | --- | --- | --- |
@@ -142,7 +142,7 @@ When a customer with an active subscription checks out a different plan, Nozle r
 | `upgrade` with `immediate` timing | A payment-gated upgrade: a provider result when money is due, or `type: "completed"` when nothing is due. |
 | `downgrade` with `immediate` timing | The downgrade is applied and `type: "completed"` is returned. |
 
-Other `405` responses from plan changes:
+Other `422` responses from plan changes:
 
 | Code | Cause |
 | --- | --- |
@@ -152,4 +152,4 @@ Other `405` responses from plan changes:
 | `target_plan_is_not_a_downgrade` | A `downgrade` transition was requested on a pair whose policy direction is `upgrade`. |
 | `plan_upgrade_invoice_missing` | An upgrade checkout to a plan that bills in arrears; nothing is invoiced up front to pay. |
 
-A new scheduled change while a change is already pending replaces the pending change and returns a new pending subscription ID. Withdrawing the old ID then returns `409 pending_subscription_changed`. A paid upgrade checkout does not replace or withdraw a pending downgrade: it returns a payable session, but the payment ends in `needs_review` with `plan_upgrade_subscription_changed`. Withdraw the pending change first. See [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits).
+A new scheduled change while a change is already pending replaces the pending change and returns a new pending subscription ID. Withdrawing the old ID then returns `409 pending_subscription_changed`. A paid upgrade checkout does not replace or withdraw a pending downgrade: it is refused with `409 subscription_change_pending`. Withdraw the pending change first. Scheduling a change cancels an open upgrade checkout. See [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits).

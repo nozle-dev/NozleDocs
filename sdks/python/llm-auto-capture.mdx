@@ -1,13 +1,85 @@
 ---
 title: "LLM auto-capture"
-description: "Wrap synchronous or asynchronous OpenAI and Anthropic clients to emit a Feature Event and optional detailed Cost Events."
+description: "Record the token usage of every LLM call from any httpx or httpx2 client, or wrap OpenAI and Anthropic clients."
 ---
 
-The wrappers patch `chat.completions.create` (OpenAI) and `messages.create` (Anthropic) in place and preserve their normal return value. The OpenAI Responses API (`responses.create`) is not wrapped. They support synchronous calls, asynchronous calls, synchronous streams, and asynchronous streams. When `cost_meter_code` is configured, each call emits categorized Cost Events linked to its Feature Event.
+`nozle.wrap_http_client()` makes the HTTP client your LLM SDK uses record the token usage of every successful response. It works with any client built on httpx or its fork httpx2, sync or async, including the OpenAI and Anthropic SDKs. Requests and responses pass through unchanged, and prompts and completions are never sent to Nozle.
 
-Only model, token counts, latency, and an optional feature tag are sent. Prompt and completion content are not captured.
+`wrap_http_client()`, `capture_http_client()`, `capture_async_http_client()` and `record_usage()` require `nozle-sdk` `0.13.0`. The [client wrappers](#client-wrappers) are available in earlier versions.
 
-## OpenAI
+Usage is recognised by the shape of the response, not by provider name: an OpenAI-style `usage` (OpenAI chat completions, the Responses API and any OpenAI-compatible API such as OpenRouter, Groq, Azure OpenAI or vLLM), an Anthropic `usage`, or Gemini `usageMetadata`. JSON responses and streams are both read, including a stream your client closes at `[DONE]`.
+
+<Note>
+Capture records usage events; they bill only when a metered Feature has the same event code. See [Set up AI token billing](/guides/ai/token-billing) for the Feature, charge and cost model to create first.
+</Note>
+
+## Capture any client
+
+```bash
+pip install "nozle-sdk[httpx]"
+```
+
+```python
+import openai
+import anthropic
+from nozle import Nozle
+
+nozle = Nozle()  # reads NOZLE_SECRET_KEY
+
+client = openai.OpenAI(
+    http_client=nozle.wrap_http_client(openai.DefaultHttpxClient(), customer_id="workspace_123"),
+)
+claude = anthropic.Anthropic(
+    http_client=nozle.wrap_http_client(anthropic.DefaultHttpxClient(), customer_id="workspace_123"),
+)
+```
+
+Pass the SDK's own `DefaultHttpxClient()` (or `DefaultAsyncHttpxClient()` for `AsyncOpenAI` and `AsyncAnthropic`): each SDK expects the HTTP package it was built with, and `wrap_http_client` keeps that package. `nozle.capture_http_client(customer_id=...)` builds a new `httpx.Client` instead (`module="httpx2"` for httpx2), and `capture_async_http_client` an async one.
+
+### One client for every customer
+
+`customer_id` can be a function, called with each `httpx` request, or a request can name its customer with the `X-Nozle-Customer-Id` header. The header wins and is removed before the request reaches the provider; so is `X-Nozle-Feature`, which sets the `feature` property. A request without a customer passes through and nothing is recorded.
+
+```python
+client.chat.completions.create(
+    model="example-chat-model",
+    messages=messages,
+    extra_headers={"X-Nozle-Customer-Id": workspace.id},
+)
+```
+
+| Argument | Description |
+|---|---|
+| `customer_id` | Customer to bill: a string, or a function of the request. |
+| `feature_code` | Feature code of the usage event. Default `llm_tokens`. |
+| `feature` | Stored as the `feature` property. |
+| `cost_meter_code` | Also send one Cost Event per token category to this Cost Event Meter. |
+| `include_stream_usage` | Default `True`: chat completion streams are sent with `stream_options.include_usage`. Set `False` for a server that rejects the field. |
+| `on_error` | Called with a recording failure, and once per event code with an error whose `code` is `feature_not_found` when no Feature has that code. Without it, a `NozleTrackingWarning` is emitted. The provider response is never affected. |
+
+Recording runs in a background thread (with `AsyncNozle`, a task on the event loop) after the response has been read.
+
+### Usage you read yourself
+
+```python
+nozle.record_usage(
+    "workspace_123",
+    model=response.model,
+    request_id=response.id,       # makes the event id stable
+    input_tokens=1200,            # all input, including cached input
+    cached_input_tokens=300,
+    output_tokens=400,            # all output, including reasoning
+    provider="openai",
+)
+```
+
+`record_usage` raises if the usage could not be recorded.
+
+## Client wrappers
+
+`wrap_openai` and `wrap_anthropic` patch `chat.completions.create` (OpenAI) and `messages.create` (Anthropic) in place instead, for synchronous and asynchronous calls and streams. They are kept for existing integrations; `wrap_http_client` also covers the Responses API, Gemini and OpenAI-compatible providers.
+
+### OpenAI
 
 ```bash
 pip install "nozle-sdk[openai]"
@@ -16,8 +88,8 @@ pip install "nozle-sdk[openai]"
 ```python
 import os
 from openai import OpenAI
+from nozle import wrap_openai
 
-from nozle import Nozle, wrap_openai
 
 nozle = Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
@@ -40,7 +112,7 @@ response = openai.chat.completions.create(
 )
 ```
 
-### OpenAI streaming
+#### OpenAI streaming
 
 The wrapper sets `stream_options.include_usage` to `true` so the final stream chunk contains token counts. Only `include_usage` is overwritten; other `stream_options` keys you pass are kept.
 
@@ -55,7 +127,7 @@ for chunk in stream:
     print(chunk.choices[0].delta.content or "", end="")
 ```
 
-## Anthropic
+### Anthropic
 
 ```bash
 pip install "nozle-sdk[anthropic]"
@@ -63,8 +135,8 @@ pip install "nozle-sdk[anthropic]"
 
 ```python
 from anthropic import Anthropic
+from nozle import wrap_anthropic
 
-from nozle import Nozle, wrap_anthropic
 
 anthropic = wrap_anthropic(
     Anthropic(),
@@ -84,7 +156,7 @@ message = anthropic.messages.create(
 
 Anthropic streams read input usage from `message_start` and output usage from `message_delta` events.
 
-## Wrapper arguments
+### Wrapper arguments
 
 | Argument | Required | Default | Description |
 |---|---|---|---|
@@ -117,7 +189,7 @@ Cost calculation remains server-side through the `ai_tokens` Cost Event Meter an
 
 ## Failure behavior
 
-The wrappers generate the Feature Event `transaction_id` before delivery and use it as `parent_transaction_id` on every detailed Cost Event. Parent and child events may therefore arrive out of order. Tracking failures do not replace a successful provider result; the SDK emits `NozleTrackingWarning`.
+The usage event's `transaction_id` is `llm-<format>-<response id>` when the response has an id, so the same response is never recorded twice; otherwise one is generated. It is the `parent_transaction_id` of every detailed Cost Event. Parent and child events may therefore arrive out of order. Tracking failures do not replace a successful provider result; the SDK emits `NozleTrackingWarning`.
 
 The warning names only the exception type, not the cause, for example `Nozle tracking failed after a successful LLM response (NozleAPIError)`. A customer with several active subscriptions makes every wrapped call emit it. Under `python -W error`, the SDK swallows the warning instead of raising it.
 

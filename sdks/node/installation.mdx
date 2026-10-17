@@ -8,11 +8,11 @@ description: "Install and configure the server-only @nozle-js/node SDK."
 Entity subscription APIs are introduced in `0.5.0`.
 
 ```bash
-npm install @nozle-js/node@0.11.0
+npm install @nozle-js/node@0.13.0
 ```
 
 <Info>
-Version `0.11.0` sends Feature Events through the Go Engine endpoint. Version `0.10.0` adds `NozleApiError` with `status`, `code` and `hasCode()`, richer checkout result types, and no longer sends `feature` from `checkAndDeduct()`. Version `0.9.1` fixes Feature Event timestamp serialization, including events created by the OpenAI and Anthropic wrappers. Version `0.9.0` introduced subscription options, signed quotes, pending-change withdrawal, and scoped checkout recovery. See [subscription self-service](/sdks/node/billing#subscription-self-service) and the [release notes](/changelog#razorpay-and-stripe-guides-new-sdk-releases-api-fixes).
+Version `0.13.0` adds `NozleApiError` on every failed call (with `requestId` and `retryAfter`), opt-in retries, the `host` option, an optional `apiKey` that reads `NOZLE_SECRET_KEY`, `captureFetch()` and `recordUsage()`, Core usage reads, the `invoices`, `alerts` and `webhooks` namespaces, and `createBillingHandler()` for the React billing hooks. Version `0.12.0` adds `billingConfiguration` to `customers.upsert()`. Version `0.11.0` sends Feature Events through the Go Engine endpoint. Version `0.10.0` adds `NozleApiError` with `status`, `code` and `hasCode()`, richer checkout result types, and no longer sends `feature` from `checkAndDeduct()`. Version `0.9.1` fixes Feature Event timestamp serialization, including events created by the OpenAI and Anthropic wrappers. Version `0.9.0` introduced subscription options, signed quotes, pending-change withdrawal, and scoped checkout recovery. See [subscription self-service](/sdks/node/billing#subscription-self-service) and the [release notes](/changelog#razorpay-and-stripe-guides-new-sdk-releases-api-fixes).
 </Info>
 
 ## Create a client
@@ -22,8 +22,6 @@ import { Nozle } from '@nozle-js/node'
 
 export const nozle = new Nozle({
   apiKey: process.env.NOZLE_SECRET_KEY!,
-  baseUrl: 'https://api.nozle.app/engine',
-  eventsUrl: 'https://api.nozle.app/core',
   timeout: 10_000,
 })
 ```
@@ -32,12 +30,15 @@ export const nozle = new Nozle({
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `apiKey` | `string` | required | Organization credential. Use a restricted `sk_` for server mutations. |
-| `baseUrl` | `string` | `https://api.nozle.app/engine` | Engine API origin used for `track()`, entitlements, credits, entities, usage, and margin. |
-| `eventsUrl` | `string` | `https://api.nozle.app/core` | Core API origin used for customer writes, billing resources, subscription discovery, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. |
-| `timeout` | `number` | `10000` | Per-request timeout in milliseconds. |
+| `apiKey` | `string` (optional) | `NOZLE_SECRET_KEY` environment variable | Organization credential. Use a restricted `sk_` for server mutations. When you do not pass it, the client reads `NOZLE_SECRET_KEY`; if that is not set the constructor throws. Optional from `0.13.0`; earlier versions require it. |
+| `host` | `string` | `https://api.nozle.app` | Root API origin. The SDK sends Engine calls to `${host}/engine` and Core calls to `${host}/core`. Set only this for a local or self-hosted deployment behind one reverse proxy. From `0.13.0`. |
+| `baseUrl` | `string` | `https://api.nozle.app/engine` | Engine API origin used for `track()`, entitlements, credits, entities, usage, and margin. Overrides the address derived from `host`. |
+| `eventsUrl` | `string` | `https://api.nozle.app/core` | Core API origin used for customer writes, billing resources, subscription discovery, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. Overrides the address derived from `host`. |
+| `timeout` | `number` | `10000` | Per-attempt timeout in milliseconds. |
+| `maxRetries` | `number` | `0` | Extra attempts after a network error, timeout, `429` or `5xx`. `0` never retries. See [errors and retries](/sdks/node/errors#retry-behavior). From `0.13.0`. |
+| `retryDelayMs` | `number` | `500` | First retry delay in milliseconds. It doubles each retry up to 10 seconds, or the `Retry-After` header is used when sent. From `0.13.0`. |
 
-The client defaults to these public service bases. Set both URLs explicitly for local or self-hosted deployments. Trailing slashes are removed automatically.
+The client defaults to the public service bases under `https://api.nozle.app`. For a local or self-hosted deployment behind one proxy, set `host`. Set `baseUrl` or `eventsUrl` only when the two services live at unrelated addresses; each one you set wins over `host`. If you set only one of them, the other service still uses `host` (by default production), so set `host` too. Trailing slashes are removed automatically.
 
 ```mermaid
 flowchart LR
@@ -57,7 +58,6 @@ const health = await nozle.ping()
 
 console.log(health.ok)
 console.log(health.engine)
-console.log(health.version)
 ```
 
 ## API surface
@@ -81,7 +81,12 @@ console.log(health.version)
 | `nozle.applySubscriptionTransition()` | Apply an idempotent settlement transition. |
 | `nozle.track()` | Send a metered event through the Events API. |
 | `nozle.can()` | Check feature access, usage, and margin state. |
-| `nozle.checkAndDeduct()` | Legacy wallet path, takes `customerId` and `credits`. Throws on `404 wallet_not_found` when the customer has no active wallet. |
+| `nozle.getSubscriptions()` | List a customer's active subscriptions from Core. From `0.13.0`. |
+| `nozle.currentUsage()` | Read a customer's usage for the current billing period. From `0.13.0`. |
+| `nozle.pastUsage()` | Read a customer's usage for past billing periods. From `0.13.0`. |
+| `nozle.captureFetch()` | Return a `fetch` that records the token usage of LLM responses. From `0.13.0`. |
+| `nozle.recordUsage()` | Record token usage your code read itself. From `0.13.0`. |
+| `nozle.checkAndDeduct()` | Deprecated legacy wallet path, takes `customerId` and `credits`. Throws on `404 wallet_not_found` when the customer has no active wallet. Use `usage.check()` and `usage.track()` with a credit system instead. |
 
 ### Namespaces
 
@@ -95,8 +100,11 @@ console.log(health.version)
 | `usage` | Advisory `check()` and atomic, idempotent `track()` |
 | `costEvents` | `track()`, `createCostEventId()` |
 | `margin` | `summary()`, `byCustomer()`, `byMetric()`, `byPlan()`, `byModel()`, `trend()` |
+| `invoices` | `list()`, `get()`, `downloadUrl()`. From `0.13.0`. |
+| `alerts` | `list()`, `get()`, `create()`, `update()`, `delete()`. From `0.13.0`. |
+| `webhooks` | `verify()`. From `0.13.0`. |
 
-The package also exports `wrapOpenAI()` and `wrapAnthropic()` for token metadata capture.
+The package also exports `wrapOpenAI()` and `wrapAnthropic()` for token usage capture; see [LLM auto-capture](/sdks/node/llm-auto-capture#client-wrappers). `openai` and `@anthropic-ai/sdk` are optional peer dependencies. From `0.13.0` it also exports `createBillingHandler()`, the backend route for the [React billing hooks](/sdks/react/hooks), and `createWebhookHandler()`, which [verifies webhooks](/api/receive-webhooks).
 
 ## Key behavior
 
@@ -104,8 +112,8 @@ The package also exports `wrapOpenAI()` and `wrapAnthropic()` for token metadata
 - Entity mutations, credit transfers, and `usage.track()` reject publishable `pk_` keys.
 - Mutation idempotency keys are caller-supplied and limited to 255 bytes.
 - Product-credit amounts are exact decimal strings, not JavaScript numbers.
-- Failed HTTP responses reject with an `Error` containing the operation and HTTP status. See [errors and retries](/sdks/node/errors).
-- Every request uses `AbortSignal.timeout(timeout)`. The SDK does not retry.
+- Failed HTTP responses reject with a `NozleApiError` (`status`, `code`, `requestId`, `retryAfter`), which extends `Error`. Its message contains the operation and HTTP status. See [errors and retries](/sdks/node/errors).
+- Every attempt uses `AbortSignal.timeout(timeout)`. The SDK does not retry unless you set `maxRetries`.
 
 ## Production pattern
 
@@ -113,13 +121,9 @@ Create one client per process and reuse it:
 
 ```ts
 // billing/nozle.ts
-import { Nozle } from '@nozle-js/node'
 
-export const nozle = new Nozle({
-  apiKey: process.env.NOZLE_SECRET_KEY!,
-  baseUrl: process.env.NOZLE_API_URL!,
-  eventsUrl: process.env.NOZLE_EVENTS_URL ?? 'https://api.nozle.app/core',
-})
+// Reads NOZLE_SECRET_KEY and uses https://api.nozle.app.
+export const nozle = new Nozle()
 ```
 
 Do not accept authoritative `customerId`, Entity IDs, plan codes, return origins, or idempotency keys blindly from a browser. Derive or validate them in your trusted backend.

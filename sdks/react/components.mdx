@@ -1,327 +1,99 @@
 ---
 title: "Components"
-description: "Pricing, checkout, billing, usage, and customer-facing React components."
+sidebarTitle: "Overview"
+description: "Every React component of @nozle-js/react: what it is for, where its data comes from, and a page per component with options and theme screenshots."
+keywords: ["react components", "pricing", "checkout", "billing", "usage", "credits"]
 ---
 
-The React SDK separates public catalog and checkout orchestration from customer state:
-
-- `PricingTable` may load the public catalog with a publishable key.
-- Catalog checkout components call your `BillingProvider.createCheckout` callback; the portal uses authenticated management adapters.
-- Gates, usage widgets, badges, and payment-method UI consume caller-supplied state.
-
-## Subscription self-service
-
-| Component | Purpose |
-| --- | --- |
-| `BillingPortal` | Customer-scoped overview with optional Cancel/Keep and plan-change adapters. |
-| `CancellationControl` | Standalone end-of-period cancellation and Keep confirmation. |
-| `PlanChangeControl` | Standalone plan selection, signed quote review, paid checkout, scheduled downgrade and exact withdrawal. |
-
-These exports are available in React `0.10.2`. See [Billing portal and self-service](/sdks/react/billing-portal) for setup, props, callback contracts, standalone examples and installation instructions. The portal does not require `BillingProvider` or Tailwind.
-
-## Pricing components
-
-![React SDK pricing table](/images/react-sdk/pricing-table.png)
-
-### `PricingTable`
-
-Renders responsive plan cards, an optional monthly/annual toggle, current-plan state, highlighted plans, and checkout actions.
-
-```tsx
-import { PricingTable } from '@nozle-js/react'
-
-<PricingTable
-  currentPlanCode="free_monthly"
-  highlightPlan="pro_monthly"
-  returnUrl="https://app.example.com/settings/billing"
-  features={[
-    ['3 projects', 'Community support'],
-    ['Unlimited projects', 'Priority support', 'Advanced analytics'],
-    ['Custom limits', 'Dedicated support'],
-  ]}
-  enterpriseEmail="sales@example.com"
-  onStripeClientSecret={setClientSecret}
-  onCheckoutError={setError}
-/>
-```
-
-When `plans` is omitted, `PricingTable` reads `GET /api/v1/plans` through `BillingProvider` itself. Supplying `plans` makes the component fully caller-driven and allows it to render outside a provider when `onSelect` is also supplied. With neither `plans` nor a provider, it shows `BillingProvider with a publishableKey is required to load plans`.
-
-<Warning>
-If its own catalog request fails, `PricingTable` renders `Plans could not be loaded: <reason>` (`HTTP <status>` or the thrown message) in a `role="alert"` message, from React `0.10.2`. Earlier versions rendered an empty grid and left an unhandled promise rejection. `onCheckoutError` does not receive catalog failures. To render your own message, load plans with `usePlans`, use its `error`, and pass `plans` to `PricingTable`.
-</Warning>
-
-`PricingTable` passes only `planCode` and `returnUrl` to `createCheckout`, with no idempotency key. Only `CheckoutButton` sends an idempotency key.
-
-| Prop | Type | Default | Description |
-|---|---|---|---|
-| `currentPlanCode` | `string` | — | Plan displayed as current and disabled. |
-| `plans` | `PricingPlan[]` | Public catalog | Caller-supplied plan list. |
-| `features` | `string[][]` | — | Feature lists aligned to the rendered plan order. |
-| `onSelect` | `(plan) => void` | Provider checkout | Overrides built-in checkout selection. |
-| `returnUrl` | `string` | Current URL | Return URL sent to `createCheckout`. |
-| `onStripeClientSecret` | `(secret) => void` | — | Receives embedded Stripe checkout secrets. |
-| `onCheckoutResult` | `(result) => void` | — | Receives every raw checkout result. |
-| `onCheckoutError` | `(error) => void` | — | Receives checkout errors. Catalog load failures are not passed to it. |
-| `showToggle` | `boolean` | `true` | Shows monthly/annual filtering when yearly plans exist. |
-| `highlightPlan` | `string` | — | Plan code marked “Most Popular.” |
-| `className` | `string` | — | Class applied to the root container. |
-| `enterpriseEmail` | `string` | — | Opens a prefilled mail link for enterprise/custom plans. |
-
-`PricingPlan` contains `code`, `name`, `amount_cents`, `amount_currency`, `interval`, and optional `description`.
-
-### `PlanCard`
-
-Use `PlanCard` when you already have a custom pricing layout and want an individual card.
-
-```tsx
-<PlanCard
-  id="growth"
-  name="Growth"
-  monthlyPrice={49}
-  annualPrice={490}
-  description="For growing product teams"
-  features={['Unlimited projects', 'Priority support']}
-  isAnnual={annualBilling}
-  isCurrent={currentPlan === 'growth'}
-  returnUrl="https://app.example.com/settings/billing"
-  onSelect={({ planCode, returnUrl }) => startCheckout(planCode, returnUrl)}
-/>
-```
-
-Prices are expressed in major currency units for this presentational component, not cents. `PlanCard` declares a `children` prop but does not render it.
-
-### `PlanComparison`
-
-Renders a side-by-side feature table. Each feature maps plan IDs to a string or boolean.
-
-```tsx
-<PlanComparison
-  plans={plans}
-  features={[
-    {
-      key: 'projects',
-      label: 'Projects',
-      values: { free: '3', growth: 'Unlimited', scale: 'Unlimited' },
-    },
-    {
-      key: 'sso',
-      label: 'SAML SSO',
-      values: { free: false, growth: false, scale: true },
-    },
-  ]}
-/>
-```
-
-## Checkout components
-
-### `CheckoutButton`
-
-Starts checkout through `BillingProvider.createCheckout` with an idempotency key and handles Stripe client-secret, Razorpay, hosted, processing, completed, and scheduled results. See [checkout result types](/sdks/react/hooks#checkout-result-types).
-
-```tsx
-<CheckoutButton
-  planCode="pro_monthly"
-  returnUrl="https://app.example.com/settings/billing"
-  label="Choose Pro"
-  onStripeClientSecret={setClientSecret}
-  onComplete={() => refreshBillingStatus()}
-  onScheduled={() => refreshBillingStatus()}
-  onError={setError}
-/>
-```
-
-| Prop | Type | Default | Description |
-|---|---|---|---|
-| `planCode` | `string` | required | Plan passed to `createCheckout`. |
-| `returnUrl` | `string` | Current URL | Validated merchant return URL. |
-| `label` | `string` | `Get Started` | Button label. |
-| `className` / `style` | React styling props | — | Button styling overrides. |
-| `razorpayKeyId` | `string` | — | Deprecated override; use the public key returned in the scoped checkout result. |
-| `onStripeClientSecret` | `(secret) => void` | — | Required for embedded Stripe results. |
-| `onSuccess` | `(paymentId) => void` | — | Razorpay success callback. |
-| `onComplete` | `(result) => void` | — | Immediate completed-result callback. |
-| `onScheduled` | `(result) => void` | — | Scheduled-change callback. |
-| `registerMandate` | `boolean` | — | Passed to `createCheckout` when set. |
-| `onProcessing` | `(status) => void` | — | Fires while the button polls a `processing` checkout. |
-| `onDismiss` | `() => void` | — | Razorpay only. Fires when the Razorpay modal is dismissed. |
-| `onError` | `(error) => void` | — | Checkout failure callback. |
-
-Each click calls `createCheckout` again, with the same idempotency key for the same plan. For a new subscription whose first payment is still pending, the second call fails with `422 subscription_incomplete`, so a retry button such as the "Payment failed. You can retry checkout." message of the Razorpay flow does not recover it. Reopen the modal on the stored Razorpay checkout, keep the Stripe client secret you already have, or use an invoice checkout from your backend. See [Create checkout](/api/create-checkout#retry-a-new-subscription-checkout).
-
-### `Checkout`
-
-Renders Stripe checkout for a client secret returned by your merchant backend. Nozle returns an embedded Checkout Session secret (`cs_`), which `Checkout` mounts with Stripe Embedded Checkout. Any other secret is mounted with Payment Element. The provider-result form also handles Razorpay, hosted checkout and processing/recovery results.
-
-```tsx
-<Checkout
-  clientSecret={clientSecret}
-  publishableKey={import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY}
-  returnUrl="https://app.example.com/settings/billing"
-  submitLabel="Pay and subscribe"
-  onSuccess={(paymentIntentId) => console.log(paymentIntentId)}
-  onComplete={() => refreshBillingStatus()}
-  onError={setError}
-/>
-```
-
-| Prop | Type | Default | Description |
-|---|---|---|---|
-| `clientSecret` | `string` | required | Stripe client secret. A `cs_` Checkout Session secret uses Embedded Checkout; any other secret uses Payment Element. |
-| `publishableKey` | `string` | required | Stripe publishable key. |
-| `stripeAccount` | `string` | — | Connected account ID. |
-| `returnUrl` | `string` | Current URL fallback | Stripe redirect URL. |
-| `submitLabel` | `string` | `Pay now` | Submit button label. |
-| `onSuccess` | `(paymentIntentId) => void` | — | Successful PaymentIntent callback (Payment Element only). |
-| `onComplete` | `() => void` | — | Embedded Checkout Session completion callback. It does not fire when the session redirects to `returnUrl`, which is how Nozle creates sessions: show success from your return page or by reading billing status. |
-| `onError` | `(error) => void` | — | Stripe or validation failure. |
-| `onReady` | `() => void` | — | Payment Element ready callback (Payment Element only). |
-| `className` / `style` | React styling props | — | Root styling. |
-| `children` | `ReactNode` | — | Additional content above the submit button (Payment Element only). |
-
-For a provider checkout result, use the alternative `checkout` prop. Supply merchant callbacks for verification and status recovery; your backend scopes both to the authenticated customer and selected subscription:
-
-```tsx
-<Checkout
-  checkout={checkoutResult}
-  verifyCheckout={verifySelectedCheckout}
-  getCheckoutStatus={getSelectedCheckoutStatus}
-  returnUrl="https://app.example.com/settings/billing"
-  onComplete={refreshBillingStatus}
-  onError={setError}
-/>
-```
-
-React `0.10.0` and later support these callbacks directly on `Checkout`, without requiring `BillingProvider`; see [the complete adapter](/sdks/react/billing-portal).
-
-The `useCheckout` export from this component must be called inside the component's Stripe Elements context. It returns `confirmPayment`, `isProcessing`, and `error`. Do not confuse it with `useCheckoutSession`, which creates checkout through your merchant callback.
-
-<Warning>
-Stripe webhook processing is authoritative. `onSuccess`, `onComplete`, and return-page navigation are user-interface signals, not proof that a subscription is active.
-</Warning>
-
-## Plan-change components
-
-![React SDK billing components](/images/react-sdk/billing-components.png)
-
-### `UpgradeButton`
-
-Opens `UpgradeModal` and starts a plan change through the provider callback.
-
-```tsx
-<UpgradeButton
-  planCode="scale_monthly"
-  label="Upgrade to Scale"
-  preview={{
-    credit: 12.5,
-    debit: 49,
-    net: 36.5,
-    nextBillingDate: '2026-09-01T00:00:00Z',
-  }}
-  onStripeClientSecret={setClientSecret}
-  onUpgraded={refreshBillingStatus}
-  onDowngradeScheduled={refreshBillingStatus}
-/>
-```
-
-The component also accepts `returnUrl`, `className`, `style`, `onCheckoutStarted`, and `onError`. React `0.10.0` adds `subscriptionId`, `quoteId`, and `idempotencyKey`, forwarded to the merchant checkout callback.
-
-### `UpgradeModal`
-
-Use the modal directly when your application owns its open state.
-
-```tsx
-<UpgradeModal
-  isOpen={upgradeOpen}
-  planCode="scale_monthly"
-  preview={preview}
-  onCancel={() => setUpgradeOpen(false)}
-  onCompleted={refreshBillingStatus}
-  onScheduled={refreshBillingStatus}
-  onStripeClientSecret={setClientSecret}
-/>
-```
-
-`preview` is caller-supplied and contains `credit`, `debit`, `net`, and `nextBillingDate`. Those legacy amount fields use **major units**. React `0.10.0` adds `currency` (default `USD`) and locale-aware formatting. Do not pass SDK minor-unit quote fields directly into this legacy shape; `PlanChangeControl` renders the exact minor-unit quote instead.
-
-React `0.10.0` also adds `onSubmit` for an authenticated custom action without `BillingProvider`, plus `title`, `confirmLabel`, `confirmDisabled`, `busy`, `children`, `locale`, and stylesheet `nonce`. For provider-backed submission it accepts `subscriptionId`, `quoteId`, and `idempotencyKey`. The modal itself does not fetch a customer quote.
-
-## Billing display components
-
-### `PlanBadge`
-
-```tsx
-<PlanBadge plan="Free" tier="free" />
-<PlanBadge plan="Starter" tier="starter" />
-<PlanBadge plan="Pro" tier="pro" />
-<PlanBadge plan="Enterprise" tier="enterprise" />
-```
-
-`tier` controls presentation and accepts `free`, `starter`, `pro`, or `enterprise`.
-
-### `PaymentMethodDisplay`
-
-```tsx
-<PaymentMethodDisplay
-  paymentMethod={{
-    brand: 'visa',
-    last4: '4242',
-    expMonth: 12,
-    expYear: 2028,
-  }}
-  onUpdatePaymentMethod={() => openPaymentMethodFlow()}
-/>
-```
-
-Without `onUpdatePaymentMethod`, the update button navigates to `updateHref`, which defaults to `/billing/update-payment`. Omit `paymentMethod` to show the empty state.
-
-## Usage components
-
-![React SDK usage components](/images/react-sdk/usage-components.png)
-
-### `UsageMeter`
-
-```tsx
-<UsageMeter used={8_200} limit={10_000} label="API requests" />
-```
-
-| Prop | Type | Default | Description |
-|---|---|---|---|
-| `used` | `number` | required | Current usage. |
-| `limit` | `number` | required | Usage limit. |
-| `label` | `string` | — | Label above the bar. |
-| `showText` | `boolean` | `true` | Shows the numeric used/limit text when a label exists. |
-
-The fill uses the primary color below 80%, warning from 80–94%, and destructive at 95% or above. `getUsageMeterColor(percentage)` exposes the same threshold selection.
-
-### `UsageDashboard`
-
-```tsx
-<UsageDashboard
-  features={[
-    { key: 'requests', label: 'API requests', used: 8_200, limit: 10_000 },
-    { key: 'storage', label: 'Storage', used: 42, limit: 100 },
-  ]}
-/>
-```
-
-Pass `loading` to render three skeleton rows. `features` defaults to an empty array.
-
-### `UsageAlert`
-
-```tsx
-<UsageAlert
-  threshold={80}
-  upgradeHref="/settings/billing"
-  features={[
-    { key: 'requests', label: 'API requests', percentage: 82 },
-    { key: 'exports', label: 'Data exports', percentage: 96 },
-  ]}
-/>
-```
-
-The component renders one dismissible warning for each feature at or above `threshold`. The default threshold is `80` and the default upgrade link is `/plans`.
-
-## Access-control components
-
-`FeatureGate`, `UsageGate`, `PlanGate`, `UpgradePrompt`, and `LockedOverlay` are documented on [Feature gates](/sdks/react/gates).
+`@nozle-js/react` has ready-made components for pricing pages, checkout, plan changes, billing settings, usage, credits and feature gates. Each component page lists every option, shows the component in all six [themes](/sdks/react/styling#themes), and explains how to feed it live data.
+
+## Where components get their data
+
+| Source | What it gives | Components |
+|---|---|---|
+| Props you pass | Anything you already have | All components; most take their data only from props |
+| `BillingProvider` with `publishableKey` | The public plan catalog and the "Powered by Nozle" answer | [`PricingTable`](/sdks/react/components/pricing-table) without `plans`, [`PlanChangeControl`](/sdks/react/components/plan-change-control) plan details, [`CurrentPlan`](/sdks/react/components/current-plan) limits |
+| `BillingProvider` with `createCheckout` | Checkout through your merchant route | [`PricingTable`](/sdks/react/components/pricing-table), [`CheckoutButton`](/sdks/react/components/checkout-button), [`UpgradeButton`](/sdks/react/components/upgrade-button), [`UpgradeModal`](/sdks/react/components/upgrade-modal) |
+| `BillingProvider` with `billingEndpoint` | The signed-in customer's subscription, entitlements, credits and usage, served by `createBillingHandler` | [`CurrentPlan`](/sdks/react/components/current-plan) without `subscription`, and the [customer hooks](/sdks/react/hooks#customer-hooks) you pass into the other components |
+| Your merchant callbacks | Plan changes, cancellation and the portal session | [`PlanChangeControl`](/sdks/react/components/plan-change-control), [`CancellationControl`](/sdks/react/components/cancellation-control), [`BillingPortal`](/sdks/react/components/billing-portal) |
+
+The browser never holds a secret key. Customer data reaches the components through your backend: `createBillingHandler`, your merchant routes, or the customer-scoped portal session. See [Installation](/sdks/react/installation) and [Provider and hooks](/sdks/react/hooks).
+
+## Components
+
+### Pricing
+
+| Component | Use it for |
+|---|---|
+| [`PricingTable`](/sdks/react/components/pricing-table) | Plan cards from your catalog with checkout on each card. |
+| [`PlanCard`](/sdks/react/components/plan-card) | One plan card in your own layout. |
+| [`PlanComparison`](/sdks/react/components/plan-comparison) | Plans side by side, one row per entitlement and credit grant. |
+
+### Checkout
+
+| Component | Use it for |
+|---|---|
+| [`CheckoutButton`](/sdks/react/components/checkout-button) | Starting checkout for one plan. |
+| [`Checkout`](/sdks/react/components/checkout) | The payment step for a Stripe client secret or a checkout result. |
+
+### Plan change
+
+| Component | Use it for |
+|---|---|
+| [`UpgradeButton`](/sdks/react/components/upgrade-button) | A button that confirms and starts one plan change. |
+| [`UpgradeModal`](/sdks/react/components/upgrade-modal) | The confirmation dialog, with your open state or your own action. |
+| [`PlanChangeControl`](/sdks/react/components/plan-change-control) | A plan picker with exact quotes, paid upgrades and scheduled downgrades. |
+| [`CancellationControl`](/sdks/react/components/cancellation-control) | Cancel at the end of the period, or keep the subscription. |
+
+### Billing display
+
+| Component | Use it for |
+|---|---|
+| [`CurrentPlan`](/sdks/react/components/current-plan) | The customer's plan, status, scheduled change and usage. |
+| [`PlanBadge`](/sdks/react/components/plan-badge) | The plan name as a pill. |
+| [`PaymentMethodDisplay`](/sdks/react/components/payment-method-display) | The saved card and an update button. |
+| [`BillingPortal`](/sdks/react/components/billing-portal) | A full customer billing page: subscriptions, wallets, details and invoices. |
+| [`PoweredByNozle`](/sdks/react/components/powered-by-nozle) | The "Powered by Nozle" badge for UI you build from the hooks. |
+
+### Usage
+
+| Component | Use it for |
+|---|---|
+| [`UsageMeter`](/sdks/react/components/usage-meter) | One limit as a progress bar. |
+| [`UsageDashboard`](/sdks/react/components/usage-dashboard) | Several meters in one card. |
+| [`UsageAlert`](/sdks/react/components/usage-alert) | Warnings for limits that are nearly used. |
+| [`UsageBreakdown`](/sdks/react/components/usage-breakdown) | This period's units and amounts per feature. |
+| [`UsageTrend`](/sdks/react/components/usage-trend) | Past periods as bars. |
+
+### Credits
+
+| Component | Use it for |
+|---|---|
+| [`CreditBalance`](/sdks/react/components/credit-balance) | Credits available and where they come from. |
+| [`CreditHistory`](/sdks/react/components/credit-history) | Credit operations with paging. |
+
+### Access control
+
+| Component | Use it for |
+|---|---|
+| [`FeatureGate`](/sdks/react/components/feature-gate) | Content only when a feature is included. |
+| [`PlanGate`](/sdks/react/components/plan-gate) | Content only on some plans. |
+| [`UsageGate`](/sdks/react/components/usage-gate) | Content only below a limit. |
+| [`UpgradePrompt`](/sdks/react/components/upgrade-prompt) | An upgrade message and button. |
+| [`LockedOverlay`](/sdks/react/components/locked-overlay) | A blurred preview with an upgrade prompt. |
+
+See [Feature gates](/sdks/react/gates) for combining gates with your backend's state.
+
+## Loading, empty and error states
+
+Components that show customer data take `isLoading` (or `loading`), `error` and `emptyMessage`, and render a placeholder, a `role="alert"` message, or a `role="status"` message instead of their content. Pass the matching fields of the hook result, for example `isLoading={query.isPending}` and `error={query.error}`. Each component page lists its states.
+
+## Powered by Nozle
+
+`PricingTable`, `PlanComparison`, `CurrentPlan`, `Checkout`, `UpgradeModal` and `BillingPortal` show "Powered by" and the Nozle logo below their content, linking to nozle.dev. Nozle decides this on the server: the publishable-key plan catalog returns `meta.nozle_branding`, and the billing portal reads it from its session. When one of these components renders another, for example a modal inside the portal, only the outer one shows the badge. Without a `BillingProvider`, only `BillingPortal` can show it.
+
+If you build your own billing UI from the hooks, `useNozleBranding()` returns the same answer and [`<PoweredByNozle />`](/sdks/react/components/powered-by-nozle) renders the badge.
+
+## Appearance
+
+Every component with a look takes `appearance`, and inherits the one on `BillingProvider`. Each component page lists the element keys it exposes for class names and styles. See [Appearance](/sdks/react/styling).

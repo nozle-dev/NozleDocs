@@ -5,7 +5,7 @@ api: "DELETE https://api.nozle.app/engine/api/v1/cost-models/{id}"
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-Delete a cost model by ID.
+Archive a cost model by ID. The cost model is not removed: its `status` becomes `archived` and it is no longer used for margin calculations. It still appears in [List Cost Models](/api/list-cost-models). Archiving a cost model that is already archived returns `200` again.
 
 <Warning>
 This legacy endpoint is retained only for rollback and cleanup. New Cost Intelligence configuration is versioned and is not managed through this route.
@@ -18,5 +18,24 @@ All cost model endpoints require a secret key (`sk_`). Publishable keys will rec
 </Warning>
 
 <ParamField path="id" type="string" required>
-  Cost model ID
+  Cost model ID (UUID)
 </ParamField>
+
+<ResponseField name="status" type="string" required>
+  Always `archived`.
+</ResponseField>
+
+```json
+{ "status": "archived" }
+```
+
+## Errors
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| `400` | `{"error": "invalid id"}` | `id` is not a UUID. |
+| `401` | `{"error": "..."}` | The `Authorization` header is missing or malformed, or the key is unknown. |
+| `403` | `{"error": "..."}` | A publishable key was used. |
+| `404` | `{"error": "not found"}` | No cost model with this ID exists in the organization. |
+| `500` | `{"error": "..."}` | The cost model could not be archived. |
+| `503` | `{"error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |

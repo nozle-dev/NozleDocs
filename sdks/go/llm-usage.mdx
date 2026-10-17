@@ -1,13 +1,44 @@
 ---
 title: "LLM auto-capture"
-description: "Automatically record OpenAI and Anthropic usage from completed calls and streams."
+description: "Record the token usage of every LLM call made through an *http.Client, from any provider."
 ---
 
-Wrap the HTTP client used by the OpenAI or Anthropic Go SDK once, then make provider calls normally. Nozle reads usage from completed responses and streams and records a Feature Event plus optional detailed Cost Events automatically. Nozle receives provider and model identifiers, token counts, latency, an optional feature tag, and the provider request ID when Cost Events are enabled. Prompt and completion content are not sent.
+`nozle.WrapHTTPClient` returns a copy of an `*http.Client` that records the token usage of every successful LLM response it carries. Pass it to any provider SDK that accepts an HTTP client, or use it for your own requests. Requests and responses pass through unchanged, and prompts and completions are never sent to Nozle.
 
-The core Go module has no provider dependency. The examples below use provider SDK versions compatible with Go 1.22; newer provider releases may require a newer Go version.
+`WrapHTTPClient` and `RecordUsage` require `v0.12.0`. The [provider-specific wrappers](#provider-specific-wrappers) are available in earlier versions.
 
-## OpenAI
+Usage is recognised by the shape of the response, not by provider name: an OpenAI-style `usage` (OpenAI chat completions, the Responses API and any OpenAI-compatible API), an Anthropic `usage`, or Gemini `usageMetadata`, for JSON responses and streams.
+
+<Note>
+Capture records usage events; they bill only when a metered Feature has the same event code. See [Set up AI token billing](/guides/ai/token-billing) for the Feature, charge and cost model to create first.
+</Note>
+
+## Capture any client
+
+```go
+import nozle "github.com/nozle-dev/nozle-go"
+
+providerHTTP, err := nozle.WrapHTTPClient(&http.Client{}, client, nozle.CaptureOptions{
+  FeatureCode: "llm_tokens",
+  OnError:     func(err error) { log.Printf("Nozle usage: %v", err) },
+})
+if err != nil { return err }
+openaiClient := openai.NewClient(openaiopt.WithHTTPClient(providerHTTP))
+
+// The customer travels with the request context, so one client serves every customer.
+ctx = nozle.WithCustomer(ctx, workspace.ID)
+response, err := openaiClient.Chat.Completions.New(ctx, params)
+```
+
+The customer for a request is, in order: the `X-Nozle-Customer-Id` request header (removed before the request is sent), `WithCustomer` on the request context, `CaptureOptions.CustomerIDFunc`, then `CaptureOptions.CustomerID`. A request without a customer passes through and nothing is recorded. `X-Nozle-Feature` (also removed) or `Feature` sets the `feature` property; `CostMeterCode` adds categorized Cost Events. Chat completion streams are sent with `stream_options.include_usage`; set `SkipStreamUsage` for a server that rejects the field. `OnError` also receives, once per event code, a `*nozle.SetupError` with `Code` `feature_not_found` when no Feature has the event code.
+
+`client.RecordUsage(ctx, nozle.ProviderCapture{CustomerID: ..., Model: ..., RequestID: ...}, nozle.Usage{InputTokens: ..., OutputTokens: ...})` records usage your code read itself.
+
+## Provider-specific wrappers
+
+`WrapOpenAIHTTPClient` and `WrapAnthropicHTTPClient` observe only `/chat/completions` and `/messages`. They are kept for existing integrations.
+
+### OpenAI
 
 ```bash
 go get github.com/openai/openai-go/v3@v3.44.0
@@ -32,7 +63,7 @@ _ = response
 
 Import `github.com/openai/openai-go/v3` as `openai` and its `/option` package as `openaiopt`. The provider SDK reads `OPENAI_API_KEY` from the environment. `NewStreaming` is also captured automatically: the wrapper requests `stream_options.include_usage` and records the final usage-bearing chunk after the stream is consumed. Closing a stream before final usage arrives cannot produce a usage event.
 
-## Anthropic
+### Anthropic
 
 ```bash
 go get github.com/anthropics/anthropic-sdk-go@v1.5.0
@@ -67,7 +98,7 @@ Import `github.com/anthropics/anthropic-sdk-go` as `anthropic` and its `/option`
 | `CostMeterCode` | Optional Cost Event Meter for categorized token costs. |
 | `Feature` | Optional Feature Event property. |
 | `DeliveryTimeout` | Timeout for background telemetry; defaults to 15 seconds. |
-| `OnError` | Called with the Nozle delivery error when sending a captured event fails. It does not change the provider response. |
+| `OnError` | Called with the Nozle delivery error when sending a captured event fails. It does not change the provider response. These wrappers do not check that a Feature has the event code; only `WrapHTTPClient` reports a `*nozle.SetupError` with `Code` `feature_not_found`. |
 | `OnResult` | `func(error)`, called after every delivery attempt: with `nil` on success, with the error on failure. |
 
 The wrapper copies the supplied `*http.Client`; it does not mutate the original. It captures only request paths ending in `/chat/completions` (OpenAI) and `/messages` (Anthropic); other routes, such as `/v1/responses`, pass through without an event. Usage delivery runs in a goroutine after the provider response or stream completes, without delaying the provider result. Use `OnError` to log or queue failures. The wrapper does not automatically retry telemetry.
@@ -83,6 +114,9 @@ Use the direct capture methods when your provider client cannot accept an `*http
 Map `prompt_tokens` to `PromptTokens`, `completion_tokens` to `CompletionTokens`, and the cached-input and reasoning details when available.
 
 ```go
+
+client := nozle.New("") // reads NOZLE_SECRET_KEY
+
 err := client.CaptureOpenAIUsage(ctx, nozle.ProviderCapture{
   CustomerID: "workspace_123",
   SubscriptionID: "workspace_123_subscription",
@@ -150,7 +184,7 @@ When `CostMeterCode` is set, each non-zero token category creates a linked Engin
 - OpenAI: `input`, `cached_input`, `output`, and `reasoning`.
 - Anthropic: `input`, `cached_input`, `cache_write`, and `output`.
 
-Configure the Cost Event Meter and effective-dated provider/model/category Cost Rules to rate those events. The parent Feature Event uses a generated UUIDv7 transaction ID for automatic capture. In manual capture, you can supply `TransactionID`; category Cost Event IDs derive from that same ID, so reuse it when retrying the same capture.
+Configure the Cost Event Meter and effective-dated provider/model/category Cost Rules to rate those events. The parent Feature Event's transaction ID is `llm-<format>-<response id>` when the response has an id, so the same response is never recorded twice; otherwise a UUIDv7 is generated. In manual capture, you can supply `TransactionID`; category Cost Event IDs derive from that same ID, so reuse it when retrying the same capture.
 
 ## Delivery and errors
 

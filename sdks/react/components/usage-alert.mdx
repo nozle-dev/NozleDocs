@@ -1,0 +1,172 @@
+---
+title: "UsageAlert"
+description: "Dismissible warnings for features whose usage has reached a threshold, with an upgrade link."
+keywords: ["usage alert", "limit warning", "upgrade", "react"]
+---
+
+`UsageAlert` shows one warning per feature at or above a usage threshold, each with an "Upgrade" link and a dismiss button.
+
+**When to use**
+
+- The top of your app's main page or dashboard.
+- Above a feature that is close to its limit.
+- Any place where you want a warning only once usage passes a threshold you choose.
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/usage-alert/light.png" alt="Two UsageAlert warnings for seats at 90% and storage at 98%, light theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/usage-alert/dark.png" alt="Two UsageAlert warnings for seats at 90% and storage at 98%, dark theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/usage-alert/minimal.png" alt="Two UsageAlert warnings for seats at 90% and storage at 98%, minimal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/usage-alert/neobrutal.png" alt="Two UsageAlert warnings for seats at 90% and storage at 98%, neobrutal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/usage-alert/nozle.png" alt="Two UsageAlert warnings for seats at 90% and storage at 98%, nozle theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    <Frame>
+      <img src="/images/react/components/usage-alert/nozle-dark.png" alt="Two UsageAlert warnings for seats at 90% and storage at 98%, nozleDark theme" width="508" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Importing UsageAlert
+
+```tsx
+import { UsageAlert, type UsageAlertFeature } from '@nozle-js/react'
+```
+
+## Rendering UsageAlert
+
+Pass each feature with its usage percentage:
+
+```tsx components/usage-alerts.tsx
+export function UsageAlerts() {
+  return (
+    <UsageAlert
+      features={[{ key: 'seats', label: 'Seats', percentage: 90 }]}
+      upgradeHref="/settings/billing/plans"
+    />
+  )
+}
+```
+
+Each warning reads "You're approaching your &lt;feature&gt; limit (N%). Upgrade". The component renders nothing when no feature is at or above the threshold.
+
+## Data
+
+Each feature is a `UsageAlertFeature`: `{ key, label, percentage }`. Features below the threshold are left out:
+
+```tsx
+const features: UsageAlertFeature[] = [
+  { key: 'seats', label: 'Seats', percentage: 90 },
+  { key: 'storage', label: 'Storage', percentage: 98 },
+  { key: 'api_calls', label: 'API calls', percentage: 40 },
+]
+
+export function Alerts() {
+  return <UsageAlert features={features} threshold={80} upgradeHref="/settings/billing/plans" />
+}
+```
+
+Only Seats and Storage show here; API calls is below the threshold.
+
+### Live data
+
+Work out the percentage from the `used` and `limit` of [`useEntitlement`](/sdks/react/hooks#the-hooks):
+
+```tsx
+import { useEntitlement } from '@nozle-js/react'
+
+export function SeatsAlert() {
+  const { data } = useEntitlement('seats')
+  const features: UsageAlertFeature[] =
+    data && data.limit ? [{ key: 'seats', label: 'Seats', percentage: ((data.used ?? 0) / data.limit) * 100 }] : []
+  return <UsageAlert features={features} />
+}
+```
+
+## Examples
+
+### Several features
+
+Each feature at or above the threshold gets its own warning. Raise `threshold` to warn later: with `threshold={95}`, only Storage would show here.
+
+<Frame>
+  <img src="/images/react/components/usage-alert/light.png" alt="Two UsageAlert warnings for seats at 90% and storage at 98%, light theme" width="508" />
+</Frame>
+
+```tsx
+export function QuotaAlerts() {
+  return (
+    <UsageAlert
+      features={[
+        { key: 'seats', label: 'Seats', percentage: 90 },
+        { key: 'storage', label: 'Storage', percentage: 98 },
+      ]}
+    />
+  )
+}
+```
+
+## API reference
+
+<ResponseField name="features" type="UsageAlertFeature[]" required>
+  `{ key, label, percentage }` per feature. The percentage is rounded in the text.
+</ResponseField>
+
+<ResponseField name="threshold" type="number" default={80}>
+  A feature at or above this percentage shows a warning.
+</ResponseField>
+
+<ResponseField name="upgradeHref" type="string" default="/plans">
+  Where the "Upgrade" link goes.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides. Defaults to the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| No feature at or above `threshold` | Nothing. |
+| One or more features over | One `role="alert"` warning per feature, in the warning colours. |
+| Warning dismissed | That warning hides, for as long as the component stays mounted. |
+
+Dismissed warnings are kept in component state, keyed by `key`; they come back when the component mounts again.
+
+### Appearance
+
+<Accordion title="Element keys">
+  `usageAlert` (root), `usageAlert__dismiss` (the × button).
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="UsageMeter" icon="bars-progress" href="/sdks/react/components/usage-meter">
+    The usage of one limit as a bar.
+  </Card>
+  <Card title="UpgradeButton" icon="arrow-up" href="/sdks/react/components/upgrade-button">
+    Upgrade from the warning.
+  </Card>
+</CardGroup>

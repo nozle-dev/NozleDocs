@@ -1,30 +1,53 @@
 ---
 title: Production integration checklist
-description: Configure event delivery, credit consumption, cost rating and payments for your integration
+description: What to verify before real customers use your Nozle integration
 ---
 
-Before launch, run your integration against a dedicated test customer in your workspace. Keep test events and payment-provider test mode separate from real customer activity.
+Run the integration against a dedicated test customer in your workspace first. Keep test events and payment-provider test mode separate from real customer activity. Tick each item only after you have seen it work.
 
-## Configure your integration
+## Keys and setup
 
-- Use Node `0.10.0`, Python `0.10.0`, Go `v0.9.1`, and React `0.10.2` or later. React `0.10.1` fixes catalog error handling.
-- Create the Feature, plan, customer and active subscription before sending events. Use the same Feature code in `track()` and `can()`, and pass an explicit subscription ID when more than one subscription is active.
-- Keep secret keys on your server. A publishable key permits public catalog reads; it does not authorize customer billing operations. Derive customer identity in your authenticated backend.
+- [ ] Secret keys (`sk_`) are only on your server and read from the environment. The browser only has a publishable key (`pk_`), which can read the plan catalog and nothing else. See [authentication](/api/authentication).
+- [ ] You use the latest Node.js, Python, Go and React SDK releases. See each SDK's installation page for the current versions.
+- [ ] The feature, plan, customer and active subscription exist before events are sent. The event name equals the feature code exactly.
+- [ ] Customer identity comes from your authenticated backend, never from the browser.
+- [ ] If a customer can hold more than one active subscription, you pass the subscription explicitly.
 
-## Events and decisions
+## Events
 
-Persist a transaction ID, timestamp and payload for each business event. Retry an uncertain submission with all three unchanged; a new ID creates a new event. Successful HTTP acceptance is separate from asynchronous usage and margin processing. Confirm the expected usage before declaring your integration test complete.
+- [ ] Each business event has a stored transaction ID, timestamp and payload. A retry sends all three unchanged; a new ID creates a new event. See [idempotency](/api/idempotency).
+- [ ] You send an event, then read usage back and see the expected count. Acceptance of a request is separate from asynchronous usage processing, so read after a few seconds.
+- [ ] Batches have at most 100 events, and you resend a whole batch after an unreadable failure. See [events](/api/events).
+- [ ] You tested a wrong event name: it is accepted but never counted.
 
-`can()` is a point-in-time decision, not an atomic quota reservation. Usage read failures return a structured HTTP `503` without an access decision. Do not interpret dependency errors as permission or zero usage. Retry within a bounded request budget and retain the request ID for support. Entitlement configuration changes can take approximately one minute to refresh.
+## Decisions and credits
 
-For atomic product-credit consumption, use [Track and Consume Credits](/api/usage-track) with a stable idempotency key. Initial subscription credit grants are asynchronous; wait for the expected balance before admitting credit-backed work.
+- [ ] `can()` is treated as a point-in-time decision, not a quota reservation. A `503` (`usage_unavailable`) is handled as an unavailable decision, never as permission or zero usage, with a bounded retry. You keep the request ID for support. Entitlement changes can take about a minute to refresh.
+- [ ] Credit-backed work uses [`usage.track`](/api/usage-track) with a stable idempotency key per unit of work, and a denial (`allowed=false`) stops the work.
+- [ ] Initial subscription credit grants are asynchronous: you wait for the expected balance before admitting credit-backed work.
 
-## Configure cost rating
+## Errors and retries
 
-Configure and publish the Cost Rules and composition for the usage you want to price. Inspect the resulting rated amounts in a test transaction. An event with `uncosted` status has been recorded but does not yet have a rated cost; review its reason before using it in financial reporting.
+- [ ] Your code retries only network errors, timeouts, `5xx` and `503` with `Retry-After`, always with the same key and payload. It does not retry `4xx`. See [errors](/api/errors).
+- [ ] You forced each of these once and saw the right behaviour: a bad key (`401`), a `pk_` key on a protected call (`403`), an unknown customer (`404`), the same idempotency key with a different request (`409`), and a network failure mid-request.
+- [ ] A retry from a new process passes an explicit `timestamp` for `usage.track`, because the SDK only remembers the time it filled in for the client that sent it.
 
-## Payments, callbacks and operational checks
+## Webhooks
 
-Configure your payment provider and signed webhooks, then verify the flows your product exposes: successful checkout, decline and retry, subscription changes, cancellation, renewal, refunds and authentication challenges. A free subscription or a rendered billing component does not test payment settlement.
+- [ ] Your receiver verifies the signature on the raw body, deduplicates on `X-Nozle-Unique-Key`, answers `2xx` within 30 seconds and returns `200` for events it does not handle. See [receive webhooks](/api/receive-webhooks).
+- [ ] You do not rely on delivery order, and you read the object from the API when you need its latest state.
 
-Validate your webhook receiver's signature checks, retries and idempotency. Test email delivery and recovery, any SSO provider you enable, and your backup/restore process. Monitor request errors, processing lag and reconciliation differences. Measure your own workload before committing to a capacity or latency SLA; request acceptance throughput alone does not establish processing capacity.
+## Cost rating
+
+- [ ] The Cost Rules and composition for the usage you price are configured and published.
+- [ ] A test transaction shows its rated amount. An event with `uncosted` status is recorded but has no rated cost yet: review its reason before it reaches financial reports.
+
+## Payments
+
+- [ ] Your payment provider is connected and the flows your product exposes work: successful checkout, decline and retry, subscription changes, cancellation, renewal, refunds and authentication challenges. A free subscription or a rendered billing component does not test payment settlement.
+- [ ] Checkout return URLs are on the allowlist of both Core and the Engine. See [create checkout](/api/create-checkout).
+
+## Operations
+
+- [ ] You monitor your request errors, processing lag and reconciliation differences, and you have tested email delivery, any SSO provider you enable, and your own backup and restore.
+- [ ] You measured your own workload before promising a capacity or latency SLA. Request acceptance throughput alone does not establish processing capacity.

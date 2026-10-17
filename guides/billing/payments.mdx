@@ -20,6 +20,8 @@ See [Checkout](/guides/billing/checkout) for the webhook setup and the Stripe an
 The PaymentMethodDisplay component shows the customer's saved card:
 
 ```tsx
+import { PaymentMethodDisplay } from '@nozle-js/react'
+
 <PaymentMethodDisplay
   paymentMethod={{ last4: '4242', brand: 'visa', expMonth: 12, expYear: 2028 }}
   onUpdatePaymentMethod={() => router.push('/update-card')}
@@ -35,8 +37,8 @@ When a payment fails, Nozle records the failed payment status. Dunning and retri
 
 **Product credit top-ups:**
 
-Configure fixed top-up packages for a Credit System. Checkout creation produces an invoice/payment flow; credits are granted only after confirmed payment:
+Configure fixed top-up packages for a Credit System. Checkout creation produces an invoice/payment flow; credits are granted once the top-up invoice is fully paid, whether by the provider, a manual payment for the full amount, a payment request or marking it paid:
 
-Expose top-up packages through your authenticated backend, start checkout from your billing UI, and refresh the balance only after payment confirmation. Product credits are separate from invoice wallet credits. See [Paid Credit Top-ups](/guides/credits/top-ups).
+Expose top-up packages through your authenticated backend, start checkout from your billing UI, and refresh the balance only after the invoice is paid. Product credits are separate from invoice wallet credits. See [Paid Credit Top-ups](/guides/credits/top-ups).
 
 For related configuration, see [Checkout](/guides/billing/checkout), [Subscriptions](/guides/billing/subscriptions), and [Paid Credit Top-ups](/guides/credits/top-ups).

@@ -22,8 +22,10 @@ All margin endpoints require a secret key (`sk_`). These endpoints expose cost d
 </ParamField>
 
 <ParamField query="granularity" type="string">
-  Time bucket size: `hour`, `day`, `week`, or `month` (default: `day`). The server does not reject other values: `year` or any unknown value returns `200` and is bucketed by day, while the response still echoes the value you sent in `granularity`. Send only the four documented values.
+  Time bucket size: `hour`, `day`, `week`, or `month` (default: `day`). Any other value returns `400` with `code` `invalid_granularity`.
 </ParamField>
+
+The endpoint reads only `from`, `to`, `from_date`, `to_date` and `granularity`. Any other query parameter is ignored without an error.
 
 ### Date range
 
@@ -66,4 +68,4 @@ An unparseable value returns `"error": "from must be an RFC3339 timestamp or a d
 }
 ```
 
-`period` is the start of the bucket: `YYYY-MM-DD` for `week` and `month`, `YYYY-MM-DD HH:MM:SS` for `hour` and `day`. `margin_percent` is `0` when the bucket has no revenue. When no events fall in the range, `trend` is `null`, not an empty array.
+`period` is the start of the bucket: `YYYY-MM-DD` for `week` and `month`, `YYYY-MM-DD HH:MM:SS` for `hour` and `day`. `margin_percent` is `0` when the bucket has no revenue. When no events fall in the range, `trend` is an empty array.

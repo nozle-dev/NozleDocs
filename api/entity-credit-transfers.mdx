@@ -6,7 +6,7 @@ description: Allocate and return provenance-preserving paid top-up credits
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-**Auth:** secret key with `entity:write` when API permissions are enabled. Publishable keys are rejected.
+**Auth:** secret key with `entity:write`. Publishable keys are rejected.
 
 Allocate paid customer top-up value:
 
@@ -36,12 +36,27 @@ Content-Type: application/json
 }
 ```
 
-Amounts must be positive decimal strings with at most 12 fractional digits. Allocation can draw only from active paid customer top-ups. Deallocation returns unused value to each exact parent source; expiry, priority, payment provenance, and conservation remain enforced by PostgreSQL.
+Amounts must be positive decimal strings with at most 18 integer digits and 12 fractional digits. Allocation can draw only from active paid customer top-ups. Deallocation returns unused value to each exact parent source; expiry, priority, payment provenance, and conservation remain enforced by PostgreSQL.
 
 Tenant isolation, Entity status, Credit System configuration, source eligibility, and available balance are validated for every transfer.
 
-Retry an uncertain response with the same idempotency key and identical payload. Reusing a key with a different customer, Entity, Credit System, direction, or amount returns a conflict.
+Retry an uncertain response with the same idempotency key and identical payload. Reusing a key with a different customer, Entity, Credit System, direction, or amount returns `409 idempotency_key_reused`.
+
+## Response
+
+A completed allocation returns `201`, including a replay. A completed deallocation returns `200`. The body has `transferred`, `operation_id`, `customer_id`, `entity_id`, `credit_system`, `direction`, `amount`, `available`, `parent_sources`, `entity_sources`, and `replayed`. Each source leg has `source_id`, `source_type`, `scope`, `amount`, `before`, `after`, and `expires_at`.
+
+When there is not enough eligible value, the response is `422` with the same body, `transferred: false`, and a `reason`: `insufficient_customer_top_up_credits` for an allocation, or `insufficient_entity_allocated_credits` for a deallocation.
 
 ## Error handling
+
+| Status | Code | Cause |
+| --- | --- | --- |
+| `400` | `invalid_request` | Invalid body, unknown field, invalid amount, or a missing `Idempotency-Key` or one over 255 bytes. |
+| `404` | `customer_not_found`, `entity_not_found`, `credit_system_not_found` | The named record was not found. |
+| `409` | `idempotency_key_reused` | The key was used with a different request. |
+| `422` | `entity_inactive` | Only an active Entity can receive allocated credits. |
+| `422` | `credit_system_archived` | An archived Credit System cannot receive new allocations. |
+| `503` | `credit_transfer_temporarily_unavailable` | Retry after `Retry-After` with the same key and payload. |
 
 If a request returns HTTP `403` with `credit_transfer_not_enabled`, contact support with the request ID to check the transfer configuration. Do not retry it as a transient network failure or report the transfer as successful.

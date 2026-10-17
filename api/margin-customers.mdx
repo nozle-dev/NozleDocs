@@ -43,3 +43,28 @@ The API answers `400` with code `invalid_date_range` when a value cannot be pars
 ```
 
 An unparseable value returns `"error": "from must be an RFC3339 timestamp or a date (YYYY-MM-DD)"` (or `to`, with the parameter that failed).
+
+The endpoint reads only `from`, `to`, `from_date` and `to_date`. Any other query parameter, such as a customer filter or a page size, is ignored without an error.
+
+### Response
+
+```json
+{
+  "customers": [
+    {
+      "customer_id": "4f6e2a1c-8b3d-4e7a-9c2f-1d5b6a7e8f90",
+      "customer_name": "Acme Inc",
+      "revenue_cents": 14750,
+      "cost_cents": 2360,
+      "margin_cents": 12390,
+      "event_count": 295
+    }
+  ]
+}
+```
+
+There is one row per customer with margin events in the range. Rows are ordered by `margin_cents` ascending, so the least profitable customer comes first. All amounts are integer cents, and `margin_cents` can be negative.
+
+`customer_name` is the customer's name. If the name is empty, it is the external ID. If that is empty too, it is the customer ID. A customer missing from the Engine's customer cache also gets its `customer_id` as `customer_name`.
+
+When no events fall in the range, `customers` is an empty array.

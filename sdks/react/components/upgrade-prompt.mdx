@@ -1,0 +1,155 @@
+---
+title: "UpgradePrompt"
+description: "A short upgrade message with an Upgrade button, for gate fallbacks and locked features."
+keywords: ["upgrade prompt", "upsell", "gate fallback", "react"]
+---
+
+`UpgradePrompt` shows a centered message and an "Upgrade" button.
+
+**When to use**
+
+- As `fallback` of [`FeatureGate`](/sdks/react/components/feature-gate), [`PlanGate`](/sdks/react/components/plan-gate) or [`UsageGate`](/sdks/react/components/usage-gate).
+- In an empty state of a feature the customer's plan does not include.
+- Over blurred content: it is the panel of [`LockedOverlay`](/sdks/react/components/locked-overlay).
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/upgrade-prompt/light.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, light theme" width="293" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/upgrade-prompt/dark.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, dark theme" width="293" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/upgrade-prompt/minimal.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, minimal theme" width="293" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/upgrade-prompt/neobrutal.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, neobrutal theme" width="293" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/upgrade-prompt/nozle.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, nozle theme" width="279" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    <Frame>
+      <img src="/images/react/components/upgrade-prompt/nozle-dark.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, nozleDark theme" width="279" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Importing UpgradePrompt
+
+```tsx
+import {
+  UpgradePrompt,
+  type UpgradePromptProps,
+} from '@nozle-js/react'
+```
+
+## Rendering UpgradePrompt
+
+Pass a plan name and open your plans from `onUpgrade`. The prompt fetches nothing and shows what you pass.
+
+```tsx components/sso-upsell.tsx
+export function SsoUpsell({ openPlans }: { openPlans: () => void }) {
+  return <UpgradePrompt planName="Pro" onUpgrade={openPlans} />
+}
+```
+
+### What a click does
+
+With `onUpgrade`, a click calls it and nothing else. Without it, the button sets `window.location.href` to `/upgrade`.
+
+## Examples
+
+### Plan name
+
+`planName` shows "Upgrade to &lt;planName&gt; to access this feature".
+
+<Frame>
+  <img src="/images/react/components/upgrade-prompt/light.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, light theme" width="293" />
+</Frame>
+
+```tsx
+export function ProPrompt({ openPlans }: { openPlans: () => void }) {
+  return <UpgradePrompt planName="Pro" onUpgrade={openPlans} />
+}
+```
+
+### Your own text
+
+Without `planName`, `text` is the message.
+
+```tsx
+export function LimitPrompt({ openPlans }: { openPlans: () => void }) {
+  return <UpgradePrompt text="You used all 1,000 API calls this month" onUpgrade={openPlans} />
+}
+```
+
+### Open an upgrade modal
+
+Open your plan change flow from `onUpgrade`, for example an [`UpgradeModal`](/sdks/react/components/upgrade-modal):
+
+```tsx
+import { useState } from 'react'
+import { UpgradeModal } from '@nozle-js/react'
+
+export function UpgradeToScale() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <UpgradePrompt planName="Scale" onUpgrade={() => setOpen(true)} />
+      <UpgradeModal isOpen={open} planCode="scale" onCancel={() => setOpen(false)} onCompleted={() => setOpen(false)} />
+    </>
+  )
+}
+```
+
+## API reference
+
+<ResponseField name="planName" type="string">
+  Shows "Upgrade to &lt;planName&gt; to access this feature". Takes priority over `text`.
+</ResponseField>
+
+<ResponseField name="text" type="string" default="Upgrade to access this feature">
+  The message when `planName` is not set.
+</ResponseField>
+
+<ResponseField name="onUpgrade" type="() => void">
+  Fires when "Upgrade" is clicked. Defaults to opening `/upgrade`: without it the button sets `window.location.href` to `/upgrade`.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides on top of the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+`UpgradePrompt` has one state: the message and the "Upgrade" button.
+
+### Appearance
+
+<Accordion title="Element keys">
+  `upgradePrompt` (root).
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="LockedOverlay" icon="eye-slash" href="/sdks/react/components/locked-overlay">
+    This prompt over blurred content.
+  </Card>
+  <Card title="FeatureGate" icon="lock" href="/sdks/react/components/feature-gate">
+    Shows it when a feature is not included.
+  </Card>
+</CardGroup>

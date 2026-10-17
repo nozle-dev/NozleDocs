@@ -173,12 +173,12 @@ if (!result.allowed) {
 `usage.track()` atomically evaluates the metric conversion, selects eligible sources, deducts credits, and records the operation. The optional Entity ID enables Entity attribution and configured pool policy.
 
 <Warning>
-**Retrying.** Pass the same `idempotencyKey` and the same `timestamp` on every retry of one unit of work. If you omit `timestamp`, the SDK uses the current time, the retry no longer matches the first request, and the API returns `409 idempotency_key_reused`. With a fixed `timestamp`, a retry replays the original result, including a denial, and does not charge again. A `timestamp` from before the credit rate became effective returns `422 no effective credit rate`. See [errors and retries](/sdks/node/errors).
+**Retrying.** Pass the same `idempotencyKey` and the same `timestamp` on every retry of one unit of work. If you omit `timestamp`, the SDK fills in the current time once per idempotency key and reuses it when the same key is sent again on the same client (it remembers the last 1,000 keys). A retry from another process, or after a restart, gets a new time, no longer matches the first request, and the API returns `409 idempotency_key_reused`; pass a fixed `timestamp` there. With a fixed `timestamp`, a retry replays the original result, including a denial, and does not charge again. A `timestamp` from before the credit rate became effective returns `422 no effective credit rate`. See [errors and retries](/sdks/node/errors).
 </Warning>
 
 ## Legacy wallet adapter
 
-`nozle.checkAndDeduct({ customerId, credits })` remains available for the legacy wallet path. The `feature` field is deprecated: it is still accepted but is not sent and has no effect. New product-credit integrations should use `usage.check()` and `usage.track()`.
+`nozle.checkAndDeduct({ customerId, credits })` is deprecated and remains available for the legacy wallet path. The `feature` field is deprecated: it is still accepted but is not sent and has no effect. Use `usage.check()` and `usage.track()` with a credit system instead.
 
 ## Security
 

@@ -1,0 +1,61 @@
+---
+title: "Set up AI token billing"
+description: "What to create in Nozle before LLM usage capture bills tokens, records their cost and shows margin."
+---
+
+Usage capture ([Node.js](/sdks/node/llm-auto-capture), [Python](/sdks/python/llm-auto-capture), [Go](/sdks/go/llm-usage), or the [LLM proxy](/api/llm-proxy)) only records events. Each LLM response becomes one usage event:
+
+```json
+{
+  "code": "llm_tokens",
+  "transaction_id": "llm-openai-chatcmpl-123",
+  "external_customer_id": "workspace_123",
+  "external_subscription_id": "sub_123",
+  "properties": {
+    "provider": "openai",
+    "provider_host": "api.openai.com",
+    "model": "gpt-4o-mini",
+    "input_tokens": 1200,
+    "output_tokens": 400,
+    "latency_ms": 840
+  }
+}
+```
+
+What that event does depends on what you set up. Nozle accepts an event whose code matches no Feature and stores it, but it is never billed, costed or shown in margin. The dashboard event debugger shows it as "No meter matches the event code", and SDK capture reports it once per event code to your error callback as `feature_not_found`.
+
+## 1. Bill tokens
+
+1. **Create a metered Feature with the event code.** In **Usage → Meters → New**, set **Event code** to the code your capture sends: `llm_tokens` by default, or your `featureCode` / `X-Nozle-Feature-Code`.
+   - **Method** Sum, **Value property** `total_tokens`, **Expression** `event.properties.input_tokens + event.properties.output_tokens`. The expression writes the sum into `total_tokens` before the event is stored.
+   - To charge more for output tokens, weight them in the expression, for example `event.properties.input_tokens + event.properties.output_tokens * 4`, and price per weighted token. One event code maps to one Feature, so a weighted expression is how one event carries both prices.
+   - To bill only one side, skip the expression and set **Value property** to `input_tokens` or `output_tokens`.
+   - A Feature with an expression cannot be used with [product credits](/guides/credits/overview).
+2. **Charge for it on the plan.** Add a usage charge for the Feature, for example package pricing per 1,000,000 tokens. Add an entitlement limit if you want [`can()`](/guides/entitlements/can-endpoint) to stop customers at a limit. See [plans](/guides/billing/plans).
+3. **Give each customer one active subscription.** The usage event is billed to a subscription. Capture looks up the customer's single active subscription and records nothing for a customer with none or several. Pass a subscription id when a customer has several. The [LLM proxy](/api/llm-proxy#subscription) looks it up before it calls the provider and refuses the call with `422 active_subscription_not_found` or `422 active_subscription_ambiguous`; send `X-Nozle-Subscription` when a customer has several.
+
+Usage counts towards the current period as soon as the event is processed. Revenue appears in margin reports when the invoice is finalized.
+
+## 2. Record the cost of tokens and see margin
+
+1. **Create a cost model from the AI tokens template** (**Usage → Cost models → New**, cost path **Detailed Cost Event**). It creates the Cost Event Meter `ai_tokens` (sum of `tokens`, filtered by `provider`, `model` and `type`). Enter your rate for each token type: input, output, and optionally cached input, cache write and reasoning.
+2. **Link it to the usage Feature.** Set **Linked feature** to your token Feature (for example `llm_tokens`) and the composition to **Detailed events only**, then publish. Without a linked feature the token cost events cannot be attributed and stay uncosted.
+3. **One cost model per provider and model you use.** The template's conditions must equal the `provider` and `model` values the capture sends (`provider` is the response format: `openai`, `anthropic` or `gemini`). A model without a matching rule is listed as uncosted with `no_matching_cost_rule`.
+4. **Turn on cost events in capture.** Set `costMeterCode: "ai_tokens"` (Node.js), `cost_meter_code="ai_tokens"` (Python) or `CostMeterCode: "ai_tokens"` (Go). Each response then also sends one cost event per token type, linked to its usage event.
+5. **Check for uncosted events** in the cost intelligence report or the Uncosted queue after the first calls. See [cost models](/guides/margin/cost-models).
+
+For `can()` to return an estimated cost and margin before work starts, also add Feature Event cost components on the token Feature, set the composition to **Add both**, and use a standard charge. Without them `can()` reports economics as `not_configured`.
+
+## 3. Credits instead of invoices
+
+Usage capture does not spend [product credits](/guides/credits/overview). To deduct credits per call, make the Feature consumable (**Count**, or **Sum** on a property without an expression), give it a credit system rate, and call `usage.track()` with the token count after the LLM call instead of relying on capture. See [credit usage tracking](/guides/credits/usage-tracking).
+
+## Checklist
+
+| Goal | You need |
+|---|---|
+| Tokens appear as usage | A metered Feature whose event code equals the capture code; one active subscription per customer, or `X-Nozle-Subscription` on proxy calls |
+| Tokens are billed | A usage charge for that Feature on the plan |
+| Token cost and margin | An AI tokens cost model per provider and model, linked to the Feature with **Detailed events only**; `costMeterCode: "ai_tokens"` in capture |
+| Cost estimate in `can()` | Feature Event cost components, composition **Add both**, a standard charge |
+| Credits deducted per call | A consumable Feature with a credit rate, and `usage.track()` |

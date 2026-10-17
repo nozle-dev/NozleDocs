@@ -5,6 +5,94 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Node.js SDK 0.13.0
+
+_October 17, 2026_
+
+- [`@nozle-js/node` 0.13.0](https://github.com/nozle-dev/nozle-js/releases/tag/node-v0.13.0): `new Nozle()` reads `NOZLE_SECRET_KEY` when you pass no `apiKey`. The `host` option (default `https://api.nozle.app`) fills in `baseUrl` and `eventsUrl`. Opt-in retries with `maxRetries` and `retryDelayMs` repeat only requests that are safe to repeat. See [Installation](/sdks/node/installation).
+- Every call that gets a non-2xx response throws `NozleApiError`, which now carries `requestId` and `retryAfter`. The message keeps its `<operation> failed: <status> <statusText>` form and the class still extends `Error`. See [Errors and retries](/sdks/node/errors).
+- `captureFetch()` returns a `fetch` that records the token usage of OpenAI-compatible, Anthropic and Gemini responses, for any client that accepts a custom `fetch`. `recordUsage()` records usage your code read itself. Capture reports `feature_not_found` once per event code through `onError` when no Feature has that code. See [LLM auto-capture](/sdks/node/llm-auto-capture).
+- `getSubscriptions()`, `currentUsage()` and `pastUsage()` read Core subscriptions and usage. The `invoices` namespace lists invoices (with `paymentOverdue` and other filters), reads one and returns its PDF URL. The `alerts` namespace manages usage and wallet balance alerts. See [Billing](/sdks/node/billing#read-usage).
+- `webhooks.verify()` and `createWebhookHandler()` check the `X-Nozle-Signature` of the webhooks Nozle sends. See [Receive Nozle webhooks](/api/receive-webhooks).
+- `createBillingHandler()` serves the React billing hooks from your backend with your secret key; the customer always comes from your session. See [Provider and hooks](/sdks/react/hooks).
+- Fixed: `wrapOpenAI` and `wrapAnthropic` keep the SDK's own `APIPromise` and `Stream`, so `withResponse()`, `asResponse()`, `chat.completions.parse()`, `messages.stream()` / `finalMessage()`, `stream.controller` and `toReadableStream()` work on a wrapped client. Usage is recorded once, when the response is read (not for `asResponse()`); a stream records when it is fully iterated. The optional peer dependency is `@anthropic-ai/sdk`. `checkAndDeduct()` is deprecated: use `usage.check()` and `usage.track()` with a credit system. See [LLM auto-capture](/sdks/node/llm-auto-capture#client-wrappers).
+- Usage events recorded by `wrapOpenAI`, `wrapAnthropic` and `captureFetch` use the provider's response id as the transaction id, so the same response is never recorded twice.
+- Fixed: `usage.track()` reuses the timestamp it filled in when the same idempotency key is sent again on the same client, so a retry no longer fails with `409 idempotency_key_reused`.
+- **Breaking:** `CanResult.limit` and `CanResult.remaining` are typed `number | null`, `null` when the feature has no limit. Code that checked `=== undefined` should check `== null`. `PingResult.version` and `SubscriptionOptions.blocked_reason` are removed from the types; the API never sent them.
+- Install with `npm install @nozle-js/node@0.13.0 @nozle-js/react@0.11.0 @tanstack/react-query`.
+
+### React SDK 0.11.0
+
+_October 17, 2026_
+
+- [`@nozle-js/react` 0.11.0](https://github.com/nozle-dev/nozle-js/releases/tag/react-v0.11.0) adds customer billing hooks built on TanStack Query: `useSubscription`, `useEntitlement`, `useCreditBalance`, `useCreditHistory`, `useUsage`, `useUpgradePreview`, `useBillingRefresh`, `useInvoices` and `useInvoiceDownload`. They read your backend route set as `BillingProvider` `billingEndpoint` (served by `createBillingHandler` from `@nozle-js/node` `0.13.0`), so the browser never holds a secret key. See [Provider and hooks](/sdks/react/hooks).
+- New components: [`CurrentPlan`](/sdks/react/components/current-plan), [`CreditBalance`](/sdks/react/components/credit-balance), [`CreditHistory`](/sdks/react/components/credit-history), [`UsageBreakdown`](/sdks/react/components/usage-breakdown), [`UsageTrend`](/sdks/react/components/usage-trend) and [`PoweredByNozle`](/sdks/react/components/powered-by-nozle).
+- `PricingTable`, `PlanCard` and `PlanComparison` show what each plan gives from the public catalog (entitlements, credit grants and usage prices) and sort plans by price, cheapest first. `planFeatures()`, `comparisonRows()` and `sortPlansByPrice()` return the same data for your own layout.
+- Appearance themes and variables; see [React themes](#react-themes) below.
+- Fixed: `PricingTable` shows the real billing interval instead of `/month` for every plan that is not yearly, `PlanCard` prints the plan's own currency, and the annual toggle no longer shows a hard-coded "Save 20%". Component buttons are `type="button"`, so they no longer submit a surrounding form.
+- **Breaking:** `@tanstack/react-query` 5 or later is a required peer dependency.
+- **Breaking:** the customer hooks need `billingEndpoint` on `BillingProvider` and a backend route that serves them.
+- **Breaking:** `PlanCard` takes a catalog `plan` instead of `id`, `name`, `monthlyPrice`, `annualPrice`, `description`, `isAnnual` and `children`, and the `Plan` type export is removed. `PlanComparison` takes catalog `plans`, and its `features` rows are keyed by plan `code`.
+- **Breaking:** components no longer read Tailwind or shadcn variables, and `PricingTable` marks contact-sales plans from `contactSalesPlans` instead of their names. See "Upgrading from 0.10" on the [Appearance](/sdks/react/styling) page.
+- Install with `npm install @nozle-js/node@0.13.0 @nozle-js/react@0.11.0 @tanstack/react-query`.
+
+### Python SDK 0.13.0
+
+_October 17, 2026_
+
+- [`nozle-sdk` 0.13.0](https://github.com/nozle-dev/nozle-python/releases/tag/v0.13.0) adds `AsyncNozle` for asyncio apps, with the same arguments, namespaces and methods as `Nozle`, awaited. See [Installation](/sdks/python/installation#async-client).
+- `Nozle()` reads `NOZLE_SECRET_KEY` when you pass no `api_key`. The `host` argument (default `https://api.nozle.app`) fills in `base_url` and `events_url`. Opt-in retries with `max_retries` and `retry_delay` repeat only requests that are safe to repeat. `NozleAPIError` adds `request_id` and `retry_after`.
+- `wrap_http_client()`, `capture_http_client()` and `capture_async_http_client()` record the token usage of any LLM client built on httpx or httpx2; `record_usage()` records usage your code read itself. See [LLM auto-capture](/sdks/python/llm-auto-capture).
+- `current_usage()` and `past_usage()` read Core usage. `invoices.list()` (with `payment_overdue` and other filters), `invoices.get()` and `invoices.download_url()` read invoices, and the `alerts` namespace manages usage and wallet balance alerts. See [Billing](/sdks/python/billing#read-usage).
+- `webhooks.verify()` checks the `X-Nozle-Signature` of the webhooks Nozle sends. See [Receive Nozle webhooks](/api/receive-webhooks).
+- `entity_subscriptions.change_plan()` accepts `billing_time`.
+- Fixed: requests leave out optional fields you did not set instead of sending JSON `null`, so the API applies its defaults. `usage.track()` reuses the timestamp it filled in when the same idempotency key is sent again on the same client.
+- `PingResult.version` and `SubscriptionOptions.blocked_reason` are removed from the types; the API never sent them.
+- Install with `pip install nozle-sdk==0.13.0`.
+
+### Go SDK v0.12.0
+
+_October 17, 2026_
+
+- [`github.com/nozle-dev/nozle-go` v0.12.0](https://github.com/nozle-dev/nozle-go/releases/tag/v0.12.0): `New` reads `NOZLE_SECRET_KEY` when the key argument is blank. `WithHost` (default `https://api.nozle.app`) fills in the Engine and Core URLs. Opt-in retries with `WithMaxRetries` and `WithRetryDelay` repeat only calls that are safe to repeat. `APIError` adds `RequestID` and `RetryAfter`. See [Installation](/sdks/go/installation).
+- `WrapHTTPClient` records the token usage of any LLM SDK that takes an `*http.Client`, and `RecordUsage` records usage your code read itself. See [LLM usage capture](/sdks/go/llm-usage).
+- `CurrentUsage` and `PastUsage` read Core usage. `ListInvoices` (with `PaymentOverdue` and other filters), `GetInvoice` and `InvoiceDownloadURL` read invoices, and `ListAlerts`, `GetAlert`, `CreateAlert`, `UpdateAlert` and `DeleteAlert` manage usage and wallet balance alerts. See [Billing](/sdks/go/billing#read-usage).
+- `VerifyWebhook` and `WebhookHandler` check the `X-Nozle-Signature` of the webhooks Nozle sends. See [Receive Nozle webhooks](/api/receive-webhooks).
+- `Track`, `CurrentUsage` and `PastUsage` without a subscription ID look up the customer's active subscription once and remember it, as the Node.js and Python SDKs do.
+- Fixed: requests leave out empty optional fields instead of sending `""` or `null`. `ChangeEntitySubscriptionPlan` sends `BillingTime` when set. `TrackUsage` reuses the timestamp it filled in when the same idempotency key is sent again on the same client.
+- **Breaking:** removed struct fields the API never sent: `PingResult.OrgID`, `KeyType`, `Env` and `Version`, and `CanResult.CostPerUseCents`, `RevenuePerUseCents`, `MarginPerUseCents` and `MinMarginPercent` (use `CanResult.Economics`).
+- Install with `go get github.com/nozle-dev/nozle-go@v0.12.0`.
+
+### React themes
+
+_October 17, 2026_
+
+- `@nozle-js/react` `0.11.0` adds `appearance` on `BillingProvider` and every component, with predefined themes from `@nozle-js/react/themes`: `light`, `dark`, `minimal`, `neobrutal`, `nozle` and `nozleDark`, and every colour adjustable. `PricingTable` adds `highlightStyle` (`outline` or `filled`) and `highlightLabel`. See [Appearance](/sdks/react/styling).
+- Components render without Tailwind. `PricingTable` marks contact-sales plans from `contactSalesPlans` instead of their names. Upgrade notes are on the Appearance page.
+
+### Error statuses and checkout fixes
+
+_October 17, 2026_
+
+- **Breaking:** a request that the resource's current state refuses now returns `422` instead of `405`, with the same `code` (for example `not_voidable` or `plan_transition_policy_required`). A conflict with another operation in progress returns `409`. The SDKs branch on `code`, so their behavior is unchanged. See [Errors](/api/errors).
+- Bad bodies and unreachable dependencies return JSON errors with a `code` instead of `500`: `400 bad_request`, `502 upstream_unavailable`.
+- Checkout charges only through the connection assigned to the customer, for single and bulk Entity checkout, and returns `422 payment_provider_required` otherwise. Customer create keeps `payment_provider` and `payment_provider_code` without `sync_with_provider`.
+- Checking out the same plan again reopens an abandoned new-subscription checkout; a different plan replaces it and returns the new checkout. `409 subscription_checkout_in_progress` (`entity_subscription_checkout_in_progress` for an Entity) remains only while the provider is still processing a payment for the old checkout.
+- Stripe: a reused invoice checkout key returns `409 idempotency_key_reused`; a rejected webhook URL sends `payment_provider.error`; `payment_method.detached` clears the stored default. Razorpay credentials are checked when you connect.
+
+### Usage, credits and checkout fixes
+
+_October 17, 2026_
+
+- The [LLM proxy](/api/llm-proxy#subscription) finds the subscription to bill before it calls the provider, and its usage event carries that `external_subscription_id`, so proxy usage is billed. A customer with several active subscriptions needs the new `X-Nozle-Subscription` header, which is not forwarded. A customer with no matching active subscription returns `422 active_subscription_not_found`, several without the header `422 active_subscription_ambiguous`; the provider is not called.
+- `POST /events` and `/events/batch` accept `external_customer_id` without `external_subscription_id`: the event is billed to the customer's single active subscription. No or several active subscriptions return `422 active_subscription_not_found` or `422 active_subscription_ambiguous` (in a batch, under the event's position). An event with neither id returns `422 validation_errors` with `external_subscription_id: ["value_is_mandatory"]`. See [Events](/api/events).
+- `can()` estimates revenue for the units of the call: 1 for a count Feature, the Feature's `field_name` value in `metadata` for a sum Feature. Other aggregations, or a sum call without that value, report economics `unavailable`, and the margin policy's `on_unavailable` decides. See [economics](/guides/entitlements/can-endpoint).
+- The deprecated [Check & Deduct](/api/check-and-deduct) moves the wallet's money balance with the credits: `balance_cents`, the ongoing balance and the consumed amount change by credits × the wallet rate, and the wallet transaction amount is that money amount.
+- Paid credit top-ups grant their credits when the top-up invoice is fully paid, by any route: a card or provider payment, a manual payment for the full amount, a payment request, or marking the invoice paid. A partial manual payment grants nothing until the invoice is fully paid. See [Paid Credit Top-ups](/guides/credits/top-ups).
+- An unpaid plan or single Entity checkout expires after 23 hours, like an Entity checkout batch: the subscription is canceled with `cancelation_reason: timeout` (`subscription.canceled` webhook), the payment-gated invoice is closed, and the Stripe Checkout Session or Razorpay order expires. The coupons, credit-note credits and wallet credits the invoice used are returned when the checkout expires or its payment fails. See [Unpaid checkout expiry](/api/create-checkout#unpaid-checkout-expiry).
+- Stripe invoice checkout and invoice payment URLs refuse an invoice that is paid, voided, draft, closed, failed or has nothing due with `invalid_invoice_status_or_payment_status`, as Razorpay already did.
+- A paid upgrade checkout returns `409 subscription_change_pending` while the subscription has a scheduled cancellation or plan change. Cancelling at period end, scheduling a plan change or applying an immediate downgrade cancels an open upgrade checkout and expires its Stripe Checkout Session or Razorpay order.
+
 ### Link existing Stripe customers from the SDKs
 
 _October 14, 2026_

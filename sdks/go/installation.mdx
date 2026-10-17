@@ -6,34 +6,37 @@ description: "Install and configure the typed, server-side Nozle Go SDK."
 The Go SDK requires Go 1.22 or later. Install it with:
 
 ```bash
-go get github.com/nozle-dev/nozle-go@v0.10.0
+go get github.com/nozle-dev/nozle-go@v0.12.0
 ```
 
 ## Create a client
 
 ```go
 import (
+import nozle "github.com/nozle-dev/nozle-go"
   "os"
-  nozle "github.com/nozle-dev/nozle-go"
 )
 
 client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"))
 ```
 
-`New` panics with `nozle: apiKey must not be empty` when the key is blank or only whitespace. Check the environment variable before calling it.
+When the key argument is blank or only whitespace, `New` reads the `NOZLE_SECRET_KEY` environment variable. It panics with `nozle: apiKey must not be empty (pass it or set NOZLE_SECRET_KEY)` when both are blank, so check the environment before calling it.
 
-The default Engine and Core URLs are `https://api.nozle.app/engine` and `https://api.nozle.app/core`. For a local deployment:
+The default Engine and Core URLs are `https://api.nozle.app/engine` and `https://api.nozle.app/core`, both derived from the default host `https://api.nozle.app`. For a local deployment behind one proxy, set the host. `WithBaseURL` and `WithEventsURL` still set one service on its own and win over `WithHost`; if you set only one of them, the other service still uses the host, so set `WithHost` too:
 
 ```go
-client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"), nozle.WithBaseURL("http://localhost:8888/engine"), nozle.WithEventsURL("http://localhost:8888/core"))
+client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"), nozle.WithHost("http://localhost:8888"))
 ```
 
 | Option | Default | Purpose |
 |---|---|---|
-| API key | required | Organization credential; protected operations require `sk_`. |
+| API key | `NOZLE_SECRET_KEY` environment variable | Organization credential; protected operations require `sk_`. |
+| `WithHost` | `https://api.nozle.app` | Root API origin. Engine calls go to `host/engine` and Core calls to `host/core`. Use it alone for a deployment behind one reverse proxy. |
 | `WithBaseURL` | `https://api.nozle.app/engine` | `Track`, `Meter`, `TrackUsage`, `CheckUsage`, `Can`, `TrackCostEvent`, `Ping`, `Plans`, `Checkout`, `CheckoutStatus`, `Subscribe`, `CancelSubscription`, subscription options, previews, transitions and withdrawal, credit balances, Entity get and upsert, and margin. |
-| `WithEventsURL` | `https://api.nozle.app/core` | Subscription lookup for `Track`, customer upsert, credit-system list, and Entity subscription calls: ensure, get, list, checkout, bulk checkout (`CheckoutEntitySubscriptions`), and change plan. |
-| `WithTimeout` | 10 seconds | One budget for the whole call, including any retries inside a custom HTTP client. |
+| `WithEventsURL` | `https://api.nozle.app/core` | Subscription lookup for `Track`, customer upsert, credit-system list, and Entity subscription calls: ensure, get, list, checkout, bulk checkout (`CheckoutEntitySubscriptions`), and change plan. From `v0.12.0` also invoices, alerts, `CurrentUsage` and `PastUsage`, Nozle's webhook public key for `VerifyWebhook`, and the Feature check of `WrapHTTPClient`. |
+| `WithTimeout` | 10 seconds | The budget of each attempt, including any retries inside a custom HTTP client. |
+| `WithMaxRetries` | 0 | Extra attempts after a network error, timeout, `429` or `5xx`. 0 never retries. |
+| `WithRetryDelay` | 500 milliseconds | First retry delay. It doubles each retry up to 10 seconds, or `Retry-After` is used when sent, capped at 30 seconds. |
 | `WithHTTPClient` | default HTTP client | Inject an `*http.Client`, for example one that retries. |
 | `WithDebug` | off | Log `[nozle] METHOD url` for each request. |
 
@@ -43,7 +46,7 @@ All methods accept `context.Context`. Reuse one client and keep `sk_` credential
 
 `Plans` accepts `pk_` or `sk_`; all other operations require `sk_`. Wrong key types fail locally. A transport failure returns `TransportError`; a non-success HTTP response returns a structured `APIError`. See [Errors and retries](/sdks/go/errors).
 
-The SDK makes one HTTP attempt per request and does not retry. To add retries, pass an `*http.Client` whose transport retries. The SDK sets `GetBody` on each request, so the body can be replayed, and the `Idempotency-Key` header is sent again with every attempt:
+By default the SDK makes one HTTP attempt per request. Set `WithMaxRetries(n)` for the SDK's own retries (see [Errors and retries](/sdks/go/errors)), or pass an `*http.Client` whose transport retries. The SDK sets `GetBody` on each request, so the body can be replayed, and the `Idempotency-Key` header is sent again with every attempt:
 
 ```go
 type retryTransport struct{ next http.RoundTripper }
@@ -79,10 +82,16 @@ client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"), nozle.WithHTTPClient(&http.Cl
 | Billing | `Checkout`, `Subscribe`, `CancelSubscription`, transition preview/apply, scoped checkout recovery |
 | Customers and Entities | `UpsertCustomer`, Entity reads and lifecycle, Entity subscriptions |
 | Credits and usage | Credit-system discovery, balances, history, transfers, `CheckUsage`, `TrackUsage` |
+| Usage reads | `CurrentUsage`, `PastUsage` |
+| Invoices | `ListInvoices`, `GetInvoice`, `InvoiceDownloadURL` |
+| Alerts | `ListAlerts`, `GetAlert`, `CreateAlert`, `UpdateAlert`, `DeleteAlert` |
+| Webhooks | `VerifyWebhook`, `WebhookHandler` |
 | Margin | Summary, customer, metric, plan, model, and trend queries |
-| LLMs | Automatic `WrapOpenAIHTTPClient`, `WrapAnthropicHTTPClient`; manual `CaptureOpenAIUsage`, `CaptureAnthropicUsage` |
+| LLMs | Automatic `WrapHTTPClient`, `WrapOpenAIHTTPClient`, `WrapAnthropicHTTPClient`; manual `RecordUsage`, `CaptureOpenAIUsage`, `CaptureAnthropicUsage` |
 
-`Ping` returns a `PingResult`. On production only `OK` and `Engine` are filled; `OrgID`, `KeyType`, `Env`, and `Version` are empty.
+Usage reads, invoices, alerts, webhooks, `WrapHTTPClient` and `RecordUsage` require `v0.12.0`.
+
+`Ping` returns a `PingResult` with `OK` and `Engine`.
 
 ## Next steps
 

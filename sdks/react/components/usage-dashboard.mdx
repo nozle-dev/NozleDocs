@@ -1,0 +1,225 @@
+---
+title: "UsageDashboard"
+description: "A card of usage meters, one per limited feature, with loading, error and empty states."
+keywords: ["usage dashboard", "limits", "meters", "react"]
+---
+
+`UsageDashboard` shows several [`UsageMeter`](/sdks/react/components/usage-meter)s in one card, one per feature.
+
+**When to use**
+
+- A "Usage" tab in your billing or account settings.
+- A dashboard card that shows the customer's limits.
+- Several limits at once, limited and unlimited, with the meter's colour thresholds.
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/usage-dashboard/light.png" alt="UsageDashboard with API calls at 62%, seats at 90% and storage at 98%, light theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/usage-dashboard/dark.png" alt="UsageDashboard with API calls at 62%, seats at 90% and storage at 98%, dark theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/usage-dashboard/minimal.png" alt="UsageDashboard with API calls at 62%, seats at 90% and storage at 98%, minimal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/usage-dashboard/neobrutal.png" alt="UsageDashboard with API calls at 62%, seats at 90% and storage at 98%, neobrutal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/usage-dashboard/nozle.png" alt="UsageDashboard with API calls at 62%, seats at 90% and storage at 98%, nozle theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle Dark">
+    <Frame>
+      <img src="/images/react/components/usage-dashboard/nozle-dark.png" alt="UsageDashboard with API calls at 62%, seats at 90% and storage at 98%, nozleDark theme" width="508" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Importing UsageDashboard
+
+```tsx
+import {
+  UsageDashboard,
+  usageItems,
+  type UsageDashboardFeature,
+  type UsageResult,
+} from '@nozle-js/react'
+```
+
+## Rendering UsageDashboard
+
+Pass one row per feature:
+
+```tsx components/usage-card.tsx
+export function UsageCard() {
+  return (
+    <UsageDashboard
+      features={[
+        { key: 'api_calls', label: 'API calls', used: 31200, limit: 50000 },
+        { key: 'seats', label: 'Seats', used: 9, limit: 10 },
+      ]}
+    />
+  )
+}
+```
+
+Each row renders a labelled `UsageMeter` with its colour thresholds.
+
+## Data
+
+Each row is a `UsageDashboardFeature`: `{ key, label, used, limit? }`. A `limit` of `null`, or no `limit`, means unlimited.
+
+```tsx
+const features: UsageDashboardFeature[] = [
+  { key: 'api_calls', label: 'API calls', used: 31200, limit: 50000 },
+  { key: 'projects', label: 'Projects', used: 12, limit: null },
+]
+
+export function Usage() {
+  return <UsageDashboard features={features} />
+}
+```
+
+<Accordion title="Full example data">
+
+```tsx
+const features: UsageDashboardFeature[] = [
+  { key: 'api_calls', label: 'API calls', used: 31200, limit: 50000 },
+  { key: 'seats', label: 'Seats', used: 9, limit: 10 },
+  { key: 'storage', label: 'Storage (GB)', used: 98, limit: 100 },
+  { key: 'projects', label: 'Projects', used: 12, limit: null },
+]
+
+export function Usage() {
+  return <UsageDashboard features={features} />
+}
+```
+
+</Accordion>
+
+### Live data
+
+`usageItems(entitlements, results)` joins a plan's metered entitlements from the catalog (for the names) with usage results keyed by feature code, the `used` and `limit` of a `can()` result. Entitlements that are not metered, or have no result, are left out.
+
+```tsx
+import { useEntitlement, usePlans, useSubscription } from '@nozle-js/react'
+
+export function LiveUsage() {
+  const subscription = useSubscription()
+  const { plans } = usePlans()
+  const apiCalls = useEntitlement('api_calls')
+  const seats = useEntitlement('seats')
+
+  const plan = plans.find((entry) => entry.code === subscription.data?.subscription?.plan_code)
+  const results: Record<string, UsageResult | undefined> = {
+    api_calls: apiCalls.data && { used: apiCalls.data.used ?? 0, limit: apiCalls.data.limit },
+    seats: seats.data && { used: seats.data.used ?? 0, limit: seats.data.limit },
+  }
+  return (
+    <UsageDashboard
+      features={usageItems(plan?.entitlements ?? [], results)}
+      loading={subscription.isPending || apiCalls.isPending || seats.isPending}
+      error={subscription.error ?? apiCalls.error ?? seats.error}
+    />
+  )
+}
+```
+
+`currentPlanMeters(entitlements, usage)` builds the same rows from this period's `charges_usage` instead; see [`CurrentPlan`](/sdks/react/components/current-plan#live-data).
+
+## Examples
+
+### Loading, empty and error
+
+`loading` shows three skeleton rows, an empty `features` list shows `emptyMessage`, and `error` shows the message instead of the rows.
+
+<Frame>
+  <img src="/images/react/components/usage-dashboard-states/light.png" alt="UsageDashboard skeleton, No usage to show yet message, and an error message, light theme" width="1008" />
+</Frame>
+
+```tsx
+export function UsageStates() {
+  return (
+    <>
+      <UsageDashboard loading />
+      <UsageDashboard features={[]} />
+      <UsageDashboard error="Usage could not be loaded." />
+    </>
+  )
+}
+```
+
+### Unlimited feature
+
+A row without a limit reads "Unlimited" and its bar stays empty.
+
+```tsx
+export function ProjectsUsage() {
+  return <UsageDashboard features={[{ key: 'projects', label: 'Projects', used: 12, limit: null }]} />
+}
+```
+
+## API reference
+
+<ResponseField name="features" type="UsageDashboardFeature[]">
+  The rows: `{ key, label, used, limit? }`. `limit` `null` or missing means unlimited. Defaults to `[]`.
+</ResponseField>
+
+<ResponseField name="loading" type="boolean" default={false}>
+  Shows three skeleton rows.
+</ResponseField>
+
+<ResponseField name="error" type="Error | string | null">
+  Shows the message in a `role="alert"` card instead of the rows. Defaults to `null`.
+</ResponseField>
+
+<ResponseField name="emptyMessage" type="string" default="No usage to show yet.">
+  Shown when `features` is empty.
+</ResponseField>
+
+<ResponseField name="appearance" type="Appearance">
+  Theme, variables and element overrides, also passed to each meter. Defaults to the provider's. See [Appearance](/sdks/react/styling).
+</ResponseField>
+
+### States
+
+| State | What shows |
+|---|---|
+| `loading` | Three skeleton rows. |
+| `error` set | The message in a `role="alert"` card, in the danger text colour. |
+| No features | `emptyMessage` in a `role="status"` card. |
+
+### Appearance
+
+<Accordion title="Element keys">
+  `usageDashboard` (the card), and the [`UsageMeter`](/sdks/react/components/usage-meter#appearance) elements for each row.
+
+  Style them with `appearance.elements`. See [Elements](/sdks/react/styling#elements).
+</Accordion>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="UsageMeter" icon="bars-progress" href="/sdks/react/components/usage-meter">
+    One meter on its own.
+  </Card>
+  <Card title="UsageBreakdown" icon="table" href="/sdks/react/components/usage-breakdown">
+    Units and amounts of this period.
+  </Card>
+  <Card title="CurrentPlan" icon="circle-info" href="/sdks/react/components/current-plan">
+    The plan with its meters built for you.
+  </Card>
+  <Card title="UsageAlert" icon="triangle-exclamation" href="/sdks/react/components/usage-alert">
+    A warning when a limit is close.
+  </Card>
+</CardGroup>

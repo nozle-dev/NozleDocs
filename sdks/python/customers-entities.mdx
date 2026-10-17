@@ -12,6 +12,10 @@ Core derives the owning organization from that key; the SDK never provisions a
 customer through a global or master organization.
 
 ```python
+from nozle import Nozle
+
+nozle = Nozle()  # reads NOZLE_SECRET_KEY
+
 customer = nozle.customers.upsert(
     "workspace_123",
     name="Acme Workspace",
@@ -37,7 +41,7 @@ nozle.customers.upsert(
 )
 ```
 
-`payment_provider` is required inside `billing_configuration`. `payment_provider_code`, `provider_customer_id`, `sync_with_provider` and `provider_payment_methods` are optional. The assignment is kept only with `provider_customer_id` or `sync_with_provider=True`; otherwise Nozle drops it. See [Assign the connection to customers](/integrations/stripe#assign-the-connection-to-customers).
+`payment_provider` is required inside `billing_configuration`. `payment_provider_code`, `provider_customer_id`, `sync_with_provider` and `provider_payment_methods` are optional. Nozle keeps the assignment with or without `sync_with_provider`, and checkout charges only through the assigned connection. See [Assign the connection to customers](/integrations/stripe#assign-the-connection-to-customers).
 
 ## Read Entities
 
