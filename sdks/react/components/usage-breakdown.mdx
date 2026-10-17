@@ -45,13 +45,23 @@ keywords: ["usage breakdown", "current usage", "billing period", "react"]
   </Tab>
 </Tabs>
 
-## Usage
+## Importing UsageBreakdown
+
+```tsx
+import {
+  UsageBreakdown,
+  useUsage,
+  type CustomerUsageData,
+} from '@nozle-js/react'
+```
+
+## Rendering UsageBreakdown
 
 Inside a `BillingProvider` with `billingEndpoint`, read the current period with `useUsage` and pass it in:
 
 ```tsx app/billing/usage/page.tsx
 'use client'
-import { BillingProvider, UsageBreakdown, useUsage } from '@nozle-js/react'
+import { BillingProvider } from '@nozle-js/react'
 
 function ThisPeriod() {
   const { data, isPending, error } = useUsage()
@@ -74,8 +84,6 @@ Each row shows the charge's invoice name when set, otherwise the feature name. U
 `usage` is the `customer_usage` object of Core's current-usage endpoint. Amounts are in cents; `units` is a decimal string.
 
 ```tsx
-import type { CustomerUsageData } from '@nozle-js/react'
-
 const usage: CustomerUsageData = {
   from_datetime: '2026-10-01T00:00:00Z',
   to_datetime: '2026-10-31T23:59:59Z',

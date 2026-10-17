@@ -46,13 +46,21 @@ Prefer [`FeatureGate`](/sdks/react/components/feature-gate) with an entitlement 
   </Tab>
 </Tabs>
 
-## Usage
+## Importing PlanGate
+
+```tsx
+import {
+  PlanGate,
+  UpgradePrompt,
+  type PlanGateProps,
+} from '@nozle-js/react'
+```
+
+## Rendering PlanGate
 
 `PlanGate` has no look of its own and fetches nothing: you pass the customer's plan code.
 
 ```tsx components/team-settings.tsx
-import { PlanGate, UpgradePrompt } from '@nozle-js/react'
-
 export function TeamSettings({ planCode }: { planCode: string }) {
   return (
     <PlanGate currentPlan={planCode} allowedPlans={['pro', 'scale']} fallback={<UpgradePrompt planName="Pro" />}>

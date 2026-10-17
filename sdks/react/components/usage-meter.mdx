@@ -47,13 +47,21 @@ For several limits at once, use [`UsageDashboard`](/sdks/react/components/usage-
   </Tab>
 </Tabs>
 
-## Usage
+## Importing UsageMeter
+
+```tsx
+import {
+  UsageMeter,
+  getUsageMeterColor,
+  type UsageMeterProps,
+} from '@nozle-js/react'
+```
+
+## Rendering UsageMeter
 
 Pass the usage so far and the limit:
 
 ```tsx components/api-calls-meter.tsx
-import { UsageMeter } from '@nozle-js/react'
-
 export function ApiCallsMeter() {
   return <UsageMeter label="API calls" used={4200} limit={10000} />
 }
@@ -139,8 +147,6 @@ export function CompactMeter() {
 `getUsageMeterColor(percentage)` returns the fill colour for a percentage, as a CSS value: `colorDanger` at 95 or more, `colorWarning` at 80 or more, otherwise `colorPrimary`.
 
 ```tsx
-import { getUsageMeterColor } from '@nozle-js/react'
-
 export function UsagePercent({ percentage }: { percentage: number }) {
   return <span style={{ color: getUsageMeterColor(percentage) }}>{percentage}% used</span>
 }

@@ -45,13 +45,17 @@ keywords: ["usage alert", "limit warning", "upgrade", "react"]
   </Tab>
 </Tabs>
 
-## Usage
+## Importing UsageAlert
+
+```tsx
+import { UsageAlert, type UsageAlertFeature } from '@nozle-js/react'
+```
+
+## Rendering UsageAlert
 
 Pass each feature with its usage percentage:
 
 ```tsx components/usage-alerts.tsx
-import { UsageAlert } from '@nozle-js/react'
-
 export function UsageAlerts() {
   return (
     <UsageAlert
@@ -69,8 +73,6 @@ Each warning reads "You're approaching your &lt;feature&gt; limit (N%). Upgrade"
 Each feature is a `UsageAlertFeature`: `{ key, label, percentage }`. Features below the threshold are left out:
 
 ```tsx
-import type { UsageAlertFeature } from '@nozle-js/react'
-
 const features: UsageAlertFeature[] = [
   { key: 'seats', label: 'Seats', percentage: 90 },
   { key: 'storage', label: 'Storage', percentage: 98 },

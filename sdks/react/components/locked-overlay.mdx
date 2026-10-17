@@ -47,13 +47,20 @@ The blurred content is still in the page. Do not put data the customer must not 
   </Tab>
 </Tabs>
 
-## Usage
+## Importing LockedOverlay
+
+```tsx
+import {
+  LockedOverlay,
+  type LockedOverlayProps,
+} from '@nozle-js/react'
+```
+
+## Rendering LockedOverlay
 
 Wrap the content and pass `locked`. When `locked` is false the children render as they are, with no wrapper at all.
 
 ```tsx components/analytics-preview.tsx
-import { LockedOverlay } from '@nozle-js/react'
-
 export function AnalyticsPreview({ locked, openPlans }: { locked: boolean; openPlans: () => void }) {
   return (
     <LockedOverlay locked={locked} upgradePlanName="Scale" onUpgrade={openPlans}>

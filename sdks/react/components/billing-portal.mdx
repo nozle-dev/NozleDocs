@@ -47,14 +47,23 @@ You do not need a `BillingProvider` or Tailwind for it.
   </Tab>
 </Tabs>
 
-## Usage
+## Importing BillingPortal
+
+```tsx
+import {
+  BillingPortal,
+  BillingPortalError,
+  type BillingPortalSession,
+  type CreateBillingPortalSession,
+} from '@nozle-js/react'
+```
+
+## Rendering BillingPortal
 
 `createSession` asks your backend for a portal session:
 
 ```tsx app/settings/billing/page.tsx
 'use client'
-import { BillingPortal } from '@nozle-js/react'
-import type { BillingPortalSession, CreateBillingPortalSession } from '@nozle-js/react'
 
 const createSession: CreateBillingPortalSession = async ({ signal }) => {
   const response = await fetch('/api/billing/session', {

@@ -45,14 +45,21 @@ keywords: ["plan card", "pricing", "react"]
   </Tab>
 </Tabs>
 
-## Usage
+## Importing PlanCard
+
+```tsx
+import {
+  PlanCard,
+  type CreateCheckoutInput,
+  type PricingPlan,
+} from '@nozle-js/react'
+```
+
+## Rendering PlanCard
 
 Pass a plan and an `onSelect` handler; the card calls it with the plan code and return URL when the "Get Started" button is clicked:
 
 ```tsx components/pro-card.tsx
-import { PlanCard } from '@nozle-js/react'
-import type { CreateCheckoutInput, PricingPlan } from '@nozle-js/react'
-
 export function ProCard({ plan, currentPlanCode }: { plan: PricingPlan; currentPlanCode: string }) {
   const select = ({ planCode, returnUrl }: CreateCheckoutInput) => {
     window.location.assign(`/checkout?plan=${planCode}&return=${encodeURIComponent(returnUrl)}`)

@@ -45,13 +45,18 @@ keywords: ["upgrade modal", "plan change dialog", "confirm", "react"]
   </Tab>
 </Tabs>
 
-## Usage
+## Importing UpgradeModal
+
+```tsx
+import { UpgradeModal, type ProrationPreview } from '@nozle-js/react'
+```
+
+## Rendering UpgradeModal
 
 Keep the open state yourself and close the dialog in its callbacks. Without `onSubmit`, confirm calls `createCheckout` on `BillingProvider`:
 
 ```tsx components/upgrade-flow.tsx
 import { useState } from 'react'
-import { UpgradeModal } from '@nozle-js/react'
 
 export function UpgradeFlow({ onClientSecret }: { onClientSecret: (secret: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -91,8 +96,6 @@ With `onSubmit`, confirm runs your action. Without it, confirm calls `createChec
 `preview` holds the amounts in major units (dollars, not cents), with separate credit and debit:
 
 ```tsx
-import type { ProrationPreview } from '@nozle-js/react'
-
 const preview: ProrationPreview = {
   credit: 14.5,
   debit: 49.5,

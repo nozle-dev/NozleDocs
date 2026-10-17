@@ -47,13 +47,21 @@ Gates only change what the interface shows. Check the entitlement again on your 
   </Tab>
 </Tabs>
 
-## Usage
+## Importing FeatureGate
+
+```tsx
+import {
+  FeatureGate,
+  UpgradePrompt,
+  type FeatureGateProps,
+} from '@nozle-js/react'
+```
+
+## Rendering FeatureGate
 
 `FeatureGate` has no look of its own and fetches nothing: you pass the entitlement decision.
 
 ```tsx components/sso-settings.tsx
-import { FeatureGate, UpgradePrompt } from '@nozle-js/react'
-
 export function SsoSettings({ allowed }: { allowed: boolean }) {
   return (
     <FeatureGate allowed={allowed} fallback={<UpgradePrompt text="SSO needs the Scale plan" />}>

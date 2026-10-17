@@ -47,13 +47,21 @@ Gates only change what the interface shows. Enforce the limit on your server.
   </Tab>
 </Tabs>
 
-## Usage
+## Importing UsageGate
+
+```tsx
+import {
+  UsageGate,
+  UpgradePrompt,
+  type UsageGateProps,
+} from '@nozle-js/react'
+```
+
+## Rendering UsageGate
 
 `UsageGate` has no look of its own and fetches nothing: you pass the usage and the limit.
 
 ```tsx components/new-project.tsx
-import { UpgradePrompt, UsageGate } from '@nozle-js/react'
-
 export function NewProject({ used, limit }: { used: number; limit: number }) {
   return (
     <UsageGate usage={used} limit={limit} fallback={<UpgradePrompt text={`You used all ${limit} projects`} />}>

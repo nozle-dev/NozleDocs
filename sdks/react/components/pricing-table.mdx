@@ -45,13 +45,23 @@ keywords: ["pricing table", "plans", "react", "checkout"]
   </Tab>
 </Tabs>
 
-## Usage
+## Importing PricingTable
+
+```tsx
+import {
+  BillingProvider,
+  PricingTable,
+  planFeatures,
+  type PricingPlan,
+} from '@nozle-js/react'
+```
+
+## Rendering PricingTable
 
 Inside a `BillingProvider`, the table reads your plans from the public catalog and starts checkout through the provider's `createCheckout`:
 
 ```tsx app/pricing/page.tsx
 'use client'
-import { BillingProvider, PricingTable } from '@nozle-js/react'
 import type { CheckoutResult } from '@nozle-js/react'
 
 // Your route creates the checkout with your secret key.
@@ -93,8 +103,6 @@ See [checkout result types](/sdks/react/hooks#checkout-result-types).
 Each plan has the `PricingPlan` shape that the public catalog returns. Pass `plans` to render your own list instead of the catalog:
 
 ```tsx
-import type { PricingPlan } from '@nozle-js/react'
-
 const plans: PricingPlan[] = [
   {
     code: 'pro',

@@ -49,13 +49,21 @@ keywords: ["checkout", "stripe", "payment element", "embedded checkout", "react"
 
 The screenshots show the pay button of a checkout result. Stripe's own form takes its look from Stripe and is not shown.
 
-## Usage
+## Importing Checkout
+
+```tsx
+import {
+  Checkout,
+  useCheckout,
+  type CheckoutResult,
+} from '@nozle-js/react'
+```
+
+## Rendering Checkout
 
 Pass a Stripe client secret and your Stripe publishable key:
 
 ```tsx components/pay-step.tsx
-import { Checkout } from '@nozle-js/react'
-
 export function PayStep({ clientSecret }: { clientSecret: string }) {
   return (
     <Checkout
@@ -80,8 +88,6 @@ Stripe webhooks decide whether the subscription is active. `onSuccess`, `onCompl
 `Checkout` takes either a Stripe client secret or a `checkout` result in the `CheckoutResult` shape that `createCheckout` returns:
 
 ```tsx
-import type { CheckoutResult } from '@nozle-js/react'
-
 const result: CheckoutResult = {
   type: 'razorpay',
   checkout_id: 'chk_123',
@@ -155,8 +161,6 @@ export function ResumePayment({ result }: { result: CheckoutResult }) {
 To place your own pay button in the Payment Element form, pass it as `children` and call `useCheckout()` in it. `children` replaces the built-in submit button.
 
 ```tsx
-import { useCheckout } from '@nozle-js/react'
-
 function PayButton() {
   const { confirmPayment, isProcessing, error } = useCheckout()
   return (

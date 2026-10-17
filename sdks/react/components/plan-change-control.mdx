@@ -47,14 +47,23 @@ keywords: ["plan change", "upgrade", "downgrade", "self-service", "react"]
   </Tab>
 </Tabs>
 
-## Usage
+## Importing PlanChangeControl
+
+```tsx
+import {
+  BillingPortalError,
+  PlanChangeControl,
+  type PlanChangeActions,
+  type PlanChangeState,
+} from '@nozle-js/react'
+```
+
+## Rendering PlanChangeControl
 
 Pass the subscription and `actions`, the callbacks that call your authenticated backend (see [Live data](#live-data)):
 
 ```tsx components/change-plan.tsx
 'use client'
-import { PlanChangeControl } from '@nozle-js/react'
-import type { PlanChangeActions } from '@nozle-js/react'
 
 export function ChangePlan(props: {
   subscriptionId: string
@@ -87,8 +96,6 @@ While a payment is pending, the control checks the status every 5 seconds. Retri
 `load` and `status` return a `PlanChangeState`:
 
 ```tsx
-import type { PlanChangeState } from '@nozle-js/react'
-
 // What your `load` and `status` actions return for an active Pro subscription.
 export const state: PlanChangeState = {
   subscriptionId: 'sub_123',
@@ -111,8 +118,6 @@ export const state: PlanChangeState = {
 `actions` calls your authenticated backend. Each callback receives the external `subscriptionId` and an `AbortSignal`; never send the signal in the request body. Create the object once, outside the component:
 
 ```tsx lib/plan-change-actions.ts
-import { BillingPortalError } from '@nozle-js/react'
-
 async function post<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {
     method: 'POST',

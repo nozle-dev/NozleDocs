@@ -45,13 +45,23 @@ keywords: ["usage trend", "past usage", "chart", "react"]
   </Tab>
 </Tabs>
 
-## Usage
+## Importing UsageTrend
+
+```tsx
+import {
+  UsageTrend,
+  useUsage,
+  type CustomerUsageData,
+} from '@nozle-js/react'
+```
+
+## Rendering UsageTrend
 
 Inside a `BillingProvider` with `billingEndpoint`, read past periods with `useUsage({ period: 'past' })` and pass them in:
 
 ```tsx app/billing/history/page.tsx
 'use client'
-import { BillingProvider, UsageTrend, useUsage } from '@nozle-js/react'
+import { BillingProvider } from '@nozle-js/react'
 
 function History() {
   const { data, isPending, error } = useUsage({ period: 'past', periods: 6 })
@@ -74,8 +84,6 @@ Periods can come in any order; they are sorted by start date. Bars scale to the 
 `periods` is a list of `CustomerUsageData`, one per billing period, as in the `usage_periods` of Core's past-usage endpoint. Amounts are in cents; `units` is a decimal string.
 
 ```tsx
-import type { CustomerUsageData } from '@nozle-js/react'
-
 const period = (from: string, to: string, apiCalls: number): CustomerUsageData => ({
   from_datetime: from,
   to_datetime: to,

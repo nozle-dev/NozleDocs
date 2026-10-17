@@ -45,13 +45,21 @@ keywords: ["credit history", "credit operations", "ledger", "react"]
   </Tab>
 </Tabs>
 
-## Usage
+## Importing CreditHistory
+
+```tsx
+import {
+  CreditHistory,
+  useCreditHistory,
+  type CreditOperationData,
+} from '@nozle-js/react'
+```
+
+## Rendering CreditHistory
 
 Read the signed-in customer's operations with `useCreditHistory` and pass them in:
 
 ```tsx components/credit-activity.tsx
-import { CreditHistory, useCreditHistory } from '@nozle-js/react'
-
 export function CreditActivity() {
   const history = useCreditHistory({ creditSystemCode: 'ai_credits', limit: 20 })
   return (
@@ -73,8 +81,6 @@ Each operation gets one row with a readable type: Used, Granted, Adjustment, Exp
 Each row is a `CreditOperationData`: the `id`, `type`, `status`, `credit_amount`, `feature_code` and `occurred_at` of an operation.
 
 ```tsx
-import type { CreditOperationData } from '@nozle-js/react'
-
 const operations: CreditOperationData[] = [
   { id: 'op_1', type: 'consume', status: 'succeeded', credit_amount: '-12', feature_code: 'ai_chat', occurred_at: '2026-10-16T08:40:00Z' },
   { id: 'op_2', type: 'grant', status: 'succeeded', credit_amount: '500', feature_code: null, occurred_at: '2026-10-01T00:00:00Z' },
@@ -87,7 +93,7 @@ export function Activity() {
 
 ### Live data
 
-[`useCreditHistory({ creditSystemCode?, limit? })`](/sdks/react/hooks#the-hooks) reads the signed-in customer's operations a page at a time through your `billingEndpoint`. `operations` holds every loaded page; see [Usage](#usage) for the full wiring.
+[`useCreditHistory({ creditSystemCode?, limit? })`](/sdks/react/hooks#the-hooks) reads the signed-in customer's operations a page at a time through your `billingEndpoint`. `operations` holds every loaded page; see [Rendering CreditHistory](#rendering-credithistory) for the full wiring.
 
 Without the hooks, pass the SDK's `credits.operations` page and fetch the next page with its `next_cursor`.
 

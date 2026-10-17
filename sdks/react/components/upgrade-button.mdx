@@ -47,12 +47,18 @@ For a full plan picker with exact quotes, use [`PlanChangeControl`](/sdks/react/
   </Tab>
 </Tabs>
 
-## Usage
+## Importing UpgradeButton
+
+```tsx
+import { UpgradeButton, type ProrationPreview } from '@nozle-js/react'
+```
+
+## Rendering UpgradeButton
 
 Render it inside a `BillingProvider` with `createCheckout` (see [Configure BillingProvider](/sdks/react/installation#configure-billingprovider)) and reload billing data when the change is done:
 
 ```tsx components/upgrade-to-scale.tsx
-import { UpgradeButton, useBillingRefresh } from '@nozle-js/react'
+import { useBillingRefresh } from '@nozle-js/react'
 
 export function UpgradeToScale({ onClientSecret }: { onClientSecret: (secret: string) => void }) {
   const refresh = useBillingRefresh()
@@ -85,8 +91,6 @@ When the change fails, the dialog stays open and shows the message. See [checkou
 `preview` holds the amounts shown in the dialog, in major units (dollars, not cents):
 
 ```tsx
-import type { ProrationPreview } from '@nozle-js/react'
-
 const preview: ProrationPreview = {
   credit: 14.5,
   debit: 49.5,
