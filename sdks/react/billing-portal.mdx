@@ -173,6 +173,8 @@ The merchant adapter converts SDK responses into the exported React types:
 
 The SDK responses use snake_case while these React adapters use camelCase. The runnable merchant examples below implement that mapping, eligible-plan validation, cancellation guards, checkout reconciliation and replay storage. Do not return an unmodified `SubscriptionOptions` object as `PlanChangeState`.
 
+The customer picks the new plan from a list. Each choice shows the plan name, price and interval, and whether it is an upgrade or a downgrade. Inside a `BillingProvider`, each choice also shows the plan's description and features from the public catalog. After **Review change**, the confirmation shows the quote, with **Back** to return to the list.
+
 For each confirmed change:
 
 1. Load policy-authorized targets for the selected subscription. The public catalog alone does not establish eligibility.
