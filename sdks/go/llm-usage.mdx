@@ -15,13 +15,9 @@ Capture records usage events; they bill only when a metered Feature has the same
 
 ## Capture any client
 
-```go Imports
+```go
 import nozle "github.com/nozle-dev/nozle-go"
 
-client := nozle.New("") // reads NOZLE_SECRET_KEY
-```
-
-```go
 providerHTTP, err := nozle.WrapHTTPClient(&http.Client{}, client, nozle.CaptureOptions{
   FeatureCode: "llm_tokens",
   OnError:     func(err error) { log.Printf("Nozle usage: %v", err) },
@@ -118,6 +114,9 @@ Use the direct capture methods when your provider client cannot accept an `*http
 Map `prompt_tokens` to `PromptTokens`, `completion_tokens` to `CompletionTokens`, and the cached-input and reasoning details when available.
 
 ```go
+
+client := nozle.New("") // reads NOZLE_SECRET_KEY
+
 err := client.CaptureOpenAIUsage(ctx, nozle.ProviderCapture{
   CustomerID: "workspace_123",
   SubscriptionID: "workspace_123_subscription",

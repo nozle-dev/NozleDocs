@@ -49,14 +49,11 @@ For several limits at once, use [`UsageDashboard`](/sdks/react/components/usage-
 
 ## Usage
 
-```tsx Imports
-import { UsageMeter, getUsageMeterColor, useEntitlement } from '@nozle-js/react'
-import type { UsageMeterProps } from '@nozle-js/react'
-```
-
 Pass the usage so far and the limit:
 
 ```tsx components/api-calls-meter.tsx
+import { UsageMeter } from '@nozle-js/react'
+
 export function ApiCallsMeter() {
   return <UsageMeter label="API calls" used={4200} limit={10000} />
 }
@@ -86,6 +83,8 @@ export function Meters() {
 [`useEntitlement(featureCode)`](/sdks/react/hooks#the-hooks) returns the `can()` result for the signed-in customer through your `billingEndpoint`, with `used` and `limit`:
 
 ```tsx
+import { useEntitlement } from '@nozle-js/react'
+
 export function ApiCallsMeter() {
   const { data } = useEntitlement('api_calls')
   if (!data) return null
@@ -140,6 +139,8 @@ export function CompactMeter() {
 `getUsageMeterColor(percentage)` returns the fill colour for a percentage, as a CSS value: `colorDanger` at 95 or more, `colorWarning` at 80 or more, otherwise `colorPrimary`.
 
 ```tsx
+import { getUsageMeterColor } from '@nozle-js/react'
+
 export function UsagePercent({ percentage }: { percentage: number }) {
   return <span style={{ color: getUsageMeterColor(percentage) }}>{percentage}% used</span>
 }

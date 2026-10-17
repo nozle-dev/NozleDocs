@@ -7,13 +7,11 @@ Customers represent billable accounts; Entities represent child users, agents, p
 
 ## Upsert a customer and Entity
 
-```go Imports
+```go
 import nozle "github.com/nozle-dev/nozle-go"
 
 client := nozle.New("") // reads NOZLE_SECRET_KEY
-```
 
-```go
 customer, err := client.UpsertCustomer(ctx, nozle.Customer{ExternalID: "workspace_123", Name: "Acme"})
 entity, err := client.UpsertEntity(ctx, customer.ExternalID, "user_42", nozle.EntityInput{
   Status: "active", Name: "Asha", Metadata: map[string]any{"role": "agent"},

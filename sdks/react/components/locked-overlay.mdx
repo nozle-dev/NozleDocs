@@ -49,14 +49,11 @@ The blurred content is still in the page. Do not put data the customer must not 
 
 ## Usage
 
-```tsx Imports
-import { LockedOverlay, useEntitlement } from '@nozle-js/react'
-import type { LockedOverlayProps } from '@nozle-js/react'
-```
-
 Wrap the content and pass `locked`. When `locked` is false the children render as they are, with no wrapper at all.
 
 ```tsx components/analytics-preview.tsx
+import { LockedOverlay } from '@nozle-js/react'
+
 export function AnalyticsPreview({ locked, openPlans }: { locked: boolean; openPlans: () => void }) {
   return (
     <LockedOverlay locked={locked} upgradePlanName="Scale" onUpgrade={openPlans}>
@@ -85,6 +82,8 @@ The overlay needs one boolean, `locked`.
 Lock it from the customer's entitlement with [`useEntitlement`](/sdks/react/hooks#the-hooks):
 
 ```tsx
+import { useEntitlement } from '@nozle-js/react'
+
 export function CohortReport() {
   const { data } = useEntitlement('advanced_analytics')
   return (

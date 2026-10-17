@@ -7,11 +7,6 @@ Every component takes its look from `appearance`. Set it once on `BillingProvide
 
 ## Themes
 
-```tsx Imports
-import { BillingProvider, CreditBalance, PricingTable } from '@nozle-js/react'
-import { dark, light, minimal, neobrutal, nozle, nozleDark } from '@nozle-js/react/themes'
-```
-
 <Tabs>
   <Tab title="Light">
     The default. You get it without any `appearance`.
@@ -21,6 +16,9 @@ import { dark, light, minimal, neobrutal, nozle, nozleDark } from '@nozle-js/rea
     </Frame>
 
     ```tsx
+    import { BillingProvider } from '@nozle-js/react'
+    import { light } from '@nozle-js/react/themes'
+
     <BillingProvider publishableKey="pk_..." appearance={{ theme: light }}>
     ```
   </Tab>
@@ -32,6 +30,9 @@ import { dark, light, minimal, neobrutal, nozle, nozleDark } from '@nozle-js/rea
     </Frame>
 
     ```tsx
+    import { BillingProvider } from '@nozle-js/react'
+    import { dark } from '@nozle-js/react/themes'
+
     <BillingProvider publishableKey="pk_..." appearance={{ theme: dark }}>
     ```
   </Tab>
@@ -43,6 +44,9 @@ import { dark, light, minimal, neobrutal, nozle, nozleDark } from '@nozle-js/rea
     </Frame>
 
     ```tsx
+    import { BillingProvider } from '@nozle-js/react'
+    import { nozle } from '@nozle-js/react/themes'
+
     <BillingProvider publishableKey="pk_..." appearance={{ theme: nozle }}>
     ```
 
@@ -56,6 +60,9 @@ import { dark, light, minimal, neobrutal, nozle, nozleDark } from '@nozle-js/rea
     </Frame>
 
     ```tsx
+    import { BillingProvider } from '@nozle-js/react'
+    import { nozleDark } from '@nozle-js/react/themes'
+
     <BillingProvider publishableKey="pk_..." appearance={{ theme: nozleDark }}>
     ```
 
@@ -69,6 +76,9 @@ import { dark, light, minimal, neobrutal, nozle, nozleDark } from '@nozle-js/rea
     </Frame>
 
     ```tsx
+    import { BillingProvider } from '@nozle-js/react'
+    import { minimal } from '@nozle-js/react/themes'
+
     <BillingProvider publishableKey="pk_..." appearance={{ theme: minimal }}>
     ```
   </Tab>
@@ -80,6 +90,9 @@ import { dark, light, minimal, neobrutal, nozle, nozleDark } from '@nozle-js/rea
     </Frame>
 
     ```tsx
+    import { BillingProvider } from '@nozle-js/react'
+    import { neobrutal } from '@nozle-js/react/themes'
+
     <BillingProvider publishableKey="pk_..." appearance={{ theme: neobrutal }}>
     ```
   </Tab>
@@ -182,6 +195,8 @@ Every colour, the font, corner radius, border width and shadow can be changed on
 With `filled`, the card takes the highlight colour, and its text and button switch to the highlight text colour.
 
 ```tsx
+import { PricingTable } from '@nozle-js/react'
+
 <PricingTable highlightPlan="pro" />
 <PricingTable highlightPlan="pro" highlightStyle="filled" />
 ```
@@ -221,6 +236,8 @@ appearance={{ theme: [neobrutal, dark] }}
 A component's own `appearance` goes on top of the provider's:
 
 ```tsx
+import { CreditBalance } from '@nozle-js/react'
+
 <BillingProvider publishableKey="pk_..." appearance={{ theme: dark }}>
   <PricingTable appearance={{ variables: { colorPrimary: '#16a34a' } }} />
   <CreditBalance balance={balance} />

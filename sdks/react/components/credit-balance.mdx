@@ -47,15 +47,11 @@ keywords: ["credit balance", "credits", "wallet", "react"]
 
 ## Usage
 
-```tsx Imports
-import { BillingProvider, CreditBalance, useCreditBalance } from '@nozle-js/react'
-import type { CreditBalanceData, CreditBalanceSource } from '@nozle-js/react'
-```
-
 Inside a `BillingProvider` with `billingEndpoint`, read the balance with `useCreditBalance` and pass it in:
 
 ```tsx app/billing/credits/page.tsx
 'use client'
+import { BillingProvider, CreditBalance, useCreditBalance } from '@nozle-js/react'
 
 function AiCredits() {
   const { data, isPending, error } = useCreditBalance('ai_credits')
@@ -78,6 +74,8 @@ The card shows the available credits with the unit name, singular for exactly 1 
 `balance` is a `CreditBalanceData`. Credit amounts are decimal strings.
 
 ```tsx
+import type { CreditBalanceData } from '@nozle-js/react'
+
 const balance: CreditBalanceData = {
   credit_system_name: 'AI credits',
   unit_name: 'credit',

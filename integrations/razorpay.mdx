@@ -130,28 +130,13 @@ If prepaid credits fully cover the invoice, Nozle returns a completed checkout a
 
 ### Create, verify and poll
 
-<CodeGroup>
-```ts Node.js
-import { Nozle } from '@nozle-js/node'
-import { BillingProvider, CheckoutButton } from '@nozle-js/react'
-
-const nozle = new Nozle() // reads NOZLE_SECRET_KEY
-```
-```python Python
-from nozle import Nozle
-
-nozle = Nozle()  # reads NOZLE_SECRET_KEY
-```
-```go Go
-import nozle "github.com/nozle-dev/nozle-go"
-
-client := nozle.New("") // reads NOZLE_SECRET_KEY
-```
-</CodeGroup>
-
 <Tabs>
 <Tab title="Node.js">
 ```ts
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
 // Merchant backend
 const checkout = await nozle.checkout(
   customerId,
@@ -169,6 +154,10 @@ const status = await nozle.checkoutStatus(checkoutId, scope)
 </Tab>
 <Tab title="Python">
 ```python
+from nozle import Nozle
+
+nozle = Nozle()  # reads NOZLE_SECRET_KEY
+
 # Merchant backend
 checkout = nozle.checkout(
     customer_id,
@@ -190,6 +179,10 @@ status = nozle.checkout_status(
 </Tab>
 <Tab title="Go">
 ```go
+import nozle "github.com/nozle-dev/nozle-go"
+
+client := nozle.New("") // reads NOZLE_SECRET_KEY
+
 // Merchant backend
 checkout, err := client.Checkout(ctx, nozle.CheckoutParams{
   CustomerID: customerID, PlanCode: "pro_monthly",
@@ -233,6 +226,8 @@ For a mandate checkout, also pass `customer_id: checkout.customer_id` and `recur
 With the React SDK, `CheckoutButton` runs this browser flow for you. It loads the Razorpay script, opens the modal, calls your `verifyCheckout` callback, then polls your `getCheckoutStatus` callback up to 30 times, one second apart. Both callbacks call your authenticated merchant backend:
 
 ```tsx
+import { BillingProvider, CheckoutButton } from '@nozle-js/react'
+
 <BillingProvider
   publishableKey={publishableKey}
   createCheckout={createCheckout}

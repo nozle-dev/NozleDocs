@@ -38,21 +38,11 @@ Verify the **raw request body** before you parse it. A framework that parses and
 
 The server SDKs check both formats and return the parsed event. For `jwt` they read Nozle's public key once with your secret key and cache it. For `hmac`, pass the signing secret. Webhook verification requires `@nozle-js/node` `0.13.0`, `nozle-sdk` `0.13.0` or `github.com/nozle-dev/nozle-go` `v0.12.0`.
 
-<CodeGroup>
-```ts Node.js
-import { Nozle, createWebhookHandler } from '@nozle-js/node'
-```
-```python Python
-from nozle import Nozle, WebhookVerificationError
-```
-```go Go
-import nozle "github.com/nozle-dev/nozle-go"
-```
-</CodeGroup>
-
 <Tabs>
 <Tab title="Node.js">
 ```ts
+import { Nozle, createWebhookHandler } from '@nozle-js/node'
+
 const nozle = new Nozle()
 
 // Next.js route handler, Remix, Hono, Bun or Deno: answers 200, 400 when the request is not genuine,
@@ -70,6 +60,8 @@ Elsewhere, call `nozle.webhooks.verify({ body, headers, hmacKey })` with the raw
 </Tab>
 <Tab title="Python">
 ```python
+from nozle import Nozle, WebhookVerificationError
+
 nozle = Nozle()
 
 @app.post("/nozle/webhooks")  # Flask
@@ -85,6 +77,8 @@ def nozle_webhook():
 </Tab>
 <Tab title="Go">
 ```go
+import nozle "github.com/nozle-dev/nozle-go"
+
 client := nozle.New("") // reads NOZLE_SECRET_KEY
 http.Handle("/nozle/webhooks", client.WebhookHandler(hmacKey, func(ctx context.Context, e nozle.WebhookEvent) error {
 	if e.Type == "subscription.started" {

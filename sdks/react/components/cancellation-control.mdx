@@ -49,15 +49,12 @@ keywords: ["cancel subscription", "keep subscription", "self-service", "react"]
 
 ## Usage
 
-```tsx Imports
-import { BillingPortalError, CancellationControl } from '@nozle-js/react'
-import type { CancellationActions, CancellationSubscription } from '@nozle-js/react'
-```
-
 Pass the subscription, `actions` and `refresh`, which call your authenticated backend for the signed-in customer (see [Live data](#live-data)):
 
 ```tsx components/cancel-plan.tsx
 'use client'
+import { CancellationControl } from '@nozle-js/react'
+import type { CancellationActions, CancellationSubscription } from '@nozle-js/react'
 
 export function CancelPlan(props: {
   subscription: CancellationSubscription
@@ -91,6 +88,8 @@ export const subscription: CancellationSubscription = {
 Create `actions` and `refresh` once, outside the component:
 
 ```tsx lib/cancellation-actions.ts
+import { BillingPortalError } from '@nozle-js/react'
+
 async function post<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {
     method: 'POST',

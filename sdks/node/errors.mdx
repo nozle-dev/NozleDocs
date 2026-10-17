@@ -15,11 +15,9 @@ Before `0.13.0`, only `checkout()`, `checkoutInvoice()`, `verifyCheckout()`, `ch
 
 ## Branch on `NozleApiError`
 
-```ts Imports
-import { Nozle, NozleApiError } from '@nozle-js/node'
-```
-
 ```ts
+import { NozleApiError } from '@nozle-js/node'
+
 try {
   await nozle.checkout('workspace_123', 'pro', 'https://app.example.com/billing')
 } catch (error) {
@@ -77,6 +75,8 @@ try {
 By default the SDK does not retry: every call is one request with a per-attempt timeout (`timeout`, default 10 seconds). Set `maxRetries` to retry network errors, timeouts, `429` and `5xx` with backoff, or after `NozleApiError.retryAfter` seconds when the service sent `Retry-After`:
 
 ```ts
+import { Nozle } from '@nozle-js/node'
+
 const nozle = new Nozle({ maxRetries: 2, retryDelayMs: 500 })
 ```
 

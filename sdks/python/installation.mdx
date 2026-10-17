@@ -17,12 +17,9 @@ Version `0.13.0` adds `AsyncNozle`, opt-in retries, the `host` argument, an opti
 
 ## Create a client
 
-```python Imports
-from nozle import AsyncNozle, Nozle
-```
-
 ```python
 import os
+from nozle import Nozle
 
 
 nozle = Nozle(
@@ -74,6 +71,8 @@ pip install "nozle-sdk[httpx]"
 ```
 
 ```python
+from nozle import AsyncNozle
+
 async with AsyncNozle(max_retries=2) as nozle:  # reads NOZLE_SECRET_KEY
     decision = await nozle.can("customer-123", "export")
     await nozle.usage.track("customer-123", "emails", idempotency_key=message_id)

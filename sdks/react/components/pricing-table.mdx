@@ -47,16 +47,12 @@ keywords: ["pricing table", "plans", "react", "checkout"]
 
 ## Usage
 
-```tsx Imports
-import { BillingProvider, PricingTable, planFeatures, usePlans } from '@nozle-js/react'
-import type { CheckoutResult, PricingPlan } from '@nozle-js/react'
-import { nozle } from '@nozle-js/react/themes'
-```
-
 Inside a `BillingProvider`, the table reads your plans from the public catalog and starts checkout through the provider's `createCheckout`:
 
 ```tsx app/pricing/page.tsx
 'use client'
+import { BillingProvider, PricingTable } from '@nozle-js/react'
+import type { CheckoutResult } from '@nozle-js/react'
 
 // Your route creates the checkout with your secret key.
 async function createCheckout(input: { planCode: string; returnUrl: string }): Promise<CheckoutResult> {
@@ -97,6 +93,8 @@ See [checkout result types](/sdks/react/hooks#checkout-result-types).
 Each plan has the `PricingPlan` shape that the public catalog returns. Pass `plans` to render your own list instead of the catalog:
 
 ```tsx
+import type { PricingPlan } from '@nozle-js/react'
+
 const plans: PricingPlan[] = [
   {
     code: 'pro',
@@ -185,6 +183,8 @@ Leave `plans` out and the table reads `GET /api/v1/plans` itself through the `pu
 To filter plans, or to show your own loading and error UI, read them with `usePlans` and pass them in:
 
 ```tsx
+import { usePlans } from '@nozle-js/react'
+
 export function MonthlyPricing() {
   const { plans, isLoading, error } = usePlans()
   if (isLoading) return <p>Loading plans…</p>
@@ -249,6 +249,8 @@ The themes `nozle` and `nozleDark` use the [panel card layout](/sdks/react/styli
 </Frame>
 
 ```tsx
+import { nozle } from '@nozle-js/react/themes'
+
 export function Pricing() {
   return <PricingTable currentPlanCode="free" highlightPlan="pro" appearance={{ theme: nozle }} />
 }

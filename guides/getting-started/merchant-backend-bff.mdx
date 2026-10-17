@@ -24,12 +24,9 @@ Merchant browser
 
 ### Backend route
 
-```ts Imports
-import { Nozle } from '@nozle-js/node'
-import { BillingProvider, PricingTable } from '@nozle-js/react'
-```
-
 ```ts
+import { Nozle } from '@nozle-js/node'
+
 const nozle = new Nozle({
   apiKey: process.env.NOZLE_SECRET_KEY!,
   baseUrl: 'https://api.nozle.app/engine',
@@ -66,6 +63,8 @@ Cookie-authenticated routes must retain normal CSRF protection. The merchant's s
 ### React
 
 ```tsx
+import { BillingProvider, PricingTable } from '@nozle-js/react'
+
 export function BillingPage({ csrfToken }: { csrfToken: string }) {
   return (
     <BillingProvider

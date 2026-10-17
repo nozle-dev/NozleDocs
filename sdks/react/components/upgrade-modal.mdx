@@ -47,15 +47,11 @@ keywords: ["upgrade modal", "plan change dialog", "confirm", "react"]
 
 ## Usage
 
-```tsx Imports
-import { UpgradeModal, useSubscription, useUpgradePreview } from '@nozle-js/react'
-import type { ProrationPreview } from '@nozle-js/react'
-```
-
 Keep the open state yourself and close the dialog in its callbacks. Without `onSubmit`, confirm calls `createCheckout` on `BillingProvider`:
 
 ```tsx components/upgrade-flow.tsx
 import { useState } from 'react'
+import { UpgradeModal } from '@nozle-js/react'
 
 export function UpgradeFlow({ onClientSecret }: { onClientSecret: (secret: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -95,6 +91,8 @@ With `onSubmit`, confirm runs your action. Without it, confirm calls `createChec
 `preview` holds the amounts in major units (dollars, not cents), with separate credit and debit:
 
 ```tsx
+import type { ProrationPreview } from '@nozle-js/react'
+
 const preview: ProrationPreview = {
   credit: 14.5,
   debit: 49.5,
@@ -113,6 +111,8 @@ export function UpgradeDialog({ open, close }: { open: boolean; close: () => voi
 The quote from [`useUpgradePreview`](/sdks/react/hooks#the-hooks) is in minor units, so show it as `children` and pass its `quote_id`:
 
 ```tsx
+import { useSubscription, useUpgradePreview } from '@nozle-js/react'
+
 function money(minor: number | string, currency: string) {
   const format = new Intl.NumberFormat('en-US', { style: 'currency', currency })
   const digits = format.resolvedOptions().maximumFractionDigits ?? 2

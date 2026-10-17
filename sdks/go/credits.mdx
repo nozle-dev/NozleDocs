@@ -7,13 +7,11 @@ Product-credit quantities are `nozle.Decimal` strings. Keep their exact decimal 
 
 ## List credit systems and read balances
 
-```go Imports
+```go
 import nozle "github.com/nozle-dev/nozle-go"
 
 client := nozle.New("") // reads NOZLE_SECRET_KEY
-```
 
-```go
 systems, err := client.ListCreditSystems(ctx)
 balance, err := client.GetEntityCreditBalance(ctx, "workspace_123", "user_42", "ai_credits")
 transfer, err := client.AllocateCredits(ctx, "workspace_123", "user_42", "ai_credits", nozle.Decimal("100.000000000001"), "allocate-user-42-v1")

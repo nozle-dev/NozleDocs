@@ -47,14 +47,11 @@ keywords: ["usage dashboard", "limits", "meters", "react"]
 
 ## Usage
 
-```tsx Imports
-import { UsageDashboard, usageItems, useEntitlement, usePlans, useSubscription } from '@nozle-js/react'
-import type { UsageDashboardFeature, UsageResult } from '@nozle-js/react'
-```
-
 Pass one row per feature:
 
 ```tsx components/usage-card.tsx
+import { UsageDashboard } from '@nozle-js/react'
+
 export function UsageCard() {
   return (
     <UsageDashboard
@@ -74,6 +71,8 @@ Each row renders a labelled `UsageMeter` with its colour thresholds.
 Each row is a `UsageDashboardFeature`: `{ key, label, used, limit? }`. A `limit` of `null`, or no `limit`, means unlimited.
 
 ```tsx
+import type { UsageDashboardFeature } from '@nozle-js/react'
+
 const features: UsageDashboardFeature[] = [
   { key: 'api_calls', label: 'API calls', used: 31200, limit: 50000 },
   { key: 'projects', label: 'Projects', used: 12, limit: null },
@@ -106,6 +105,9 @@ export function Usage() {
 `usageItems(entitlements, results)` joins a plan's metered entitlements from the catalog (for the names) with usage results keyed by feature code, the `used` and `limit` of a `can()` result. Entitlements that are not metered, or have no result, are left out.
 
 ```tsx
+import { usageItems, useEntitlement, usePlans, useSubscription } from '@nozle-js/react'
+import type { UsageResult } from '@nozle-js/react'
+
 export function LiveUsage() {
   const subscription = useSubscription()
   const { plans } = usePlans()

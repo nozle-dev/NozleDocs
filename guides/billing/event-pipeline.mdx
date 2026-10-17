@@ -7,19 +7,9 @@ Usage billing starts with an application-owned event. Each logical event should 
 
 ## 1. Track from your backend
 
-<CodeGroup>
-```ts Node.js
-import { Nozle } from '@nozle-js/node'
-```
-```python Python
-from nozle import Nozle
-```
-```go Go
-import nozle "github.com/nozle-dev/nozle-go"
-```
-</CodeGroup>
-
 ```ts title="Node.js"
+import { Nozle } from '@nozle-js/node'
+
 const nozle = new Nozle({
   apiKey: process.env.NOZLE_SECRET_KEY!,
 })
@@ -38,6 +28,7 @@ await nozle.track(
 
 ```python title="Python"
 import os
+from nozle import Nozle
 
 nozle = Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
@@ -54,6 +45,8 @@ nozle.track(
 ```
 
 ```go title="Go"
+import nozle "github.com/nozle-dev/nozle-go"
+
 client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"))
 err := client.Track(ctx, nozle.TrackParams{
   CustomerID: "customer_123",

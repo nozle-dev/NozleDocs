@@ -14,13 +14,11 @@ The Go SDK exposes `ValidationError`, `AuthenticationError`, `TransportError`, a
 | `WebhookVerificationError` | `VerifyWebhook` found the request not genuine. `Code` is `missing_signature`, `unsupported_algorithm`, `missing_hmac_key`, `invalid_signature` or `invalid_payload`. From `v0.12.0`. |
 | `SetupError` | Passed to `WrapHTTPClient`'s `OnError` with `Code` `feature_not_found` when no Feature has the event code: the usage is stored but not billed. From `v0.12.0`. |
 
-```go Imports
+```go
 import nozle "github.com/nozle-dev/nozle-go"
 
 client := nozle.New("") // reads NOZLE_SECRET_KEY
-```
 
-```go
 _, err := client.Ping(ctx)
 var apiErr *nozle.APIError
 if errors.As(err, &apiErr) {

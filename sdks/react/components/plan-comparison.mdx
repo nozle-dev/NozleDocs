@@ -46,14 +46,12 @@ keywords: ["plan comparison", "feature table", "pricing", "react"]
 
 ## Usage
 
-```tsx Imports
-import { PlanComparison, comparisonRows, usePlans } from '@nozle-js/react'
-import type { ComparisonFeature, PricingPlan } from '@nozle-js/react'
-```
-
 Pass the plans; the table builds one column per plan and one row per entitlement and per granted credit system:
 
 ```tsx components/compare-plans.tsx
+import { PlanComparison } from '@nozle-js/react'
+import type { PricingPlan } from '@nozle-js/react'
+
 export function ComparePlans({ plans }: { plans: PricingPlan[] }) {
   return <PlanComparison plans={plans} />
 }
@@ -132,6 +130,8 @@ export function ComparePlans() {
 Pass the plans of [`usePlans`](/sdks/react/hooks#useplans). `comparisonRows(plans)` returns the generated rows, so you can add or remove rows before passing them as `features`:
 
 ```tsx
+import { comparisonRows, usePlans } from '@nozle-js/react'
+
 export function LiveComparison() {
   const { plans, isLoading } = usePlans()
   if (isLoading) return null
@@ -159,6 +159,8 @@ Generated row keys are `entitlement:<feature code>` and `credit:<credit system c
 Pass `features` to write the rows yourself. `values` is keyed by plan code; `true` shows a check, `false` a cross, and a string is shown as written.
 
 ```tsx
+import type { ComparisonFeature } from '@nozle-js/react'
+
 const plans: PricingPlan[] = [
   { code: 'free', name: 'Free', amount_cents: 0, amount_currency: 'USD', interval: 'monthly' },
   { code: 'pro', name: 'Pro', amount_cents: 2900, amount_currency: 'USD', interval: 'monthly' },

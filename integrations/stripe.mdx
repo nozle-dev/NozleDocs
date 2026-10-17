@@ -144,28 +144,13 @@ An invoice checkout forwards its `Idempotency-Key` to Stripe. Reusing a key with
 
 ### Create and poll
 
-<CodeGroup>
-```ts Node.js
-import { Nozle } from '@nozle-js/node'
-import { BillingProvider, Checkout, CheckoutButton } from '@nozle-js/react'
-
-const nozle = new Nozle() // reads NOZLE_SECRET_KEY
-```
-```python Python
-from nozle import Nozle
-
-nozle = Nozle()  # reads NOZLE_SECRET_KEY
-```
-```go Go
-import nozle "github.com/nozle-dev/nozle-go"
-
-client := nozle.New("") // reads NOZLE_SECRET_KEY
-```
-</CodeGroup>
-
 <Tabs>
 <Tab title="Node.js">
 ```ts
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
 // Merchant backend
 const checkout = await nozle.checkout(
   customerId,
@@ -184,6 +169,10 @@ const invoiceCheckout = await nozle.checkoutInvoice(invoiceId, { idempotencyKey 
 </Tab>
 <Tab title="Python">
 ```python
+from nozle import Nozle
+
+nozle = Nozle()  # reads NOZLE_SECRET_KEY
+
 # Merchant backend
 checkout = nozle.checkout(
     customer_id,
@@ -204,6 +193,10 @@ invoice_checkout = nozle.checkout_invoice(invoice_id, idempotency_key=idempotenc
 </Tab>
 <Tab title="Go">
 ```go
+import nozle "github.com/nozle-dev/nozle-go"
+
+client := nozle.New("") // reads NOZLE_SECRET_KEY
+
 // Merchant backend
 checkout, err := client.Checkout(ctx, nozle.CheckoutParams{
   CustomerID: customerID, PlanCode: "pro_monthly",
@@ -235,6 +228,8 @@ Mount the `cs_` secret with Stripe Embedded Checkout and the publishable key of 
 With the React SDK, `CheckoutButton` calls your `createCheckout` callback and hands the Stripe client secret to `onStripeClientSecret`. `Checkout` mounts the secret. It uses Embedded Checkout for a `cs_` secret:
 
 ```tsx
+import { BillingProvider, Checkout, CheckoutButton } from '@nozle-js/react'
+
 const [clientSecret, setClientSecret] = useState<string | null>(null)
 
 <BillingProvider publishableKey={publishableKey} createCheckout={createCheckout}>

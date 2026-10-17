@@ -9,6 +9,10 @@ Margin alerts help you detect when profitability drops below acceptable threshol
 The `can()` endpoint can include a point-in-time `economics` estimate. Check its status and exclusions before using it for an operational warning.
 
 ```typescript
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
 const check = await nozle.can('cust_123', 'api_calls');
 if (
   check.economics?.status === 'estimated' &&
@@ -33,14 +37,9 @@ const trend = await nozle.margin.trend({ granularity: 'hour' });
 
 **React-side usage alerts:**
 The UsageAlert component shows warnings when usage approaches limits:
-```ts Imports
-import { Nozle } from '@nozle-js/node'
+```tsx
 import { UsageAlert } from '@nozle-js/react'
 
-const nozle = new Nozle() // reads NOZLE_SECRET_KEY
-```
-
-```tsx
 <UsageAlert
   features={[
     { key: 'api_calls', label: 'API Calls', percentage: 92 },

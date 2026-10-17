@@ -6,6 +6,10 @@ description: "Query summary, customer, metric, plan, model, and trend margin dat
 Margin methods are available under `nozle.margin` and call `GET /api/v1/margin/*`.
 
 ```ts
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
 const range = {
   from: '2026-07-01',
   to: '2026-07-31',
@@ -44,13 +48,9 @@ const result = await nozle.margin.byCustomer({
 
 An unparseable date, or an end that is not after the start, makes the API answer `400`. The SDK throws a `NozleApiError` with the usual `margin/summary failed: 400 Bad Request` message and the response code on `err.code`.
 
-```ts Imports
-import { Nozle, NozleApiError } from '@nozle-js/node'
-
-const nozle = new Nozle() // reads NOZLE_SECRET_KEY
-```
-
 ```ts
+import { NozleApiError } from '@nozle-js/node'
+
 try {
   await nozle.margin.summary({ from: '2026-07-31', to: '2026-07-01' })
 } catch (err) {

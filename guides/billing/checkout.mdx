@@ -143,14 +143,9 @@ Changing an existing subscription needs a [plan transition policy](/api/plan-tra
 
 ### Option A -- CheckoutButton (simplest)
 
-```ts Imports
-import { Nozle } from '@nozle-js/node'
-import { Checkout, CheckoutButton, useCheckoutSession } from '@nozle-js/react'
-
-const nozle = new Nozle() // reads NOZLE_SECRET_KEY
-```
-
 ```tsx
+import { CheckoutButton } from '@nozle-js/react'
+
 <CheckoutButton
   planCode="growth"
   returnUrl="https://app.example.com/settings/billing"
@@ -162,6 +157,8 @@ const nozle = new Nozle() // reads NOZLE_SECRET_KEY
 ### Option B -- Custom flow with `useCheckoutSession`
 
 ```tsx
+import { Checkout, useCheckoutSession } from '@nozle-js/react'
+
 const { fetchClientSecret, isLoading } = useCheckoutSession();
 
 const handleCheckout = async () => {
@@ -190,6 +187,10 @@ const handleCheckout = async () => {
 For B2B scenarios where payment is already handled outside embedded checkout:
 
 ```typescript
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
 await nozle.customers.upsert({ externalId: 'customer_123', name: 'Acme' });
 const result = await nozle.subscribe('customer_123', 'growth');
 // { subscription_id: 'sub_...', status: 'active' }

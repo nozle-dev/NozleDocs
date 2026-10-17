@@ -12,13 +12,11 @@ All SDK exceptions derive from `NozleError`.
 | `NozleTransportError` | No HTTP response was received due to a `requests` transport failure. |
 | `NozleAPIError` | Nozle returned a non-2xx response or an invalid JSON success payload. |
 
-```python Imports
-from nozle import Nozle, NozleAPIError, NozleAuthenticationError, NozleTrackingWarning, NozleTransportError, NozleValidationError
+```python
+from nozle import Nozle, NozleAPIError, NozleAuthenticationError, NozleTransportError, NozleValidationError
 
 nozle = Nozle()  # reads NOZLE_SECRET_KEY
-```
 
-```python
 try:
     result = nozle.usage.track(
         "workspace_123",
@@ -73,6 +71,7 @@ The warning text names only the exception type, not the cause, for example `Nozl
 
 ```python
 import warnings
+from nozle import NozleTrackingWarning
 
 
 warnings.simplefilter("always", NozleTrackingWarning)

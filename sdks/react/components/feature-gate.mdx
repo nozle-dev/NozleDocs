@@ -49,14 +49,11 @@ Gates only change what the interface shows. Check the entitlement again on your 
 
 ## Usage
 
-```tsx Imports
-import { FeatureGate, UpgradePrompt, useEntitlement } from '@nozle-js/react'
-import type { FeatureGateProps } from '@nozle-js/react'
-```
-
 `FeatureGate` has no look of its own and fetches nothing: you pass the entitlement decision.
 
 ```tsx components/sso-settings.tsx
+import { FeatureGate, UpgradePrompt } from '@nozle-js/react'
+
 export function SsoSettings({ allowed }: { allowed: boolean }) {
   return (
     <FeatureGate allowed={allowed} fallback={<UpgradePrompt text="SSO needs the Scale plan" />}>
@@ -75,6 +72,8 @@ The gate needs one boolean, `allowed`, and optionally `loading` while you read i
 [`useEntitlement(featureCode)`](/sdks/react/hooks#the-hooks) returns the customer's `can()` result through your `billingEndpoint`:
 
 ```tsx
+import { useEntitlement } from '@nozle-js/react'
+
 export function Exports() {
   const entitlement = useEntitlement('data_exports')
   return (

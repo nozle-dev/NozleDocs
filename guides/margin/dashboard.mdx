@@ -8,6 +8,10 @@ The summary, customer, metric, plan, model and trend queries are available via t
 **Summary** — overall margin overview:
 
 ```typescript
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
 const summary = await nozle.margin.summary({
   from: '2026-07-01',
   to: '2026-07-31'
@@ -75,15 +79,11 @@ If you send only one end, the API derives the other: only `to` covers the month 
 
 An unparseable value, or an end that is not after the start, returns `400` with `{"code": "invalid_date_range", "error": "..."}`. In the Node SDK the call throws a `NozleApiError` whose `code` is `invalid_date_range`:
 
-```ts Imports
-import { Nozle, NozleApiError } from '@nozle-js/node'
-
-const nozle = new Nozle() // reads NOZLE_SECRET_KEY
-```
-
 <Tabs>
   <Tab title="Node">
     ```typescript
+    import { NozleApiError } from '@nozle-js/node'
+
     try {
       await nozle.margin.summary({ from: '2026-07-31', to: '2026-07-01' });
     } catch (err) {

@@ -7,13 +7,11 @@ description: "List plans, create payment-aware checkouts, and manage customer or
 
 `Plans` accepts `pk_` or `sk_`; other billing methods require a server-side `sk_`. `Plan` includes code, name, amount in cents, currency, and interval; the Go struct drops every other field of the API response. The list itself includes trial, pay-in-arrears and pending-deletion plans, and with a `pk_` key the full plans are readable by anyone who has the key. See the [public plan catalog](/api/list-plans). Upsert the customer with `UpsertCustomer` before billing.
 
-```go Imports
+```go
 import nozle "github.com/nozle-dev/nozle-go"
 
 client := nozle.New("") // reads NOZLE_SECRET_KEY
-```
 
-```go
 plans, err := client.Plans(ctx)
 checkout, err := client.Checkout(ctx, nozle.CheckoutParams{
   CustomerID: "workspace_123", PlanCode: "pro_monthly",

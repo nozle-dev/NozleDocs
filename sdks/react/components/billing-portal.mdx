@@ -49,15 +49,12 @@ You do not need a `BillingProvider` or Tailwind for it.
 
 ## Usage
 
-```tsx Imports
-import { BillingPortal, BillingPortalError } from '@nozle-js/react'
-import type { BillingPortalSession, CancellationActions, CreateBillingPortalSession, PlanChangeActions } from '@nozle-js/react'
-```
-
 `createSession` asks your backend for a portal session:
 
 ```tsx app/settings/billing/page.tsx
 'use client'
+import { BillingPortal } from '@nozle-js/react'
+import type { BillingPortalSession, CreateBillingPortalSession } from '@nozle-js/react'
 
 const createSession: CreateBillingPortalSession = async ({ signal }) => {
   const response = await fetch('/api/billing/session', {
@@ -109,6 +106,8 @@ With `planChangeActions` and `cancellationActions`, each subscription shows [`Pl
 </Frame>
 
 ```tsx
+import type { CancellationActions, PlanChangeActions } from '@nozle-js/react'
+
 export function FullPortal(props: {
   accountId: string
   createSession: CreateBillingPortalSession
