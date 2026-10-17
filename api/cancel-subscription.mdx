@@ -27,7 +27,7 @@ For customer-facing Cancel/Keep with a confirmed ending date, use [the transitio
 
 ### Response
 
-For `end_of_period`, the subscription remains `active` and `ending_at` contains the next renewal boundary. Engine access checks deny access at that boundary; the termination worker updates the subscription row according to its schedule and handles renewal termination. Repeating the request does not extend an earlier scheduled ending.
+For `end_of_period`, the subscription remains `active` and `ending_at` contains the next renewal boundary. An open paid upgrade checkout of the subscription is canceled, and its Stripe Checkout Session or Razorpay order is expired. Engine access checks deny access at that boundary; the termination worker updates the subscription row according to its schedule and handles renewal termination. Repeating the request does not extend an earlier scheduled ending.
 
 For `immediate`, the response contains the terminated subscription.
 

@@ -61,7 +61,7 @@ Call this endpoint from a trusted backend with a restricted secret key. Derive `
 | `economics.status` | `string` | `estimated`, `not_configured`, `unavailable`, or `stale` |
 | `economics.currency` | `string?` | The organization's reporting currency |
 | `economics.estimated_incremental_cost` | `string?` | Exact decimal incremental cost for the proposed Feature Event |
-| `economics.estimated_incremental_revenue` | `string?` | Exact decimal usage revenue of the proposed call: the standard charge's unit price × the call's units (1 for a count Feature; the Feature's value property from `metadata` for a sum Feature) |
+| `economics.estimated_incremental_revenue` | `string?` | Exact decimal usage revenue of the proposed call: the standard charge's unit price × the call's units (1 for a count Feature; the value of the Feature's `field_name` in `metadata` for a sum Feature) |
 | `economics.estimated_incremental_margin` | `string?` | Estimated revenue minus estimated cost |
 | `economics.estimated_margin_percent` | `string?` | Margin percentage when estimated revenue is greater than zero |
 | `economics.rule_version_ids` | `string[]?` | Immutable Cost Rule versions used by the estimate |
@@ -76,7 +76,7 @@ The service may cache entitlement and usage state. Always treat the returned dec
 
 The optional `economics` object is also point-in-time, but it is not a financial ledger entry. Calling `/can` never consumes usage, changes a pricing period, or records cost. If a Feature uses `detailed_events_only`, the estimate is `unavailable` because the actual Cost Events do not exist yet. If it uses `add_both`, the known Feature Event Cost is returned and `future_detailed_cost_events` appears in `excludes`. An estimate older than the policy's `maximum_snapshot_age_seconds` is returned as `stale` and follows `on_unavailable`.
 
-Revenue needs the call's units. For a sum Feature, pass its value property in `metadata` (for example `tokens=500`); without it the estimate is `unavailable` with `revenue_quantity_missing` in `excludes`. Features that do not add a fixed amount per call (max, latest, unique count, weighted sum) report `non_additive_revenue_aggregation`.
+Estimated revenue is the standard charge's unit price × the units of this call. A count Feature adds 1 unit. A sum Feature adds the value of its value property (`field_name`) in the call's `metadata`, for example `{"tokens": 500}`; without that value the estimate is `unavailable` with `revenue_quantity_missing` in `excludes`. Max, latest, unique count, weighted sum and custom aggregations do not add a fixed amount per call, so their estimate is `unavailable` with `non_additive_revenue_aggregation`. When the estimate is `unavailable`, a margin policy decides with its `on_unavailable` value (`allow`, `warn` or `deny`), and `policy.reason` is `economics_unavailable`.
 
 ## Denial reasons
 

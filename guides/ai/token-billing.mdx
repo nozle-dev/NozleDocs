@@ -10,6 +10,7 @@ Usage capture ([Node.js](/sdks/node/llm-auto-capture), [Python](/sdks/python/llm
   "code": "llm_tokens",
   "transaction_id": "llm-openai-chatcmpl-123",
   "external_customer_id": "workspace_123",
+  "external_subscription_id": "sub_123",
   "properties": {
     "provider": "openai",
     "provider_host": "api.openai.com",
@@ -31,7 +32,7 @@ What that event does depends on what you set up. Nozle accepts an event whose co
    - To bill only one side, skip the expression and set **Value property** to `input_tokens` or `output_tokens`.
    - A Feature with an expression cannot be used with [product credits](/guides/credits/overview).
 2. **Charge for it on the plan.** Add a usage charge for the Feature, for example package pricing per 1,000,000 tokens. Add an entitlement limit if you want [`can()`](/guides/entitlements/can-endpoint) to stop customers at a limit. See [plans](/guides/billing/plans).
-3. **Give each customer one active subscription.** Capture looks up the customer's single active subscription and records nothing for a customer with none or several. Pass a subscription id when a customer has several.
+3. **Give each customer one active subscription.** The usage event is billed to a subscription. Capture looks up the customer's single active subscription and records nothing for a customer with none or several. Pass a subscription id when a customer has several. The [LLM proxy](/api/llm-proxy#subscription) looks it up before it calls the provider and refuses the call with `422 active_subscription_not_found` or `422 active_subscription_ambiguous`; send `X-Nozle-Subscription` when a customer has several.
 
 Usage counts towards the current period as soon as the event is processed. Revenue appears in margin reports when the invoice is finalized.
 
@@ -53,7 +54,7 @@ Usage capture does not spend [product credits](/guides/credits/overview). To ded
 
 | Goal | You need |
 |---|---|
-| Tokens appear as usage | A metered Feature whose event code equals the capture code; one active subscription per customer |
+| Tokens appear as usage | A metered Feature whose event code equals the capture code; one active subscription per customer, or `X-Nozle-Subscription` on proxy calls |
 | Tokens are billed | A usage charge for that Feature on the plan |
 | Token cost and margin | An AI tokens cost model per provider and model, linked to the Feature with **Detailed events only**; `costMeterCode: "ai_tokens"` in capture |
 | Cost estimate in `can()` | Feature Event cost components, composition **Add both**, a standard charge |

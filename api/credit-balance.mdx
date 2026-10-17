@@ -23,7 +23,7 @@ Returns the customer's active wallet, the most recently created one if there are
 {
   "wallet_id": "09b4f6d3-f463-4f4f-ac75-27e36bc2a296",
   "name": "Prepaid wallet",
-  "balance_cents": 2000,
+  "balance_cents": 1600,
   "currency": "USD",
   "credits_balance": "16.00000",
   "status": "active"
@@ -39,7 +39,7 @@ Returns the customer's active wallet, the most recently created one if there are
 </ResponseField>
 
 <ResponseField name="balance_cents" type="number" required>
-  Wallet balance in the smallest unit of `currency`, as last recorded by Core. [Check & Deduct](/api/check-and-deduct) does not update it, so it can be higher than the real balance after deductions.
+  Wallet balance in the smallest unit of `currency`. [Check & Deduct](/api/check-and-deduct) lowers it with the credits it deducts.
 </ResponseField>
 
 <ResponseField name="currency" type="string" required>
@@ -55,5 +55,5 @@ Returns the customer's active wallet, the most recently created one if there are
 </ResponseField>
 
 <Note>
-After a Check & Deduct call, trust `credits_balance`. For example, a wallet funded with 20 credits shows `balance_cents: 2000` and `credits_balance: "20.00000"`; after deducting 4 credits, `credits_balance` is `"16.00000"` while `balance_cents` is still `2000`.
+A Check & Deduct call moves both balances. For example, a wallet funded with 20 credits at a rate of 1.00 shows `balance_cents: 2000` and `credits_balance: "20.00000"`; after deducting 4 credits, `credits_balance` is `"16.00000"` and `balance_cents` is `1600`.
 </Note>

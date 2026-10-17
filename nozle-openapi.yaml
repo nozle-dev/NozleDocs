@@ -3223,7 +3223,30 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'The event was not stored. `validation_errors` for an invalid field, including `external_subscription_id: [value_is_mandatory]` when neither `external_subscription_id` nor `external_customer_id` is sent. `active_subscription_not_found` or `active_subscription_ambiguous` when only `external_customer_id` is sent and the customer has no active subscription (or is unknown) or several.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+              examples:
+                missing_subscription:
+                  summary: Neither id
+                  value:
+                    status: 422
+                    error: Unprocessable Entity
+                    code: validation_errors
+                    error_details:
+                      external_subscription_id:
+                        - value_is_mandatory
+                ambiguous:
+                  summary: Several active subscriptions
+                  value:
+                    status: 422
+                    error: Unprocessable Entity
+                    code: active_subscription_ambiguous
+                    error_details:
+                      external_customer_id:
+                        - active_subscription_ambiguous
       x-codeSamples:
         - lang: TypeScript
           label: Node.js
@@ -3337,7 +3360,19 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'The batch was not stored. `code` is `validation_errors` and `error_details` is keyed by the position of each failing event, with the same field errors as a single event, for example `{"0": {"external_customer_id": ["active_subscription_not_found"]}}`. An empty batch returns `events: [no_events]`, more than 100 events `events: [too_many_events]`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+              example:
+                status: 422
+                error: Unprocessable Entity
+                code: validation_errors
+                error_details:
+                  '0':
+                    external_customer_id:
+                      - active_subscription_not_found
       x-codeSamples:
         - lang: Go
           label: Go
@@ -4266,7 +4301,7 @@ paths:
       tags:
         - Invoices
       summary: Generate a payment URL
-      description: This endpoint generates a checkout link for a specific invoice.
+      description: This endpoint generates a checkout link for a specific invoice. An invoice that is paid, voided, draft, closed, failed or has nothing due returns `422 validation_errors` with `error_details.base` `invalid_invoice_status_or_payment_status`.
       parameters:
         - $ref: '#/components/parameters/invoice_id'
       operationId: invoicePaymentUrl
@@ -7751,7 +7786,7 @@ paths:
       tags:
         - Checkout
       summary: Create a checkout
-      description: 'Creates a payment-gated plan checkout, an invoice checkout (`invoice_id`), or an Entity checkout (`external_entity_id`). Requires `payment:write`. Engine validates the body and the `return_url` origin, then forwards to Core `POST /checkout_sessions` (renaming `subscription_id` to `external_subscription_id`). Core decides the result type from the plan, the current subscription and its transition policy: a provider checkout when money is due, `completed` when nothing external is due, `scheduled` for an end-of-period change. A customer without a subscription choosing a plan that needs no up-front payment gets `422 checkout_not_required`. Engine forwards Core''s status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine''s own `{error, code?}` errors.'
+      description: 'Creates a payment-gated plan checkout, an invoice checkout (`invoice_id`), or an Entity checkout (`external_entity_id`). Requires `payment:write`. Engine validates the body and the `return_url` origin, then forwards to Core `POST /checkout_sessions` (renaming `subscription_id` to `external_subscription_id`). Core decides the result type from the plan, the current subscription and its transition policy: a provider checkout when money is due, `completed` when nothing external is due, `scheduled` for an end-of-period change. An unpaid plan or single Entity checkout expires after 23 hours (the Stripe Checkout Session and Razorpay order too): the subscription is canceled with `cancelation_reason: timeout` and a `subscription.canceled` webhook, the invoice is closed, and the coupons, credit-note credits and wallet credits it used are returned. They are also returned when the checkout payment fails. Checking out the same plan again reopens an abandoned checkout; another plan replaces it. A customer without a subscription choosing a plan that needs no up-front payment gets `422 checkout_not_required`. Engine forwards Core''s status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine''s own `{error, code?}` errors.'
       operationId: engineCreateCheckout
       security:
         - bearerAuth: []
@@ -7838,13 +7873,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '409':
-          description: 'Core: `subscription_selection_required`, `plan_upgrade_checkout_in_progress`, `entity_subscription_checkout_in_progress`, `billing_anchor_checkout_in_progress`, `idempotency_key_reused` (quoted checkout), `plan_change_quote_changed`, `subscription_change_pending`.'
+          description: 'Core: `subscription_selection_required`, `plan_upgrade_checkout_in_progress`, `subscription_checkout_in_progress` or `entity_subscription_checkout_in_progress` (a payment for the abandoned new-subscription checkout on another plan is still processing, or it was paid; an abandoned checkout is otherwise replaced), `billing_anchor_checkout_in_progress`, `idempotency_key_reused` (quoted checkout), `plan_change_quote_changed`, `subscription_change_pending` (a paid upgrade while the subscription has a scheduled cancellation or plan change, or an upgrade payment in progress).'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '422':
-          description: 'Core: `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active`, `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
+          description: 'Core: `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active`, `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`, or `base: [invalid_invoice_status_or_payment_status]` for an invoice checkout of an invoice that is paid, voided, draft, closed, failed or has nothing due). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
           content:
             application/json:
               schema:
@@ -9093,7 +9128,7 @@ paths:
       tags:
         - Entity Subscriptions
       summary: Start an Entity subscription checkout
-      description: 'Starts or resumes checkout of a plan for one Entity. Same Core action and result types as plan checkout (`POST /checkout_sessions`), scoped to the Entity''s subscription identity, which is created when missing. Retrying an incomplete checkout for the same plan reuses its subscription and invoice. A plan with no up-front payment completes with `payment_source: none`. Requires a secret key (`403 secret_key_required` otherwise) with `subscription` permission (`payment` for checkout routes).'
+      description: 'Starts or resumes checkout of a plan for one Entity. Same Core action and result types as plan checkout (`POST /checkout_sessions`), scoped to the Entity''s subscription identity, which is created when missing. Retrying an incomplete checkout for the same plan reuses its subscription and invoice; another plan replaces the abandoned checkout. An unpaid checkout expires after 23 hours: the subscription is canceled with `cancelation_reason: timeout`, the invoice is closed and the coupons, credit-note credits and wallet credits it used are returned. A plan with no up-front payment completes with `payment_source: none`. Requires a secret key (`403 secret_key_required` otherwise) with `subscription` permission (`payment` for checkout routes).'
       operationId: coreCreateEntitySubscriptionCheckout
       security:
         - bearerAuth: []
@@ -9156,7 +9191,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '409':
-          description: '`entity_subscription_checkout_in_progress`, `billing_anchor_checkout_in_progress`, `plan_upgrade_checkout_in_progress`, `idempotency_key_reused`, `plan_change_quote_changed`, `subscription_change_pending`.'
+          description: '`entity_subscription_checkout_in_progress` (a payment for the abandoned checkout on another plan is still processing, or it was paid; an abandoned checkout is otherwise replaced), `billing_anchor_checkout_in_progress`, `plan_upgrade_checkout_in_progress`, `idempotency_key_reused`, `plan_change_quote_changed`, `subscription_change_pending` (a scheduled cancellation or plan change, or an upgrade payment in progress).'
           content:
             application/json:
               schema:
@@ -11146,7 +11181,7 @@ paths:
   /credit-top-up-purchases:
     post:
       summary: Create a credit top-up purchase
-      description: Starts checkout for a fixed top-up package. The Engine forwards the request to Nozle Core and returns Core's status and body unchanged. Creating checkout does not grant credits; credits are added only after a confirmed successful payment. The body is at most 64 KiB and unknown fields are rejected. Requires an organization secret key, or trusted internal authentication; when API permissions are enabled a secret key needs `credit_system:write`.
+      description: Starts checkout for a fixed top-up package. The Engine forwards the request to Nozle Core and returns Core's status and body unchanged. Creating checkout does not grant credits; credits are added once the top-up invoice is fully paid, by a provider payment, a manual payment for the full amount, a payment request or marking the invoice paid. A partial payment grants nothing. The body is at most 64 KiB and unknown fields are rejected. Requires an organization secret key, or trusted internal authentication; when API permissions are enabled a secret key needs `credit_system:write`.
       operationId: engineCreateCreditTopUpPurchase
       tags:
         - Credits
@@ -11559,7 +11594,7 @@ paths:
   /check-and-deduct:
     post:
       summary: Check and deduct legacy wallet credits
-      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet, and when its `credits_balance` covers `credits`, deducts them and records an outbound wallet transaction, in one database transaction. It does not apply Feature conversion rates or the product-credit source ledger, and it does not update the wallet''s `balance_cents`. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; API permissions are not checked.'
+      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet, and when its `credits_balance` covers `credits`, deducts them and records an outbound wallet transaction, in one database transaction. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; API permissions are not checked.'
       operationId: engineCheckAndDeductCredits
       tags:
         - Credits
@@ -11733,7 +11768,7 @@ paths:
   /margin/customers:
     get:
       summary: Get margin by customer
-      description: 'Returns one row per customer with margin events in the range, ordered by `margin_cents` ascending (least profitable first). `customer_name` comes from the Engine''s in-memory customer cache (the customer''s name, else its external ID, else its ID); a customer missing from the cache gets its `customer_id` as the name. When no events fall in the range the list is `null`, not an empty array; treat `null` as empty. The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Returns one row per customer with margin events in the range, ordered by `margin_cents` ascending (least profitable first). `customer_name` comes from the Engine''s in-memory customer cache (the customer''s name, else its external ID, else its ID); a customer missing from the cache gets its `customer_id` as the name. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
       operationId: engineListMarginByCustomer
       tags:
         - Margin
@@ -11828,7 +11863,7 @@ paths:
   /margin/metrics:
     get:
       summary: Get margin by metric
-      description: 'Returns one row per `metric_code` with margin events in the range, ordered by `margin_cents` ascending. When no events fall in the range the list is `null`, not an empty array; treat `null` as empty. The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Returns one row per `metric_code` with margin events in the range, ordered by `margin_cents` ascending. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
       operationId: engineListMarginByMetric
       tags:
         - Margin
@@ -11923,7 +11958,7 @@ paths:
   /margin/plans:
     get:
       summary: Get margin by plan
-      description: 'Returns one row per `plan_id` recorded on the margin events in the range, ordered by `margin_cents` ascending. Events recorded without a plan are grouped under an empty `plan_id`. The plan is identified by ID only; no name or code is returned. When no events fall in the range the list is `null`, not an empty array; treat `null` as empty. The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Returns one row per `plan_id` recorded on the margin events in the range, ordered by `margin_cents` ascending. Events recorded without a plan are grouped under an empty `plan_id`. The plan is identified by ID only; no name or code is returned. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
       operationId: engineListMarginByPlan
       tags:
         - Margin
@@ -12018,7 +12053,7 @@ paths:
   /margin/models:
     get:
       summary: Get margin by model
-      description: 'Returns one row per `model` value in the margin events'' `properties` (the `model` property of the event), ordered by `cost_cents` descending. Events whose `model` property is missing or empty are left out. When no events fall in the range the list is `null`, not an empty array; treat `null` as empty. The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Returns one row per `model` value in the margin events'' `properties` (the `model` property of the event), ordered by `cost_cents` descending. Events whose `model` property is missing or empty are left out. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
       operationId: engineListMarginByModel
       tags:
         - Margin
@@ -12113,7 +12148,7 @@ paths:
   /margin/trend:
     get:
       summary: Get margin trend
-      description: 'Returns revenue, cost and margin per time bucket in the range, ordered by `period` ascending. Only buckets that contain events are returned; empty buckets are not filled in. Weeks start on Sunday (ClickHouse `toStartOfWeek` default mode). `margin_percent` is `0` for a bucket with no positive revenue. When no events fall in the range the list is `null`, not an empty array; treat `null` as empty. The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Returns revenue, cost and margin per time bucket in the range, ordered by `period` ascending. Only buckets that contain events are returned; empty buckets are not filled in. Weeks start on Sunday (ClickHouse `toStartOfWeek` default mode). `margin_percent` is `0` for a bucket with no positive revenue. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
       operationId: engineGetMarginTrend
       tags:
         - Margin
@@ -12152,7 +12187,7 @@ paths:
         - name: granularity
           in: query
           required: false
-          description: 'Bucket size. `hour`, `day`, `week` and `month` are bucketed as named; `day` is the default when the parameter is missing or empty. The value is not validated: any other value returns `200`, is bucketed by day, and is echoed unchanged in the response `granularity`. Send only the four listed values.'
+          description: 'Bucket size. `hour`, `day`, `week` and `month` are bucketed as named; `day` is the default when the parameter is missing or empty. Any other value returns `400` with `code` `invalid_granularity`.'
           schema:
             type: string
             default: day
@@ -12420,7 +12455,7 @@ paths:
         - name: metadata
           in: query
           required: false
-          description: URL-encoded JSON object of event properties. The cost estimate uses it to evaluate Cost Sheet conditions and quantities. A value that is not a JSON object returns `400`.
+          description: URL-encoded JSON object of event properties. The cost estimate uses it to evaluate Cost Sheet conditions and quantities. For a sum Feature, the revenue estimate reads the call's units from the Feature's `field_name` in it. A value that is not a JSON object returns `400`.
           schema:
             type: string
           example: '{"model":"gpt-4o","input_tokens":1200}'
@@ -12690,9 +12725,11 @@ paths:
       description: |-
         Forwards the request to `https://api.openai.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
-        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
+        **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
+
+        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
         Example: `POST /proxy/openai/v1/chat/completions` is sent to `https://api.openai.com/v1/chat/completions`.
       operationId: engineProxyOpenAIPost
@@ -12712,6 +12749,13 @@ paths:
           schema:
             type: string
           example: cust_123
+        - name: X-Nozle-Subscription
+          in: header
+          required: false
+          description: External ID of the subscription to bill. It must be an active subscription of the customer, or the response is `422 active_subscription_not_found`. Required when the customer has several active subscriptions. Not forwarded to the provider.
+          schema:
+            type: string
+          example: sub_123
         - name: X-Nozle-Feature
           in: header
           required: false
@@ -12758,6 +12802,15 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '422':
+          description: No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+              example:
+                code: active_subscription_ambiguous
+                error: customer has multiple active subscriptions; set X-Nozle-Subscription
         '502':
           description: Engine could not reach the provider or read its response. The body is empty.
         '503':
@@ -12772,9 +12825,11 @@ paths:
       description: |-
         Forwards the request to `https://api.openai.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
-        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
+        **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
+
+        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
         Example: `POST /proxy/openai/v1/chat/completions` is sent to `https://api.openai.com/v1/chat/completions`.
       operationId: engineProxyOpenAIGet
@@ -12794,6 +12849,13 @@ paths:
           schema:
             type: string
           example: cust_123
+        - name: X-Nozle-Subscription
+          in: header
+          required: false
+          description: External ID of the subscription to bill. It must be an active subscription of the customer, or the response is `422 active_subscription_not_found`. Required when the customer has several active subscriptions. Not forwarded to the provider.
+          schema:
+            type: string
+          example: sub_123
         - name: X-Nozle-Feature
           in: header
           required: false
@@ -12828,6 +12890,15 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '422':
+          description: No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+              example:
+                code: active_subscription_ambiguous
+                error: customer has multiple active subscriptions; set X-Nozle-Subscription
         '502':
           description: Engine could not reach the provider or read its response. The body is empty.
         '503':
@@ -12850,9 +12921,11 @@ paths:
       description: |-
         Forwards the request to `https://api.anthropic.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
-        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
+        **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
+
+        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
         Example: `POST /proxy/anthropic/v1/messages` is sent to `https://api.anthropic.com/v1/messages`.
       operationId: engineProxyAnthropicPost
@@ -12872,6 +12945,13 @@ paths:
           schema:
             type: string
           example: cust_123
+        - name: X-Nozle-Subscription
+          in: header
+          required: false
+          description: External ID of the subscription to bill. It must be an active subscription of the customer, or the response is `422 active_subscription_not_found`. Required when the customer has several active subscriptions. Not forwarded to the provider.
+          schema:
+            type: string
+          example: sub_123
         - name: X-Nozle-Feature
           in: header
           required: false
@@ -12926,6 +13006,15 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '422':
+          description: No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+              example:
+                code: active_subscription_ambiguous
+                error: customer has multiple active subscriptions; set X-Nozle-Subscription
         '502':
           description: Engine could not reach the provider or read its response. The body is empty.
         '503':
@@ -12940,9 +13029,11 @@ paths:
       description: |-
         Forwards the request to `https://api.anthropic.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
 
-        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
+        **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
+
+        **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
         Example: `POST /proxy/anthropic/v1/messages` is sent to `https://api.anthropic.com/v1/messages`.
       operationId: engineProxyAnthropicGet
@@ -12962,6 +13053,13 @@ paths:
           schema:
             type: string
           example: cust_123
+        - name: X-Nozle-Subscription
+          in: header
+          required: false
+          description: External ID of the subscription to bill. It must be an active subscription of the customer, or the response is `422 active_subscription_not_found`. Required when the customer has several active subscriptions. Not forwarded to the provider.
+          schema:
+            type: string
+          example: sub_123
         - name: X-Nozle-Feature
           in: header
           required: false
@@ -13003,6 +13101,15 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '422':
+          description: No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+              example:
+                code: active_subscription_ambiguous
+                error: customer has multiple active subscriptions; set X-Nozle-Subscription
         '502':
           description: Engine could not reach the provider or read its response. The body is empty.
         '503':
@@ -23759,7 +23866,7 @@ components:
           type: string
           maxLength: 255
           example: sub_1234567890
-          description: External ID of the subscription the event is billed to. Ingestion does not check that it is present, but it is the only field that links the event to a customer, so always send it. The SDKs look it up when you pass only a customer.
+          description: 'External ID of the subscription the event is billed to. Send it or `external_customer_id`; with neither the response is `422 validation_errors` with `external_subscription_id: [value_is_mandatory]`. When it is given, `external_customer_id` is ignored.'
         code:
           type: string
           maxLength: 255
@@ -23794,8 +23901,8 @@ components:
             gb: 10
         external_customer_id:
           type: string
-          deprecated: true
-          description: 'Accepted and ignored: ingestion stores no customer ID. The SDKs send it and use it only to look up the subscription before sending the event.'
+          example: cust_123
+          description: 'Used only when `external_subscription_id` is blank. The event is billed to this customer''s single active subscription and stored with its `external_subscription_id`. An unknown customer or one with no active subscription returns `422 active_subscription_not_found`, and several active subscriptions return `422 active_subscription_ambiguous`, with `error_details` `{"external_customer_id": [code]}`.'
     CostEventInput:
       type: object
       required:
@@ -32175,7 +32282,7 @@ components:
         balance_cents:
           type: integer
           format: int64
-          description: Money balance as last recorded by Core. `POST /check-and-deduct` does not update it.
+          description: Money balance in the smallest unit of the currency. `POST /check-and-deduct` lowers it with the credits it deducts.
         currency:
           type: string
         credits_balance:
@@ -32189,7 +32296,7 @@ components:
       example:
         wallet_id: 09b4f6d3-f463-4f4f-ac75-27e36bc2a296
         name: Prepaid wallet
-        balance_cents: 2000
+        balance_cents: 1600
         currency: USD
         credits_balance: '16.00000'
         status: active
@@ -32220,10 +32327,10 @@ components:
             - unknown
         amount:
           type: string
-          description: Decimal text.
+          description: Money amount in the wallet currency, as decimal text. For a check-and-deduct transaction it is the credits × the wallet rate.
         credit_amount:
           type: string
-          description: Decimal text.
+          description: Credits, as decimal text.
         settled_at:
           type:
             - string
@@ -32904,7 +33011,7 @@ components:
           $ref: '#/components/schemas/PlatformCanPolicy'
     PlatformCanEconomics:
       type: object
-      description: Point-in-time estimate for one more unit of an allowed metered feature. Monetary values are exact decimal strings in `currency`, not cents.
+      description: Point-in-time estimate for the proposed call of an allowed metered feature. Monetary values are exact decimal strings in `currency`, not cents.
       required:
         - status
         - calculated_at
@@ -32924,7 +33031,7 @@ components:
           description: Present when `status` is `estimated`.
         estimated_incremental_revenue:
           type: string
-          description: Revenue from the plan's standard charge for the feature, `0` when there is no charge.
+          description: 'Revenue of the proposed call: the standard charge''s unit price × the call''s units, `0` when there is no charge. A count feature adds 1 unit; a sum feature adds the value of its `field_name` in `metadata`. Without that value, and for max, latest, unique count, weighted sum and custom aggregations, `status` is `unavailable` and `excludes` has `revenue_quantity_missing` or `non_additive_revenue_aggregation`.'
         estimated_incremental_margin:
           type: string
           description: Revenue minus cost. Present when the cost is estimated.
@@ -32945,7 +33052,7 @@ components:
           type: array
           items:
             type: string
-          description: Costs that are not in the estimate, such as `shared_period_costs`, `finalized_invoice_adjustments`, `non_standard_revenue_pricing` or `foreign_exchange_conversion`.
+          description: Costs that are not in the estimate, such as `shared_period_costs`, `finalized_invoice_adjustments`, `non_standard_revenue_pricing`, `revenue_quantity_missing`, `non_additive_revenue_aggregation` or `foreign_exchange_conversion`.
         reason:
           type: string
           description: Machine code explaining a status other than `estimated`, such as `cost_estimator_unavailable`, `cost_estimate_failed`, `no_matching_cost_rule`, `estimated_revenue_unavailable`, `revenue_currency_mismatch` or `snapshot_too_old`.
@@ -32976,7 +33083,7 @@ components:
             - deny
         on_unavailable:
           type: string
-          description: Decision used when economics are not `estimated` or cannot be compared.
+          description: Decision used when economics are not `estimated` (for example `unavailable` because the call's revenue cannot be estimated) or cannot be compared.
           enum:
             - allow
             - warn

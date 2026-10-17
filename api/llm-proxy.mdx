@@ -34,6 +34,7 @@ Proxies all requests to `https://api.openai.com/v1/*`. Usage is recorded for cha
 
 | Header | Description |
 |--------|-------------|
+| `X-Nozle-Subscription` | External subscription ID to bill. It must be an active subscription of that customer. Needed when the customer has several active subscriptions. |
 | `X-Nozle-Feature-Code` | Code of the usage event. Default `llm_tokens`. Must match a metered Feature to bill. |
 | `X-Nozle-Feature` | Stored as the `feature` property of the event. |
 
@@ -70,6 +71,7 @@ Proxies all requests to `https://api.anthropic.com/v1/*`.
 
 | Header | Description |
 |--------|-------------|
+| `X-Nozle-Subscription` | External subscription ID to bill. It must be an active subscription of that customer. Needed when the customer has several active subscriptions. |
 | `X-Nozle-Feature-Code` | Code of the usage event. Default `llm_tokens`. Must match a metered Feature to bill. |
 | `X-Nozle-Feature` | Stored as the `feature` property of the event. |
 
@@ -88,21 +90,31 @@ curl -X POST https://api.nozle.app/engine/api/v1/proxy/anthropic/v1/messages \
 ```
 
 <Info>
-The proxy returns the provider's response unchanged. Your customer's API key is forwarded but never stored. Token usage is read from the response and recorded as a usage event in your organization, with the code from `X-Nozle-Feature-Code` (default `llm_tokens`).
+The proxy returns the provider's response unchanged. Your customer's API key is forwarded but never stored. Token usage is read from the response and recorded as a usage event in your organization, with the code from `X-Nozle-Feature-Code` (default `llm_tokens`) and the `external_subscription_id` of the subscription it is billed to.
 </Info>
 
 <Warning>
 Before this release the proxy recorded usage under Nozle's own organization instead of yours, so proxy usage from earlier calls is not in your account.
 </Warning>
 
+## Subscription
+
+Engine finds the subscription to bill before it calls the provider. Without `X-Nozle-Subscription`, the customer must have exactly one active subscription. With it, that subscription must be an active subscription of the customer in your organization. Otherwise Engine answers `422` and the provider is not called:
+
+| Case | Response |
+|------|----------|
+| Unknown customer, no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer | `422 active_subscription_not_found` |
+| Several active subscriptions and no `X-Nozle-Subscription` | `422 active_subscription_ambiguous` |
+| The lookup failed | `503 unavailable`. Retry later. |
+
 ## How it works
 
 - The path after `/proxy/openai/` or `/proxy/anthropic/` is sent to the provider host unchanged, with the same method, query string, headers and body, except as noted below.
-- Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding. All other headers, including `Authorization` and `x-api-key`, are forwarded. `Accept-Encoding` is set to `identity` so the usage can be read.
+- Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding. All other headers, including `Authorization` and `x-api-key`, are forwarded. `Accept-Encoding` is set to `identity` so the usage can be read.
 - A chat completion stream (`"stream": true` to `/chat/completions`) is sent with `stream_options.include_usage: true`, because OpenAI leaves usage out of streams otherwise.
 - Streaming (`text/event-stream`) responses are passed through as they arrive; usage is read from the stream as it passes.
 - Usage is recognised by the shape of the response: chat completions, the Responses API, and Anthropic messages, including cached input and cache writes.
-- An event is recorded only for a successful response that reports more than zero tokens. Its `transaction_id` is `llm-<format>-<response id>`, so the same response is never billed twice. Its properties are `provider`, `provider_host`, `model`, `input_tokens` (all input, including cached), `output_tokens`, `latency_ms` and, when sent, `feature`. Recording runs in the background; a recording failure does not change the response.
+- An event is recorded only for a successful response that reports more than zero tokens. It carries `external_customer_id` and the resolved `external_subscription_id`, so it is billed to that subscription. Its `transaction_id` is `llm-<format>-<response id>`, so the same response is never billed twice. Its properties are `provider`, `provider_host`, `model`, `input_tokens` (all input, including cached), `output_tokens`, `latency_ms` and, when sent, `feature`. Recording runs in the background; a recording failure does not change the response.
 
 ## Errors
 
@@ -115,5 +127,8 @@ These come from Engine. Provider errors are returned unchanged, with the provide
 | `401` | `{"code": "unauthorized", "error": "invalid nozle key"}` | The key is unknown. |
 | `403` | `{"code": "publishable_key_not_allowed", ...}` | A publishable key was used. |
 | `403` | `{"code": "permission_denied", "error": "API key requires event:write permission"}` | The key cannot write events, so the call is refused before it reaches the provider. |
+| `422` | `{"code": "active_subscription_not_found", "error": "customer has no matching active subscription"}` | The customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer. The provider is not called. |
+| `422` | `{"code": "active_subscription_ambiguous", "error": "customer has multiple active subscriptions; set X-Nozle-Subscription"}` | The customer has several active subscriptions. Send `X-Nozle-Subscription`. The provider is not called. |
 | `502` | Empty | Engine could not reach the provider. |
 | `503` | `{"code": "unavailable", "error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |
+| `503` | `{"code": "unavailable", "error": "subscription lookup is unavailable"}` | The subscription could not be looked up. The provider is not called. Retry later. |

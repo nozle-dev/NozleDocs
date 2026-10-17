@@ -61,7 +61,7 @@ Credit top-ups and payment links do not assign a customer. The customer must alr
 | **Upgrades** | A paid plan upgrade opens an embedded Checkout Session. The current plan stays active until the payment settles |
 | **Payment links** | A hosted Stripe Checkout page for credit top-ups, invoice payment URLs and overdue invoices |
 | **Subscriptions** | Managed in Nozle. Paid plans activate only after the payment succeeds |
-| **Credit top-ups** | Paid on a hosted Stripe Checkout page. Credits are granted after confirmed payment |
+| **Credit top-ups** | Paid on a hosted Stripe Checkout page. Credits are granted once the top-up invoice is fully paid |
 | **Saved payment methods** | The card used at checkout is saved for later automatic charges |
 | **Refunds and disputes** | Credit-note refunds are sent to Stripe. Lost disputes update the invoice |
 | **Customer import** | The dashboard imports existing Stripe customers and invoices |
@@ -126,15 +126,19 @@ For an invoice that already exists, call checkout with the invoice instead of a 
 - A plan or invoice checkout result has no Stripe-hosted URL, no Stripe publishable key, no `checkout_id` and no `expires_at`. Only credit top-ups return a Stripe-hosted `payment_url`. See [Credit top-ups](#credit-top-ups).
 - `amount_cents` is in the smallest unit of the invoice currency.
 - A paid upgrade returns `plan_upgrade_intent_id` instead of `invoice_id`. It is the ID you poll. The session stays open for 35 minutes.
+- The Checkout Session of a new-subscription or single Entity checkout expires after 23 hours, when the unpaid checkout itself expires.
 - An Entity checkout adds `external_entity_id` and `external_subscription_id`.
 - Send an `Idempotency-Key`. For an invoice checkout Nozle forwards it to Stripe, so a retry returns the same session.
 - Starting the same upgrade again returns the session that is still open. Starting a different plan expires the open session and replaces it. If the open session cannot be replaced, for example while a payment is processing, Nozle answers `409 plan_upgrade_checkout_in_progress`.
+- An upgrade is refused with `409 subscription_change_pending` while the subscription has a scheduled cancellation or plan change. Cancelling at period end or scheduling a plan change expires an open upgrade session.
 - If the session expired before its time, for example because Stripe expired it, the upgrade itself stays open. A new upgrade checkout then returns `409 plan_upgrade_checkout_in_progress` until the upgrade's own 35 minutes pass, even though status already reports `expired`.
 - A retry of a confirmed quoted upgrade can return `{"type": "processing", "checkout_id", "status"}`, where `checkout_id` is the upgrade ID. This is the answer while Nozle waits for the webhook of a payment that is already complete. Recover it with checkout status rather than starting another checkout.
 
 #### Retry a new-subscription checkout
 
-A new-subscription checkout leaves an incomplete subscription behind until the payment succeeds. Calling checkout again for the same customer and plan while that subscription is incomplete reopens the first checkout for the same invoice instead of failing, with or without the same `Idempotency-Key`. Asking for a different plan while it is open returns `409 subscription_checkout_in_progress`. The React `CheckoutButton` retry does this.
+A new-subscription checkout leaves an incomplete subscription behind until the payment succeeds. Calling checkout again for the same customer and plan while that subscription is incomplete reopens the first checkout for the same invoice instead of failing, with or without the same `Idempotency-Key`. The React `CheckoutButton` retry does this. Asking for a different plan replaces the abandoned checkout: the old checkout expires and the new checkout is returned. `409 subscription_checkout_in_progress` is returned only while Stripe is still processing a payment for the old checkout, or when that checkout turns out to be paid.
+
+An unpaid new-subscription checkout expires after 23 hours: the subscription is canceled with `cancelation_reason: timeout` (`subscription.canceled` webhook), the invoice is closed, the coupons, credit-note credits and wallet credits it used are returned, and its open Checkout Session is expired. See [Unpaid checkout expiry](/api/create-checkout#unpaid-checkout-expiry).
 
 An invoice checkout forwards its `Idempotency-Key` to Stripe. Reusing a key with a different body returns `409 idempotency_key_reused`.
 
@@ -284,7 +288,7 @@ Nozle uses a hosted Stripe Checkout page where the customer is not inside your e
 
 ## Credit top-ups
 
-A credit top-up for a Stripe customer returns a hosted Stripe Checkout page as `payment_url`, and `payment_provider` is `stripe`. Navigate to it. Credits are granted only after Stripe confirms the payment and the credit signal is delivered.
+A credit top-up for a Stripe customer returns a hosted Stripe Checkout page as `payment_url`, and `payment_provider` is `stripe`. Navigate to it. Credits are granted once the top-up invoice is fully paid and the credit signal is delivered. A Stripe payment pays it; so does a manual payment for the full amount, a payment request, or marking the invoice paid.
 
 ```bash
 curl -X POST https://api.nozle.app/engine/api/v1/credit-top-up-purchases \
@@ -324,8 +328,8 @@ Checkout errors that are specific to Stripe. See [Create checkout](/api/create-c
 |---|---|---|
 | `422` | `payment_provider_required` | The organization has no Stripe connection and the customer is not on Razorpay |
 | `422` | `stripe_customer_required` | Nozle could not create the customer in Stripe. A `customer.payment_provider_error` webhook carries the Stripe error |
-| `409` | `subscription_checkout_in_progress` | A new-subscription checkout for this customer is still open on a different plan. See [Retry a new-subscription checkout](#retry-a-new-subscription-checkout) |
-| `422` | `validation_errors` | `error_details.base` is `invalid_invoice_status_or_payment_status` when the invoice is paid, void or a draft, `missing_stripe_customer` or `missing_payment_provider` when the connection or Stripe customer is missing, or `no_linked_payment_provider` and `missing_payment_provider_customer` for a payment link or top-up |
+| `409` | `subscription_checkout_in_progress` | A new-subscription checkout for this customer on a different plan is still being paid. See [Retry a new-subscription checkout](#retry-a-new-subscription-checkout) |
+| `422` | `validation_errors` | `error_details.base` is `invalid_invoice_status_or_payment_status` when the invoice is paid, voided, a draft, closed, failed or has nothing due (embedded checkout and payment URL), `missing_stripe_customer` or `missing_payment_provider` when the connection or Stripe customer is missing, or `no_linked_payment_provider` and `missing_payment_provider_customer` for a payment link or top-up |
 | `409` | `plan_upgrade_checkout_in_progress` | A payment for the upgrade is already processing, or another upgrade checkout is open. It also stays in force after Stripe expired the session early, until the upgrade's own 35 minutes pass |
 | `422` | `third_party_error` | Stripe rejected the request. `error_details.third_party` is `Stripe` and `thirdparty_error` carries Stripe's message |
 | `404` | `checkout_session_not_found` | Unknown upgrade ID, or a status call without the customer and subscription scope |
@@ -337,7 +341,7 @@ Connecting Stripe can fail with `500 stripe_account_already_connected` (message 
 
 - Plan and invoice checkout use embedded Checkout only. Nozle returns no Stripe-hosted URL for them. A hosted Stripe page (`checkout.stripe.com`, valid for 24 hours) is used for credit top-ups, invoice payment URLs and overdue invoices.
 - A new-subscription or invoice checkout has no checkout ID and no status call. A paid upgrade has both.
-- An upgrade session lasts 35 minutes. A bulk Entity checkout lasts 23 hours. See [Entity Subscriptions](/api/entity-subscriptions#purchase-multiple-entity-plans-together).
+- An upgrade session lasts 35 minutes. A new-subscription, single Entity or bulk Entity checkout lasts 23 hours. See [Entity Subscriptions](/api/entity-subscriptions#purchase-multiple-entity-plans-together).
 - One connection per Stripe account in an organization. The secret key of a connection cannot change.
 - Nozle manages the webhook signing secret. You cannot enter it in the dashboard.
 - Bank transfers through `customer_balance` support USD, GBP, JPY, MXN and EUR. For EUR the customer or your billing entity must be in Belgium, Germany, Spain, France, Ireland or the Netherlands.
@@ -354,7 +358,7 @@ Connecting Stripe can fail with `500 stripe_account_already_connected` (message 
 | `stripe_customer_required` | Nozle could not create the Stripe customer. Check the `customer.payment_provider_error` webhook for the reason |
 | Customer lands on stripe.com after a top-up | Add a success redirect URL to the connection |
 | An upgrade shows `expired` | The session ended. Start the upgrade again. If Stripe expired the session early, the new call returns `409 plan_upgrade_checkout_in_progress` until the upgrade's 35 minutes pass |
-| A checkout returns `409 subscription_checkout_in_progress` | A new-subscription checkout for this customer is open on another plan. Let it be paid, or check out the same plan to reopen it |
+| A checkout returns `409 subscription_checkout_in_progress` | A payment for the customer's new-subscription checkout on another plan is processing, or it was paid. Wait for the webhook and reload the subscription |
 | Status call returns `404 checkout_session_not_found` | Send `customer_id` and `subscription_id` together, and use the upgrade ID, not an invoice ID |
 
 Test your flows with a test-key connection before you connect live keys.
