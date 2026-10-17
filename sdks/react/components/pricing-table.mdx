@@ -1,0 +1,314 @@
+---
+title: "PricingTable"
+description: "Plan cards for a pricing page, read from your public plan catalog, with checkout on each card."
+keywords: ["pricing table", "plans", "react", "checkout"]
+---
+
+`PricingTable` renders one card per plan with its price, what it includes and a button that starts checkout. Use it as the main block of a pricing or upgrade page.
+
+## What PricingTable supports
+
+- Loads your plans from the public catalog with the publishable key, or takes `plans` you pass.
+- Lists what each plan gives, built from the catalog: entitlements, credit grants and usage prices.
+- Sorts plans cheapest first; plans sold on request go last with a "Contact Sales" button.
+- A Monthly/Annual toggle when some plans are yearly.
+- Marks the current plan and highlights one plan with an outline or a filled card.
+- Starts checkout through `BillingProvider.createCheckout`, or calls your `onSelect`.
+- A loading skeleton and a load error message.
+
+## Where to use PricingTable
+
+- A public pricing page.
+- The plans page inside your app, with the customer's current plan marked.
+- An upgrade screen that a gate or a usage limit sends the customer to.
+
+## Importing PricingTable
+
+```tsx
+import { BillingProvider, PricingTable, type PricingPlan } from '@nozle-js/react'
+```
+
+## Rendering PricingTable
+
+Pass `plans` to render your own list. Each plan has the shape the public catalog returns.
+
+```tsx
+import { BillingProvider, PricingTable, type CheckoutResult, type PricingPlan } from '@nozle-js/react'
+
+const plans: PricingPlan[] = [
+  {
+    code: 'free',
+    name: 'Free',
+    amount_cents: 0,
+    amount_currency: 'USD',
+    interval: 'monthly',
+    description: 'For trying things out',
+    entitlements: [{ feature_type: 'metered', code: 'api_calls', name: 'API calls', usage_limit: 1000 }],
+  },
+  {
+    code: 'pro',
+    name: 'Pro',
+    amount_cents: 2900,
+    amount_currency: 'USD',
+    interval: 'monthly',
+    description: 'For growing teams',
+    entitlements: [{ feature_type: 'metered', code: 'api_calls', name: 'API calls', usage_limit: 50000 }],
+    credit_grant_rules: [{ credit_system_code: 'ai_credits', amount: '500', interval: 'month' }],
+  },
+  {
+    code: 'enterprise',
+    name: 'Enterprise',
+    amount_cents: 0,
+    amount_currency: 'USD',
+    interval: 'monthly',
+    entitlements: [{ feature_type: 'boolean', code: 'sso', name: 'Single sign-on' }],
+  },
+]
+
+// Your merchant route creates the checkout with your secret key.
+async function createCheckout(input: { planCode: string; returnUrl: string }): Promise<CheckoutResult> {
+  const response = await fetch('/api/billing/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error('Checkout could not be started')
+  return response.json()
+}
+
+export function PricingPage({ onClientSecret }: { onClientSecret: (secret: string) => void }) {
+  return (
+    <BillingProvider publishableKey="pk_live_..." createCheckout={createCheckout}>
+      <PricingTable
+        plans={plans}
+        currentPlanCode="free"
+        highlightPlan="pro"
+        contactSalesPlans={['enterprise']}
+        enterpriseEmail="sales@example.com"
+        onStripeClientSecret={onClientSecret}
+        onCheckoutError={(error) => console.error(error.message)}
+      />
+    </BillingProvider>
+  )
+}
+```
+
+## Using live data
+
+Leave `plans` out and `PricingTable` reads `GET /api/v1/plans` itself through the `publishableKey` of `BillingProvider`. It shares one cached request with [`usePlans`](/sdks/react/hooks#useplans).
+
+```tsx
+import { BillingProvider, PricingTable } from '@nozle-js/react'
+
+export function Pricing() {
+  return (
+    <BillingProvider publishableKey="pk_live_...">
+      <PricingTable highlightPlan="pro" onSelect={(plan) => console.log('selected', plan.code)} />
+    </BillingProvider>
+  )
+}
+```
+
+To filter plans, or to show your own loading and error UI, read them with `usePlans` and pass them in. The catalog may return `description: null`, which `PricingPlan` does not accept, so map it:
+
+```tsx
+import { PricingTable, usePlans, type PricingPlan } from '@nozle-js/react'
+
+export function MonthlyPricing() {
+  const { plans, isLoading, error } = usePlans()
+  if (isLoading) return <p>Loading plans…</p>
+  if (error) return <p role="alert">Plans could not be loaded.</p>
+  const monthly: PricingPlan[] = plans
+    .filter((plan) => plan.interval === 'monthly')
+    .map((plan) => ({ ...plan, description: plan.description ?? undefined }))
+  return <PricingTable plans={monthly} showToggle={false} />
+}
+```
+
+Each card's lines come from `planFeatures(plan)`, which you can also call for your own layout:
+
+| Catalog item | Line |
+|---|---|
+| Metered entitlement with a `usage_limit` | `100,000 API calls` |
+| Metered entitlement without a limit, and boolean entitlements | The entitlement name |
+| `config` entitlement | `Support: priority`, one line per privilege value |
+| Credit grant rule | `500 ai credits every month`, `10 credits (one time)` |
+| `standard` usage charge | `$0.01 per api calls` |
+| `graduated`, `volume` and `graduated_percentage` charges | One line per range, for example `0 to 1,000 emails: free` |
+| `package` charge | `$5.00 per 100 sms, first 50 free` |
+| `percentage` charge | `2.9% of each payment + $0.30 per payment` |
+
+A `custom` or `dynamic` charge gives no line; pass `features` for a plan that needs one.
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `plans` | `PricingPlan[]` | Read from the catalog | The plans to show. When set, the table does not fetch. |
+| `currentPlanCode` | `string` | none | Code of the customer's plan. Its card shows "Current Plan" and its button is disabled. Plans priced above it, in the same currency, get the primary button; cheaper plans get the secondary one. |
+| `highlightPlan` | `string` | none | Code of the plan to stand out. Without `currentPlanCode`, only this plan gets the primary button. |
+| `highlightStyle` | `'outline'` or `'filled'` | `'outline'` | `outline` draws the card border in `colorHighlight`; `filled` paints the card in `colorHighlight` and its text and button in `colorHighlightForeground`. See [highlighted plan](/sdks/react/styling#highlighted-plan). |
+| `highlightLabel` | `string` or `null` | `'Most Popular'` | Badge on the highlighted card. `null` shows no badge. On the current plan the badge reads "Current Plan". |
+| `showToggle` | `boolean` | `true` | Shows the Monthly/Annual toggle when at least one plan has `interval: 'yearly'`. While the toggle shows, only plans with the selected interval (`monthly` or `yearly`) and contact-sales plans are listed. |
+| `contactSalesPlans` | `string[]` | none | Codes of plans sold on request. Their card shows "Custom" instead of a price and a "Contact Sales" button, and they are placed last. From React `0.11.0`; earlier versions guessed these plans from their names. |
+| `enterpriseEmail` | `string` | none | The "Contact Sales" button opens a mail to this address with the subject "Enterprise Plan Inquiry". Without it, the button selects the plan like any other card. |
+| `features` | `string[][]` or `Record<string, string[]>` | Lines from `planFeatures` | Replaces the lines of a card: an array in the order the cards are rendered (after sorting and the toggle), or an object keyed by plan code. |
+| `sort` | `(a: PricingPlan, b: PricingPlan) => number` | Cheapest first | Orders the plans. The default is `sortPlansByPrice` with contact-sales plans last; plans in different currencies stay grouped. |
+| `onSelect` | `(plan: PricingPlan) => void` | Starts checkout | Called with the plan when its button is clicked. When set, the table does not call `createCheckout`. |
+| `returnUrl` | `string` | The current URL | Sent to `createCheckout` with the plan code. The table sends no idempotency key; only `CheckoutButton` does. |
+| `onCheckoutResult` | `(result: CheckoutResult) => void` | none | Receives every checkout result from `createCheckout`, before the table handles it. |
+| `onStripeClientSecret` | `(clientSecret: string) => void` | none | Receives the client secret of an embedded Stripe checkout; render [`Checkout`](/sdks/react/components/checkout) with it. Without it a Stripe result shows "onStripeClientSecret is required for embedded Stripe checkout". |
+| `onCheckoutError` | `(error: Error) => void` | none | Called when checkout fails. The message also shows above the cards. Catalog load errors are not passed to it. |
+| `className` | `string` | none | Class name on the root element. |
+| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides on top of the provider's. See [Appearance](/sdks/react/styling). |
+
+### Checkout results
+
+Without `onSelect`, a click calls `createCheckout({ planCode, returnUrl })`. The table then:
+
+- opens Razorpay for a `razorpay` result (with the provider's `verifyCheckout`),
+- shows "Payment is processing. Confirmation may take a little while." and polls with `getCheckoutStatus` for a `processing` result,
+- redirects to the URL of a `hosted` result or a result with `url`,
+- passes the secret of a `stripe` result to `onStripeClientSecret`,
+- does nothing more for `completed` and `scheduled` results; read them in `onCheckoutResult`.
+
+See [checkout result types](/sdks/react/hooks#checkout-result-types).
+
+### States
+
+| State | What shows |
+|---|---|
+| Loading the catalog | Three skeleton cards. |
+| Catalog request failed | `Plans could not be loaded: <reason>` in a `role="alert"` message, for example `HTTP 404`. From React `0.10.2`; earlier versions rendered an empty grid. |
+| No `plans` and no `BillingProvider` | `BillingProvider with a publishableKey is required to load plans`. |
+| Checkout failed | The error message in red above the cards. |
+
+### Appearance elements
+
+`pricingTable`, `pricingTable__toggle`, `pricingTable__toggleButton`, `pricingTable__grid`, and for each card `planCard`, `planCard__header` (panel layout only), `planCard__badge`, `planCard__name`, `planCard__description`, `planCard__price`, `planCard__features`, `planCard__feature`, `planCard__cta`. The themes `nozle` and `nozleDark` use the [panel card layout](/sdks/react/styling#plan-card-layout).
+
+On the free Nozle plan the table shows [Powered by Nozle](/sdks/react/components/powered-by-nozle) below the cards.
+
+## Themes
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/pricing-table/light.png" alt="PricingTable with Free, Pro, Scale and Enterprise plans, the Monthly/Annual toggle, Free as the current plan and Pro highlighted, light theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/pricing-table/dark.png" alt="PricingTable with Free, Pro, Scale and Enterprise plans, the Monthly/Annual toggle, Free as the current plan and Pro highlighted, dark theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/pricing-table/minimal.png" alt="PricingTable with Free, Pro, Scale and Enterprise plans, the Monthly/Annual toggle, Free as the current plan and Pro highlighted, minimal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/pricing-table/neobrutal.png" alt="PricingTable with Free, Pro, Scale and Enterprise plans, the Monthly/Annual toggle, Free as the current plan and Pro highlighted, neobrutal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/pricing-table/nozle.png" alt="PricingTable with Free, Pro, Scale and Enterprise plans, the Monthly/Annual toggle, Free as the current plan and Pro highlighted, nozle theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/pricing-table/nozle-dark.png" alt="PricingTable with Free, Pro, Scale and Enterprise plans, the Monthly/Annual toggle, Free as the current plan and Pro highlighted, nozleDark theme" width="1008" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+### Filled highlight
+
+`highlightStyle="filled"`:
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/pricing-table-filled/light.png" alt="PricingTable with the Pro card filled with the highlight colour, light theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/pricing-table-filled/dark.png" alt="PricingTable with the Pro card filled with the highlight colour, dark theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/pricing-table-filled/minimal.png" alt="PricingTable with the Pro card filled with the highlight colour, minimal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/pricing-table-filled/neobrutal.png" alt="PricingTable with the Pro card filled with the highlight colour, neobrutal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/pricing-table-filled/nozle.png" alt="PricingTable with the Pro card filled with the highlight colour, nozle theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/pricing-table-filled/nozle-dark.png" alt="PricingTable with the Pro card filled with the highlight colour, nozleDark theme" width="1008" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+### Catalog error
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/pricing-table-error/light.png" alt="The PricingTable message when the catalog request fails, light theme" width="260" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/pricing-table-error/dark.png" alt="The PricingTable message when the catalog request fails, dark theme" width="260" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/pricing-table-error/minimal.png" alt="The PricingTable message when the catalog request fails, minimal theme" width="260" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/pricing-table-error/neobrutal.png" alt="The PricingTable message when the catalog request fails, neobrutal theme" width="260" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/pricing-table-error/nozle.png" alt="The PricingTable message when the catalog request fails, nozle theme" width="250" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/pricing-table-error/nozle-dark.png" alt="The PricingTable message when the catalog request fails, nozleDark theme" width="250" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="PlanCard" icon="id-card" href="/sdks/react/components/plan-card">
+    One plan card for your own layout.
+  </Card>
+  <Card title="PlanComparison" icon="table" href="/sdks/react/components/plan-comparison">
+    The plans side by side, feature by feature.
+  </Card>
+  <Card title="Checkout" icon="credit-card" href="/sdks/react/components/checkout">
+    Collects the payment for a Stripe client secret.
+  </Card>
+  <Card title="Appearance" icon="palette" href="/sdks/react/styling">
+    Themes, variables and element overrides.
+  </Card>
+</Columns>

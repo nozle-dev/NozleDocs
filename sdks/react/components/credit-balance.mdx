@@ -1,0 +1,160 @@
+---
+title: "CreditBalance"
+description: "One credit balance: credits available, the time of the reading, and where the credits come from."
+keywords: ["credit balance", "credits", "wallet", "react"]
+---
+
+`CreditBalance` shows how many credits a customer has in one credit system, and the grants and top-ups they come from.
+
+## What CreditBalance supports
+
+- The available credits with the unit name, singular for exactly 1 ("1 credit available", "1,240 credits available").
+- "As of &lt;date&gt;" for the time of the reading.
+- One line per source with what remains and when it expires: Plan grant, Top-up, Granted, Adjustment, Allocated top-up. Sources with nothing left are hidden.
+- Loading, error and empty states.
+
+## Where to use CreditBalance
+
+- Next to an AI or credit-metered feature, so customers see what is left.
+- The credits section of your billing settings, with [`CreditHistory`](/sdks/react/components/credit-history) below it.
+
+## Importing CreditBalance
+
+```tsx
+import { CreditBalance, type CreditBalanceData } from '@nozle-js/react'
+```
+
+## Rendering CreditBalance
+
+Credit amounts are decimal strings.
+
+```tsx
+import { CreditBalance, type CreditBalanceData } from '@nozle-js/react'
+
+const balance: CreditBalanceData = {
+  credit_system_name: 'AI credits',
+  unit_name: 'credit',
+  available: '1240',
+  as_of: '2026-10-16T09:00:00Z',
+  sources: [
+    { id: 'grant_1', type: 'subscription_grant', remaining: '500', expires_at: '2026-11-01T00:00:00Z' },
+    { id: 'topup_1', type: 'top_up', remaining: '740', expires_at: null },
+  ],
+}
+
+export function Credits() {
+  return <CreditBalance balance={balance} />
+}
+```
+
+## Using live data
+
+Inside a `BillingProvider` with `billingEndpoint`, [`useCreditBalance(creditSystemCode?)`](/sdks/react/hooks#the-hooks) returns one balance of the signed-in customer: the given credit system, else the first one with credits, else the first one.
+
+```tsx
+import { CreditBalance, useCreditBalance } from '@nozle-js/react'
+
+export function AiCredits() {
+  const { data, isPending, error } = useCreditBalance('ai_credits')
+  return <CreditBalance balance={data} isLoading={isPending} error={error} />
+}
+```
+
+Without the hooks, pass one entry of the SDK's `credits.balance` result, read on your backend.
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `balance` | `CreditBalanceData` or `null` | none | `credit_system_name`, `unit_name`, `available`, `as_of` and optional `sources` (`id`, `type`, `remaining`, `expires_at`). `null` or no value shows the empty message. |
+| `isLoading` | `boolean` | `false` | Shows a loading placeholder. |
+| `error` | `Error`, `string` or `null` | `null` | Shows the message as an alert. |
+| `emptyMessage` | `string` | `'No credit balance yet.'` | Shown when there is no balance. |
+| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
+
+Dates show in `en-US` ("Oct 16, 2026"). A source type the component does not know shows as sent.
+
+### Appearance elements
+
+`creditBalance` (root), `creditBalance__amount` (the large number).
+
+## Themes
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/credit-balance/light.png" alt="CreditBalance with 1,240 AI credits from a plan grant and a top-up, light theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/credit-balance/dark.png" alt="CreditBalance with 1,240 AI credits from a plan grant and a top-up, dark theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/credit-balance/minimal.png" alt="CreditBalance with 1,240 AI credits from a plan grant and a top-up, minimal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/credit-balance/neobrutal.png" alt="CreditBalance with 1,240 AI credits from a plan grant and a top-up, neobrutal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/credit-balance/nozle.png" alt="CreditBalance with 1,240 AI credits from a plan grant and a top-up, nozle theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/credit-balance/nozle-dark.png" alt="CreditBalance with 1,240 AI credits from a plan grant and a top-up, nozleDark theme" width="1008" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+### Loading, empty and error
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/credit-balance-states/light.png" alt="CreditBalance loading placeholder, No credit balance yet message, and an error message, light theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/credit-balance-states/dark.png" alt="CreditBalance loading placeholder, No credit balance yet message, and an error message, dark theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/credit-balance-states/minimal.png" alt="CreditBalance loading placeholder, No credit balance yet message, and an error message, minimal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/credit-balance-states/neobrutal.png" alt="CreditBalance loading placeholder, No credit balance yet message, and an error message, neobrutal theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/credit-balance-states/nozle.png" alt="CreditBalance loading placeholder, No credit balance yet message, and an error message, nozle theme" width="1008" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/credit-balance-states/nozle-dark.png" alt="CreditBalance loading placeholder, No credit balance yet message, and an error message, nozleDark theme" width="1008" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="CreditHistory" icon="clock-rotate-left" href="/sdks/react/components/credit-history">
+    How credits were used and granted.
+  </Card>
+  <Card title="Credits" icon="coins" href="/guides/credits/overview">
+    How credit systems work.
+  </Card>
+</Columns>

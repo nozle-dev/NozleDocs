@@ -1,0 +1,118 @@
+---
+title: "UsageGate"
+description: "Shows content while usage is below its limit, and a fallback once the limit is reached."
+keywords: ["usage gate", "limit", "access control", "react"]
+---
+
+`UsageGate` renders its children while `usage` is below `limit`, and `fallback` once `usage` reaches it. It has no look of its own and fetches nothing.
+
+## What UsageGate supports
+
+- A limit check where reaching the limit counts as used up (`usage >= limit`).
+- A fallback for the used-up state.
+
+## Where to use UsageGate
+
+- Around a "Create" button for something with a monthly cap.
+- Around an API console or generator that consumes a metered feature.
+
+Gates only change what the interface shows. Enforce the limit on your server.
+
+## Importing UsageGate
+
+```tsx
+import { UsageGate, UpgradePrompt } from '@nozle-js/react'
+```
+
+## Rendering UsageGate
+
+```tsx
+import { UsageGate, UpgradePrompt } from '@nozle-js/react'
+
+export function NewProject({ used, limit }: { used: number; limit: number }) {
+  return (
+    <UsageGate usage={used} limit={limit} fallback={<UpgradePrompt text={`You used all ${limit} projects`} />}>
+      <button type="button">New project</button>
+    </UsageGate>
+  )
+}
+```
+
+## Using live data
+
+[`useEntitlement(featureCode)`](/sdks/react/hooks#the-hooks) returns `used` and `limit`. A `null` limit means unlimited, so skip the gate then:
+
+```tsx
+import { UsageGate, UpgradePrompt, useEntitlement } from '@nozle-js/react'
+
+export function ApiConsole() {
+  const { data } = useEntitlement('api_calls')
+  if (!data) return null
+  const editor = <textarea aria-label="Request body" />
+  if (data.limit === null) return editor
+  return (
+    <UsageGate usage={data.used ?? 0} limit={data.limit} fallback={<UpgradePrompt text="You used all your API calls" />}>
+      {editor}
+    </UsageGate>
+  )
+}
+```
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `usage` | `number` | required | The usage so far. |
+| `limit` | `number` | required | The limit. At or above it, `fallback` renders. |
+| `children` | `ReactNode` | required | The content available below the limit. |
+| `fallback` | `ReactNode` | `null` | Rendered when `usage >= limit`. |
+
+`UsageGate` has no loading state and no `appearance`.
+
+## Themes
+
+The fallbacks of the three gates, each an [`UpgradePrompt`](/sdks/react/components/upgrade-prompt):
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/gates/light.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, light theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/gates/dark.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, dark theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/gates/minimal.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, minimal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/gates/neobrutal.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, neobrutal theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/gates/nozle.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, nozle theme" width="508" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/gates/nozle-dark.png" alt="Three UpgradePrompt fallbacks shown by FeatureGate, PlanGate and UsageGate, nozleDark theme" width="508" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="UsageMeter" icon="bars-progress" href="/sdks/react/components/usage-meter">
+    Show how close the limit is.
+  </Card>
+  <Card title="UsageAlert" icon="triangle-exclamation" href="/sdks/react/components/usage-alert">
+    Warn before the limit.
+  </Card>
+</Columns>

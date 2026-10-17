@@ -1,0 +1,118 @@
+---
+title: "PlanBadge"
+description: "A small pill with a plan name, coloured by tier."
+keywords: ["plan badge", "tier", "react"]
+---
+
+`PlanBadge` shows a plan name as a pill. Its colour comes from one of four tiers and your theme.
+
+## What PlanBadge supports
+
+- Any text as the label.
+- Four tier colours: `free` (muted), `starter` (tinted primary), `pro` (primary) and `enterprise` (accent).
+
+## Where to use PlanBadge
+
+- Next to the account or workspace name in your app's header or menu.
+- In a team or customer list.
+- On a feature that needs a higher plan.
+
+## Importing PlanBadge
+
+```tsx
+import { PlanBadge, type PlanBadgeProps } from '@nozle-js/react'
+```
+
+## Rendering PlanBadge
+
+```tsx
+import { PlanBadge } from '@nozle-js/react'
+
+export function Badges() {
+  return (
+    <>
+      <PlanBadge plan="Free" tier="free" />
+      <PlanBadge plan="Starter" tier="starter" />
+      <PlanBadge plan="Pro" tier="pro" />
+      <PlanBadge plan="Enterprise" tier="enterprise" />
+    </>
+  )
+}
+```
+
+## Using live data
+
+Take the plan name from [`useSubscription`](/sdks/react/hooks#the-hooks) and choose the tier from the plan code yourself; the badge does not know your plans.
+
+```tsx
+import { PlanBadge, useSubscription, type PlanBadgeProps } from '@nozle-js/react'
+
+const tiers: Record<string, PlanBadgeProps['tier']> = { free: 'free', pro: 'pro', scale: 'enterprise' }
+
+export function AccountPlan() {
+  const { data } = useSubscription()
+  const plan = data?.subscription?.plan
+  if (!plan) return null
+  return <PlanBadge plan={plan.name} tier={tiers[plan.code] ?? 'free'} />
+}
+```
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `plan` | `string` | required | The text of the badge. |
+| `tier` | `'free'`, `'starter'`, `'pro'` or `'enterprise'` | `'free'` | The colour: `free` uses `colorMuted` with a border, `starter` a tint of `colorPrimary`, `pro` `colorPrimary`, `enterprise` `colorAccent`. |
+| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
+
+The label uses the theme's small label font, so themes with uppercase labels show it in capitals.
+
+### Appearance elements
+
+`planBadge` (the pill).
+
+## Themes
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/plan-badge/light.png" alt="PlanBadge in the free, starter, pro and enterprise tiers, light theme" width="257" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/plan-badge/dark.png" alt="PlanBadge in the free, starter, pro and enterprise tiers, dark theme" width="257" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/plan-badge/minimal.png" alt="PlanBadge in the free, starter, pro and enterprise tiers, minimal theme" width="257" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/plan-badge/neobrutal.png" alt="PlanBadge in the free, starter, pro and enterprise tiers, neobrutal theme" width="316" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/plan-badge/nozle.png" alt="PlanBadge in the free, starter, pro and enterprise tiers, nozle theme" width="318" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/plan-badge/nozle-dark.png" alt="PlanBadge in the free, starter, pro and enterprise tiers, nozleDark theme" width="318" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="CurrentPlan" icon="circle-info" href="/sdks/react/components/current-plan">
+    The plan with status, price and usage.
+  </Card>
+  <Card title="PlanGate" icon="lock" href="/sdks/react/components/plan-gate">
+    Shows content only on some plans.
+  </Card>
+</Columns>

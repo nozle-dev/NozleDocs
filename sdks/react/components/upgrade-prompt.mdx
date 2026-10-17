@@ -1,0 +1,116 @@
+---
+title: "UpgradePrompt"
+description: "A short upgrade message with an Upgrade button, for gate fallbacks and locked features."
+keywords: ["upgrade prompt", "upsell", "gate fallback", "react"]
+---
+
+`UpgradePrompt` shows a centered message and an "Upgrade" button. It is the fallback of choice for the gates and the panel of [`LockedOverlay`](/sdks/react/components/locked-overlay).
+
+## What UpgradePrompt supports
+
+- "Upgrade to &lt;plan&gt; to access this feature" from a plan name, or your own text.
+- An "Upgrade" button that calls your handler or opens `/upgrade`.
+
+## Where to use UpgradePrompt
+
+- As `fallback` of [`FeatureGate`](/sdks/react/components/feature-gate), [`PlanGate`](/sdks/react/components/plan-gate) or [`UsageGate`](/sdks/react/components/usage-gate).
+- In an empty state of a feature the customer's plan does not include.
+
+## Importing UpgradePrompt
+
+```tsx
+import { UpgradePrompt } from '@nozle-js/react'
+```
+
+## Rendering UpgradePrompt
+
+```tsx
+import { UpgradePrompt } from '@nozle-js/react'
+
+export function Prompts({ openPlans }: { openPlans: () => void }) {
+  return (
+    <>
+      <UpgradePrompt planName="Pro" onUpgrade={openPlans} />
+      <UpgradePrompt text="You used all 1,000 API calls this month" onUpgrade={openPlans} />
+    </>
+  )
+}
+```
+
+## Using live data
+
+The prompt shows what you pass. Open your plan change flow from `onUpgrade`, for example an [`UpgradeModal`](/sdks/react/components/upgrade-modal):
+
+```tsx
+import { useState } from 'react'
+import { UpgradeModal, UpgradePrompt } from '@nozle-js/react'
+
+export function UpgradeToScale() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <UpgradePrompt planName="Scale" onUpgrade={() => setOpen(true)} />
+      <UpgradeModal isOpen={open} planCode="scale" onCancel={() => setOpen(false)} onCompleted={() => setOpen(false)} />
+    </>
+  )
+}
+```
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `planName` | `string` | none | Shows "Upgrade to &lt;planName&gt; to access this feature". Takes priority over `text`. |
+| `text` | `string` | `'Upgrade to access this feature'` | The message when `planName` is not set. |
+| `onUpgrade` | `() => void` | Opens `/upgrade` | Called when "Upgrade" is clicked. Without it the button sets `window.location.href` to `/upgrade`. |
+| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
+
+### Appearance elements
+
+`upgradePrompt` (root).
+
+## Themes
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/upgrade-prompt/light.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, light theme" width="293" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/upgrade-prompt/dark.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, dark theme" width="293" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/upgrade-prompt/minimal.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, minimal theme" width="293" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/upgrade-prompt/neobrutal.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, neobrutal theme" width="293" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/upgrade-prompt/nozle.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, nozle theme" width="279" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/upgrade-prompt/nozle-dark.png" alt="UpgradePrompt reading Upgrade to Pro to access this feature, with an Upgrade button, nozleDark theme" width="279" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="LockedOverlay" icon="eye-slash" href="/sdks/react/components/locked-overlay">
+    This prompt over blurred content.
+  </Card>
+  <Card title="FeatureGate" icon="lock" href="/sdks/react/components/feature-gate">
+    Shows it when a feature is not included.
+  </Card>
+</Columns>

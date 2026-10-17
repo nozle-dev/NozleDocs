@@ -1,0 +1,202 @@
+---
+title: "CheckoutButton"
+description: "A button that starts checkout for one plan through your BillingProvider and handles the result."
+keywords: ["checkout button", "subscribe", "react", "razorpay", "stripe"]
+---
+
+`CheckoutButton` starts checkout for one plan when clicked. It calls `createCheckout` on `BillingProvider` with an idempotency key, then opens Razorpay, redirects, hands you a Stripe client secret, or reports a completed or scheduled change.
+
+## What CheckoutButton supports
+
+- One idempotency key per plan, reused when the customer clicks again, so a retry reopens the same pending checkout.
+- Every checkout result: Stripe client secret, Razorpay, hosted payment link, processing, completed and scheduled.
+- Razorpay verification and status polling through the provider's `verifyCheckout` and `getCheckoutStatus`.
+- A busy label while checkout starts, a processing message and the error message under the button.
+
+## Where to use CheckoutButton
+
+- A plan card or marketing section that sells one plan.
+- An onboarding step that subscribes the new customer.
+- Anywhere you need checkout without the full [`PricingTable`](/sdks/react/components/pricing-table).
+
+## Importing CheckoutButton
+
+```tsx
+import {
+  BillingProvider,
+  CheckoutButton,
+  type CompletedCheckoutResult,
+  type CreateCheckout,
+  type ScheduledCheckoutResult,
+} from '@nozle-js/react'
+```
+
+## Rendering CheckoutButton
+
+`CheckoutButton` must be inside a `BillingProvider` with `createCheckout`. Your merchant route creates the checkout with your secret key; see [Implement the merchant endpoint](/sdks/react/installation#implement-the-merchant-endpoint).
+
+```tsx
+import { useState } from 'react'
+import {
+  BillingProvider,
+  Checkout,
+  CheckoutButton,
+  type CompletedCheckoutResult,
+  type CreateCheckout,
+  type ScheduledCheckoutResult,
+} from '@nozle-js/react'
+
+const createCheckout: CreateCheckout = async (input) => {
+  const response = await fetch('/api/billing/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) throw new Error('Checkout could not be started')
+  return response.json()
+}
+
+export function BuyPro() {
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [message, setMessage] = useState('')
+
+  return (
+    <BillingProvider publishableKey="pk_live_..." createCheckout={createCheckout}>
+      {clientSecret ? (
+        <Checkout clientSecret={clientSecret} publishableKey="pk_live_stripe..." />
+      ) : (
+        <CheckoutButton
+          planCode="pro"
+          label="Get Pro"
+          returnUrl="https://app.example.com/settings/billing"
+          onStripeClientSecret={setClientSecret}
+          onComplete={(result: CompletedCheckoutResult) => setMessage(`Subscribed: ${result.status}`)}
+          onScheduled={(result: ScheduledCheckoutResult) => setMessage(`Change scheduled for ${result.effective_at}`)}
+          onError={(error) => setMessage(error.message)}
+        />
+      )}
+      {message && <p>{message}</p>}
+    </BillingProvider>
+  )
+}
+```
+
+## Using live data
+
+The button needs no customer data. It reads `createCheckout`, `verifyCheckout` and `getCheckoutStatus` from `BillingProvider`. For Razorpay, give the provider both callbacks; each calls your backend, which scopes the request to the signed-in customer:
+
+```tsx
+import { BillingProvider, CheckoutButton, type CheckoutStatus, type CreateCheckout, type RazorpayVerification } from '@nozle-js/react'
+
+const post = async <T,>(path: string, body: object): Promise<T> => {
+  const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`)
+  return response.json()
+}
+
+const createCheckout: CreateCheckout = (input) => post('/api/billing/checkout', input)
+const verifyCheckout = (checkoutId: string, verification: RazorpayVerification) =>
+  post<CheckoutStatus>('/api/billing/checkout/verify', { checkoutId, ...verification })
+const getCheckoutStatus = (checkoutId: string) => post<CheckoutStatus>('/api/billing/checkout/status', { checkoutId })
+
+export function RazorpayBuy() {
+  return (
+    <BillingProvider
+      publishableKey="pk_live_..."
+      createCheckout={createCheckout}
+      verifyCheckout={verifyCheckout}
+      getCheckoutStatus={getCheckoutStatus}
+    >
+      <CheckoutButton planCode="pro" registerMandate onSuccess={(paymentId) => console.log('paid', paymentId)} />
+    </BillingProvider>
+  )
+}
+```
+
+After a completed or scheduled result, reload the customer's billing data, for example with `useBillingRefresh()` from the [hooks](/sdks/react/hooks).
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `planCode` | `string` | required | The plan to check out, sent to `createCheckout`. |
+| `label` | `string` | `'Get Started'` | Button text. While checkout starts, the button reads "Loading..." and is disabled. |
+| `returnUrl` | `string` | The current URL | Sent to `createCheckout`, where the provider returns the customer after payment. |
+| `registerMandate` | `boolean` | not sent | Sent to `createCheckout` when set, to ask for a recurring payment mandate. |
+| `onStripeClientSecret` | `(clientSecret: string) => void` | none | Receives the client secret of an embedded Stripe checkout; render [`Checkout`](/sdks/react/components/checkout) with it. Without it, a Stripe result fails with "onStripeClientSecret is required for embedded Stripe checkout". |
+| `onComplete` | `(result: CompletedCheckoutResult) => void` | none | Called for a `completed` result: the change took effect without a payment step, or a resumed checkout succeeded. |
+| `onScheduled` | `(result: ScheduledCheckoutResult) => void` | none | Called for a `scheduled` result, such as a downgrade at renewal. |
+| `onSuccess` | `(paymentId: string) => void` | none | Razorpay only. Called with the Razorpay payment ID when the payment is captured and the plan is fulfilled. |
+| `onProcessing` | `(status: CheckoutStatus) => void` | none | Called with each status while the button waits for a payment to be confirmed. The button shows "Payment is processing. Confirmation may take a little while." |
+| `onDismiss` | `() => void` | none | Razorpay only. Called when the customer closes the Razorpay window without paying. |
+| `onError` | `(error: Error) => void` | none | Called when checkout fails. The message also shows next to the button in a `role="alert"` element. |
+| `razorpayKeyId` | `string` | none | Deprecated and not used. The Razorpay key comes from the checkout result. |
+| `className` | `string` | none | Class name on the button. |
+| `style` | `CSSProperties` | none | Inline styles on the button, on top of the theme's. |
+| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
+
+### What happens on click
+
+1. The button calls `createCheckout({ idempotencyKey, planCode, returnUrl, registerMandate? })`. A second click while the first is running does nothing.
+2. For a `razorpay` result it loads Razorpay and opens it. A captured payment is checked with `verifyCheckout`, then polled with `getCheckoutStatus` up to 30 times, one second apart. A failed payment shows "Payment failed. You can retry checkout."
+3. For a `processing` result it polls the same way and continues with the checkout it returns.
+4. For a `hosted` result, or a result with a `url`, it redirects the page.
+5. For a `stripe` result it passes the client secret to `onStripeClientSecret`.
+
+Without `createCheckout` on the provider the button shows "BillingProvider createCheckout callback is required for checkout". Outside a `BillingProvider` it throws.
+
+### Appearance elements
+
+`checkoutButton` (the button).
+
+## Themes
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/checkout-button/light.png" alt="CheckoutButton labelled Get Pro, light theme" width="128" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/checkout-button/dark.png" alt="CheckoutButton labelled Get Pro, dark theme" width="128" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/checkout-button/minimal.png" alt="CheckoutButton labelled Get Pro, minimal theme" width="128" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/checkout-button/neobrutal.png" alt="CheckoutButton labelled Get Pro, neobrutal theme" width="130" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/checkout-button/nozle.png" alt="CheckoutButton labelled Get Pro, nozle theme" width="135" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/checkout-button/nozle-dark.png" alt="CheckoutButton labelled Get Pro, nozleDark theme" width="135" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="Checkout" icon="credit-card" href="/sdks/react/components/checkout">
+    Renders the Stripe payment step for the client secret.
+  </Card>
+  <Card title="PricingTable" icon="table-columns" href="/sdks/react/components/pricing-table">
+    Plan cards that start checkout the same way.
+  </Card>
+  <Card title="UpgradeButton" icon="arrow-up" href="/sdks/react/components/upgrade-button">
+    Confirms a plan change before checkout.
+  </Card>
+  <Card title="Checkout result types" icon="code" href="/sdks/react/hooks#checkout-result-types">
+    Every result `createCheckout` can return.
+  </Card>
+</Columns>

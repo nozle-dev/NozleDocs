@@ -1,0 +1,207 @@
+---
+title: "CancellationControl"
+description: "Cancel a subscription at the end of its period, or keep it before the cancellation takes effect."
+keywords: ["cancel subscription", "keep subscription", "self-service", "react"]
+---
+
+`CancellationControl` renders "Cancel subscription" for an active subscription, or "Keep my subscription" for one that is ending. A dialog shows the date from your backend's preview before the customer confirms.
+
+## What CancellationControl supports
+
+- Cancellation at the end of the period, with the exact end date from your backend.
+- Keep (uncancel) before the end date, with the next renewal date.
+- A note that a scheduled plan change will be removed when the customer cancels.
+- Re-reading the subscription after every attempt, including a lost response, and "Check status / retry" with the same idempotency key.
+
+## Where to use CancellationControl
+
+- The subscription section of your billing settings page.
+- Inside [`BillingPortal`](/sdks/react/components/billing-portal), which renders it when you pass `cancellationActions`.
+
+## Importing CancellationControl
+
+```tsx
+import {
+  BillingPortalError,
+  CancellationControl,
+  type CancellationActions,
+  type CancellationSubscription,
+} from '@nozle-js/react'
+```
+
+## Rendering CancellationControl
+
+```tsx
+import { BillingPortalError, CancellationControl, type CancellationActions, type CancellationSubscription } from '@nozle-js/react'
+
+async function post<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(path, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal,
+  })
+  if (!response.ok) {
+    throw new BillingPortalError(response.status === 401 || response.status === 403 ? 'unauthorized' : 'request')
+  }
+  return response.json()
+}
+
+const actions: CancellationActions = {
+  preview: ({ signal, ...body }) => post('/api/billing/cancellation/preview', body, signal),
+  apply: ({ signal, ...body }) => post('/api/billing/cancellation', body, signal),
+}
+
+const subscription: CancellationSubscription = {
+  id: '6f1c2a4e-0000-4000-8000-000000000001',
+  externalId: 'sub_123',
+  name: 'Pro subscription',
+  status: 'active',
+  endingAt: null,
+  pendingPlanName: null,
+}
+
+export function CancelPlan({ onChanged }: { onChanged: () => void }) {
+  return (
+    <CancellationControl
+      subscription={subscription}
+      actions={actions}
+      refresh={(signal) => post<CancellationSubscription | null>('/api/billing/subscription', {}, signal)}
+      onChanged={onChanged}
+      locale="en-US"
+      timezone="UTC"
+    />
+  )
+}
+```
+
+## Using live data
+
+Your backend answers the two actions and `refresh` for the signed-in customer:
+
+| Callback | Receives | Returns |
+|---|---|---|
+| `preview` | `subscriptionId`, `operation` (`cancel` or `uncancel`), `signal` | `{ operation, effectiveAt, renewalAt }`, ISO dates; `renewalAt` may be null |
+| `apply` | the same, plus `idempotencyKey` and, for `cancel`, `expectedEffectiveAt` (the preview's date) | Anything |
+| `refresh` | `signal` | The subscription as `CancellationSubscription`, or `null` |
+
+Reject a changed end date on the server with HTTP 409. Use the subscription's external ID for these calls and keep its Core `id` for portal reads. See [Cancel and Keep](/sdks/react/billing-portal#cancel-and-keep) for the server side.
+
+## Options
+
+| Prop | Type | Default | What it does |
+|---|---|---|---|
+| `subscription` | `CancellationSubscription` | required | `id` (Core UUID), `externalId`, `name`, `status`, `endingAt` and optional `pendingPlanName`. The button shows only when `status` is `active` and `endingAt` has not passed. |
+| `actions` | `CancellationActions` | required | `preview` and `apply`, above. |
+| `refresh` | `(signal: AbortSignal) => Promise<CancellationSubscription \| null>` | required | Reads the saved subscription after every attempt; the control checks it to decide whether the change took effect. |
+| `onChanged` | `() => void` | none | Called after a cancellation or keep is confirmed by `refresh`. |
+| `onError` | `(error: BillingPortalError) => void` | none | Called when a request fails. |
+| `locale` | `string` | `'en-US'` | Formats the dates (long style, for example "November 1, 2026"). The text is English. |
+| `timezone` | `string` | `'UTC'` | Time zone of the dates: an IANA name, or a Nozle `TZ_` name. |
+| `nonce` | `string` | none | CSP nonce for the control's `<style>` element. |
+| `appearance` | `Appearance` | The provider's | Theme, variables and element overrides. See [Appearance](/sdks/react/styling). |
+
+### What the customer sees
+
+| Step | Shown |
+|---|---|
+| Active subscription | "Cancel subscription". |
+| Ending subscription | "Keep my subscription". |
+| Dialog, loading | "Loading subscription details…". A failed preview shows "Could not load this change. Please try again." and "Try again". |
+| Cancel preview | "If you confirm, your subscription will end on &lt;date&gt;." and that invoices and usage charges still apply; "Confirm cancellation". |
+| Keep preview | "Your current plan will continue to renew on &lt;date&gt;."; "Confirm keep subscription". |
+| Done | "Cancellation scheduled." or "Your subscription will continue to renew." |
+
+A request that takes over 30 seconds stops with "This request timed out. Check its status before trying again." The dialog closes with Escape or Close, not while busy.
+
+### Appearance elements
+
+`cancellationControl` (root, also class `nozle-cancellation`).
+
+## Themes
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/cancellation-control/light.png" alt="The Cancel subscription button, light theme" width="183" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/cancellation-control/dark.png" alt="The Cancel subscription button, dark theme" width="183" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/cancellation-control/minimal.png" alt="The Cancel subscription button, minimal theme" width="183" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/cancellation-control/neobrutal.png" alt="The Cancel subscription button, neobrutal theme" width="185" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/cancellation-control/nozle.png" alt="The Cancel subscription button, nozle theme" width="197" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/cancellation-control/nozle-dark.png" alt="The Cancel subscription button, nozleDark theme" width="197" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+### Cancel dialog
+
+<Tabs>
+  <Tab title="Light">
+    <Frame>
+      <img src="/images/react/components/cancellation-control-dialog/light.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, light theme" width="472" />
+    </Frame>
+  </Tab>
+  <Tab title="Dark">
+    <Frame>
+      <img src="/images/react/components/cancellation-control-dialog/dark.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, dark theme" width="472" />
+    </Frame>
+  </Tab>
+  <Tab title="Minimal">
+    <Frame>
+      <img src="/images/react/components/cancellation-control-dialog/minimal.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, minimal theme" width="472" />
+    </Frame>
+  </Tab>
+  <Tab title="Neobrutal">
+    <Frame>
+      <img src="/images/react/components/cancellation-control-dialog/neobrutal.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, neobrutal theme" width="472" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle">
+    <Frame>
+      <img src="/images/react/components/cancellation-control-dialog/nozle.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, nozle theme" width="472" />
+    </Frame>
+  </Tab>
+  <Tab title="Nozle dark">
+    <Frame>
+      <img src="/images/react/components/cancellation-control-dialog/nozle-dark.png" alt="The Cancel subscription dialog with the end date, a note about outstanding charges, and Close and Confirm cancellation buttons, nozleDark theme" width="472" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+## Related components
+
+<Columns cols={2}>
+  <Card title="PlanChangeControl" icon="arrows-rotate" href="/sdks/react/components/plan-change-control">
+    Upgrades, downgrades and scheduled changes.
+  </Card>
+  <Card title="BillingPortal" icon="building-columns" href="/sdks/react/components/billing-portal">
+    The whole customer portal, with this control inside.
+  </Card>
+  <Card title="Billing portal and self-service" icon="book" href="/sdks/react/billing-portal">
+    Backend adapters and runnable examples.
+  </Card>
+  <Card title="CurrentPlan" icon="circle-info" href="/sdks/react/components/current-plan">
+    Shows "Ends &lt;date&gt;" for a cancelled subscription.
+  </Card>
+</Columns>
