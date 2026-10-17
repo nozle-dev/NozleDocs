@@ -135,7 +135,7 @@ Set the colours with `colorHighlight` and `colorHighlightForeground`; they defau
 
 A theme's `planCardLayout` picks how `PricingTable` and `PlanCard` lay out each plan:
 
-- `card` (default): name, description, price and ticked features.
+- `card` (default): name, description, price and ticked features. Plans priced above the current plan get the primary button; the current plan and cheaper ones get the plain button.
 - `panel`: the name in a header band, with `ACTIVE` on the right for the current plan and the highlight label for the highlighted plan, then price, description and plain feature lines. `nozle` and `nozleDark` use it.
 
 ```tsx
@@ -185,7 +185,10 @@ The order, highest first: the component's `variables`, the component's `theme`, 
 | `colorHighlight` | `--nozle-highlight` | `colorPrimary` | `colorPrimary` |
 | `colorHighlightForeground` | `--nozle-highlight-foreground` | `colorPrimaryForeground` | `colorPrimaryForeground` |
 | `fontFamily` | `--nozle-font` | system UI font | same |
-| `fontFamilyMono` | `--nozle-font-mono` | system monospace font | same |
+| `fontFamilyNumbers` | `--nozle-font-numbers` | the surrounding font | same |
+| `labelFont` | `--nozle-label-font` | `600 12px/1.4` in `fontFamily` | same |
+| `labelTextTransform` | `--nozle-label-transform` | `none` | same |
+| `labelLetterSpacing` | `--nozle-label-spacing` | `normal` | same |
 | `borderRadius` | `--nozle-radius` | `12px` | same |
 | `borderWidth` | `--nozle-border-width` | `1px` | same |
 | `shadow` | `--nozle-shadow` | soft shadow | darker shadow |
@@ -195,6 +198,8 @@ The order, highest first: the component's `variables`, the component's `theme`, 
 | `buttonShadow` | `--nozle-button-shadow` | none | none |
 
 `buttonBorderColor` and `buttonShadow` apply to primary buttons only, so one action per view stands out. Secondary buttons take `colorSecondary` as their fill and `colorInput` as their border.
+
+The `label*` variables style small labels: table headers and the status label of a panel plan card. `nozle` uses small uppercase JetBrains Mono, `neobrutal` bold uppercase. Numbers in tables are right-aligned in tabular figures, in `fontFamilyNumbers`.
 | `colorScheme` | `color-scheme` | `light` | `dark` |
 
 Any CSS value works, including `var(...)` and `oklch(...)`. Warning and error tints are mixed from `colorWarning` and `colorDanger`.
