@@ -49,7 +49,7 @@ Nozle subscribes to these eight events only. Without this webhook, Stripe may co
 
 A new-subscription Stripe checkout returns no checkout ID to poll. After Embedded Checkout completes, reload the subscription or wait for your `subscription.started` webhook. A paid upgrade returns `plan_upgrade_intent_id`; poll its status with [`GET /checkout/{id}`](/api/subscription-management) and the subscription scope.
 
-Retrying a new-subscription checkout for the same plan while its subscription is still incomplete reopens the first checkout. A different plan returns `409 subscription_checkout_in_progress`. See [Retry a new-subscription checkout](/integrations/stripe#retry-a-new-subscription-checkout).
+Retrying a new-subscription checkout for the same plan while its subscription is still incomplete reopens the first checkout. A different plan replaces the abandoned checkout and returns the new one; `409 subscription_checkout_in_progress` remains only while the provider is still processing a payment for the old checkout. An unpaid plan or single Entity checkout expires after 23 hours: the subscription is canceled with `cancelation_reason: timeout`, the invoice is closed and the credits it used are returned. See [Unpaid checkout expiry](/api/create-checkout#unpaid-checkout-expiry).
 
 ## Razorpay
 

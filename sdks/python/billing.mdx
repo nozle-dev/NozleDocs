@@ -58,7 +58,7 @@ Validate the exact HTTPS return origin before passing a browser-provided URL to 
 | 422 | `checkout_not_required` | The plan needs no up-front payment (free, trial, or pay-in-arrears) and the customer has no subscription. Use `subscribe()` instead. |
 | 422 | `payment_provider_required` | No payment provider is connected. |
 | 422 | `plan_already_active` | The customer is already on that plan. |
-| 409 | `subscription_checkout_in_progress` | A new-subscription checkout for this customer is still open on a different plan. Checking out the same plan again reopens it. |
+| 409 | `subscription_checkout_in_progress` | A payment for the customer's new-subscription checkout on a different plan is still processing, or it was paid. An abandoned checkout is replaced instead, and the same plan reopens it. |
 
 The SDK raises `NozleValidationError` before any request when `register_mandate` is not a `bool`, or when `quote_id` is given without `subscription_id`. See [Create checkout](/api/create-checkout) for the HTTP contract.
 
@@ -172,7 +172,7 @@ withdrawn = nozle.withdraw_pending_subscription_change(
 
 The result is `{"subscription": {"id", "external_id", "plan_code", "status"}, "withdrawn_pending_subscription_id", "replayed"}`. The same key returns the same body with `replayed: True`. Withdrawal preserves the active plan.
 
-A new scheduled change while a change is pending replaces it with a new pending ID. A paid upgrade checkout does not replace or withdraw a pending downgrade: withdraw it first, or the upgrade payment ends in `needs_review` with `plan_upgrade_subscription_changed`. Withdrawing the replaced ID returns `409 pending_subscription_changed`. An unknown ID returns `404 pending_subscription_not_found`.
+A new scheduled change while a change is pending replaces it with a new pending ID. A paid upgrade checkout is refused with `409 subscription_change_pending` while a downgrade or cancellation is scheduled: withdraw the downgrade, or keep the subscription, first. Scheduling a change or cancelling at period end cancels an open upgrade checkout. Withdrawing the replaced ID returns `409 pending_subscription_changed`. An unknown ID returns `404 pending_subscription_not_found`.
 
 ### Cancel at period end and Keep
 

@@ -95,7 +95,7 @@ The existing transition result is nested under `subscription_transition`. Reload
 
 Preview `operation: "cancel"` with `timing: "end_of_period"` through `/subscriptions/transitions/preview`. Send the same parameters to `/subscriptions/transitions` with `expected_effective_at` set to the exact preview's `subscription_transition.effective_at`, plus an `Idempotency-Key` header. A stale date returns HTTP 409 before cancellation.
 
-Keep uses `operation: "uncancel"`, the customer/subscription identifiers and an `Idempotency-Key`. It accepts no settlement overrides. Keep is available only before the ending is due; it does not restart a terminated subscription. Cancellation removes a pending downgrade, and Keep does not recreate it.
+Keep uses `operation: "uncancel"`, the customer/subscription identifiers and an `Idempotency-Key`. It accepts no settlement overrides. Keep is available only before the ending is due; it does not restart a terminated subscription. Cancellation removes a pending downgrade and cancels an open paid upgrade checkout, and Keep does not recreate them.
 
 ## Withdraw a pending downgrade
 
@@ -111,7 +111,7 @@ Read and retain `pending_change.id` from options when the customer opens the con
 
 `pending_subscription_id` is the pending internal UUID, not the active subscription's external ID. Core, called directly at `POST /subscription_transitions/withdraw`, names the other two fields `external_customer_id` and `external_subscription_id`. The response contains `subscription`, `withdrawn_pending_subscription_id` and `replayed`. A stale owned pending ID returns `409 pending_subscription_changed`; an unknown or unowned resource returns `404 pending_subscription_not_found`. The same idempotency key returns the original result with `replayed: true`. The active subscription remains in place.
 
-A new scheduled change while a change is pending replaces that change and creates a new pending ID. Re-read `pending_change.id` from options before you withdraw. A paid upgrade checkout does not replace or withdraw it: withdraw the pending downgrade first, or the upgrade payment ends in `needs_review` with `plan_upgrade_subscription_changed`. See [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits).
+A new scheduled change while a change is pending replaces that change and creates a new pending ID. Re-read `pending_change.id` from options before you withdraw. A paid upgrade checkout is refused with `409 subscription_change_pending` while a downgrade or cancellation is scheduled: withdraw the pending downgrade, or keep the subscription, first. Scheduling a change or cancelling at period end cancels an open upgrade checkout. See [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits).
 
 ## Payment status and recovery
 

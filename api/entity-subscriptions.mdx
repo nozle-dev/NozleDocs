@@ -87,7 +87,7 @@ Content-Type: application/json
 }
 ```
 
-`billing_time` accepts `anniversary` or `calendar` for the initial subscription. Paid plans remain incomplete until verified payment succeeds. Retrying an incomplete checkout for the same plan reuses its subscription and invoice instead of creating another charge.
+`billing_time` accepts `anniversary` or `calendar` for the initial subscription. Paid plans remain incomplete until verified payment succeeds. Retrying an incomplete checkout for the same plan reuses its subscription and invoice instead of creating another charge. A different plan replaces the abandoned checkout; `409 entity_subscription_checkout_in_progress` remains only while the provider is still processing a payment for it. An unpaid checkout expires after 23 hours: the subscription is canceled with `cancelation_reason: timeout`, the invoice is closed and the credits it used are returned. See [Unpaid checkout expiry](/api/create-checkout#unpaid-checkout-expiry).
 
 ## Purchase multiple Entity plans together
 
@@ -312,7 +312,7 @@ The result is a checkout result with `external_entity_id` and `external_subscrip
 }
 ```
 
-`effective_at` carries the customer's timezone offset, for example `2026-11-01T00:00:00.000000+05:30`. Changing again while a scheduled change is pending replaces the pending change. A paid upgrade does not replace or withdraw a pending downgrade: withdraw it first, as described in [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits). The target being the current plan returns `422 plan_already_active`.
+`effective_at` carries the customer's timezone offset, for example `2026-11-01T00:00:00.000000+05:30`. Changing again while a scheduled change is pending replaces the pending change. A paid upgrade does not replace or withdraw a pending downgrade: it is refused with `409 subscription_change_pending`, so withdraw it first, as described in [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits). The target being the current plan returns `422 plan_already_active`.
 
 ## Cancel
 

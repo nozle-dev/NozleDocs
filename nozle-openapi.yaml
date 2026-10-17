@@ -4301,7 +4301,7 @@ paths:
       tags:
         - Invoices
       summary: Generate a payment URL
-      description: This endpoint generates a checkout link for a specific invoice.
+      description: This endpoint generates a checkout link for a specific invoice. An invoice that is paid, voided, draft, closed, failed or has nothing due returns `422 validation_errors` with `error_details.base` `invalid_invoice_status_or_payment_status`.
       parameters:
         - $ref: '#/components/parameters/invoice_id'
       operationId: invoicePaymentUrl
@@ -7786,7 +7786,7 @@ paths:
       tags:
         - Checkout
       summary: Create a checkout
-      description: 'Creates a payment-gated plan checkout, an invoice checkout (`invoice_id`), or an Entity checkout (`external_entity_id`). Requires `payment:write`. Engine validates the body and the `return_url` origin, then forwards to Core `POST /checkout_sessions` (renaming `subscription_id` to `external_subscription_id`). Core decides the result type from the plan, the current subscription and its transition policy: a provider checkout when money is due, `completed` when nothing external is due, `scheduled` for an end-of-period change. A customer without a subscription choosing a plan that needs no up-front payment gets `422 checkout_not_required`. Engine forwards Core''s status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine''s own `{error, code?}` errors.'
+      description: 'Creates a payment-gated plan checkout, an invoice checkout (`invoice_id`), or an Entity checkout (`external_entity_id`). Requires `payment:write`. Engine validates the body and the `return_url` origin, then forwards to Core `POST /checkout_sessions` (renaming `subscription_id` to `external_subscription_id`). Core decides the result type from the plan, the current subscription and its transition policy: a provider checkout when money is due, `completed` when nothing external is due, `scheduled` for an end-of-period change. An unpaid plan or single Entity checkout expires after 23 hours (the Stripe Checkout Session and Razorpay order too): the subscription is canceled with `cancelation_reason: timeout` and a `subscription.canceled` webhook, the invoice is closed, and the coupons, credit-note credits and wallet credits it used are returned. They are also returned when the checkout payment fails. Checking out the same plan again reopens an abandoned checkout; another plan replaces it. A customer without a subscription choosing a plan that needs no up-front payment gets `422 checkout_not_required`. Engine forwards Core''s status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine''s own `{error, code?}` errors.'
       operationId: engineCreateCheckout
       security:
         - bearerAuth: []
@@ -7873,13 +7873,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '409':
-          description: 'Core: `subscription_selection_required`, `plan_upgrade_checkout_in_progress`, `entity_subscription_checkout_in_progress`, `billing_anchor_checkout_in_progress`, `idempotency_key_reused` (quoted checkout), `plan_change_quote_changed`, `subscription_change_pending`.'
+          description: 'Core: `subscription_selection_required`, `plan_upgrade_checkout_in_progress`, `subscription_checkout_in_progress` or `entity_subscription_checkout_in_progress` (a payment for the abandoned new-subscription checkout on another plan is still processing, or it was paid; an abandoned checkout is otherwise replaced), `billing_anchor_checkout_in_progress`, `idempotency_key_reused` (quoted checkout), `plan_change_quote_changed`, `subscription_change_pending` (a paid upgrade while the subscription has a scheduled cancellation or plan change, or an upgrade payment in progress).'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '422':
-          description: 'Core: `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active`, `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
+          description: 'Core: `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active`, `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`, or `base: [invalid_invoice_status_or_payment_status]` for an invoice checkout of an invoice that is paid, voided, draft, closed, failed or has nothing due). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
           content:
             application/json:
               schema:
@@ -9128,7 +9128,7 @@ paths:
       tags:
         - Entity Subscriptions
       summary: Start an Entity subscription checkout
-      description: 'Starts or resumes checkout of a plan for one Entity. Same Core action and result types as plan checkout (`POST /checkout_sessions`), scoped to the Entity''s subscription identity, which is created when missing. Retrying an incomplete checkout for the same plan reuses its subscription and invoice. A plan with no up-front payment completes with `payment_source: none`. Requires a secret key (`403 secret_key_required` otherwise) with `subscription` permission (`payment` for checkout routes).'
+      description: 'Starts or resumes checkout of a plan for one Entity. Same Core action and result types as plan checkout (`POST /checkout_sessions`), scoped to the Entity''s subscription identity, which is created when missing. Retrying an incomplete checkout for the same plan reuses its subscription and invoice; another plan replaces the abandoned checkout. An unpaid checkout expires after 23 hours: the subscription is canceled with `cancelation_reason: timeout`, the invoice is closed and the coupons, credit-note credits and wallet credits it used are returned. A plan with no up-front payment completes with `payment_source: none`. Requires a secret key (`403 secret_key_required` otherwise) with `subscription` permission (`payment` for checkout routes).'
       operationId: coreCreateEntitySubscriptionCheckout
       security:
         - bearerAuth: []
@@ -9191,7 +9191,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '409':
-          description: '`entity_subscription_checkout_in_progress`, `billing_anchor_checkout_in_progress`, `plan_upgrade_checkout_in_progress`, `idempotency_key_reused`, `plan_change_quote_changed`, `subscription_change_pending`.'
+          description: '`entity_subscription_checkout_in_progress` (a payment for the abandoned checkout on another plan is still processing, or it was paid; an abandoned checkout is otherwise replaced), `billing_anchor_checkout_in_progress`, `plan_upgrade_checkout_in_progress`, `idempotency_key_reused`, `plan_change_quote_changed`, `subscription_change_pending` (a scheduled cancellation or plan change, or an upgrade payment in progress).'
           content:
             application/json:
               schema:
