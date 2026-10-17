@@ -49,7 +49,7 @@ Send `customer_id`, `subscription_id`, and `plan_code` to `POST /subscriptions/p
 }
 ```
 
-`subscription_id` is optional, but without it a customer with several active subscriptions gets `409 subscription_selection_required`.
+This route needs the `invoice:read` API permission, not a `subscription` permission. `subscription_id` is optional, but without it a customer with several active subscriptions gets `409 subscription_selection_required`.
 
 The response includes `quote_id`, `transition_direction`, `timing`, `currency`, `credit_amount_cents`, `debit_amount_cents`, `net_amount_cents`, `amount_due_now_cents`, `amount_due_at_effective_cents`, `effective_at`, and nullable `renewal_at`.
 

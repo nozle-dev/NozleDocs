@@ -26,7 +26,7 @@ Proxies all requests to `https://api.openai.com/v1/*`. Usage is recorded for cha
 
 | Header | Description |
 |--------|-------------|
-| `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`). |
+| `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`). It needs `event:write` permission. |
 | `X-Nozle-Customer-Id` | External customer ID to bill for this usage. Missing returns `400`. |
 | `Authorization` | Customer's OpenAI API key (`Bearer sk-...`) |
 
@@ -62,7 +62,7 @@ Proxies all requests to `https://api.anthropic.com/v1/*`.
 
 | Header | Description |
 |--------|-------------|
-| `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`). |
+| `X-Nozle-Key` | Your Nozle secret key (`sk_live_...`). It needs `event:write` permission. |
 | `X-Nozle-Customer-Id` | External customer ID to bill for this usage. Missing returns `400`. |
 | `x-api-key` | Customer's Anthropic API key |
 | `anthropic-version` | Anthropic API version |
@@ -126,6 +126,7 @@ These come from Engine. Provider errors are returned unchanged, with the provide
 | `401` | `{"code": "unauthorized", "error": "missing X-Nozle-Key header"}` | `X-Nozle-Key` is missing. |
 | `401` | `{"code": "unauthorized", "error": "invalid nozle key"}` | The key is unknown. |
 | `403` | `{"code": "publishable_key_not_allowed", ...}` | A publishable key was used. |
+| `403` | `{"code": "permission_denied", "error": "API key requires event:write permission"}` | The key cannot write events, so the call is refused before it reaches the provider. |
 | `422` | `{"code": "active_subscription_not_found", "error": "customer has no matching active subscription"}` | The customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer. The provider is not called. |
 | `422` | `{"code": "active_subscription_ambiguous", "error": "customer has multiple active subscriptions; set X-Nozle-Subscription"}` | The customer has several active subscriptions. Send `X-Nozle-Subscription`. The provider is not called. |
 | `502` | Empty | Engine could not reach the provider. |

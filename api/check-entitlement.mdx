@@ -7,7 +7,7 @@ Base URL: `https://api.nozle.app/engine/api/v1`.
 
 Check whether a customer is entitled to use a feature under their current plan. This is the primary gating endpoint -- call it before executing any metered or limited operation.
 
-**Auth:** secret key only. Publishable keys are always rejected.
+**Auth:** secret key only. The key requires `customer_usage:read`. Publishable keys are always rejected.
 
 <ParamField query="customer_id" type="string" required>
   External customer ID derived by the trusted merchant backend.
@@ -78,7 +78,7 @@ A denial is an HTTP `200` response with `allowed: false`.
 | `400` | `{"error": "customer_id and feature required"}` | `customer_id` or `feature` is missing. |
 | `400` | `{"error": "metadata must be a JSON object"}` | `metadata` is not a JSON object. |
 | `401` | `{"error": "..."}` | The `Authorization` header is missing or malformed, or the key is unknown. |
-| `403` | `{"error": "..."}` | A publishable key. |
+| `403` | `{"error": "..."}` | A publishable key, or a secret key without `customer_usage:read`. |
 | `503` | `{"error": "usage lookup failed", "code": "usage_unavailable", "request_id": "..."}` | The usage counter could not be read. The response has `Retry-After: 1`. Retry after that many seconds, and quote `request_id` to support. |
 | `503` | `{"error": "subscription access unavailable"}` | The customer's subscription could not be read. Retry later. |
 | `503` | `{"error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |

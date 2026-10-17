@@ -1,6 +1,6 @@
 ---
 title: Payments
-description: Payment processing and retries
+description: Payment processing, retries, and dunning
 ---
 
 Nozle collects payments through the provider connected to your organization: Stripe or Razorpay. Payments are initiated during checkout and processed automatically for recurring subscriptions.
@@ -28,7 +28,10 @@ The PaymentMethodDisplay component shows the customer's saved card:
 
 **Failed payments and retries:**
 
-When a payment fails, Nozle records the failed payment status. Retry it with `POST /invoices/{id}/retry_payment`.
+When a payment fails, Nozle records the failed payment status. Dunning and retries can be configured for recurring invoices:
+
+- Automatic dunning: configurable retry schedule
+- Manual dunning: manually trigger retry
 
 **Product credit top-ups:**
 
