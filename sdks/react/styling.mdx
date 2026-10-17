@@ -60,6 +60,25 @@ Every component takes its look from `appearance`. Set it once on `BillingProvide
     <BillingProvider publishableKey="pk_..." appearance={{ theme: neobrutal }}>
     ```
   </Tab>
+  <Tab title="Nozle">
+    The Nozle dashboard look: flat cards with fine borders, and a hard ink shadow on buttons only. `nozle` is light; `nozleDark` is dark and needs a dark page background.
+
+    <Frame>
+      <img src="/images/react/themes/nozle.png" alt="The components in the nozle theme" />
+    </Frame>
+
+    <Frame>
+      <img src="/images/react/themes/nozle-dark.png" alt="The components in the nozleDark theme" />
+    </Frame>
+
+    ```tsx
+    import { nozle, nozleDark } from '@nozle-js/react/themes'
+
+    <BillingProvider publishableKey="pk_..." appearance={{ theme: nozle }}>
+    ```
+
+    The theme uses the Nunito font, which your app loads, for example with `next/font/google` or a Google Fonts `<link>`. Without it the system font is used.
+  </Tab>
 </Tabs>
 
 Every colour, the font, corner radius, border width and shadow can be changed on top of a theme with `variables` (full list below):
@@ -114,7 +133,7 @@ Set the colours with `colorHighlight` and `colorHighlightForeground`; they defau
 
 ## Combine themes
 
-`minimal` and `neobrutal` set shape; `light` and `dark` set colour. Pass several themes in an array. Later ones win where they overlap.
+`minimal` and `neobrutal` set shape; `light` and `dark` set colour. `nozle` and `nozleDark` set both, so use them on their own. Pass several themes in an array. Later ones win where they overlap.
 
 ```tsx
 appearance={{ theme: [neobrutal, dark] }}
@@ -156,6 +175,10 @@ The order, highest first: the component's `variables`, the component's `theme`, 
 | `borderRadius` | `--nozle-radius` | `12px` | same |
 | `borderWidth` | `--nozle-border-width` | `1px` | same |
 | `shadow` | `--nozle-shadow` | soft shadow | darker shadow |
+| `buttonRadius` | `--nozle-button-radius` | a fraction of `borderRadius` | same |
+| `buttonBorderWidth` | `--nozle-button-border-width` | `borderWidth` | same |
+| `buttonBorderColor` | `--nozle-button-border` | each button's own colour | same |
+| `buttonShadow` | `--nozle-button-shadow` | none | none |
 | `colorScheme` | `color-scheme` | `light` | `dark` |
 
 Any CSS value works, including `var(...)` and `oklch(...)`. Warning and error tints are mixed from `colorWarning` and `colorDanger`.
