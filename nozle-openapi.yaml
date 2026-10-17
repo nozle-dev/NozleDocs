@@ -11181,7 +11181,7 @@ paths:
   /credit-top-up-purchases:
     post:
       summary: Create a credit top-up purchase
-      description: Starts checkout for a fixed top-up package. The Engine forwards the request to Nozle Core and returns Core's status and body unchanged. Creating checkout does not grant credits; credits are added only after a confirmed successful payment. The body is at most 64 KiB and unknown fields are rejected. Requires an organization secret key, or trusted internal authentication; when API permissions are enabled a secret key needs `credit_system:write`.
+      description: Starts checkout for a fixed top-up package. The Engine forwards the request to Nozle Core and returns Core's status and body unchanged. Creating checkout does not grant credits; credits are added once the top-up invoice is fully paid, by a provider payment, a manual payment for the full amount, a payment request or marking the invoice paid. A partial payment grants nothing. The body is at most 64 KiB and unknown fields are rejected. Requires an organization secret key, or trusted internal authentication; when API permissions are enabled a secret key needs `credit_system:write`.
       operationId: engineCreateCreditTopUpPurchase
       tags:
         - Credits

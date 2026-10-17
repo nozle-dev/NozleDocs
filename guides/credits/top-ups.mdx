@@ -1,17 +1,17 @@
 ---
 title: Paid Credit Top-ups
-description: Sell fixed packages and grant credits only after confirmed payment
+description: Sell fixed packages and grant credits once the top-up invoice is fully paid
 ---
 
 Paid top-ups use fixed catalog packages. A package snapshots its Credit System, credit amount, money amount, currency, and optional expiry.
 
 ```text
-Create purchase -> checkout/invoice -> payment succeeds -> idempotent credit source
+Create purchase -> checkout/invoice -> invoice fully paid -> idempotent credit source
 ```
 
-Checkout creation never grants credits. Nozle durably records the successful payment signal, then materializes exactly one source and one originating grant operation. A reconciliation sweep repairs missed delivery without duplicating credits.
+Checkout creation never grants credits. Credits are granted when the top-up invoice is fully paid, by any route: a card or provider payment, a manual payment for the full amount, a payment request, or marking the invoice paid. A partial manual payment grants nothing until the invoice is fully paid. Nozle then durably records one payment signal for the purchase and materializes exactly one source and one originating grant operation. A reconciliation sweep repairs missed delivery for every paid top-up invoice without duplicating credits.
 
-Expose available packages through your authenticated backend and start checkout from your own billing UI or a merchant callback. Refresh the product-credit balance only after payment confirmation.
+Expose available packages through your authenticated backend and start checkout from your own billing UI or a merchant callback. Refresh the product-credit balance only after the invoice is paid.
 
 ## Customer pool and Entity allocation
 

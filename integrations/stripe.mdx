@@ -61,7 +61,7 @@ Credit top-ups and payment links do not assign a customer. The customer must alr
 | **Upgrades** | A paid plan upgrade opens an embedded Checkout Session. The current plan stays active until the payment settles |
 | **Payment links** | A hosted Stripe Checkout page for credit top-ups, invoice payment URLs and overdue invoices |
 | **Subscriptions** | Managed in Nozle. Paid plans activate only after the payment succeeds |
-| **Credit top-ups** | Paid on a hosted Stripe Checkout page. Credits are granted after confirmed payment |
+| **Credit top-ups** | Paid on a hosted Stripe Checkout page. Credits are granted once the top-up invoice is fully paid |
 | **Saved payment methods** | The card used at checkout is saved for later automatic charges |
 | **Refunds and disputes** | Credit-note refunds are sent to Stripe. Lost disputes update the invoice |
 | **Customer import** | The dashboard imports existing Stripe customers and invoices |
@@ -284,7 +284,7 @@ Nozle uses a hosted Stripe Checkout page where the customer is not inside your e
 
 ## Credit top-ups
 
-A credit top-up for a Stripe customer returns a hosted Stripe Checkout page as `payment_url`, and `payment_provider` is `stripe`. Navigate to it. Credits are granted only after Stripe confirms the payment and the credit signal is delivered.
+A credit top-up for a Stripe customer returns a hosted Stripe Checkout page as `payment_url`, and `payment_provider` is `stripe`. Navigate to it. Credits are granted once the top-up invoice is fully paid and the credit signal is delivered. A Stripe payment pays it; so does a manual payment for the full amount, a payment request, or marking the invoice paid.
 
 ```bash
 curl -X POST https://api.nozle.app/engine/api/v1/credit-top-up-purchases \

@@ -51,7 +51,7 @@ To assign the connection from code, send `billing_configuration.payment_provider
 | **Checkout** | A Razorpay order for a Nozle invoice, opened in the Razorpay checkout modal |
 | **Payment links** | A hosted Razorpay payment link for invoice payment URLs, credit top-ups and overdue payment requests |
 | **Subscriptions** | Managed in Nozle. Paid plans activate only after the payment is captured |
-| **Credit top-ups** | Paid with a Razorpay payment link. Credits are granted after confirmed payment |
+| **Credit top-ups** | Paid with a Razorpay payment link. Credits are granted once the top-up invoice is fully paid |
 | **Recurring payments** | Optional UPI AutoPay mandates for subscription renewals |
 | **Refunds and disputes** | Credit-note refunds are sent to Razorpay. Lost disputes update the invoice |
 | **Webhooks** | You configure the webhook in Razorpay. Nozle verifies every request |
@@ -305,7 +305,7 @@ Neither result has a checkout ID, so there is nothing to poll. Redirect the cust
 
 ## Credit top-ups
 
-A credit top-up for a Razorpay customer returns a Razorpay payment link as `payment_url`, and `payment_provider` is `razorpay`. Navigate to it. Credits are granted only after Razorpay confirms the captured payment and the credit signal is delivered, so capture and the credit grant can finish at different times. The top-up package must be priced in INR, and its currency must match the customer's currency. See [Paid Credit Top-ups](/guides/credits/top-ups) and [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase).
+A credit top-up for a Razorpay customer returns a Razorpay payment link as `payment_url`, and `payment_provider` is `razorpay`. Navigate to it. Credits are granted once the top-up invoice is fully paid and the credit signal is delivered, so capture and the credit grant can finish at different times. A captured Razorpay payment pays it; so does a manual payment for the full amount, a payment request, or marking the invoice paid. The top-up package must be priced in INR, and its currency must match the customer's currency. See [Paid Credit Top-ups](/guides/credits/top-ups) and [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase).
 
 | Case | Result |
 |---|---|
