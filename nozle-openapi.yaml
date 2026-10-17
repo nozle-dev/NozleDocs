@@ -14603,45 +14603,6 @@ webhooks:
       responses:
         '200':
           description: Return a 200 status to indicate that the data was received successfully
-  invoice_resynced:
-    post:
-      operationId: invoiceResynced
-      summary: An invoice has been resynced with salesforce
-      description: An invoice has been resynced with salesforce
-      parameters:
-        - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
-      requestBody:
-        description: Details of the invoice
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - webhook_type
-                - object_type
-                - organization_id
-                - invoice
-              properties:
-                webhook_type:
-                  type: string
-                  enum:
-                    - invoice.resynced
-                object_type:
-                  type: string
-                  enum:
-                    - invoice
-                organization_id:
-                  type: string
-                  format: uuid
-                  description: Unique identifier of the organization, created by Nozle.
-                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
-                invoice:
-                  $ref: '#/components/schemas/InvoiceObjectExtended'
-      responses:
-        '200':
-          description: Return a 200 status to indicate that the data was received successfully
   integration_provider_error:
     post:
       operationId: integrationProviderError
@@ -18003,7 +17964,7 @@ components:
                 type: string
               example:
                 - google
-                - okta
+                - microsoft
               description: Array of string, required only when value_type is `select`.
     FeatureObject:
       type: object
@@ -18064,7 +18025,7 @@ components:
               config:
                 select_options:
                   - google
-                  - okta
+                  - microsoft
           description: Privileges for boolean and config Features. Config Features require at least one.
         aggregation_type:
           type:
@@ -18208,7 +18169,7 @@ components:
                       type: string
                     example:
                       - google
-                      - okta
+                      - microsoft
                     description: Array of string, required only when value_type is `select`.
           example:
             - code: max
@@ -18226,7 +18187,7 @@ components:
               config:
                 select_options:
                   - google
-                  - okta
+                  - microsoft
           description: Privileges associated with this feature. Can be empty.
         aggregation_type:
           type: string
@@ -20641,10 +20602,9 @@ components:
           example: anrok
           description: |-
             The integration type used for accounting and tax syncs.
-            Accepted values: `anrok`, `salesforce`.
+            Accepted values: `anrok`.
           enum:
             - anrok
-            - salesforce
         integration_code:
           type: string
           example: anrok1
@@ -26093,7 +26053,7 @@ components:
               config:
                 select_options:
                   - google
-                  - okta
+                  - microsoft
           description: Privileges associated with this feature. Each privilege must have a value assigned. Always an empty array for metered features.
     PlanEntitlement:
       type: object
@@ -27415,7 +27375,7 @@ components:
               max_admins: 10
               root: false
             sso:
-              provider: okta
+              provider: microsoft
           description: Feature entitlements with their privilege values. Each key is a feature code, and the value is an object containing privilege codes with their associated values.
     PlanMetadataResponse:
       type: object
@@ -28539,20 +28499,20 @@ components:
             - code: provider
               name: SSO Provider
               value_type: select
-              value: okta
+              value: microsoft
               plan_value: google
-              override_value: okta
+              override_value: microsoft
               config:
                 select_options:
                   - google
-                  - okta
+                  - microsoft
           description: Privileges associated with this feature. Each privilege shows the plan value and any subscription override.
         overrides:
           type: object
           additionalProperties: true
           example:
             max: 15
-            provider: okta
+            provider: microsoft
     SubscriptionEntitlements:
       type: object
       required:
@@ -29249,8 +29209,6 @@ components:
           type: string
           enum:
             - anrok
-            - okta
-            - salesforce
           description: The type of accounting provider code
           example: anrok
         accounting_provider_code:
@@ -29320,8 +29278,6 @@ components:
           type: string
           enum:
             - anrock
-            - okta
-            - salesforce
           description: The type of tax provider
           example: anrock
         tax_provider_code:
