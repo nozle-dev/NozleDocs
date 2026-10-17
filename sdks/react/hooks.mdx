@@ -35,6 +35,8 @@ The last path segment picks the route: `subscription`, `entitlement`, `credits`,
 Then point the provider at it:
 
 ```tsx
+import { BillingProvider } from '@nozle-js/react'
+
 <BillingProvider
   publishableKey="pk_..."
   billingEndpoint="/api/nozle"
@@ -142,7 +144,7 @@ The publishable key is public, so every field it receives, including charges, ta
 Calls `BillingProvider.createCheckout` with a plan code and return URL.
 
 ```tsx
-import { useCheckoutSession } from '@nozle-js/react'
+import { useCheckoutSession, Checkout } from '@nozle-js/react'
 
 function BuyProButton() {
   const { fetchClientSecret, checkout, isLoading, error } = useCheckoutSession()
@@ -190,6 +192,8 @@ The hook returns a string only for a Stripe client secret. For a `hosted` result
 Returns the required billing context and throws outside `BillingProvider`.
 
 ```tsx
+import { useBillingContext } from '@nozle-js/react'
+
 const { client, createCheckout, verifyCheckout, getCheckoutStatus } = useBillingContext()
 ```
 
@@ -218,6 +222,8 @@ interface NozleClient {
 `BillingContext` is exported for advanced integrations that need React's direct context API. Its value is either `null` or:
 
 ```ts
+import type { CreateCheckout, GetCheckoutStatus, NozleClient, VerifyCheckout } from '@nozle-js/react'
+
 interface BillingContextValue {
   client: NozleClient
   createCheckout?: CreateCheckout
