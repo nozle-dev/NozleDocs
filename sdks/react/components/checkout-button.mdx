@@ -47,21 +47,15 @@ keywords: ["checkout button", "subscribe", "react", "razorpay", "stripe"]
 
 ## Usage
 
-```tsx
-import {
-  BillingProvider,
-  CheckoutButton,
-  type CompletedCheckoutResult,
-  type CreateCheckout,
-  type ScheduledCheckoutResult,
-} from '@nozle-js/react'
+```tsx Imports
+import { BillingProvider, Checkout, CheckoutButton } from '@nozle-js/react'
+import type { CheckoutStatus, CompletedCheckoutResult, CreateCheckout, RazorpayVerification, ScheduledCheckoutResult } from '@nozle-js/react'
 ```
 
 `CheckoutButton` must be inside a `BillingProvider` with `createCheckout`. Your merchant route creates the checkout with your secret key; see [Implement the merchant endpoint](/sdks/react/installation#implement-the-merchant-endpoint).
 
 ```tsx app/pricing/buy-pro.tsx
 'use client'
-import { BillingProvider, CheckoutButton, type CreateCheckout } from '@nozle-js/react'
 
 const createCheckout: CreateCheckout = async (input) => {
   const response = await fetch('/api/billing/checkout', {
@@ -103,12 +97,6 @@ Pass `onStripeClientSecret` and render [`Checkout`](/sdks/react/components/check
 
 ```tsx
 import { useState } from 'react'
-import {
-  Checkout,
-  CheckoutButton,
-  type CompletedCheckoutResult,
-  type ScheduledCheckoutResult,
-} from '@nozle-js/react'
 
 export function BuyPro() {
   const [clientSecret, setClientSecret] = useState<string | null>(null)
@@ -136,8 +124,6 @@ export function BuyPro() {
 For Razorpay, give the provider `verifyCheckout` and `getCheckoutStatus`. Each calls your backend, which scopes the request to the signed-in customer.
 
 ```tsx
-import { BillingProvider, CheckoutButton, type CheckoutStatus, type CreateCheckout, type RazorpayVerification } from '@nozle-js/react'
-
 const post = async <T,>(path: string, body: object): Promise<T> => {
   const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!response.ok) throw new Error(`Request failed: ${response.status}`)

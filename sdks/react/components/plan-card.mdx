@@ -47,15 +47,15 @@ keywords: ["plan card", "pricing", "react"]
 
 ## Usage
 
-```tsx
-import { PlanCard, type CreateCheckoutInput, type PricingPlan } from '@nozle-js/react'
+```tsx Imports
+import { Checkout, PlanCard, useCheckoutSession, usePlans } from '@nozle-js/react'
+import type { CreateCheckoutInput, PricingPlan } from '@nozle-js/react'
+import { nozle } from '@nozle-js/react/themes'
 ```
 
 Pass a plan and an `onSelect` handler; the card calls it with the plan code and return URL when the "Get Started" button is clicked:
 
 ```tsx components/pro-card.tsx
-import { PlanCard, type CreateCheckoutInput, type PricingPlan } from '@nozle-js/react'
-
 export function ProCard({ plan, currentPlanCode }: { plan: PricingPlan; currentPlanCode: string }) {
   const select = ({ planCode, returnUrl }: CreateCheckoutInput) => {
     window.location.assign(`/checkout?plan=${planCode}&return=${encodeURIComponent(returnUrl)}`)
@@ -80,8 +80,6 @@ The card shows the name, description, price with its interval and the plan's lin
 The card needs one plan in the `PricingPlan` shape the public catalog returns:
 
 ```tsx
-import { PlanCard, type PricingPlan } from '@nozle-js/react'
-
 const pro: PricingPlan = {
   code: 'pro',
   name: 'Pro',
@@ -107,7 +105,6 @@ Read the plans with [`usePlans`](/sdks/react/hooks#useplans) inside `BillingProv
 
 ```tsx
 import { useState } from 'react'
-import { Checkout, PlanCard, useCheckoutSession, usePlans } from '@nozle-js/react'
 
 export function PlanCards({ currentPlanCode }: { currentPlanCode: string }) {
   const { plans } = usePlans()
@@ -139,8 +136,6 @@ With `isCurrent`, the card gets a primary-colour border, `aria-current="true"` a
 </Frame>
 
 ```tsx
-import { PlanCard, type PricingPlan } from '@nozle-js/react'
-
 export function FreeCard({ plan }: { plan: PricingPlan }) {
   return <PlanCard plan={plan} isCurrent onSelect={() => {}} />
 }
@@ -155,9 +150,6 @@ The themes `nozle` and `nozleDark` use the [panel card layout](/sdks/react/styli
 </Frame>
 
 ```tsx
-import { PlanCard, type PricingPlan } from '@nozle-js/react'
-import { nozle } from '@nozle-js/react/themes'
-
 export function ProCard({ plan }: { plan: PricingPlan }) {
   return <PlanCard plan={plan} isCurrent={false} onSelect={() => {}} appearance={{ theme: nozle }} />
 }
@@ -168,8 +160,6 @@ export function ProCard({ plan }: { plan: PricingPlan }) {
 `features` replaces the lines read from the plan.
 
 ```tsx
-import { PlanCard, type PricingPlan } from '@nozle-js/react'
-
 export function ProCard({ plan }: { plan: PricingPlan }) {
   return <PlanCard plan={plan} isCurrent={false} features={['Unlimited projects', 'Priority support']} />
 }

@@ -47,15 +47,14 @@ keywords: ["plan badge", "tier", "react"]
 
 ## Usage
 
-```tsx
-import { PlanBadge, type PlanBadgeProps } from '@nozle-js/react'
+```tsx Imports
+import { PlanBadge, useSubscription } from '@nozle-js/react'
+import type { PlanBadgeProps } from '@nozle-js/react'
 ```
 
 Pass any text as `plan` and pick a `tier` for the colour:
 
 ```tsx components/account-menu.tsx
-import { PlanBadge } from '@nozle-js/react'
-
 export function AccountMenu() {
   return (
     <span>
@@ -76,8 +75,6 @@ The badge needs only a label and a tier; it does not read or know your plans.
 Take the plan name from [`useSubscription`](/sdks/react/hooks#the-hooks) and choose the tier from the plan code yourself:
 
 ```tsx
-import { PlanBadge, useSubscription, type PlanBadgeProps } from '@nozle-js/react'
-
 const tiers: Record<string, PlanBadgeProps['tier']> = { free: 'free', pro: 'pro', scale: 'enterprise' }
 
 export function AccountPlan() {
@@ -99,8 +96,6 @@ The four tiers: `free` (muted), `starter` (tinted primary), `pro` (primary) and 
 </Frame>
 
 ```tsx
-import { PlanBadge } from '@nozle-js/react'
-
 export function Badges() {
   return (
     <>

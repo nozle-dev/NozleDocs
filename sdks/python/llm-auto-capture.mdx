@@ -19,10 +19,13 @@ Capture records usage events; they bill only when a metered Feature has the same
 pip install "nozle-sdk[httpx]"
 ```
 
+```python Imports
+from nozle import Nozle, wrap_anthropic, wrap_openai
+```
+
 ```python
 import openai
 import anthropic
-from nozle import Nozle
 
 nozle = Nozle()  # reads NOZLE_SECRET_KEY
 
@@ -89,7 +92,6 @@ pip install "nozle-sdk[openai]"
 import os
 from openai import OpenAI
 
-from nozle import Nozle, wrap_openai
 
 nozle = Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
@@ -136,7 +138,6 @@ pip install "nozle-sdk[anthropic]"
 ```python
 from anthropic import Anthropic
 
-from nozle import Nozle, wrap_anthropic
 
 anthropic = wrap_anthropic(
     Anthropic(),

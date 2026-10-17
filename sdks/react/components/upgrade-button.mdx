@@ -49,15 +49,14 @@ For a full plan picker with exact quotes, use [`PlanChangeControl`](/sdks/react/
 
 ## Usage
 
-```tsx
-import { UpgradeButton, type ProrationPreview } from '@nozle-js/react'
+```tsx Imports
+import { UpgradeButton, useBillingRefresh, useSubscription, useUpgradePreview } from '@nozle-js/react'
+import type { ProrationPreview } from '@nozle-js/react'
 ```
 
 Render it inside a `BillingProvider` with `createCheckout` (see [Configure BillingProvider](/sdks/react/installation#configure-billingprovider)) and reload billing data when the change is done:
 
 ```tsx components/upgrade-to-scale.tsx
-import { UpgradeButton, useBillingRefresh } from '@nozle-js/react'
-
 export function UpgradeToScale({ onClientSecret }: { onClientSecret: (secret: string) => void }) {
   const refresh = useBillingRefresh()
   return (
@@ -89,8 +88,6 @@ When the change fails, the dialog stays open and shows the message. See [checkou
 `preview` holds the amounts shown in the dialog, in major units (dollars, not cents):
 
 ```tsx
-import { UpgradeButton, type ProrationPreview } from '@nozle-js/react'
-
 const preview: ProrationPreview = {
   credit: 14.5,
   debit: 49.5,
@@ -109,8 +106,6 @@ export function UpgradeToScale() {
 [`useUpgradePreview(planCode)`](/sdks/react/hooks#the-hooks) reads the quote for a plan change from your `billingEndpoint`. Its amounts are minor units and it has no separate credit and debit, so it does not fit `ProrationPreview`. Pass its `quote_id` as `quoteId`, and show its amounts in an [`UpgradeModal`](/sdks/react/components/upgrade-modal#live-data) you control, or use [`PlanChangeControl`](/sdks/react/components/plan-change-control), which shows the exact quote.
 
 ```tsx
-import { UpgradeButton, useBillingRefresh, useSubscription, useUpgradePreview } from '@nozle-js/react'
-
 export function UpgradeWithQuote() {
   const subscription = useSubscription()
   const quote = useUpgradePreview('scale')
@@ -138,8 +133,6 @@ A click opens the dialog with the amounts from `preview`: credits applied, the n
 </Frame>
 
 ```tsx
-import { UpgradeButton, type ProrationPreview } from '@nozle-js/react'
-
 const preview: ProrationPreview = { credit: 14.5, debit: 49.5, net: 35, currency: 'USD', nextBillingDate: '2026-11-01T00:00:00Z' }
 
 export function UpgradeToScale() {

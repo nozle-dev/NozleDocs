@@ -49,20 +49,15 @@ keywords: ["cancel subscription", "keep subscription", "self-service", "react"]
 
 ## Usage
 
-```tsx
-import {
-  BillingPortalError,
-  CancellationControl,
-  type CancellationActions,
-  type CancellationSubscription,
-} from '@nozle-js/react'
+```tsx Imports
+import { BillingPortalError, CancellationControl } from '@nozle-js/react'
+import type { CancellationActions, CancellationSubscription } from '@nozle-js/react'
 ```
 
 Pass the subscription, `actions` and `refresh`, which call your authenticated backend for the signed-in customer (see [Live data](#live-data)):
 
 ```tsx components/cancel-plan.tsx
 'use client'
-import { CancellationControl, type CancellationActions, type CancellationSubscription } from '@nozle-js/react'
 
 export function CancelPlan(props: {
   subscription: CancellationSubscription
@@ -81,8 +76,6 @@ After every attempt, including one whose response was lost, the control re-reads
 `subscription` and `refresh` use the `CancellationSubscription` shape:
 
 ```tsx
-import type { CancellationSubscription } from '@nozle-js/react'
-
 export const subscription: CancellationSubscription = {
   id: '6f1c2a4e-0000-4000-8000-000000000001',
   externalId: 'sub_123',
@@ -98,8 +91,6 @@ export const subscription: CancellationSubscription = {
 Create `actions` and `refresh` once, outside the component:
 
 ```tsx lib/cancellation-actions.ts
-import { BillingPortalError, type CancellationActions, type CancellationSubscription } from '@nozle-js/react'
-
 async function post<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {
     method: 'POST',
@@ -144,8 +135,6 @@ Your backend answers the two actions and `refresh` for the signed-in customer. R
 </Frame>
 
 ```tsx
-import { CancellationControl, type CancellationActions, type CancellationSubscription } from '@nozle-js/react'
-
 const subscription: CancellationSubscription = {
   id: '6f1c2a4e-0000-4000-8000-000000000001',
   externalId: 'sub_123',
@@ -168,8 +157,6 @@ export function CancelPlan({ actions, refresh }: {
 When `endingAt` is set and has not passed, the button reads "Keep my subscription". Its dialog says "Your current plan will continue to renew on &lt;date&gt;." and offers "Confirm keep subscription".
 
 ```tsx
-import { CancellationControl, type CancellationActions, type CancellationSubscription } from '@nozle-js/react'
-
 const subscription: CancellationSubscription = {
   id: '6f1c2a4e-0000-4000-8000-000000000001',
   externalId: 'sub_123',

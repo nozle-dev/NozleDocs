@@ -47,15 +47,14 @@ keywords: ["credit history", "credit operations", "ledger", "react"]
 
 ## Usage
 
-```tsx
-import { CreditHistory, useCreditHistory, type CreditOperationData } from '@nozle-js/react'
+```tsx Imports
+import { CreditHistory, useCreditHistory } from '@nozle-js/react'
+import type { CreditOperationData } from '@nozle-js/react'
 ```
 
 Read the signed-in customer's operations with `useCreditHistory` and pass them in:
 
 ```tsx components/credit-activity.tsx
-import { CreditHistory, useCreditHistory } from '@nozle-js/react'
-
 export function CreditActivity() {
   const history = useCreditHistory({ creditSystemCode: 'ai_credits', limit: 20 })
   return (
@@ -77,8 +76,6 @@ Each operation gets one row with a readable type: Used, Granted, Adjustment, Exp
 Each row is a `CreditOperationData`: the `id`, `type`, `status`, `credit_amount`, `feature_code` and `occurred_at` of an operation.
 
 ```tsx
-import { CreditHistory, type CreditOperationData } from '@nozle-js/react'
-
 const operations: CreditOperationData[] = [
   { id: 'op_1', type: 'consume', status: 'succeeded', credit_amount: '-12', feature_code: 'ai_chat', occurred_at: '2026-10-16T08:40:00Z' },
   { id: 'op_2', type: 'grant', status: 'succeeded', credit_amount: '500', feature_code: null, occurred_at: '2026-10-01T00:00:00Z' },
@@ -106,8 +103,6 @@ With `hasMore` and `onLoadMore`, a "Load more" button shows under the table. Whi
 </Frame>
 
 ```tsx
-import { CreditHistory, type CreditOperationData } from '@nozle-js/react'
-
 const operations: CreditOperationData[] = [
   { id: 'op_1', type: 'consume', status: 'succeeded', credit_amount: '-12', feature_code: 'ai_chat', occurred_at: '2026-10-16T08:40:00Z' },
   { id: 'op_2', type: 'grant', status: 'succeeded', credit_amount: '500', feature_code: null, occurred_at: '2026-10-01T00:00:00Z' },
@@ -128,8 +123,6 @@ With no operations, `isLoading` shows a placeholder, an empty list shows `emptyM
 </Frame>
 
 ```tsx
-import { CreditHistory } from '@nozle-js/react'
-
 export function ActivityStates() {
   return (
     <>

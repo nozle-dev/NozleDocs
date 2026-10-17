@@ -44,9 +44,13 @@ const result = await nozle.margin.byCustomer({
 
 An unparseable date, or an end that is not after the start, makes the API answer `400`. The SDK throws a `NozleApiError` with the usual `margin/summary failed: 400 Bad Request` message and the response code on `err.code`.
 
-```ts
-import { NozleApiError } from '@nozle-js/node'
+```ts Imports
+import { Nozle, NozleApiError } from '@nozle-js/node'
 
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+```
+
+```ts
 try {
   await nozle.margin.summary({ from: '2026-07-31', to: '2026-07-01' })
 } catch (err) {

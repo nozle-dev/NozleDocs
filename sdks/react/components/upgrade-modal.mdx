@@ -47,15 +47,15 @@ keywords: ["upgrade modal", "plan change dialog", "confirm", "react"]
 
 ## Usage
 
-```tsx
-import { UpgradeModal, type ProrationPreview } from '@nozle-js/react'
+```tsx Imports
+import { UpgradeModal, useSubscription, useUpgradePreview } from '@nozle-js/react'
+import type { ProrationPreview } from '@nozle-js/react'
 ```
 
 Keep the open state yourself and close the dialog in its callbacks. Without `onSubmit`, confirm calls `createCheckout` on `BillingProvider`:
 
 ```tsx components/upgrade-flow.tsx
 import { useState } from 'react'
-import { UpgradeModal } from '@nozle-js/react'
 
 export function UpgradeFlow({ onClientSecret }: { onClientSecret: (secret: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -95,8 +95,6 @@ With `onSubmit`, confirm runs your action. Without it, confirm calls `createChec
 `preview` holds the amounts in major units (dollars, not cents), with separate credit and debit:
 
 ```tsx
-import { UpgradeModal, type ProrationPreview } from '@nozle-js/react'
-
 const preview: ProrationPreview = {
   credit: 14.5,
   debit: 49.5,
@@ -115,8 +113,6 @@ export function UpgradeDialog({ open, close }: { open: boolean; close: () => voi
 The quote from [`useUpgradePreview`](/sdks/react/hooks#the-hooks) is in minor units, so show it as `children` and pass its `quote_id`:
 
 ```tsx
-import { UpgradeModal, useSubscription, useUpgradePreview } from '@nozle-js/react'
-
 function money(minor: number | string, currency: string) {
   const format = new Intl.NumberFormat('en-US', { style: 'currency', currency })
   const digits = format.resolvedOptions().maximumFractionDigits ?? 2
@@ -159,8 +155,6 @@ With `preview`, the dialog lists credits applied, the new plan charge, the amoun
 </Frame>
 
 ```tsx
-import { UpgradeModal, type ProrationPreview } from '@nozle-js/react'
-
 const preview: ProrationPreview = { credit: 14.5, debit: 49.5, net: 35, currency: 'USD', nextBillingDate: '2026-11-01T00:00:00Z' }
 
 export function UpgradeDialog({ open, close }: { open: boolean; close: () => void }) {
@@ -173,8 +167,6 @@ export function UpgradeDialog({ open, close }: { open: boolean; close: () => voi
 With `onSubmit`, the dialog runs your action instead of `createCheckout` and needs no `BillingProvider`.
 
 ```tsx
-import { UpgradeModal } from '@nozle-js/react'
-
 export function ConfirmSeats({ open, close }: { open: boolean; close: () => void }) {
   return (
     <UpgradeModal
@@ -200,8 +192,6 @@ export function ConfirmSeats({ open, close }: { open: boolean; close: () => void
 `onBack` shows a Back button on the left of the actions, for a step that has a previous step.
 
 ```tsx
-import { UpgradeModal } from '@nozle-js/react'
-
 export function ConfirmStep({ open, back, close }: { open: boolean; back: () => void; close: () => void }) {
   return <UpgradeModal isOpen={open} planCode="scale" onBack={back} onCancel={close} onCompleted={close} />
 }

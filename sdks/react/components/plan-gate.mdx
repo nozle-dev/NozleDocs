@@ -48,15 +48,14 @@ Prefer [`FeatureGate`](/sdks/react/components/feature-gate) with an entitlement 
 
 ## Usage
 
-```tsx
-import { PlanGate, UpgradePrompt, type PlanGateProps } from '@nozle-js/react'
+```tsx Imports
+import { PlanGate, UpgradePrompt, useSubscription } from '@nozle-js/react'
+import type { PlanGateProps } from '@nozle-js/react'
 ```
 
 `PlanGate` has no look of its own and fetches nothing: you pass the customer's plan code.
 
 ```tsx components/team-settings.tsx
-import { PlanGate, UpgradePrompt } from '@nozle-js/react'
-
 export function TeamSettings({ planCode }: { planCode: string }) {
   return (
     <PlanGate currentPlan={planCode} allowedPlans={['pro', 'scale']} fallback={<UpgradePrompt planName="Pro" />}>
@@ -75,8 +74,6 @@ The gate needs the customer's plan code as `currentPlan`. It has no loading stat
 Take the plan code from [`useSubscription`](/sdks/react/hooks#the-hooks):
 
 ```tsx
-import { PlanGate, UpgradePrompt, useSubscription } from '@nozle-js/react'
-
 export function Analytics() {
   const { data, isPending } = useSubscription()
   if (isPending) return null
@@ -103,8 +100,6 @@ Any plan not in `allowedPlans` gets the fallback, usually an [`UpgradePrompt`](/
 </Frame>
 
 ```tsx
-import { PlanGate, UpgradePrompt } from '@nozle-js/react'
-
 export function AuditLog({ planCode, openPlans }: { planCode: string; openPlans: () => void }) {
   return (
     <PlanGate currentPlan={planCode} allowedPlans={['scale']} fallback={<UpgradePrompt planName="Scale" onUpgrade={openPlans} />}>

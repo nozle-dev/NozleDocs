@@ -47,15 +47,14 @@ keywords: ["upgrade prompt", "upsell", "gate fallback", "react"]
 
 ## Usage
 
-```tsx
-import { UpgradePrompt, type UpgradePromptProps } from '@nozle-js/react'
+```tsx Imports
+import { UpgradeModal, UpgradePrompt } from '@nozle-js/react'
+import type { UpgradePromptProps } from '@nozle-js/react'
 ```
 
 Pass a plan name and open your plans from `onUpgrade`. The prompt fetches nothing and shows what you pass.
 
 ```tsx components/sso-upsell.tsx
-import { UpgradePrompt } from '@nozle-js/react'
-
 export function SsoUpsell({ openPlans }: { openPlans: () => void }) {
   return <UpgradePrompt planName="Pro" onUpgrade={openPlans} />
 }
@@ -76,8 +75,6 @@ With `onUpgrade`, a click calls it and nothing else. Without it, the button sets
 </Frame>
 
 ```tsx
-import { UpgradePrompt } from '@nozle-js/react'
-
 export function ProPrompt({ openPlans }: { openPlans: () => void }) {
   return <UpgradePrompt planName="Pro" onUpgrade={openPlans} />
 }
@@ -88,8 +85,6 @@ export function ProPrompt({ openPlans }: { openPlans: () => void }) {
 Without `planName`, `text` is the message.
 
 ```tsx
-import { UpgradePrompt } from '@nozle-js/react'
-
 export function LimitPrompt({ openPlans }: { openPlans: () => void }) {
   return <UpgradePrompt text="You used all 1,000 API calls this month" onUpgrade={openPlans} />
 }
@@ -101,7 +96,6 @@ Open your plan change flow from `onUpgrade`, for example an [`UpgradeModal`](/sd
 
 ```tsx
 import { useState } from 'react'
-import { UpgradeModal, UpgradePrompt } from '@nozle-js/react'
 
 export function UpgradeToScale() {
   const [open, setOpen] = useState(false)

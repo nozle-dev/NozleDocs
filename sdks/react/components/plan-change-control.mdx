@@ -49,20 +49,15 @@ keywords: ["plan change", "upgrade", "downgrade", "self-service", "react"]
 
 ## Usage
 
-```tsx
-import {
-  BillingPortalError,
-  PlanChangeControl,
-  type PlanChangeActions,
-  type PlanChangeState,
-} from '@nozle-js/react'
+```tsx Imports
+import { BillingPortalError, BillingProvider, PlanChangeControl } from '@nozle-js/react'
+import type { PlanChangeActions, PlanChangePreview, PlanChangeState } from '@nozle-js/react'
 ```
 
 Pass the subscription and `actions`, the callbacks that call your authenticated backend (see [Live data](#live-data)):
 
 ```tsx components/change-plan.tsx
 'use client'
-import { PlanChangeControl, type PlanChangeActions } from '@nozle-js/react'
 
 export function ChangePlan(props: {
   subscriptionId: string
@@ -95,8 +90,6 @@ While a payment is pending, the control checks the status every 5 seconds. Retri
 `load` and `status` return a `PlanChangeState`:
 
 ```tsx
-import type { PlanChangeState } from '@nozle-js/react'
-
 // What your `load` and `status` actions return for an active Pro subscription.
 export const state: PlanChangeState = {
   subscriptionId: 'sub_123',
@@ -119,8 +112,6 @@ export const state: PlanChangeState = {
 `actions` calls your authenticated backend. Each callback receives the external `subscriptionId` and an `AbortSignal`; never send the signal in the request body. Create the object once, outside the component:
 
 ```tsx lib/plan-change-actions.ts
-import { BillingPortalError, type PlanChangeActions } from '@nozle-js/react'
-
 async function post<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {
     method: 'POST',
@@ -174,7 +165,6 @@ Your backend fills the adapter with the Node, Python or Go SDK: it authenticates
 
 ```tsx
 'use client'
-import { BillingProvider, PlanChangeControl, type PlanChangeActions } from '@nozle-js/react'
 
 export function ChangePlan({ subscriptionId, actions }: { subscriptionId: string; actions: PlanChangeActions }) {
   return (
@@ -194,8 +184,6 @@ After "Review change", the dialog shows the quote that `preview` returns. An end
 </Frame>
 
 ```tsx
-import type { PlanChangePreview } from '@nozle-js/react'
-
 // What your `preview` action returns for an immediate upgrade from Pro to Scale.
 export const quote: PlanChangePreview = {
   operation: 'upgrade',
@@ -221,8 +209,6 @@ When `load` or `status` returns a `pendingChange`, the control shows "Current pl
 </Frame>
 
 ```tsx
-import type { PlanChangeState } from '@nozle-js/react'
-
 // What your `load` and `status` actions return while a downgrade to Free waits for renewal.
 export const scheduled: PlanChangeState = {
   subscriptionId: 'sub_123',

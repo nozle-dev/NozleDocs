@@ -47,15 +47,15 @@ keywords: ["usage breakdown", "current usage", "billing period", "react"]
 
 ## Usage
 
-```tsx
-import { UsageBreakdown, useUsage, type CustomerUsageData } from '@nozle-js/react'
+```tsx Imports
+import { BillingProvider, UsageBreakdown, useUsage } from '@nozle-js/react'
+import type { CustomerUsageData } from '@nozle-js/react'
 ```
 
 Inside a `BillingProvider` with `billingEndpoint`, read the current period with `useUsage` and pass it in:
 
 ```tsx app/billing/usage/page.tsx
 'use client'
-import { BillingProvider, UsageBreakdown, useUsage } from '@nozle-js/react'
 
 function ThisPeriod() {
   const { data, isPending, error } = useUsage()
@@ -78,8 +78,6 @@ Each row shows the charge's invoice name when set, otherwise the feature name. U
 `usage` is the `customer_usage` object of Core's current-usage endpoint. Amounts are in cents; `units` is a decimal string.
 
 ```tsx
-import { UsageBreakdown, type CustomerUsageData } from '@nozle-js/react'
-
 const usage: CustomerUsageData = {
   from_datetime: '2026-10-01T00:00:00Z',
   to_datetime: '2026-10-31T23:59:59Z',
@@ -104,8 +102,6 @@ export function ThisPeriod() {
 <Accordion title="Full example data">
 
 ```tsx
-import { UsageBreakdown, type CustomerUsageData } from '@nozle-js/react'
-
 const usage: CustomerUsageData = {
   from_datetime: '2026-10-01T00:00:00Z',
   to_datetime: '2026-10-31T23:59:59Z',
@@ -141,8 +137,6 @@ export function ThisPeriod() {
 Inside a `BillingProvider` with `billingEndpoint`, [`useUsage()`](/sdks/react/hooks#the-hooks) reads the current period for the signed-in customer. Its `data` passes to `usage` directly:
 
 ```tsx
-import { UsageBreakdown, useUsage } from '@nozle-js/react'
-
 export function LiveBreakdown() {
   const { data, isPending, error } = useUsage()
   return <UsageBreakdown usage={data} isLoading={isPending} error={error} />
@@ -162,8 +156,6 @@ Without the hooks, read `GET https://api.nozle.app/core/api/v1/customers/{extern
 </Frame>
 
 ```tsx
-import { UsageBreakdown } from '@nozle-js/react'
-
 export function BreakdownStates() {
   return (
     <>

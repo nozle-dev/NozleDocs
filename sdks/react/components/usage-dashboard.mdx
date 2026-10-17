@@ -47,15 +47,14 @@ keywords: ["usage dashboard", "limits", "meters", "react"]
 
 ## Usage
 
-```tsx
-import { UsageDashboard, usageItems, type UsageDashboardFeature, type UsageResult } from '@nozle-js/react'
+```tsx Imports
+import { UsageDashboard, usageItems, useEntitlement, usePlans, useSubscription } from '@nozle-js/react'
+import type { UsageDashboardFeature, UsageResult } from '@nozle-js/react'
 ```
 
 Pass one row per feature:
 
 ```tsx components/usage-card.tsx
-import { UsageDashboard } from '@nozle-js/react'
-
 export function UsageCard() {
   return (
     <UsageDashboard
@@ -75,8 +74,6 @@ Each row renders a labelled `UsageMeter` with its colour thresholds.
 Each row is a `UsageDashboardFeature`: `{ key, label, used, limit? }`. A `limit` of `null`, or no `limit`, means unlimited.
 
 ```tsx
-import { UsageDashboard, type UsageDashboardFeature } from '@nozle-js/react'
-
 const features: UsageDashboardFeature[] = [
   { key: 'api_calls', label: 'API calls', used: 31200, limit: 50000 },
   { key: 'projects', label: 'Projects', used: 12, limit: null },
@@ -90,8 +87,6 @@ export function Usage() {
 <Accordion title="Full example data">
 
 ```tsx
-import { UsageDashboard, type UsageDashboardFeature } from '@nozle-js/react'
-
 const features: UsageDashboardFeature[] = [
   { key: 'api_calls', label: 'API calls', used: 31200, limit: 50000 },
   { key: 'seats', label: 'Seats', used: 9, limit: 10 },
@@ -111,8 +106,6 @@ export function Usage() {
 `usageItems(entitlements, results)` joins a plan's metered entitlements from the catalog (for the names) with usage results keyed by feature code, the `used` and `limit` of a `can()` result. Entitlements that are not metered, or have no result, are left out.
 
 ```tsx
-import { UsageDashboard, useEntitlement, usePlans, usageItems, useSubscription, type UsageResult } from '@nozle-js/react'
-
 export function LiveUsage() {
   const subscription = useSubscription()
   const { plans } = usePlans()
@@ -147,8 +140,6 @@ export function LiveUsage() {
 </Frame>
 
 ```tsx
-import { UsageDashboard } from '@nozle-js/react'
-
 export function UsageStates() {
   return (
     <>
@@ -165,8 +156,6 @@ export function UsageStates() {
 A row without a limit reads "Unlimited" and its bar stays empty.
 
 ```tsx
-import { UsageDashboard } from '@nozle-js/react'
-
 export function ProjectsUsage() {
   return <UsageDashboard features={[{ key: 'projects', label: 'Projects', used: 12, limit: null }]} />
 }

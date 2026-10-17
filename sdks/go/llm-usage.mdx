@@ -15,6 +15,12 @@ Capture records usage events; they bill only when a metered Feature has the same
 
 ## Capture any client
 
+```go Imports
+import nozle "github.com/nozle-dev/nozle-go"
+
+client := nozle.New("") // reads NOZLE_SECRET_KEY
+```
+
 ```go
 providerHTTP, err := nozle.WrapHTTPClient(&http.Client{}, client, nozle.CaptureOptions{
   FeatureCode: "llm_tokens",

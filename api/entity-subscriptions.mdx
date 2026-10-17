@@ -95,9 +95,22 @@ Use bulk Entity checkout when a customer purchases a mixed pool of plans in one 
 
 Use a server SDK from your trusted backend. These SDK methods validate the basket and return the checkout contract. In Node.js:
 
-```ts
+<CodeGroup>
+```ts Node.js
 import { Nozle } from '@nozle-js/node'
+import { Checkout } from '@nozle-js/react'
+```
+```python Python
+from nozle import Nozle
+```
+```go Go
+import nozle "github.com/nozle-dev/nozle-go"
 
+client := nozle.New("") // reads NOZLE_SECRET_KEY
+```
+</CodeGroup>
+
+```ts
 const nozle = new Nozle({
   apiKey: process.env.NOZLE_SECRET_KEY!,
   eventsUrl: 'https://api.nozle.app/core',
@@ -121,7 +134,6 @@ The Python SDK exposes the same backend operation:
 ```python
 import os
 
-from nozle import Nozle
 
 nozle = Nozle(
     api_key=os.environ["NOZLE_SECRET_KEY"],
@@ -154,8 +166,6 @@ _ = checkout
 On the frontend, pass a Stripe result to the React checkout component:
 
 ```tsx
-import { Checkout } from '@nozle-js/react'
-
 if (checkout.type === 'stripe' && checkout.client_secret) {
   return (
     <Checkout

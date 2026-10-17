@@ -51,15 +51,14 @@ The screenshots show the pay button of a checkout result. Stripe's own form take
 
 ## Usage
 
-```tsx
-import { Checkout, useCheckout, type CheckoutResult } from '@nozle-js/react'
+```tsx Imports
+import { Checkout, CheckoutButton, useCheckout } from '@nozle-js/react'
+import type { CheckoutResult, CheckoutStatus, RazorpayVerification } from '@nozle-js/react'
 ```
 
 Pass a Stripe client secret and your Stripe publishable key:
 
 ```tsx components/pay-step.tsx
-import { Checkout } from '@nozle-js/react'
-
 export function PayStep({ clientSecret }: { clientSecret: string }) {
   return (
     <Checkout
@@ -84,8 +83,6 @@ Stripe webhooks decide whether the subscription is active. `onSuccess`, `onCompl
 `Checkout` takes either a Stripe client secret or a `checkout` result in the `CheckoutResult` shape that `createCheckout` returns:
 
 ```tsx
-import { Checkout, type CheckoutResult } from '@nozle-js/react'
-
 const result: CheckoutResult = {
   type: 'razorpay',
   checkout_id: 'chk_123',
@@ -108,7 +105,6 @@ The client secret comes from `onStripeClientSecret` of [`CheckoutButton`](/sdks/
 
 ```tsx
 import { useState } from 'react'
-import { Checkout, CheckoutButton } from '@nozle-js/react'
 
 export function BuyPro() {
   const [clientSecret, setClientSecret] = useState<string | null>(null)
@@ -130,8 +126,6 @@ With `checkout`, the component renders a pay button that handles Razorpay, hoste
 </Frame>
 
 ```tsx
-import { Checkout, type CheckoutResult, type CheckoutStatus, type RazorpayVerification } from '@nozle-js/react'
-
 const post = async (path: string, body: object): Promise<CheckoutStatus> => {
   const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!response.ok) throw new Error(`Request failed: ${response.status}`)
@@ -159,8 +153,6 @@ export function ResumePayment({ result }: { result: CheckoutResult }) {
 To place your own pay button in the Payment Element form, pass it as `children` and call `useCheckout()` in it. `children` replaces the built-in submit button.
 
 ```tsx
-import { Checkout, useCheckout } from '@nozle-js/react'
-
 function PayButton() {
   const { confirmPayment, isProcessing, error } = useCheckout()
   return (

@@ -55,17 +55,14 @@ Portal reads use a customer-scoped session issued by your backend. Subscription 
 
 Serve these example merchant routes on the same HTTPS origin as your app, or proxy them there. Keep your application's session and CSRF protection. The route names below are examples from the SDK repositories, not public Nozle API paths.
 
+```tsx Imports
+import { BillingPortal, BillingPortalError, CancellationControl, PlanChangeControl } from '@nozle-js/react'
+import type { BillingPortalSession, CancellationActions, CancellationSubscription, CreateBillingPortalSession, PlanChangeActions } from '@nozle-js/react'
+```
+
 ```tsx
 'use client';
 
-import {
-  BillingPortal,
-  BillingPortalError,
-  type BillingPortalSession,
-  type CancellationActions,
-  type CreateBillingPortalSession,
-  type PlanChangeActions,
-} from '@nozle-js/react';
 
 async function post<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {
@@ -193,11 +190,6 @@ A Razorpay payment must be captured before the upgrade is fulfilled. A Stripe ca
 Import `CancellationControl` and `PlanChangeControl` for your own billing layout. The cancellation control needs both the current subscription and a persisted-state `refresh`; the plan control loads its state through the adapter.
 
 ```tsx
-import {
-  CancellationControl, PlanChangeControl,
-  type CancellationActions, type CancellationSubscription, type PlanChangeActions,
-} from '@nozle-js/react';
-
 export function SubscriptionControls(props: {
   accountId: string;
   subscription: CancellationSubscription;

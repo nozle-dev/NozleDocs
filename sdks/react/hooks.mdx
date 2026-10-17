@@ -19,8 +19,13 @@ Requires `@nozle-js/react` `0.11.0` and a backend on `@nozle-js/node` `0.13.0`.
 
 `createBillingHandler` from `@nozle-js/node` is a web-standard request handler that serves every customer hook with your secret key. The customer always comes from `getCustomerId`, read from your session; a customer id sent by the browser is ignored.
 
-```ts title="app/api/nozle/[route]/route.ts"
+```tsx Imports
 import { Nozle, createBillingHandler } from '@nozle-js/node'
+import { BillingProvider, Checkout, CreditBalance, useBillingContext, useCheckoutSession, useCreditBalance, useEntitlement, usePlans } from '@nozle-js/react'
+import type { CatalogPlan, CreateCheckout, GetCheckoutStatus, NozleClient, VerifyCheckout } from '@nozle-js/react'
+```
+
+```ts title="app/api/nozle/[route]/route.ts"
 import { auth } from '@/lib/auth'
 
 const nozle = new Nozle() // reads NOZLE_SECRET_KEY
@@ -35,8 +40,6 @@ The last path segment picks the route: `subscription`, `entitlement`, `credits`,
 Then point the provider at it:
 
 ```tsx
-import { BillingProvider } from '@nozle-js/react'
-
 <BillingProvider
   publishableKey="pk_..."
   billingEndpoint="/api/nozle"
@@ -66,8 +69,6 @@ Each hook returns TanStack Query's result (`data`, `isPending`, `error`, `refetc
 `useBillingRefresh()` returns a function that reloads every billing hook, for example after checkout or a plan change.
 
 ```tsx
-import { CreditBalance, useCreditBalance, useEntitlement } from '@nozle-js/react'
-
 function AiPanel() {
   const credits = useCreditBalance()
   const entitlement = useEntitlement('ai_calls')
@@ -87,8 +88,6 @@ Fetches `GET /api/v1/plans` through the `BillingProvider` catalog client.
 Calls share one cached request per `publishableKey` and `baseUrl`, kept for five minutes. A failed load is not retried automatically; call `refetch()`. `usePlans` does not fetch during server rendering; it renders the initial loading state.
 
 ```tsx
-import { usePlans } from '@nozle-js/react'
-
 function PlanList() {
   const { plans, isLoading, error } = usePlans()
 
@@ -121,8 +120,6 @@ At runtime, each item in `plans` is the trimmed plan object the API returns to a
 The list is not filtered. It includes trial plans and pay-in-arrears plans, and not plans that are pending deletion. Decide in your component which plans to show. To read an undeclared field, widen the type:
 
 ```tsx
-import { usePlans, type CatalogPlan } from '@nozle-js/react'
-
 type CatalogPlanDetail = CatalogPlan & {
   trial_period?: number | null
   pay_in_advance?: boolean
@@ -144,8 +141,6 @@ The publishable key is public, so every field it receives, including charges, ta
 Calls `BillingProvider.createCheckout` with a plan code and return URL.
 
 ```tsx
-import { useCheckoutSession, Checkout } from '@nozle-js/react'
-
 function BuyProButton() {
   const { fetchClientSecret, checkout, isLoading, error } = useCheckoutSession()
 
@@ -192,8 +187,6 @@ The hook returns a string only for a Stripe client secret. For a `hosted` result
 Returns the required billing context and throws outside `BillingProvider`.
 
 ```tsx
-import { useBillingContext } from '@nozle-js/react'
-
 const { client, createCheckout, verifyCheckout, getCheckoutStatus } = useBillingContext()
 ```
 
@@ -222,8 +215,6 @@ interface NozleClient {
 `BillingContext` is exported for advanced integrations that need React's direct context API. Its value is either `null` or:
 
 ```ts
-import type { CreateCheckout, GetCheckoutStatus, NozleClient, VerifyCheckout } from '@nozle-js/react'
-
 interface BillingContextValue {
   client: NozleClient
   createCheckout?: CreateCheckout

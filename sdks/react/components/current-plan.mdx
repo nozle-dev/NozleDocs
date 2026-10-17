@@ -48,15 +48,15 @@ keywords: ["current plan", "subscription", "usage", "billing settings", "react"]
 
 ## Usage
 
-```tsx
-import { CurrentPlan, currentPlanMeters, type BillingSubscription, type CurrentPlanDetail, type UsageDashboardFeature } from '@nozle-js/react'
+```tsx Imports
+import { BillingProvider, CurrentPlan, currentPlanMeters, usePlans, useSubscription, useUsage } from '@nozle-js/react'
+import type { BillingSubscription, CurrentPlanDetail, UsageDashboardFeature } from '@nozle-js/react'
 ```
 
 Inside a `BillingProvider` with `billingEndpoint`, the card reads the subscription, the plan's limits and this period's usage itself:
 
 ```tsx app/settings/billing/page.tsx
 'use client'
-import { BillingProvider, CurrentPlan } from '@nozle-js/react'
 
 export default function BillingSettings() {
   return (
@@ -74,8 +74,6 @@ The card shows the plan name, a status label, the price and interval, "Changes t
 Pass `subscription` (the shape `useSubscription` returns) and `usage` to render your own data:
 
 ```tsx
-import { CurrentPlan, type BillingSubscription, type UsageDashboardFeature } from '@nozle-js/react'
-
 const subscription: BillingSubscription = {
   subscription: {
     external_id: 'sub_123',
@@ -98,8 +96,6 @@ export function PlanSummary() {
 <Accordion title="Full example data">
 
 ```tsx
-import { CurrentPlan, type BillingSubscription, type CurrentPlanDetail, type UsageDashboardFeature } from '@nozle-js/react'
-
 const subscription: BillingSubscription = {
   subscription: {
     external_id: 'sub_123',
@@ -155,8 +151,6 @@ Without `subscription`, `CurrentPlan` needs `BillingProvider` with `billingEndpo
 `currentPlanMeters(entitlements, usage)` joins a plan's metered entitlements with a period's `charges_usage` and returns `usage` rows:
 
 ```tsx
-import { CurrentPlan, currentPlanMeters, usePlans, useSubscription, useUsage } from '@nozle-js/react'
-
 export function PlanWithMeters() {
   const subscription = useSubscription()
   const { plans } = usePlans()
@@ -184,8 +178,6 @@ export function PlanWithMeters() {
 </Frame>
 
 ```tsx
-import { CurrentPlan, type BillingSubscription } from '@nozle-js/react'
-
 const subscription: BillingSubscription = {
   subscription: {
     external_id: 'sub_123',
@@ -212,8 +204,6 @@ export function PlanSummary() {
 </Frame>
 
 ```tsx
-import { CurrentPlan } from '@nozle-js/react'
-
 export function PlanStates() {
   return (
     <>

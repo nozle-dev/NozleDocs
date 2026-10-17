@@ -23,9 +23,12 @@ Capture records usage events; they bill only when a metered Feature has the same
 
 ## Capture any client
 
+```ts Imports
+import { Nozle, captureFetch, wrapAnthropic, wrapOpenAI } from '@nozle-js/node'
+```
+
 ```ts
 import OpenAI from 'openai'
-import { Nozle } from '@nozle-js/node'
 
 const nozle = new Nozle() // reads NOZLE_SECRET_KEY
 
@@ -106,7 +109,6 @@ npm install openai
 
 ```ts
 import OpenAI from 'openai'
-import { Nozle, wrapOpenAI } from '@nozle-js/node'
 
 const nozle = new Nozle()
 
@@ -151,7 +153,6 @@ npm install @anthropic-ai/sdk
 
 ```ts
 import Anthropic from '@anthropic-ai/sdk'
-import { Nozle, wrapAnthropic } from '@nozle-js/node'
 
 const anthropic = wrapAnthropic(new Anthropic(), nozle, {
   customerId: 'workspace_123',

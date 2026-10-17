@@ -26,9 +26,14 @@ It does not accept a secret key or choose a Nozle customer. The native billing p
 
 Wrap public catalog and provider-context checkout UI in `BillingProvider`. `BillingPortal` and its management controls use their own callbacks and do not require this provider. Your `createCheckout` callback calls an authenticated merchant endpoint; that endpoint derives the customer from the logged-in user or team and calls Nozle with a restricted `sk_`.
 
-```tsx
+```tsx Imports
+import { Nozle } from '@nozle-js/node'
 import { BillingProvider, PricingTable } from '@nozle-js/react'
 
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+```
+
+```tsx
 export function BillingPage({ csrfToken }: { csrfToken: string }) {
   return (
     <BillingProvider

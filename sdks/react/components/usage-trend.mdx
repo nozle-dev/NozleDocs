@@ -47,15 +47,15 @@ keywords: ["usage trend", "past usage", "chart", "react"]
 
 ## Usage
 
-```tsx
-import { UsageTrend, useUsage, type CustomerUsageData } from '@nozle-js/react'
+```tsx Imports
+import { BillingProvider, UsageTrend, useUsage } from '@nozle-js/react'
+import type { CustomerUsageData } from '@nozle-js/react'
 ```
 
 Inside a `BillingProvider` with `billingEndpoint`, read past periods with `useUsage({ period: 'past' })` and pass them in:
 
 ```tsx app/billing/history/page.tsx
 'use client'
-import { BillingProvider, UsageTrend, useUsage } from '@nozle-js/react'
 
 function History() {
   const { data, isPending, error } = useUsage({ period: 'past', periods: 6 })
@@ -78,8 +78,6 @@ Periods can come in any order; they are sorted by start date. Bars scale to the 
 `periods` is a list of `CustomerUsageData`, one per billing period, as in the `usage_periods` of Core's past-usage endpoint. Amounts are in cents; `units` is a decimal string.
 
 ```tsx
-import { UsageTrend, type CustomerUsageData } from '@nozle-js/react'
-
 const period = (from: string, to: string, apiCalls: number): CustomerUsageData => ({
   from_datetime: from,
   to_datetime: to,
@@ -109,8 +107,6 @@ export function History() {
 <Accordion title="Full example data">
 
 ```tsx
-import { UsageTrend, type CustomerUsageData } from '@nozle-js/react'
-
 const period = (from: string, to: string, apiCalls: number): CustomerUsageData => ({
   from_datetime: from,
   to_datetime: to,
@@ -150,8 +146,6 @@ export function History() {
 [`useUsage({ period: 'past' })`](/sdks/react/hooks#the-hooks) reads past periods for the signed-in customer through your `billingEndpoint`; `periods` sets how many. Its `data` is the list of periods and passes to `periods` directly:
 
 ```tsx
-import { UsageTrend, useUsage } from '@nozle-js/react'
-
 export function LiveTrend() {
   const { data, isPending, error } = useUsage({ period: 'past', periods: 6 })
   return <UsageTrend periods={data} isLoading={isPending} error={error} />
@@ -171,8 +165,6 @@ With `featureCode`, each bar shows that feature's units in the period instead of
 </Frame>
 
 ```tsx
-import { UsageTrend, useUsage } from '@nozle-js/react'
-
 export function ApiCallsTrend() {
   const { data, isPending, error } = useUsage({ period: 'past', periods: 6 })
   return <UsageTrend periods={data} featureCode="api_calls" isLoading={isPending} error={error} />
@@ -188,8 +180,6 @@ export function ApiCallsTrend() {
 </Frame>
 
 ```tsx
-import { UsageTrend } from '@nozle-js/react'
-
 export function TrendStates() {
   return (
     <>
