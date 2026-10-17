@@ -81,7 +81,7 @@ console.log(health.engine)
 | `nozle.applySubscriptionTransition()` | Apply an idempotent settlement transition. |
 | `nozle.track()` | Send a metered event through the Events API. |
 | `nozle.can()` | Check feature access, usage, and margin state. |
-| `nozle.checkAndDeduct()` | Legacy wallet path, takes `customerId` and `credits`. Throws on `404 wallet_not_found` when the customer has no active wallet. |
+| `nozle.checkAndDeduct()` | Deprecated legacy wallet path, takes `customerId` and `credits`. Throws on `404 wallet_not_found` when the customer has no active wallet. Use `usage.check()` and `usage.track()` with a credit system instead. |
 
 ### Namespaces
 
@@ -96,7 +96,7 @@ console.log(health.engine)
 | `costEvents` | `track()`, `createCostEventId()` |
 | `margin` | `summary()`, `byCustomer()`, `byMetric()`, `byPlan()`, `byModel()`, `trend()` |
 
-The package also exports `wrapOpenAI()` and `wrapAnthropic()` for token metadata capture.
+The package also exports `wrapOpenAI()` and `wrapAnthropic()` for token usage capture; see [LLM auto-capture](/sdks/node/llm-auto-capture#client-wrappers). `openai` and `@anthropic-ai/sdk` are optional peer dependencies.
 
 ## Key behavior
 

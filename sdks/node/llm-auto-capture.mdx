@@ -92,6 +92,10 @@ await nozle.recordUsage({
 
 `wrapOpenAI` and `wrapAnthropic` patch one client's `create` method instead. They are kept for existing integrations; `captureFetch` covers more APIs and providers.
 
+The wrapped client keeps the full SDK surface. `create` returns the SDK's own `APIPromise` or `Stream`, so `withResponse()`, `asResponse()`, `chat.completions.parse()`, `messages.stream()` / `finalMessage()`, `stream.controller` and `toReadableStream()` work as without the wrapper. Usage is recorded once, when your code reads the response. `asResponse()` leaves the body to you, so nothing is recorded for it. A provider error rejects to your code only and records nothing.
+
+`openai` and `@anthropic-ai/sdk` are optional peer dependencies of `@nozle-js/node`. Install the one you wrap.
+
 ### OpenAI
 
 ```bash
@@ -133,7 +137,7 @@ for await (const chunk of stream) {
 }
 ```
 
-Tracking is attempted after the stream finishes. If you stop reading a stream early (`break` or `return()`) after a chunk, the wrapper sends no Feature Event and no Cost Events, for OpenAI and Anthropic.
+A stream is recorded when it is fully iterated. If you stop reading early (`break` or `return()`), or read the stream through `tee()`, the wrapper sends no Feature Event and no Cost Events, for OpenAI and Anthropic.
 
 Only `chat.completions.create` is wrapped for OpenAI. The Responses API is not wrapped.
 
@@ -161,7 +165,7 @@ const message = await anthropic.messages.create({
 })
 ```
 
-For Anthropic streams, the wrapper reads input usage from `message_start` and output usage from `message_delta` events.
+For Anthropic streams, the wrapper reads input usage from `message_start` and output usage from `message_delta` events. `messages.stream()` and `finalMessage()` read the whole stream, so they record usage once.
 
 ### `WrapOptions`
 
@@ -171,6 +175,7 @@ For Anthropic streams, the wrapper reads input usage from `message_start` and ou
 | `metricCode` | `string` | no | Event code; defaults to `llm_tokens`. |
 | `costMeterCode` | `string` | no | Cost Event Meter code. When set, emits categorized token Cost Events linked to the Feature Event. |
 | `feature` | `string` | no | Included as a `feature` event property. |
+| `onError` | `(error) => void` | no | Called when usage could not be recorded, and once per event code with `code: "feature_not_found"` when no Feature has that code. Without it these failures are silent. |
 
 ## Event properties
 
@@ -200,7 +205,7 @@ Cost calculation remains server-side. Configure the `ai_tokens` Cost Event Meter
 The usage event's `transaction_id` is `llm-<format>-<response id>`, for example `llm-openai-chatcmpl-123`, so the same response is never recorded twice. A response without an id gets a generated one. The same id is the `parent_transaction_id` of every detailed Cost Event, so parent and child events may arrive in any order. Recording runs without delaying the provider response, and a recording failure never replaces a successful provider result.
 
 <Warning>
-`wrapOpenAI` and `wrapAnthropic` record failures silently: no log line and no unhandled rejection, including for a customer with no active subscription. Use `captureFetch` with `onError`, or `recordUsage`, when you need to know.
+Without `onError`, `wrapOpenAI` and `wrapAnthropic` record failures silently: no log line and no unhandled rejection, including for a customer with no active subscription. Pass `onError`, or use `recordUsage`, when you need to know.
 </Warning>
 
 For workflows requiring durable delivery, explicit transaction IDs, or strict error handling, track manually through your queue instead of relying on the wrapper.
