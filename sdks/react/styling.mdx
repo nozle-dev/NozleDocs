@@ -5,6 +5,8 @@ description: "Pick a theme for the React components, then adjust colours, shape 
 
 Every component takes its look from `appearance`. Set it once on `BillingProvider` for all components inside, or on one component. No Tailwind or extra CSS is needed. Requires `@nozle-js/react` `0.11.0`.
 
+You can also pick the look in the dashboard and save it for your organization: every component then uses it without any code. See [Saved appearance](#saved-appearance).
+
 ## Themes
 
 <Tabs>
@@ -107,6 +109,56 @@ Every colour, the font, corner radius, border width and shadow can be changed on
 >
 ```
 
+## Saved appearance
+
+Requires `@nozle-js/react` `0.13.0`.
+
+In the dashboard, open **Developers > Customize SDK**, pick a theme, colours and plan card options, and select **Save changes**. Nozle saves the appearance for your organization, next to the plan card content. Every SDK component in your app picks it up automatically, with no code. The components read it from the plan catalog request they already make (`meta.sdk_appearance` in [`GET /api/v1/plans`](/api/list-plans)), with your publishable key.
+
+The page has these parts:
+
+- **Appearance** panel with the groups Theme, Plan cards, Buttons, Highlighted plan, Surfaces, Text, and Status and accents. An empty value keeps the theme's value.
+- **Preview as a customer on** a plan, which shows the Active and upgrade states of the plan cards.
+- **Component** dropdown, which previews any SDK component as it would look in your app. A customer picker shows only for components that show one customer's data. The preview uses live data from your organization where available and sample data otherwise, and labels which one it shows.
+
+**Save changes** saves the content and the appearance together.
+
+### What is saved
+
+| Setting | Values |
+|---|---|
+| Theme | `light`, `dark`, `nozle`, `nozleDark`, `minimal`, `neobrutal` |
+| Colours | `colorPrimary`, `colorPrimaryForeground`, `colorBackground`, `colorCard`, `colorForeground`, `colorMuted`, `colorMutedForeground`, `colorAccent`, `colorAccentForeground`, `colorBorder`, `colorDanger`, `colorWarning`, `colorSuccess`, `colorSecondary`, `colorInput`, `colorHighlight`, `colorHighlightForeground`, `buttonBorderColor`. Hex only: `#rgb` or `#rrggbb`. |
+| Shape | `borderRadius`, `buttonRadius`, `borderWidth`, `buttonBorderWidth`. Lengths such as `12px` or `1rem`. |
+| Plan cards | `planCardLayout` (`card` or `panel`) |
+| Pricing table | `highlightStyle` (`outline` or `filled`; the dashboard shows Outlined and Contained), `annualDiscountLabel` (up to 40 characters), `showToggle` |
+
+Fonts, shadows, `elements`, `enterpriseEmail` and any CSS are not saved. Set them in code. The saved object is at most 4 KB. Anything outside this list, or a value in the wrong format, is rejected with `422`.
+
+### Precedence
+
+From lowest to highest: the saved appearance, `appearance` on `BillingProvider`, `appearance` on a component. A theme set in code replaces the values that theme defines; saved values the code theme does not define stay.
+
+For example, you saved the `nozle` theme and a `colorHighlight` of `#16a34a`. In code you set the `minimal` theme:
+
+```tsx
+<BillingProvider publishableKey="pk_..." appearance={{ theme: minimal }}>
+```
+
+The primary colour becomes `minimal`'s, and the highlight colour stays `#16a34a`, because `minimal` does not define it.
+
+### Turn it off
+
+```tsx
+<BillingProvider publishableKey="pk_..." savedAppearance={false}>
+```
+
+With `savedAppearance={false}`, the components ignore the saved appearance and use only your code.
+
+Without a saved appearance, nothing is applied, and `--nozle-*` CSS variables you set on `:root` keep working.
+
+Components that only show data, such as `UsageMeter`, make one cached request for the plan catalog through the provider. A page with several components makes one request per `BillingProvider`.
+
 ## Highlighted plan
 
 `highlightPlan` on `PricingTable` marks one plan: its border and its button take the highlight colour (`colorHighlight`, by default the primary colour), with the label from `highlightLabel` (default "Most Popular"; `null` for none). `highlightStyle` picks how the card stands out. The tabs follow the theme you picked above:
@@ -201,6 +253,8 @@ import { PricingTable } from '@nozle-js/react'
 <PricingTable highlightPlan="pro" highlightStyle="filled" />
 ```
 
+The style, the colours and the toggle can also be saved in the dashboard: see [Saved appearance](#saved-appearance). A `highlightStyle` prop wins over the saved one.
+
 Set the colours with `colorHighlight` and `colorHighlightForeground`; they default to the primary colours. Change the badge text with `highlightLabel`, or pass `highlightLabel={null}` for no badge.
 
 ```tsx
@@ -216,12 +270,22 @@ Set the colours with `colorHighlight` and `colorHighlightForeground`; they defau
 
 A theme's `planCardLayout` picks how `PricingTable` and `PlanCard` lay out each plan:
 
-- `card` (default): name, description, price and ticked features. Plans priced above the current plan get the primary button; the current plan and cheaper ones get the plain button.
+- `card` (default): name, description, price and ticked features. See [Plan buttons](#plan-buttons) for which plan gets which button.
 - `panel`: the name in a header band, with `ACTIVE` on the right for the current plan and the highlight label for the highlighted plan, then price, description and plain feature lines. `nozle` and `nozleDark` use it.
 
 ```tsx
 appearance={{ theme: light, planCardLayout: 'panel' }}
 ```
+
+The layout can be saved in the dashboard too: see [Saved appearance](#saved-appearance).
+
+### Plan buttons
+
+Requires `@nozle-js/react` `0.13.0`. Which button a plan gets depends on the customer's plan:
+
+- **No current plan known:** every paid plan gets the primary button. In the `nozle`, `nozleDark` and `neobrutal` themes it has the hard shadow of the theme's button shadow; `light`, `dark` and `minimal` have none. The highlighted plan keeps its highlight colours.
+- **With `currentPlanCode`:** plans above it get the primary button. The current plan uses the primary colour with no shadow (in the panel layout it also shows the `ACTIVE` label in the header). Plans at or below it get a plain button.
+- **Contact-sales plans** stay outlined.
 
 ## Combine themes
 
@@ -244,7 +308,7 @@ import { CreditBalance } from '@nozle-js/react'
 </BillingProvider>
 ```
 
-The order, highest first: the component's `variables`, the component's `theme`, the provider's `variables`, the provider's `theme`, `--nozle-*` CSS variables set by your app, then the light values.
+The order, highest first: the component's `variables`, the component's `theme`, the provider's `variables`, the provider's `theme`, the [saved appearance](#saved-appearance), `--nozle-*` CSS variables set by your app, then the light values.
 
 ## Text
 
@@ -319,7 +383,7 @@ Muted text follows `colorForeground`: when `colorMutedForeground` is not set, it
 
 The `font*` and `label*` variables are the text roles described in [Text](#text). Numbers in tables are right-aligned in tabular figures, in `fontFamilyNumbers`.
 
-Any CSS value works, including `var(...)` and `oklch(...)`. Warning and error tints are mixed from `colorWarning` and `colorDanger`.
+In code, any CSS value works, including `var(...)` and `oklch(...)`. The [saved appearance](#saved-appearance) takes hex colours and simple lengths only, and none of the font, shadow or `colorScheme` variables. Warning and error tints are mixed from `colorWarning` and `colorDanger`.
 
 You can also set the CSS variables yourself, for example on `:root`. A component without `appearance` reads them. The older `--nozle-portal-*` and `--nozle-pricing-*` names still work after the `--nozle-*` name.
 
