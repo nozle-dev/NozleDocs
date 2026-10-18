@@ -26575,8 +26575,83 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PlanObject'
+        families:
+          type: array
+          description: The plan families of the returned plans, ordered by pricing position. A publishable key, or `include_hidden=false`, leaves out families and features hidden from the pricing table.
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - 'null'
+              show_on_pricing:
+                type: boolean
+              pricing_position:
+                type:
+                  - integer
+                  - 'null'
+              pricing_highlighted:
+                type: boolean
+              badge_text:
+                type:
+                  - string
+                  - 'null'
+              cta_text:
+                type:
+                  - string
+                  - 'null'
+              plan_codes:
+                type: array
+                items:
+                  type: string
+              features:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    code:
+                      type: string
+                    name:
+                      type: string
+                    description:
+                      type:
+                        - string
+                        - 'null'
+                    show_on_pricing:
+                      type: boolean
+                    show_description:
+                      type: boolean
+                    display_position:
+                      type:
+                        - integer
+                        - 'null'
         meta:
-          $ref: '#/components/schemas/PaginationMeta'
+          allOf:
+            - $ref: '#/components/schemas/PaginationMeta'
+            - type: object
+              properties:
+                sdk_appearance:
+                  type: object
+                  additionalProperties: true
+                  description: The appearance saved for the organization on the dashboard page Developers > Customize SDK, which the React SDK components apply automatically. `{}` when none is saved. Keys are `theme`, `variables`, `planCardLayout` and `pricingTable`. Returned for publishable and secret keys on this list endpoint only, not on `GET /plans/{code}`.
+                  example:
+                    theme: nozle
+                    variables:
+                      colorHighlight: '#16a34a'
+                    planCardLayout: panel
+                    pricingTable:
+                      highlightStyle: outline
+                      annualDiscountLabel: Save 20%
+                      showToggle: true
+                nozle_branding:
+                  type: boolean
+                  description: Whether the SDK components show "Powered by Nozle". Returned for publishable keys only.
+                  example: true
     MinimumCommitmentInput:
       type:
         - object
