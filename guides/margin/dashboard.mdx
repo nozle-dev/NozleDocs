@@ -71,7 +71,7 @@ curl https://api.nozle.app/engine/api/v1/margin/forecast \
   -H "Authorization: Bearer sk_live_..."
 ```
 
-The forecast fits a straight line to the daily totals of the range (by default the last month) and returns 30 daily `points`, for the 30 days after the end of the range. `projected_revenue`, `projected_cost` and `projected_margin` are integer cents, although their names have no `_cents` suffix. `confidence` is `low`, `medium` or `high`, depending on how many days of the range have events. With fewer than 2 such days, `points` is an empty array and `confidence` is `low`.
+The forecast fits a straight line to the daily totals of the range (by default the last month) and returns 30 daily `points`, dated from the day after the range's exclusive end: with the default range that is tomorrow; with a plain `to` date such as `2026-10-15` (which includes that day, so the range ends at `2026-10-16T00:00:00Z`) the first point is `2026-10-17`. `projected_revenue`, `projected_cost` and `projected_margin` are integer cents, although their names have no `_cents` suffix. `confidence` is `low`, `medium` or `high`, depending on how many days of the range have events. With fewer than 2 such days, `points` is an empty array and `confidence` is `low`.
 
 Every endpoint accepts optional `from` and `to` parameters. Use a `YYYY-MM-DD` date or an RFC3339 timestamp (`2026-07-01T09:30:00Z`). A plain date `to` includes that whole day, while an RFC3339 `to` is an exclusive instant. The Python and Go SDKs send the same values as `from_date` and `to_date`, which the API accepts as aliases. These four names, and `granularity` on the trend, are the only query parameters the endpoints read. Other query parameters are ignored without an error.
 
