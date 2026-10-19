@@ -115,13 +115,12 @@ Requires `@nozle-js/react` `0.13.0`.
 
 In the dashboard, open **Developers > Customize SDK**, pick a theme, colours and plan card options, and select **Save changes**. Nozle saves the appearance for your organization, next to the plan card content. Every SDK component in your app picks it up automatically, with no code. The components read it from the plan catalog request they already make (`meta.sdk_appearance` in [`GET /api/v1/plans`](/api/list-plans)), with your publishable key.
 
-The page has these parts:
+The page has two tabs:
 
-- **Appearance** panel with the groups Theme, Plan cards, Buttons, Highlighted plan, Surfaces, Text, and Status and accents. An empty value keeps the theme's value.
-- **Preview as a customer on** a plan, which shows the Active and upgrade states of the plan cards.
-- **Component** dropdown, which previews any SDK component as it would look in your app. A customer picker shows only for components that show one customer's data. The preview uses live data from your organization where available and sample data otherwise, and labels which one it shows.
+- **Global settings** are saved at the root of the SDK and apply to every component: theme, "Powered by Nozle", button, surface, text and status colours, and radius. The tab also shows the `BillingProvider` code to paste at the root of your app if you prefer to set the same appearance in code. It has no preview, because it is not tied to one component.
+- **Component settings** change one component only. Pick a component in the **Component** dropdown to see it as it would look in your app, with live data from your organization where available and sample data otherwise. The panel lists only the settings that component reads (a usage meter has an accent colour but no buttons), and the plan card layout and the highlighted plan appear on the pricing table and plan card. A field left empty follows the global settings, and the placeholder shows the global value. A field you set is marked **Set here**. **Use global** removes the component's own settings.
 
-**Save changes** saves the content and the appearance together.
+**Save changes** saves the content, the global settings and the component settings together.
 
 ### What is saved
 
@@ -130,14 +129,16 @@ The page has these parts:
 | Theme | `light`, `dark`, `nozle`, `nozleDark`, `minimal`, `neobrutal` |
 | Colours | `colorPrimary`, `colorPrimaryForeground`, `colorBackground`, `colorCard`, `colorForeground`, `colorMuted`, `colorMutedForeground`, `colorAccent`, `colorAccentForeground`, `colorBorder`, `colorDanger`, `colorWarning`, `colorSuccess`, `colorSecondary`, `colorInput`, `colorHighlight`, `colorHighlightForeground`, `buttonBorderColor`. Hex only: `#rgb` or `#rrggbb`. |
 | Shape | `borderRadius`, `buttonRadius`, `borderWidth`, `buttonBorderWidth`. Lengths such as `12px` or `1rem`. |
-| Plan cards | `planCardLayout` (`card` or `panel`) |
-| Pricing table | `highlightStyle` (`outline` or `filled`; the dashboard shows Outlined and Contained), `annualDiscountLabel` (up to 40 characters), `showToggle` |
+| Plan cards | `planCardLayout` (`card` or `panel`), set per component |
+| Pricing table | `highlightStyle` (`outline` or `filled`; the dashboard shows Outlined and Contained), `annualDiscountLabel` (up to 40 characters), `showToggle`, set per component |
+| Branding | `hideBranding`, only for plans that remove the "Powered by Nozle" line |
+| Components | `components.<Name>` with its own `theme`, `variables`, `planCardLayout` and `pricingTable`. Names: `PricingTable`, `PlanCard`, `PlanComparison`, `PlanBadge`, `CurrentPlan`, `PlanChangeControl`, `CancellationControl`, `UsageMeter`, `UsageDashboard`, `UsageAlert`, `UsageBreakdown`, `UsageTrend`, `CreditBalance`, `CreditHistory`, `PaymentMethodDisplay`, `CheckoutButton`, `UpgradeButton`, `UpgradeModal`, `UpgradePrompt`, `LockedOverlay` |
 
-Fonts, shadows, `elements`, `enterpriseEmail` and any CSS are not saved. Set them in code. The saved object is at most 4 KB. Anything outside this list, or a value in the wrong format, is rejected with `422`.
+Fonts, shadows, `elements`, `enterpriseEmail` and any CSS are not saved. Set them in code. The saved object is at most 8 KB. Anything outside this list, or a value in the wrong format, is rejected with `422`.
 
 ### Precedence
 
-From lowest to highest: the saved appearance, `appearance` on `BillingProvider`, `appearance` on a component. A theme set in code replaces the values that theme defines; saved values the code theme does not define stay.
+From lowest to highest: the saved global appearance, the appearance saved for that component, `appearance` on `BillingProvider`, `appearance` on the component in code. A component rendered inside another, such as a `UsageMeter` in a `UsageDashboard`, uses its own saved settings. A theme set in code replaces the values that theme defines; saved values the code theme does not define stay.
 
 For example, you saved the `nozle` theme and a `colorHighlight` of `#16a34a`. In code you set the `minimal` theme:
 
