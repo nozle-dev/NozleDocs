@@ -64,16 +64,16 @@ curl -X POST https://api.nozle.app/engine/api/v1/margin/simulate \
   -d '{ "metric_code": "agent_execution", "new_price_dollars": 1 }'
 ```
 
-**Forecast** — projected daily revenue, cost and margin for the next 30 days (REST only):
+**Forecast** — projected daily revenue, cost and margin for the 30 days after the range (REST only):
 
 ```bash
 curl https://api.nozle.app/engine/api/v1/margin/forecast \
   -H "Authorization: Bearer sk_live_..."
 ```
 
-The forecast reads no query parameters. It always fits a straight line to the daily totals of the last 30 days and returns 30 daily `points`. `projected_revenue`, `projected_cost` and `projected_margin` are integer cents, although their names have no `_cents` suffix. `confidence` is `low`, `medium` or `high`, depending on how many of the last 30 days have events. With fewer than 2 such days, `points` is an empty array and `confidence` is `low`.
+The forecast fits a straight line to the daily totals of the range (by default the last month) and returns 30 daily `points`, dated from the day after the range's exclusive end: with the default range that is tomorrow; with a plain `to` date such as `2026-10-15` (which includes that day, so the range ends at `2026-10-16T00:00:00Z`) the first point is `2026-10-17`. `projected_revenue`, `projected_cost` and `projected_margin` are integer cents, although their names have no `_cents` suffix. `confidence` is `low`, `medium` or `high`, depending on how many days of the range have events. With fewer than 2 such days, `points` is an empty array and `confidence` is `low`.
 
-Every endpoint except the forecast accepts optional `from` and `to` parameters. Use a `YYYY-MM-DD` date or an RFC3339 timestamp (`2026-07-01T09:30:00Z`). A plain date `to` includes that whole day, while an RFC3339 `to` is an exclusive instant. The Python and Go SDKs send the same values as `from_date` and `to_date`, which the API accepts as aliases. These four names, and `granularity` on the trend, are the only query parameters the endpoints read. Other query parameters are ignored without an error.
+Every endpoint accepts optional `from` and `to` parameters. Use a `YYYY-MM-DD` date or an RFC3339 timestamp (`2026-07-01T09:30:00Z`). A plain date `to` includes that whole day, while an RFC3339 `to` is an exclusive instant. The Python and Go SDKs send the same values as `from_date` and `to_date`, which the API accepts as aliases. These four names, and `granularity` on the trend, are the only query parameters the endpoints read. Other query parameters are ignored without an error.
 
 If you send only one end, the API derives the other: only `to` covers the month before it, and only `from` runs until now (one month after `from` if it is not in the past). With neither, the range is the last month.
 

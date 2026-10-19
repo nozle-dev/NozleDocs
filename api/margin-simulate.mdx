@@ -27,14 +27,14 @@ Content-Type: application/json
 ```
 
 <ParamField body="metric_code" type="string" required>
-  Code of the metric to simulate. A missing or empty value returns `400` with `metric_code required`.
+  Code of the metric to simulate. A missing or empty value returns `400` with `{"code": "invalid_request", "error": "metric_code required"}`.
 </ParamField>
 
-<ParamField body="new_price_dollars" type="number" default="0">
-  New price per unit of usage, in dollars (a JSON number, not a string). The server does not require it: if you omit it, the server uses `0` and returns a simulation with no revenue. A string returns `400`.
+<ParamField body="new_price_dollars" type="number" required>
+  New price per unit of usage, in dollars (a JSON number, not a string). It must be `0` or more. A missing, negative or string value returns `400` with code `invalid_request`.
 </ParamField>
 
-The simulation covers the date range given by the `from` and `to` query parameters, which default to the last month. They take a `YYYY-MM-DD` date (a plain `to` includes that whole day) or an RFC3339 timestamp (an exclusive instant), with `from_date` and `to_date` as aliases. When you send only one end, the API derives the other: only `to` covers the month before it, and only `from` runs until now (one month after `from` if it is not in the past). An unparseable value, or an end that is not after the start, returns `400` with `{"code": "invalid_date_range", "error": "..."}`. See [Margin Summary](/api/margin-summary) for the full rules. The body takes no other fields; fields such as `plan_code`, `new_price_cents`, `cost_change_percent` and `price_change_percent` are ignored. The query string is read only for `from`, `to`, `from_date` and `to_date`. The body is checked before the range, so a body error is returned first.
+The simulation covers the date range given by the `from` and `to` query parameters, which default to the last month. They take a `YYYY-MM-DD` date (a plain `to` includes that whole day) or an RFC3339 timestamp (an exclusive instant), with `from_date` and `to_date` as aliases. When you send only one end, the API derives the other: only `to` covers the month before it, and only `from` runs until now (one month after `from` if it is not in the past). An unparseable value, or an end that is not after the start, returns `400` with `{"code": "invalid_date_range", "error": "..."}`. See [Margin Summary](/api/margin-summary) for the full rules. The body takes no other fields: an unknown field such as `plan_code` or `new_price_cents` returns `400` with code `invalid_request`. The query string is read only for `from`, `to`, `from_date` and `to_date`. The body is checked before the range, so a body error is returned first.
 
 ### Response
 

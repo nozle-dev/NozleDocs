@@ -18,7 +18,7 @@ Get the plan of a customer's active subscription. If the customer has several ac
 ```json
 {
   "plan": "pro",
-  "planName": "pro",
+  "planName": "Pro",
   "status": "active",
   "interval": "monthly",
   "amount_cents": 4900,
@@ -31,7 +31,7 @@ Get the plan of a customer's active subscription. If the customer has several ac
 </ResponseField>
 
 <ResponseField name="planName" type="string" required>
-  The plan code again, not the plan's display name. Kept for older clients.
+  The plan's display name. Falls back to the plan code when the plan has no name.
 </ResponseField>
 
 <ResponseField name="status" type="string" required>
@@ -39,7 +39,7 @@ Get the plan of a customer's active subscription. If the customer has several ac
 </ResponseField>
 
 <ResponseField name="interval" type="string" required>
-  Always `monthly`. The value is fixed and does not reflect the plan's interval.
+  The plan's billing interval: `weekly`, `monthly`, `yearly`, `quarterly` or `semiannual`.
 </ResponseField>
 
 <ResponseField name="amount_cents" type="integer" required>
