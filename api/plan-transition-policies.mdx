@@ -132,6 +132,18 @@ Downgrade at the end of the period. Subscription options list a downgrade only w
 }
 ```
 
+## Proration on a mid-cycle upgrade
+
+When a subscription moves to another plan in the middle of its billing period, the policy for that pair decides what is charged:
+
+- `timing: "immediate"` applies the change now. With `end_of_period`, the change waits for the next period and nothing is prorated (`proration_behavior` and `credit_action` must be `none`).
+- `proration_behavior: "prorate_immediately"`, the default, prorates the unused part of the current period. `none` does not prorate it.
+- `credit_action` decides what happens to that unused amount of the current plan: `credit` credits it, `refund` refunds it (`refund_mode` `prorated` refunds the unused part, `full` the whole amount), `offset` needs `final_invoice_action: "generate"`, and `none`, the default, does nothing with it.
+- `billing_anchor: "keep_anchor"` keeps the current renewal day. `reset_anchor` starts a new period on the change date.
+- An immediate upgrade is payment-gated: checkout returns a provider result when money is due, or `type: "completed"` when nothing is due.
+
+To see the exact amounts before applying a change, preview it with [`POST /subscriptions/preview`](/api/subscription-management). The preview returns `credit_amount_cents`, `debit_amount_cents`, `net_amount_cents`, `amount_due_now_cents` and the policy it applied.
+
 ## How a policy shapes checkout
 
 When a customer with an active subscription checks out a different plan, Nozle resolves the policy for the pair and then:
