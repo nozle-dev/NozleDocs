@@ -4691,7 +4691,7 @@ paths:
 
         - All top-level plans of the organization are returned, newest first. There is no listed or public flag. Plans with a trial (`trial_period`) and pay-in-arrears plans (`pay_in_advance: false`) are included. Plans pending deletion (`pending_deletion: true`) are included for a secret key only. Per-customer override plans (`parent_id` set) are not.
         - Items do not include `fixed_charges`; use `GET /plans/{code}` for those.
-        - The Engine host serves this list at `https://api.nozle.app/engine/api/v1/plans` with the same body. Engine ignores `page` and `per_page` and returns the first page (up to 100 plans). Use this Core endpoint to page through larger catalogs.
+        - The Engine host serves this list at `https://api.nozle.app/engine/api/v1/plans` with the same body. Engine forwards `page` and `per_page` to Core.
 
         Because a publishable key ships in browsers, anything stored on a plan is readable by anyone who has the key. See [Public plan catalog](/api/list-plans).
       operationId: findAllPlans
@@ -4845,7 +4845,7 @@ paths:
 
         This endpoint also returns a plan that is pending deletion (`pending_deletion: true`) and a plan with a trial or pay-in-arrears billing. An unknown code, or the code of a per-customer override plan, returns `404` with the code `plan_not_found`.
 
-        The Engine host does not serve this path. Call it on the Core host.
+        The Engine host also serves this path at `https://api.nozle.app/engine/api/v1/plans/{code}` and returns Core's body unchanged.
 
         See [Public plan catalog](/api/list-plans).
       operationId: findPlan
@@ -9996,7 +9996,7 @@ paths:
           name: limit
           in: query
           required: false
-          description: Page size from 1 to 100. Omitted, empty or `0` uses 50. A non-integer, a negative value or a value above 100 returns `400 invalid_request`.
+          description: Page size from 1 to 100. Omitted or empty uses 50. `0`, a negative value, a value above 100 or a non-integer returns `400 invalid_request`.
           schema:
             type: integer
             minimum: 0
@@ -11611,6 +11611,17 @@ paths:
       responses:
         '200':
           description: Deduction result. Check `allowed`.
+          headers:
+            Deprecation:
+              description: Always `true`. Sent on every response of this endpoint after authentication.
+              schema:
+                type: string
+                example: 'true'
+            Link:
+              description: The successor endpoint.
+              schema:
+                type: string
+                example: '</api/v1/usage/track>; rel="successor-version"'
           content:
             application/json:
               schema:
@@ -11625,16 +11636,18 @@ paths:
                     allowed: false
                     remaining: 2
         '400':
-          description: Body has `error` only.
+          description: The body has `code` `bad_request`.
           content:
             application/json:
               schema: *id001
               examples:
                 invalid_body:
                   value:
+                    code: bad_request
                     error: invalid request body
                 missing:
                   value:
+                    code: bad_request
                     error: customer_id and positive credits are required
         '401': *id006
         '403':
@@ -11658,6 +11671,7 @@ paths:
               examples:
                 failed:
                   value:
+                    code: internal_server_error
                     error: could not deduct wallet credits
         '503': *id018
       x-codeSamples:
@@ -11743,7 +11757,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"error": "<store error text>"}` with no `code`.'
+          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
           content:
             application/json:
               schema:
@@ -11838,7 +11852,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"error": "<store error text>"}` with no `code`.'
+          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
           content:
             application/json:
               schema:
@@ -11933,7 +11947,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"error": "<store error text>"}` with no `code`.'
+          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
           content:
             application/json:
               schema:
@@ -12028,7 +12042,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"error": "<store error text>"}` with no `code`.'
+          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
           content:
             application/json:
               schema:
@@ -12123,7 +12137,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"error": "<store error text>"}` with no `code`.'
+          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
           content:
             application/json:
               schema:
@@ -12242,7 +12256,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"error": "<store error text>"}` with no `code`.'
+          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
           content:
             application/json:
               schema:
@@ -12265,7 +12279,7 @@ paths:
   /margin/forecast:
     get:
       summary: Get margin forecast
-      description: 'Projects daily revenue, cost and margin for the next 30 days. The handler reads no query parameters: it always uses the daily margin trend of the last 30 days (from now minus 30 days to now, UTC) and fits a least-squares line to revenue and to cost, using the position of each returned day bucket as x (days without events are skipped, not counted as zero). Each point is dated now + 1 to now + 30 days (UTC, `YYYY-MM-DD`). Projected revenue and cost are clamped at 0 and truncated to integer cents; `projected_margin` is their difference and can be negative. `confidence` is `low` with fewer than 7 day buckets, `medium` with 7 to 19 and `high` with 20 or more. With fewer than 2 day buckets the response is `{"points": [], "confidence": "low"}`; `points` is never `null`. `from`, `to` and every other query parameter are ignored, so this operation never returns `invalid_date_range`. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Projects daily revenue, cost and margin for the 30 days after the range. It uses the daily margin trend of the range (by default the last month up to now) and fits a least-squares line to revenue and to cost, using the position of each returned day bucket as x (days without events are skipped, not counted as zero). Each point is dated 1 to 30 days after the end of the range (UTC, `YYYY-MM-DD`). Projected revenue and cost are clamped at 0 and truncated to integer cents; `projected_margin` is their difference and can be negative. `confidence` is `low` with fewer than 7 day buckets, `medium` with 7 to 19 and `high` with 20 or more. With fewer than 2 day buckets the response is `{"points": [], "confidence": "low"}`; `points` is never `null`. The range is read by the Engine''s shared range parser, with the same `from`, `to`, `from_date` and `to_date` rules as the other margin operations; a value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. Other query parameters are ignored. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
       operationId: engineGetMarginForecast
       tags:
         - Margin
@@ -12274,10 +12288,36 @@ paths:
           description: Engine margin analytics
       security:
         - bearerAuth: []
-      parameters: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: 'Start of the range, inclusive: a date (`YYYY-MM-DD`, starting at 00:00 UTC that day) or an RFC3339 timestamp such as `2026-07-01T09:30:00Z`. Defaults as described in the operation description.'
+          schema:
+            type: string
+          example: '2026-07-01'
+        - name: to
+          in: query
+          required: false
+          description: 'End of the range: a date (`YYYY-MM-DD`) includes that whole day; an RFC3339 timestamp is used as given and is exclusive. Defaults as described in the operation description.'
+          schema:
+            type: string
+          example: '2026-07-31'
+        - name: from_date
+          in: query
+          required: false
+          description: Alias of `from`, sent by the Python and Go SDKs. Ignored when `from` is also sent.
+          schema:
+            type: string
+        - name: to_date
+          in: query
+          required: false
+          description: Alias of `to`, sent by the Python and Go SDKs. Ignored when `to` is also sent.
+          schema:
+            type: string
       responses:
         '200':
-          description: Forecast for the next 30 days.
+          description: Forecast for the 30 days after the range.
           content:
             application/json:
               schema:
@@ -12295,7 +12335,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"error": "<store error text>"}` with no `code`.'
+          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
           content:
             application/json:
               schema:
@@ -12370,7 +12410,7 @@ paths:
                 margin_delta_cents: 14750
                 event_count: 295
         '400':
-          description: 'Bad request. The body has `code: invalid_date_range` when `from`/`to` (or their aliases) cannot be parsed or the end is not after the start; `error` then names the problem. Body errors carry only `error`: `metric_code required` when `metric_code` is missing or empty, or the JSON decoder''s message when the body is not valid JSON or a field has the wrong type (for example `new_price_dollars` sent as a string). The authentication middleware also answers `400` without a `code` when trusted internal authentication is used without the `X-Nozle-Org-Id` header.'
+          description: 'Bad request. The body has `code: invalid_date_range` when `from`/`to` (or their aliases) cannot be parsed or the end is not after the start; `error` then names the problem. Body errors have `code: invalid_request`: `metric_code required` when `metric_code` is missing or empty, `new_price_dollars must be a number of 0 or more` when `new_price_dollars` is missing or negative, or the JSON decoder''s message when the body is not valid JSON, has an unknown field, or a field has the wrong type (for example `new_price_dollars` sent as a string). The authentication middleware also answers `400` when trusted internal authentication is used without the `X-Nozle-Org-Id` header.'
           content:
             application/json:
               schema:
@@ -12391,13 +12431,14 @@ paths:
                 metric_code_missing:
                   summary: metric_code missing
                   value:
+                    code: invalid_request
                     error: metric_code required
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"error": "<store error text>"}` with no `code`.'
+          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
           content:
             application/json:
               schema:
@@ -12659,9 +12700,9 @@ paths:
         - Plans
       summary: List the public plan catalog (Engine)
       description: |-
-        Engine proxy for Core's `GET /plans`. Engine calls Core `GET /api/v1/plans` with no query parameters and copies Core's status code and body unchanged, so a `200` body is the same `PlansPaginated` object Core returns. Engine ignores `page` and `per_page` and always returns Core's first page (up to 100 plans); page through larger catalogs with Core's `GET /plans`.
+        Engine proxy for Core's `GET /plans`. Engine calls Core `GET /api/v1/plans` with the caller's query string (`page`, `per_page`) and copies Core's status code and body unchanged, so a `200` body is the same `PlansPaginated` object Core returns. Engine also serves `GET /api/v1/plans/{code}` the same way, as a proxy for Core's `GET /plans/{code}`.
 
-        **Keys.** This is the only Engine route that accepts a publishable `pk_` key. It also accepts a secret `sk_` key and the trusted internal credential. Engine forwards a `pk_` or `sk_` key to Core as the caller's own credential. The internal credential works only for the organization Engine is configured to act for; any other organization returns `403`.
+        **Keys.** These two plan routes are the only Engine routes that accept a publishable `pk_` key. They also accept a secret `sk_` key and the trusted internal credential. Engine forwards a `pk_` or `sk_` key to Core as the caller's own credential. The internal credential works only for the organization Engine is configured to act for; any other organization returns `403`.
 
         Any error status Core returns is passed through with Core's error body. Engine returns `502` when it cannot reach Core within 10 seconds.
 
@@ -12669,6 +12710,9 @@ paths:
       operationId: engineListPlans
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
       responses:
         '200':
           description: Core's plan list, passed through unchanged.
@@ -12689,6 +12733,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/EngineError'
               example:
+                code: billing_unavailable
                 error: failed to reach billing service
         '503':
           $ref: '#/components/responses/EngineUnavailable'
@@ -29861,8 +29906,8 @@ components:
           example: pro
         planName:
           type: string
-          description: Same value as `plan` (the plan code, not the display name). Kept for older clients.
-          example: pro
+          description: The plan's display name. Falls back to the plan code when the plan has no name.
+          example: Pro
         status:
           type: string
           enum:
@@ -29871,8 +29916,12 @@ components:
         interval:
           type: string
           enum:
+            - weekly
             - monthly
-          description: Always `monthly`; the value is fixed in code and does not reflect the plan's interval.
+            - yearly
+            - quarterly
+            - semiannual
+          description: The plan's billing interval.
         amount_cents:
           type: integer
           format: int64
@@ -32794,18 +32843,20 @@ components:
       type: object
       required:
         - metric_code
-      description: Unknown fields are ignored.
+        - new_price_dollars
+      additionalProperties: false
+      description: An unknown field returns 400 `invalid_request`.
       properties:
         metric_code:
           type: string
           minLength: 1
-          description: Code of the metric to simulate. Missing or empty returns 400 `metric_code required`.
+          description: Code of the metric to simulate. Missing or empty returns 400 `invalid_request` with `metric_code required`.
           example: agent_execution
         new_price_dollars:
           type: number
           format: double
-          default: 0
-          description: 'New price per unit of usage, in dollars, as a JSON number. Not enforced by the server: when omitted it is 0 and the simulation has no revenue. A string returns 400.'
+          minimum: 0
+          description: 'New price per unit of usage, in dollars, as a JSON number of 0 or more. A missing, negative or string value returns 400 `invalid_request`.'
           example: 1
     MarginSimulationResult:
       type: object
