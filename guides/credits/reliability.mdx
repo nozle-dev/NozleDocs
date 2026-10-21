@@ -19,6 +19,8 @@ PostgreSQL balance sources plus immutable allocations are the credit source of t
 
 Usage publication is at-least-once. The credit operation ID becomes the billing transaction ID, so retrying after a timeout cannot create a second usage effect. Workers claim rows in bounded waves and reconcile published events against committed operations.
 
+A failed delivery to billing is retried for about a day before the event is dead-lettered. A dead-lettered event does not block credit usage: `503 credit_usage_publication_backlog` is returned only while 1,000 or more events are still being retried, or the oldest is older than 5 minutes, and clears by itself. Dead-lettered events wait for Nozle support to requeue them.
+
 ## Reconciliation
 
 Continuous jobs detect:

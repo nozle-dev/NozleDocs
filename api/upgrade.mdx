@@ -19,7 +19,7 @@ Change a customer's current plan without checkout from a trusted backend.
 
 ### Response
 
-Nozle reads the customer's active subscription (the most recently started one) and its plan. If the target plan's yearly amount is above zero and at least the current plan's yearly amount, the request returns `422` and nothing changes. This includes a change between two paid plans with the same price. Otherwise Nozle changes the plan and returns Core's subscription response, `{"subscription": {...}}`, with Core's status code.
+Nozle reads the customer's current subscription and its plan. A customer with one current subscription uses it. With several, Nozle uses the customer's own subscription (not owned by an Entity) when there is exactly one; otherwise the request returns `409` with `subscription_required` and changes nothing. The most recently started subscription is no longer picked for you. If the target plan's yearly amount is above zero and at least the current plan's yearly amount, the request returns `422` and nothing changes. This includes a change between two paid plans with the same price. Otherwise Nozle changes the plan and returns Core's subscription response, `{"subscription": {...}}`, with Core's status code.
 
 The `422` body:
 
@@ -27,6 +27,15 @@ The `422` body:
 {
   "error": "payment_checkout_required",
   "code": "payment_checkout_required"
+}
+```
+
+The `409` body:
+
+```json
+{
+  "error": "subscription_required",
+  "code": "subscription_required"
 }
 ```
 

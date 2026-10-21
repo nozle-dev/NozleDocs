@@ -1,7 +1,10 @@
 openapi: 3.1.0
 info:
   title: Nozle API
-  description: One specification for the Nozle API. Core operations use the default server https://api.nozle.app/core/api/v1. Engine operations name their own server, https://api.nozle.app/engine/api/v1. Both live on the one host https://api.nozle.app.
+  description: |-
+    One specification for the Nozle API. Core operations use the default server https://api.nozle.app/core/api/v1. Engine operations name their own server, https://api.nozle.app/engine/api/v1. Both live on the one host https://api.nozle.app.
+
+    **Legacy key names, removed after January 19, 2027.** Until January 19, 2027 (inclusive), REST responses and webhook payloads carry the old key beside the new one, with the same value, on every object that had it before. `lago_id` is the old name of `nozle_id`. These old names are the new keys with the former prefix: `lago_add_on_id`, `lago_alert_id`, `lago_charge_filter_id`, `lago_charge_id`, `lago_coupon_id`, `lago_credit_note_id`, `lago_customer_id`, `lago_feature_id`, `lago_fee_id`, `lago_fixed_charge_id`, `lago_integration_id`, `lago_invoice_id`, `lago_invoice_ids`, `lago_item_id`, `lago_order_form_id`, `lago_organization_id`, `lago_original_fee_id`, `lago_parent_id`, `lago_payable_id`, `lago_payment_provider_id`, `lago_payment_request_id`, `lago_plan_id`, `lago_pricing_unit_id`, `lago_quote_id`, `lago_quote_version_id`, `lago_subscription_id`, `lago_tax_id`, `lago_true_up_fee_id`, `lago_true_up_parent_fee_id`, `lago_user_id`, `lago_voided_invoice_id`, `lago_wallet_id`, `lago_wallet_transaction_id`. A key gets its old name only on the objects where it was renamed. Old EU tax codes (`lago_eu_<rest>`) resolve to `nozle_eu_<rest>` in `tax_codes` inputs and in `GET`, `PUT` and `DELETE /taxes/{code}`. CSV exports (invoices, invoice fees, credit notes, credit note items) repeat the id columns at the end under the old names `lago_id`, `customer_lago_id`, `invoice_lago_id`, `fee_lago_id`, `credit_note_lago_id`, `credit_note_item_lago_id` and `credit_note_item_fee_lago_id`. Read the new names before the removal date.
   version: 1.49.0
   license:
     name: AGPLv3
@@ -4671,7 +4674,7 @@ paths:
       tags:
         - Plans
       summary: Create a plan
-      description: This endpoint creates a plan with subscription and usage-based charges. It supports flexible billing cadence (in-advance or in-arrears) and allows for both recurring and metered charges.
+      description: This endpoint creates a plan with subscription and usage-based charges. It supports flexible billing cadence (in-advance or in-arrears) and allows for both recurring and metered charges. Usage thresholds (`usage_thresholds`) need progressive billing, which comes with the Growth, Scale and Enterprise Nozle plans, so without it a non-empty list is refused with `422` with `feature_not_available` in `error_details.usage_thresholds`, and nothing is saved. An empty list is accepted and changes nothing.
       operationId: createPlan
       requestBody:
         description: Plan payload
@@ -4828,7 +4831,7 @@ paths:
       tags:
         - Plans
       summary: Update a plan
-      description: This endpoint updates a specific plan with subscription and usage-based charges. It supports flexible billing cadence (in-advance or in-arrears) and allows for both recurring and metered charges.
+      description: This endpoint updates a specific plan with subscription and usage-based charges. It supports flexible billing cadence (in-advance or in-arrears) and allows for both recurring and metered charges. Usage thresholds (`usage_thresholds`) need progressive billing, which comes with the Growth, Scale and Enterprise Nozle plans, so without it a non-empty list is refused with `422` with `feature_not_available` in `error_details.usage_thresholds`, and nothing is saved. An empty list is accepted and changes nothing.
       operationId: updatePlan
       requestBody:
         description: Plan payload
@@ -5165,7 +5168,7 @@ paths:
       tags:
         - Entitlements
       summary: Partial update of an entitlement
-      description: This accepts a list of entitlements to update. If the feature isn't part of the plan yet, it's added with all the privileges from the payload. If the feature is already part of the plan, the privilege and values are updated or added. All privileges must be valid for the feature. All features  and privileges not part of the payload are left untouched. To remove privileges or features, use the DELETE endpoints. In a plan family, features and privileges are written to every plan of the family, but `usage_limit` and `hard_limit` are set on the plan in the path only, so each billing interval keeps its own limits, because usage is counted per billing period. A plan of the family that gets a metered feature for the first time this way has no limit until one is set on it.
+      description: This accepts a list of entitlements to update. If the feature isn't part of the plan yet, it's added with all the privileges from the payload. If the feature is already part of the plan, the privilege and values are updated or added. All privileges must be valid for the feature. All features  and privileges not part of the payload are left untouched. For a feature that is already part of the plan, the metered settings the payload leaves out (`usage_limit`, `hard_limit`, `min_margin_percent`, `margin_enforcement_mode`, `enforce_plan_margin`) keep their current values, so sending only `hard_limit` set to false keeps the usage limit, and sending only `usage_limit` keeps a soft limit soft. POST replaces the whole entitlement and applies the defaults. To remove privileges or features, use the DELETE endpoints. In a plan family, features and privileges are written to every plan of the family, but `usage_limit` and `hard_limit` are set on the plan in the path only, so each billing interval keeps its own limits, because usage is counted per billing period. A plan of the family that gets a metered feature for the first time this way has no limit until one is set on it.
       operationId: updateEntitlement
       requestBody:
         description: Entitlement payload
@@ -5784,7 +5787,7 @@ paths:
       tags:
         - Subscriptions
       summary: Assign a plan to a customer
-      description: This endpoint assigns a plan to a customer, creating or modifying a subscription. Ideal for initial subscriptions or plan changes (upgrades/downgrades).
+      description: This endpoint assigns a plan to a customer, creating or modifying a subscription. Ideal for initial subscriptions or plan changes (upgrades/downgrades). `usage_thresholds` and `plan_overrides.usage_thresholds` need progressive billing (Growth, Scale and Enterprise Nozle plans); without it a non-empty list answers `422` with `feature_not_available` in `error_details.usage_thresholds`, and nothing is saved.
       operationId: createSubscription
       requestBody:
         description: Subscription payload
@@ -6029,7 +6032,7 @@ paths:
       tags:
         - Subscriptions
       summary: Retrieve subscription lifetime usage
-      description: This endpoint enables the retrieval of the lifetime usage of a subscription.
+      description: This endpoint enables the retrieval of the lifetime usage of a subscription. It answers `403` with `feature_not_available` when the organization's Nozle plan includes neither lifetime usage nor progressive billing (Growth, Scale and Enterprise include them).
       operationId: getSubscriptionLifetimeUsage
       responses:
         '200':
@@ -6046,7 +6049,7 @@ paths:
       tags:
         - Subscriptions
       summary: Update a subscription lifetime usage
-      description: This endpoint allows you to update the lifetime usage of a subscription.
+      description: This endpoint allows you to update the lifetime usage of a subscription. It answers `403` with `feature_not_available` when the organization's Nozle plan includes neither lifetime usage nor progressive billing.
       operationId: updateSubscriptionLifetimeUsage
       requestBody:
         description: Update the lifetime usage of a subscription
@@ -6265,7 +6268,7 @@ paths:
       summary: Update subscription entitlements
       parameters:
         - $ref: '#/components/parameters/subscription_status'
-      description: This accepts a list of entitlements to update. If the feature isn't part of the subscription yet, it's added with all the privileges from the payload. If the feature is already part of the subscription (via plan or via override), the privilege and values are updated or added. All privileges must be valid for the feature. All features  and privileges not part of the payload are left untouched. To remove privileges or features, use the DELETE endpoints.
+      description: This accepts a list of entitlements to update. If the feature isn't part of the subscription yet, it's added with all the privileges from the payload. If the feature is already part of the subscription (via plan or via override), the privilege and values are updated or added. All privileges must be valid for the feature. All features  and privileges not part of the payload are left untouched. The metered settings the payload leaves out keep the subscription's override, or the plan's value when the subscription has no override. To remove privileges or features, use the DELETE endpoints.
       operationId: updateSubscriptionEntitlements
       requestBody:
         description: Subscription entitlements payload
@@ -6739,7 +6742,7 @@ paths:
     parameters:
       - name: code
         in: path
-        description: The code of the tax. It serves as a unique identifier associated with a particular tax. The code is typically used for internal or system-level identification purposes.
+        description: The code of the tax. It serves as a unique identifier associated with a particular tax. The code is typically used for internal or system-level identification purposes. Until January 19, 2027, an old `lago_eu_<rest>` code resolves to the `nozle_eu_<rest>` tax (a tax you created yourself with a `lago_eu_*` code keeps it).
         required: true
         schema:
           type: string
@@ -8172,7 +8175,7 @@ paths:
       tags:
         - Subscription Changes
       summary: Change plan without checkout
-      description: 'Changes the plan of the customer''s active subscription without checkout, from a trusted backend. Requires a secret key with `subscription:write`. Engine loads the target plan, the customer''s most recent active subscription and its plan. When the target plan''s yearly amount is above zero and at least the current plan''s yearly amount, Engine returns `422` with `code: payment_checkout_required` and changes nothing. Otherwise it calls Core `POST /subscriptions` with the subscription''s external ID and the new plan code, and returns Core''s status and body unchanged.'
+      description: 'Changes the plan of the customer''s active subscription without checkout, from a trusted backend. Requires a secret key with `subscription:write`. Engine loads the target plan, the customer''s current subscription and its plan. With several current subscriptions it uses the customer''s own (not Entity-owned) subscription when there is exactly one, and otherwise answers `409` with `code: subscription_required`. When the target plan''s yearly amount is above zero and at least the current plan''s yearly amount, Engine returns `422` with `code: payment_checkout_required` and changes nothing. Otherwise it calls Core `POST /subscriptions` with the subscription''s external ID and the new plan code, and returns Core''s status and body unchanged.'
       operationId: engineUpgradeSubscription
       security:
         - bearerAuth: []
@@ -8217,6 +8220,15 @@ paths:
               example:
                 error: payment_checkout_required
                 code: payment_checkout_required
+        '409':
+          description: 'Engine: `subscription_required`. The customer has several current subscriptions and not exactly one of them is the customer''s own. Nothing changes.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingEngineOrCoreError'
+              example:
+                error: subscription_required
+                code: subscription_required
         '502':
           description: 'Engine could not reach Core, or Core returned an unusable response. Body: `{"error": "failed to reach billing service"}` or a similar message.'
           content:
@@ -11269,7 +11281,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorNotFound'
         '422':
-          description: Core validation error, for example `customer_currency_mismatch` in `error_details.currency`, `razorpay_requires_inr`, `no_linked_payment_provider`, `top_up_package_archived` or `idempotency_key_reused`.
+          description: Core validation error, for example `customer_currency_mismatch` in `error_details.currency`, `razorpay_requires_inr`, `no_linked_payment_provider`, `invalid_payment_provider`, `missing_payment_provider`, `missing_payment_provider_customer`, `top_up_package_archived` or `idempotency_key_reused`. Provider errors are returned before anything is created, so no invoice, purchase or webhook is left behind.
           content:
             application/json:
               schema:
@@ -11426,7 +11438,7 @@ paths:
           description: '`code` is `customer_not_found`, `active_subscription_not_found` (`subscription_id` is not an active subscription of the customer, or belongs to another Entity), `feature_not_found` or `entity_not_found`.'
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
-          description: '`code` is `active_subscription_ambiguous` (several active subscriptions could pay and neither `subscription_id` nor `entity_id` picks one; the message names both), `feature_not_consumable`, `entity_inactive`, `credit_pool_policy_not_configured` (Entity usage with no explicit pool policy), or `credit_usage_configuration_invalid` (unsupported aggregation or expression, missing or invalid metric value, amount precision, inexact credit amount, no effective credit rate at that time, or ambiguous Credit System); `error` then holds the detail.'
+          description: '`code` is `active_subscription_ambiguous` (several active subscriptions could pay and neither `subscription_id` nor `entity_id` picks one; the message names both), `feature_not_consumable` (a boolean or config Feature, which has no usage to consume), `entity_inactive`, `credit_pool_policy_not_configured` (Entity usage with no explicit pool policy), or `credit_usage_configuration_invalid` (unsupported aggregation or expression, missing or invalid metric value, amount precision, no effective credit rate at that time, or ambiguous Credit System); `error` then holds the detail.'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -11538,7 +11550,7 @@ paths:
           description: '`code: idempotency_key_reused`: the key was used with a different body.'
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
-          description: '`code` is `active_subscription_ambiguous` (several active subscriptions could pay and neither `subscription_id` nor `entity_id` picks one; the message names both), `feature_not_consumable`, `entity_inactive`, `credit_pool_policy_not_configured` (Entity usage with no explicit pool policy), or `credit_usage_configuration_invalid` (unsupported aggregation or expression, missing or invalid metric value, amount precision, inexact credit amount, no effective credit rate at that time, or ambiguous Credit System); `error` then holds the detail.'
+          description: '`code` is `active_subscription_ambiguous` (several active subscriptions could pay and neither `subscription_id` nor `entity_id` picks one; the message names both), `feature_not_consumable` (a boolean or config Feature, which has no usage to consume), `entity_inactive`, `credit_pool_policy_not_configured` (Entity usage with no explicit pool policy), or `credit_usage_configuration_invalid` (unsupported aggregation or expression, missing or invalid metric value, amount precision, no effective credit rate at that time, or ambiguous Credit System); `error` then holds the detail.'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -11550,7 +11562,7 @@ paths:
                     code: internal_error
                     error: credit usage request failed
         '503':
-          description: 'Service unavailable. Retry with the same `Idempotency-Key` and the same body, including the same `timestamp`. `credit_usage_contention`: the balance stayed locked through every attempt. `credit_usage_publication_backlog`: the organization''s usage-event outbox is over its safe limit or has a dead-lettered event, so new consumes are refused. API key verification failures return `{"error": "API key verification is unavailable"}` with no `code` and no `Retry-After`.'
+          description: 'Service unavailable. Retry with the same `Idempotency-Key` and the same body, including the same `timestamp`. `credit_usage_contention`: the balance stayed locked through every attempt. `credit_usage_publication_backlog`: the organization''s usage-event outbox has 1,000 or more events still being retried, or its oldest one is older than 5 minutes, so new consumes are refused; it clears by itself once the events are accepted again. A dead-lettered event does not count. API key verification failures return `{"error": "API key verification is unavailable"}` with no `code` and no `Retry-After`.'
           headers:
             Retry-After:
               description: Seconds to wait before retrying. Sent with every coded 503 listed here; values are `1` for `credit_usage_contention`, `30` for `credit_usage_publication_backlog`, `1` for `credit_usage_temporarily_unavailable`.
@@ -12485,14 +12497,17 @@ paths:
         | `reason` | Meaning |
         |---|---|
         | `feature_not_found` | No feature with this code exists in the organization. |
-        | `no_subscription` | The customer has no current subscription, or the customer does not exist. |
+        | `no_subscription` | The customer has no current subscription, or the customer does not exist. Also an unknown or ended `subscription_id` or `entity_id`. |
+        | `subscription_required` | The customer has several current subscriptions and not exactly one of them is the customer's own (not Entity-owned). Send `subscription_id` or `entity_id`. |
         | `no_entitlement` | The plan neither grants the feature (entitlement) nor, for a metered feature, prices it (charge). |
         | `usage_limit_exceeded` | Usage reached a hard limit. A soft limit never denies; it sets `overage: true`. |
         | `economic_policy_denied` | A margin policy decided `deny`. The `policy` object has the detail. |
 
         A subscription on an override plan (a plan made from a catalog plan for one customer, for example a negotiated price or a subscription created from a quote) gets the entitlements and usage limits of the catalog plan it was made from. Its usage is still priced with the override plan's own charges.
 
-        Subscription access is read from the database on every call, so a cancellation applies at once. For a metered feature with an entitlement, `used` is read from the usage counter for the current billing period. If that read fails, the response is `503` with `code: usage_unavailable` and a `Retry-After` header; the failure is never treated as zero usage.
+        **Subscription.** Plan, entitlements, limits and usage come from one subscription that is current now (started, not ended). With `subscription_id`, that subscription is evaluated. With `entity_id`, the Entity's own subscription is evaluated, else the customer's own (not Entity-owned) one. Without either, the customer's only current subscription is evaluated; with several, the customer's own one when there is exactly one, otherwise the answer is `subscription_required`. The newest subscription is never picked.
+
+        Subscription access is read from the database on every call, so a cancellation applies at once. For a metered feature, `used` is read from the usage counter of the selected subscription for the current billing period: the period Nozle invoices the usage in, for every plan interval and in the customer's time zone. A recurring feature (seats, storage) keeps one running total across periods. A metered feature priced only by a charge, without an entitlement, reports its real `used` with `limit` and `remaining` null. If that read fails, the response is `503` with `code: usage_unavailable` and a `Retry-After` header; the failure is never treated as zero usage.
 
         For an allowed metered feature the response adds `economics`, a point-in-time estimate from the published Cost Sheet, and `policy` when a margin policy applies. The estimate does not record usage or write a ledger entry. Monetary values are decimal strings in `economics.currency`, not cents.
 
@@ -12515,6 +12530,18 @@ paths:
           schema:
             type: string
           example: ai_messages
+        - name: subscription_id
+          in: query
+          required: false
+          description: External ID of one current subscription of the customer. That subscription is evaluated. An unknown or ended one answers `no_subscription`.
+          schema:
+            type: string
+        - name: entity_id
+          in: query
+          required: false
+          description: External ID of an Entity. The Entity's own subscription is evaluated, else the customer's own subscription. With `subscription_id` too, the subscription must belong to that Entity.
+          schema:
+            type: string
         - name: metadata
           in: query
           required: false
@@ -12575,6 +12602,14 @@ paths:
                   value:
                     allowed: false
                     reason: no_subscription
+                    used: 0
+                    limit: null
+                    remaining: null
+                subscription_required:
+                  summary: Several current subscriptions and no selector
+                  value:
+                    allowed: false
+                    reason: subscription_required
                     used: 0
                     limit: null
                     remaining: null
@@ -25126,6 +25161,20 @@ components:
               type: boolean
               example: false
               description: Determines whether invoices with a zero total amount should be finalized. If set to true, zero amount invoices will be finalized. If set to false, zero amount invoices will not be finalized.
+            checkout_return_origins:
+              type: array
+              maxItems: 20
+              items:
+                type: string
+              example:
+                - https://app.acme.com
+              description: HTTPS origins your checkout `return_url` and `success_url` may point to, in addition to Nozle's own apps. Up to 20; each is a scheme and host only (no path, query or user info) and is stored lowercase without a trailing slash. An invalid origin answers `422` with `value_is_invalid` in `checkout_return_origins`. Another organization's origin is never accepted for your checkouts. Requires the `developers:manage` permission.
+            checkout_default_return_url:
+              type:
+                - string
+                - 'null'
+              example: https://app.acme.com/billing/done
+              description: HTTPS URL on one of the allowed origins where the customer returns when a checkout gives no `return_url`. When it is `null`, the customer returns to the first of `checkout_return_origins`, else to the payment provider's success URL. A URL off the allowed origins answers `422` with `invalid_or_untrusted` in `checkout_default_return_url`.
     OrganizationObject:
       type: object
       required:
@@ -25264,6 +25313,19 @@ components:
           description: List of default organization taxes
           items:
             $ref: '#/components/schemas/TaxObject'
+        checkout_return_origins:
+          type: array
+          items:
+            type: string
+          example:
+            - https://app.acme.com
+          description: HTTPS origins your checkout return URLs may point to, in addition to Nozle's own apps. Set with `PUT /organizations`.
+        checkout_default_return_url:
+          type:
+            - string
+            - 'null'
+          example: https://app.acme.com/billing/done
+          description: Where the customer returns when a checkout gives no `return_url`. When it is `null`, the first of `checkout_return_origins`, else the payment provider's success URL.
         finalize_zero_amount_invoice:
           type: boolean
           example: false
@@ -33041,6 +33103,7 @@ components:
           enum:
             - feature_not_found
             - no_subscription
+            - subscription_required
             - no_entitlement
             - usage_limit_exceeded
             - economic_policy_denied
@@ -33055,13 +33118,13 @@ components:
         used:
           type: integer
           format: int64
-          description: Units used in the current billing period, as a whole number (fractional usage is truncated). `0` for non-metered features and for denials decided before usage is read.
+          description: Units used in the current billing period (the running total for a recurring feature), as a whole number (fractional usage is truncated). Also the real usage of a metered feature priced only by a charge. `0` for non-metered features and for denials decided before usage is read.
         limit:
           type:
             - integer
             - 'null'
           format: int64
-          description: Usage limit from the entitlement. `null` when there is no cap or the feature is not metered.
+          description: Usage limit from the entitlement. `null` when there is no cap, the feature is not metered, or a metered feature has no entitlement.
         remaining:
           type:
             - integer

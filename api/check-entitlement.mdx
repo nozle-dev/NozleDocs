@@ -19,6 +19,16 @@ A subscription on an override plan (a plan made from a catalog plan for one cust
   Feature key to check (matches a feature code)
 </ParamField>
 
+<ParamField query="subscription_id" type="string">
+  External ID of one current subscription of the customer. `/can` evaluates that subscription: its plan, entitlements, limits and usage. An unknown or ended subscription answers `no_subscription`.
+</ParamField>
+
+<ParamField query="entity_id" type="string">
+  External ID of an Entity. `/can` evaluates the Entity's own subscription, else the customer's own subscription (not owned by an Entity). With `subscription_id` too, the subscription must belong to that Entity.
+</ParamField>
+
+Without `subscription_id` or `entity_id`, `/can` evaluates the customer's only current subscription. A customer with several current subscriptions is evaluated on its own subscription (not owned by an Entity) when there is exactly one; otherwise the answer is `allowed: false` with the reason `subscription_required`. Before Engine 2.0.0, the most recently started subscription was used. See [which subscription is checked](/guides/entitlements/can-endpoint#which-subscription-is-checked).
+
 <ParamField query="metadata" type="string">
   URL-encoded JSON object of event properties. The economics estimate uses it to evaluate Cost Sheet conditions and quantities, and, for a sum Feature, reads the call's units from the Feature's `field_name`. A value that is not a JSON object returns `400`.
 </ParamField>
@@ -28,7 +38,7 @@ A subscription on an override plan (a plan made from a catalog plan for one cust
 </ResponseField>
 
 <ResponseField name="reason" type="string">
-  Present only when access is denied; omitted when `allowed` is `true`. One of `feature_not_found`, `no_subscription`, `no_entitlement`, `usage_limit_exceeded`, or `economic_policy_denied`.
+  Present only when access is denied; omitted when `allowed` is `true`. One of `feature_not_found`, `no_subscription`, `subscription_required`, `no_entitlement`, `usage_limit_exceeded`, or `economic_policy_denied`.
 </ResponseField>
 
 <ResponseField name="feature_type" type="string">
@@ -40,11 +50,11 @@ A subscription on an override plan (a plan made from a catalog plan for one cust
 </ResponseField>
 
 <ResponseField name="used" type="integer" required>
-  Units consumed in the current billing period, as a whole number (a fractional total is truncated). `0` for a denial that is decided before usage is read, and for features that are not metered.
+  Units consumed in the current billing period (the running total for a recurring Feature), as a whole number (a fractional total is truncated). Also the real usage of a metered Feature that is priced by a charge and has no entitlement. `0` for a denial that is decided before usage is read, and for features that are not metered. The period is the one Nozle invoices the usage in, in the customer's time zone. See [usage and billing periods](/guides/entitlements/can-endpoint#usage-and-billing-periods).
 </ResponseField>
 
 <ResponseField name="limit" type="number | null" required>
-  Maximum units allowed by the plan. `null` when the plan sets no cap or the feature is not metered.
+  Maximum units allowed by the plan. `null` when the plan sets no cap, the feature is not metered, or a metered Feature has no entitlement.
 </ResponseField>
 
 <ResponseField name="remaining" type="number | null" required>
@@ -66,7 +76,8 @@ The `economics.status` value is `estimated`, `not_configured`, `unavailable`, or
 | `reason` | Meaning |
 |----------|---------|
 | `feature_not_found` | No feature with this code exists in the organization. |
-| `no_subscription` | The customer has no active subscription (none started, ended, or cancelled), or the customer does not exist. |
+| `no_subscription` | The customer has no active subscription (none started, ended, or cancelled), or the customer does not exist. Also an unknown or ended `subscription_id` or `entity_id`. |
+| `subscription_required` | The customer has several current subscriptions and not exactly one of them is the customer's own (not Entity-owned). Send `subscription_id` or `entity_id`. |
 | `no_entitlement` | The customer's plan does not include the feature. |
 | `usage_limit_exceeded` | A hard limit is reached. A soft limit never denies; it sets `overage` to `true`. |
 | `economic_policy_denied` | A margin policy in `deny` mode rejected the estimated cost or margin. The `policy` object has the detail. |

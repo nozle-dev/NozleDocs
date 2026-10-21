@@ -35,3 +35,6 @@ Creating checkout does not grant credits. Credits are materialized once the top-
 | `422` | `validation_errors` with `customer_currency_mismatch` in `error_details.currency` | The customer has a currency that differs from the package currency. |
 | `422` | `validation_errors` with `razorpay_requires_inr` | A Razorpay customer and a package that is not priced in INR. |
 | `422` | `validation_errors` with `no_linked_payment_provider` | The customer has no payment provider. |
+| `422` | `validation_errors` with `invalid_payment_provider`, `missing_payment_provider` or `missing_payment_provider_customer` | The customer's payment provider cannot take the payment (for example GoCardless), or the customer has no link to a provider customer. |
+
+Core checks the customer's payment provider before it creates anything. A provider error leaves no invoice, no purchase, no `invoice.one_off_created` webhook or email, and the customer's currency stays unset, so retrying with a new `Idempotency-Key` after such an error creates nothing. A successful purchase is recorded in the activity log as `credit_top_up_purchase.created`, and its finalized one-off invoice as `invoice.one_off_created`.

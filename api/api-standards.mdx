@@ -61,4 +61,17 @@ See [Errors](/api/errors) for retry guidance and application-safe handling.
 
 ## Compatibility names
 
-Some inherited response properties and webhook headers retain compatibility names from the underlying billing contract. Use the exact names displayed in the generated endpoint schemas; they remain stable even when the product-facing terminology differs.
+Some inherited response properties and webhook headers retain compatibility names from the underlying billing contract. Use the exact names displayed in the generated endpoint schemas. Those names can change, and a change is announced in the [changelog](/changelog) first.
+
+### Legacy key names (removal January 19, 2027)
+
+API 1.0.0 renamed the identifier keys of REST responses, webhook payloads and CSV exports and the EU tax codes, from the former product prefix to `nozle_` (`nozle_id`) or to no prefix (`customer_id`, `plan_id`), without notice. Until **January 19, 2027** (inclusive) the old names work again next to the new ones. After that date they are removed.
+
+- **Responses and webhook payloads** carry the old key beside the new one, with the same value, on every object that had it before: the old id key beside `nozle_id`, and the old prefixed key beside each of these keys: `add_on_id`, `alert_id`, `charge_filter_id`, `charge_id`, `coupon_id`, `credit_note_id`, `customer_id`, `feature_id`, `fee_id`, `fixed_charge_id`, `integration_id`, `invoice_id`, `invoice_ids`, `item_id`, `order_form_id`, `organization_id`, `original_fee_id`, `parent_id`, `payable_id`, `payment_provider_id`, `payment_request_id`, `plan_id`, `pricing_unit_id`, `quote_id`, `quote_version_id`, `subscription_id`, `tax_id`, `true_up_fee_id`, `true_up_parent_fee_id`, `user_id`, `voided_invoice_id`, `wallet_id`, `wallet_transaction_id`. A key gets its old name only on the objects where it was renamed.
+- **EU tax codes:** an old EU code resolves to the matching `nozle_eu_` code in every `tax_codes` input and in `GET`, `PUT` and `DELETE /taxes/{code}`: the old `fr_standard` code resolves to `nozle_eu_fr_standard`. A tax you created yourself with an old EU code keeps that code. Responses show the `nozle_eu_` code.
+- **CSV exports** (invoices, invoice fees, credit notes, credit note items) repeat the id columns at the end under their old names (the old `id` column and the old `customer_`, `invoice_`, `fee_`, `credit_note_`, `credit_note_item_` and `credit_note_item_fee_` id columns). The earlier columns are unchanged.
+- The old webhook header names stay as before.
+
+The exact old key names are listed in the introduction of the OpenAPI specification (`nozle-openapi.yaml`).
+
+**Migrate before January 19, 2027:** read `nozle_id` and the new key names in your webhook receivers, API clients and CSV imports (by column name), and use the `nozle_eu_` tax codes. The new names are always present. Event properties you send are never changed.

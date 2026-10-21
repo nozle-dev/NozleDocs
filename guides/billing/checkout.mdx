@@ -93,6 +93,30 @@ Plan checkout:
 
 Free plans and paid upgrades fully funded by prepaid credits return a completed response instead. Downgrades and other cycle-end transitions return a scheduled response from the same `/checkout` endpoint; browser sessions never call `/billing/upgrade` or `/subscriptions/change`.
 
+## Return URLs and your organization's origins
+
+A checkout `return_url` (or `success_url`) must be an absolute HTTPS URL on an allowed origin. Core accepts the origins of the Nozle deployment and the origins you register for your own organization, for `POST /checkout_sessions`, Entity checkouts and Entity subscription checkout batches. Another organization's origin is refused with `422` and `return_url: [invalid_or_untrusted]`.
+
+Register your origins with `PUT /organizations` (REST) or `updateOrganization` (GraphQL), which needs the `developers:manage` permission:
+
+```json
+{
+  "organization": {
+    "checkout_return_origins": ["https://app.acme.com"],
+    "checkout_default_return_url": "https://app.acme.com/billing/done"
+  }
+}
+```
+
+- `checkout_return_origins`: up to 20 HTTPS origins, each a scheme and host only (no path, query or user info). They are stored in lowercase without a trailing slash. An invalid value answers `422` with `checkout_return_origins: [value_is_invalid]`.
+- `checkout_default_return_url`: an HTTPS URL on one of the allowed origins, or `null`. A URL off the allowed origins answers `422` with `checkout_default_return_url: [invalid_or_untrusted]`.
+- GraphQL: `checkoutReturnOrigins` and `checkoutDefaultReturnUrl` on `updateOrganization` and `CurrentOrganization`.
+- `GET /organizations` returns both settings.
+
+When a checkout gives no return URL, the customer returns to your default return URL, else to the first registered origin, else to the payment provider's success URL.
+
+The Engine's `POST /checkout` route still checks `return_url` against the origins configured for the Nozle deployment before it forwards the request, and does not read your registered origins yet; see [create checkout](/api/create-checkout).
+
 ## Response
 
 ```json

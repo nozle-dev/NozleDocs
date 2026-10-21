@@ -60,11 +60,25 @@ Rates may be entered manually or loaded from an effective-dated provider price c
 
 The setup review shows the exact cost of 1,000 tokens for every configured category before publication. Unknown provider, model, or category combinations enter the Uncosted queue rather than becoming zero-cost usage. A Cost Event whose meter code matches no Cost Event Meter is accepted and then lands in the same queue as `uncosted` with `unknown_cost_event_meter`; it is not dropped from the report.
 
+## Margin policy
+
+The Cost Sheet form also sets the margin policy that `/can` applies to the Feature. The policy is saved after the Cost Sheet is published: if publishing fails, no policy is created and the draft stays. If only the policy cannot be saved, the Cost Sheet stays published without an active margin policy, and the dashboard says so and opens the published sheet.
+
+**When cost can't be estimated** decides what `/can` does when it has no estimate, for example because the Feature uses `detailed_events_only` and the actual Cost Events do not exist yet:
+
+| Choice | `/can` result when there is no estimate |
+|---|---|
+| Allow | Allowed |
+| Warn | Allowed, with a warning in `policy` |
+| Deny | Denied with `economic_policy_denied` |
+
+This is the policy's `on_unavailable` value. With `detailed_events_only` it follows the policy mode (Warn or Deny) until you change it, so a Deny policy denies on the AI-token path too. Before, the dashboard always sent Warn, so Deny only warned. See [the can() endpoint](/guides/entitlements/can-endpoint#runtime-behavior).
+
 ## Reporting and audit
 
 PostgreSQL stores the authoritative immutable cost ledger, period totals, source state, and projection outbox. ClickHouse stores a rebuildable analytics projection used by the dashboard.
 
-The dashboard shows Feature profitability, customer profitability, Cost Events, Shared Costs, and Uncosted sources. Finalized billing revenue and estimated event revenue are separate and are never added together.
+The dashboard shows Feature profitability, customer profitability, Cost Events, Shared Costs, and Uncosted sources. Finalized billing revenue and estimated event revenue are separate and are never added together. Finalized revenue is by service period: see [Finalized revenue](/api/cost-intelligence-report#finalized-revenue).
 
 <Warning>
 The legacy `/cost-models` endpoints are retained only as a temporary rollback surface. They do not configure the new Cost Intelligence ledger and should not be used for new integrations.
