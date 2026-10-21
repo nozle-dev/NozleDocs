@@ -823,7 +823,7 @@ paths:
       tags:
         - Analytics
       summary: List usage
-      description: Returns usages.
+      description: Usage analytics is not available on Nozle. This endpoint answers `503` with `analytics_unavailable`.
       operationId: findAllUsages
       parameters:
         - name: time_granularity
@@ -923,6 +923,8 @@ paths:
                 $ref: '#/components/schemas/Usages'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: 'Usage analytics is not available. The body is `{"status": 503, "error": "analytics_unavailable", ...}`.'
   /applied_coupons:
     post:
       tags:
@@ -3485,6 +3487,7 @@ paths:
       description: |
         Publishes internal cost usage linked to a Feature Event, directly to a customer, or to both.
         This endpoint requires a secret key and returns only after Kafka acknowledges the message.
+        With API key permissions, the secret key needs `event:write`; without it the answer is `403` with `code: permission_denied`.
         Financial rating and analytics processing continue asynchronously.
       operationId: createCostEvent
       requestBody:
@@ -3554,6 +3557,7 @@ paths:
         customer-resolved Cost Event during the overlap between the allocation period and service period.
         Pools configured for active provisioned customers instead use subscriptions that overlap the period;
         free and paid plans are treated equally.
+        Requires a secret key. With API key permissions, the key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`.
       operationId: previewSharedCostAllocation
       requestBody:
         required: true
@@ -3570,6 +3574,8 @@ paths:
                 $ref: '#/components/schemas/SharedCostAllocationPreview'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 'A publishable key, or `code: permission_denied` when API key permissions are enabled and the secret key lacks `analytic:read`.'
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
@@ -3590,6 +3596,7 @@ paths:
       description: |
         Freezes the eligible customer population for a closed allocation period and writes immutable
         customer allocation entries to the PostgreSQL cost ledger. Repeating the same request is idempotent.
+        Requires a secret key. With API key permissions, the key needs `analytic:write`; without it the answer is `403` with `code: permission_denied`.
       operationId: createSharedCostAllocation
       requestBody:
         required: true
@@ -3606,6 +3613,8 @@ paths:
                 $ref: '#/components/schemas/SharedCostAllocationRun'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 'A publishable key, or `code: permission_denied` when API key permissions are enabled and the secret key lacks `analytic:write`.'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -3623,6 +3632,7 @@ paths:
         identifier-conflict sources.
         This endpoint returns cost data only. The dashboard combines it with finalized billing invoice
         and fee revenue without adding estimated event revenue.
+        Requires a secret key. With API key permissions, the key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`.
       operationId: getCostIntelligenceReport
       parameters:
         - name: from
@@ -3657,6 +3667,8 @@ paths:
                 $ref: '#/components/schemas/CostIntelligenceReport'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 'A publishable key, or `code: permission_denied` when API key permissions are enabled and the secret key lacks `analytic:read`.'
         '500':
           description: A report data source could not be queried
   /admin/cost-intelligence/replay-source:
@@ -4697,6 +4709,7 @@ paths:
         - All top-level plans of the organization are returned, newest first. There is no listed or public flag. Plans with a trial (`trial_period`) and pay-in-arrears plans (`pay_in_advance: false`) are included. Plans pending deletion (`pending_deletion: true`) are included for a secret key only. Per-customer override plans (`parent_id` set) are not.
         - Items do not include `fixed_charges`; use `GET /plans/{code}` for those.
         - The Engine host serves this list at `https://api.nozle.app/engine/api/v1/plans` with the same body. Engine forwards `page` and `per_page` to Core.
+        - A publishable key, or a secret key with `include_hidden=false`, does not receive the plans of plan families hidden from the pricing table, and `families[].features` leaves out hidden features. Hiding is a listing setting only: every plan carries all its entitlements and charges, including those of hidden features.
 
         Because a publishable key ships in browsers, anything stored on a plan is readable by anyone who has the key. See [Public plan catalog](/api/list-plans).
       operationId: findAllPlans
@@ -4848,7 +4861,9 @@ paths:
 
         **Publishable keys.** A publishable `pk_` key may call this endpoint and `GET /plans`, and nothing else. It returns the same body as a secret key: the whole plan, including `charges`, `fixed_charges`, `taxes`, `minimum_commitment`, `usage_thresholds`, `entitlements`, `credit_grant_rules`, `credit_pool_policies` and `metadata`. Anyone who has the key can read all of it.
 
-        This endpoint also returns a plan that is pending deletion (`pending_deletion: true`) and a plan with a trial or pay-in-arrears billing. An unknown code, or the code of a per-customer override plan, returns `404` with the code `plan_not_found`.
+        This endpoint also returns a plan with a trial or pay-in-arrears billing, and, to a secret key, a plan that is pending deletion (`pending_deletion: true`). An unknown code, the code of a per-customer override plan, or a plan pending deletion read with a publishable key returns `404` with the code `plan_not_found`.
+
+        A publishable key receives a plan of a family hidden from the pricing table, or whose family was deleted, so the SDK can describe a subscriber's own plan. The plan carries all its entitlements and charges, including those of features hidden from the pricing table.
 
         The Engine host also serves this path at `https://api.nozle.app/engine/api/v1/plans/{code}` and returns Core's body unchanged.
 
@@ -7544,7 +7559,7 @@ paths:
       tags:
         - Subscription Changes
       summary: Get plan-change options
-      description: Returns the selected active subscription, its pending scheduled change, the plans it may change to under the configured transition policies, and the latest upgrade checkout. Engine checks the inputs and the customer scope, then forwards to Core `GET /subscription_transitions/options` with `external_customer_id` and `external_subscription_id`. Requires `subscription:read`. Engine forwards Core's status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine's own `{error, code?}` errors.
+      description: Returns the selected active subscription, its pending scheduled change, the plans it may change to under the configured transition policies, and the latest upgrade checkout. Engine checks the inputs and the customer scope, then forwards to Core `GET /subscription_transitions/options` with `external_customer_id` and `external_subscription_id`. A subscription on an override plan (for example one created from a quote) gets the eligible plans of the catalog plan it was made from, under that plan's transition policies. Requires `subscription:read`. Engine forwards Core's status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine's own `{error, code?}` errors.
       operationId: engineGetSubscriptionOptions
       security:
         - bearerAuth: []
@@ -11599,7 +11614,7 @@ paths:
   /check-and-deduct:
     post:
       summary: Check and deduct legacy wallet credits
-      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet, and when its `credits_balance` covers `credits`, deducts them and records an outbound wallet transaction, in one database transaction. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; API permissions are not checked.'
+      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet, and when its `credits_balance` covers `credits`, deducts them and records an outbound wallet transaction, in one database transaction. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; With API key permissions, the secret key needs `credit_system:write`, as on `POST /usage/track`.'
       operationId: engineCheckAndDeductCredits
       tags:
         - Credits
@@ -11659,7 +11674,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: 'A publishable key. Body `{"error": "this endpoint requires a secret key (sk_)"}`.'
+          description: 'A publishable key (body `{"error": "this endpoint requires a secret key (sk_)"}`), or `code: permission_denied` when API key permissions are enabled and the secret key lacks `credit_system:write`.'
         '404':
           description: The customer does not exist or has no active wallet.
           content:
@@ -11697,7 +11712,7 @@ paths:
   /margin/summary:
     get:
       summary: Get margin summary
-      description: 'Returns revenue, cost and margin totals, in integer cents, over all margin events of the organization in the range. `margin_percent` is `total_margin_cents / total_revenue_cents * 100`, and `0` when total revenue is not positive. A range with no events returns zeros. The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Returns revenue, cost and margin totals, in integer cents, over all margin events of the organization in the range. `margin_percent` is `total_margin_cents / total_revenue_cents * 100`, and `0` when total revenue is not positive. A range with no events returns zeros. The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. With API key permissions, the secret key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable, or, with `code: analytics_unavailable`, that the analytics store could not be reached or a query failed.'
       operationId: engineGetMarginSummary
       tags:
         - Margin
@@ -11764,7 +11779,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
+          description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
             application/json:
               schema:
@@ -11787,7 +11802,7 @@ paths:
   /margin/customers:
     get:
       summary: Get margin by customer
-      description: 'Returns one row per customer with margin events in the range, ordered by `margin_cents` ascending (least profitable first). `customer_name` comes from the Engine''s in-memory customer cache (the customer''s name, else its external ID, else its ID); a customer missing from the cache gets its `customer_id` as the name. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Returns one row per customer with margin events in the range, ordered by `margin_cents` ascending (least profitable first). `customer_name` comes from the Engine''s in-memory customer cache (the customer''s name, else its external ID, else its ID); a customer missing from the cache gets its `customer_id` as the name. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. With API key permissions, the secret key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable, or, with `code: analytics_unavailable`, that the analytics store could not be reached or a query failed.'
       operationId: engineListMarginByCustomer
       tags:
         - Margin
@@ -11859,7 +11874,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
+          description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
             application/json:
               schema:
@@ -11882,7 +11897,7 @@ paths:
   /margin/metrics:
     get:
       summary: Get margin by metric
-      description: 'Returns one row per `metric_code` with margin events in the range, ordered by `margin_cents` ascending. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Returns one row per `metric_code` with margin events in the range, ordered by `margin_cents` ascending. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. With API key permissions, the secret key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable, or, with `code: analytics_unavailable`, that the analytics store could not be reached or a query failed.'
       operationId: engineListMarginByMetric
       tags:
         - Margin
@@ -11954,7 +11969,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
+          description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
             application/json:
               schema:
@@ -11977,7 +11992,7 @@ paths:
   /margin/plans:
     get:
       summary: Get margin by plan
-      description: 'Returns one row per `plan_id` recorded on the margin events in the range, ordered by `margin_cents` ascending. Events recorded without a plan are grouped under an empty `plan_id`. The plan is identified by ID only; no name or code is returned. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Returns one row per `plan_id` recorded on the margin events in the range, ordered by `margin_cents` ascending. Events recorded without a plan are grouped under an empty `plan_id`. The plan is identified by ID only; no name or code is returned. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. With API key permissions, the secret key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable, or, with `code: analytics_unavailable`, that the analytics store could not be reached or a query failed.'
       operationId: engineListMarginByPlan
       tags:
         - Margin
@@ -12049,7 +12064,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
+          description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
             application/json:
               schema:
@@ -12072,7 +12087,7 @@ paths:
   /margin/models:
     get:
       summary: Get margin by model
-      description: 'Returns one row per `model` value in the margin events'' `properties` (the `model` property of the event), ordered by `cost_cents` descending. Events whose `model` property is missing or empty are left out. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Returns one row per `model` value in the margin events'' `properties` (the `model` property of the event), ordered by `cost_cents` descending. Events whose `model` property is missing or empty are left out. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. With API key permissions, the secret key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable, or, with `code: analytics_unavailable`, that the analytics store could not be reached or a query failed.'
       operationId: engineListMarginByModel
       tags:
         - Margin
@@ -12144,7 +12159,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
+          description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
             application/json:
               schema:
@@ -12167,7 +12182,7 @@ paths:
   /margin/trend:
     get:
       summary: Get margin trend
-      description: 'Returns revenue, cost and margin per time bucket in the range, ordered by `period` ascending. Only buckets that contain events are returned; empty buckets are not filled in. Weeks start on Sunday (ClickHouse `toStartOfWeek` default mode). `margin_percent` is `0` for a bucket with no positive revenue. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Returns revenue, cost and margin per time bucket in the range, ordered by `period` ascending. Only buckets that contain events are returned; empty buckets are not filled in. Weeks start on Sunday (ClickHouse `toStartOfWeek` default mode). `margin_percent` is `0` for a bucket with no positive revenue. When no events fall in the range the list is empty (`[]`). The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. With API key permissions, the secret key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable, or, with `code: analytics_unavailable`, that the analytics store could not be reached or a query failed.'
       operationId: engineGetMarginTrend
       tags:
         - Margin
@@ -12263,7 +12278,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
+          description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
             application/json:
               schema:
@@ -12286,7 +12301,7 @@ paths:
   /margin/forecast:
     get:
       summary: Get margin forecast
-      description: 'Projects daily revenue, cost and margin for the 30 days after the range. It uses the daily margin trend of the range (by default the last month up to now) and fits a least-squares line to revenue and to cost, using the position of each returned day bucket as x (days without events are skipped, not counted as zero). Each point is dated 1 to 30 days after the end of the range (UTC, `YYYY-MM-DD`). Projected revenue and cost are clamped at 0 and truncated to integer cents; `projected_margin` is their difference and can be negative. `confidence` is `low` with fewer than 7 day buckets, `medium` with 7 to 19 and `high` with 20 or more. With fewer than 2 day buckets the response is `{"points": [], "confidence": "low"}`; `points` is never `null`. The range is read by the Engine''s shared range parser, with the same `from`, `to`, `from_date` and `to_date` rules as the other margin operations; a value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. Other query parameters are ignored. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Projects daily revenue, cost and margin for the 30 days after the range. It uses the daily margin trend of the range (by default the last month up to now) and fits a least-squares line to revenue and to cost, using the position of each returned day bucket as x (days without events are skipped, not counted as zero). Each point is dated 1 to 30 days after the end of the range (UTC, `YYYY-MM-DD`). Projected revenue and cost are clamped at 0 and truncated to integer cents; `projected_margin` is their difference and can be negative. `confidence` is `low` with fewer than 7 day buckets, `medium` with 7 to 19 and `high` with 20 or more. With fewer than 2 day buckets the response is `{"points": [], "confidence": "low"}`; `points` is never `null`. The range is read by the Engine''s shared range parser, with the same `from`, `to`, `from_date` and `to_date` rules as the other margin operations; a value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. Other query parameters are ignored. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. With API key permissions, the secret key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable, or, with `code: analytics_unavailable`, that the analytics store could not be reached or a query failed.'
       operationId: engineGetMarginForecast
       tags:
         - Margin
@@ -12342,7 +12357,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
+          description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
             application/json:
               schema:
@@ -12352,7 +12367,7 @@ paths:
   /margin/simulate:
     post:
       summary: Simulate margin at a new price
-      description: 'Replays one metric''s recorded usage in the range at a new unit price and keeps the recorded cost. `new_revenue_cents` is the sum of the metric''s recorded `quantity` times `new_price_dollars` times 100, truncated toward zero to whole cents. `new_cost_cents` equals `current_cost_cents`. `revenue_delta_cents` and `margin_delta_cents` are new minus current. A metric with no events in the range returns zeros with `event_count` `0`. The body is decoded before the range is checked, so a body error is reported first. The range comes from the query string, not the body. The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable.'
+      description: 'Replays one metric''s recorded usage in the range at a new unit price and keeps the recorded cost. `new_revenue_cents` is the sum of the metric''s recorded `quantity` times `new_price_dollars` times 100, truncated toward zero to whole cents. `new_cost_cents` equals `current_cost_cents`. `revenue_delta_cents` and `margin_delta_cents` are new minus current. A metric with no events in the range returns zeros with `event_count` `0`. The body is decoded before the range is checked, so a body error is reported first. The range comes from the query string, not the body. The range is read by the Engine''s shared range parser. `from` and `to` take an RFC3339 timestamp or a plain date (`YYYY-MM-DD`); `from_date` and `to_date` are aliases, and when both a name and its alias are sent, `from`/`to` win. A plain `from` starts at 00:00 UTC of that day; a plain `to` includes that whole day (the range ends at 00:00 UTC of the next day); an RFC3339 `to` is an exclusive instant. Events match when `from <= timestamp < to`. With neither end the range is the last month up to now; with only `to` it is the month before `to`; with only `from` it runs to now, or to one month after `from` when `from` is not in the past. A value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. No other query parameter is read: filters such as a customer, metric or plan identifier, and paging parameters, are ignored without an error. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. With API key permissions, the secret key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable, or, with `code: analytics_unavailable`, that the analytics store could not be reached or a query failed.'
       operationId: engineSimulateMargin
       tags:
         - Margin
@@ -12445,7 +12460,7 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '500':
-          description: 'The analytics store query failed. The body is `{"code": "internal_error", "error": "the query failed", "request_id": "..."}`; the store error is logged, not returned. When the analytics schema is missing, the answer is `503` with code `analytics_schema_missing` instead.'
+          description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
             application/json:
               schema:
@@ -12667,7 +12682,7 @@ paths:
       description: |-
         Returns an HS256 JWT for connecting to Centrifugo to receive real-time entitlement updates. The token's `sub` is the organization ID, it expires 24 hours after issue, and its `channels` claim is `["customer:<organization_id>"]`.
 
-        **Keys.** A secret `sk_` key or the trusted internal credential. A publishable `pk_` key returns `403`.
+        **Keys.** A secret `sk_` key or the trusted internal credential. A publishable `pk_` key returns `403`. With API key permissions, the secret key needs `customer_usage:read`; without it the answer is `403` with `code: permission_denied`.
 
         Returns `404` when Centrifugo is not configured on the Engine.
       operationId: engineGetCentrifugoToken
@@ -12712,6 +12727,8 @@ paths:
         Engine proxy for Core's `GET /plans`. Engine calls Core `GET /api/v1/plans` with the caller's query string (`page`, `per_page`) and copies Core's status code and body unchanged, so a `200` body is the same `PlansPaginated` object Core returns. Engine also serves `GET /api/v1/plans/{code}` the same way, as a proxy for Core's `GET /plans/{code}`.
 
         **Keys.** These two plan routes are the only Engine routes that accept a publishable `pk_` key. They also accept a secret `sk_` key and the trusted internal credential. Engine forwards a `pk_` or `sk_` key to Core as the caller's own credential. The internal credential works only for the organization Engine is configured to act for; any other organization returns `403`.
+
+        **CORS.** These two plan routes and their preflight answer any origin with `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Methods: GET, OPTIONS` and `Access-Control-Allow-Headers: Authorization, Content-Type`, and never send `Access-Control-Allow-Credentials`. Every other Engine route keeps its origin allow-list.
 
         Any error status Core returns is passed through with Core's error body. Engine returns `502` when it cannot reach Core within 10 seconds.
 
@@ -13177,7 +13194,7 @@ paths:
       description: |-
         Creates a legacy cost model for margin calculations. This endpoint is kept as a rollback surface; new integrations use versioned Cost Sheets in Cost Intelligence.
 
-        **Keys.** A secret `sk_` key or the trusted internal credential. A publishable `pk_` key returns `403`.
+        **Keys.** A secret `sk_` key or the trusted internal credential. A publishable `pk_` key returns `403`. With API key permissions, the secret key needs `analytic:write`; without it the answer is `403` with `code: permission_denied`.
 
         The body is validated by `cost_type`:
 
@@ -13270,7 +13287,7 @@ paths:
       description: |-
         Lists the organization's legacy cost models, newest first, including archived ones. Versioned Cost Sheets are not returned.
 
-        **Keys.** A secret `sk_` key or the trusted internal credential. A publishable `pk_` key returns `403`.
+        **Keys.** A secret `sk_` key or the trusted internal credential. A publishable `pk_` key returns `403`. With API key permissions, the secret key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`.
 
         Without `page` and `per_page` every model is returned and there is no `meta`; with no models `cost_models` is `null`. With either parameter the list is paged (default `page` 1, `per_page` 20, maximum 100) and `meta` is added. An invalid value returns `400` `invalid pagination`.
       operationId: engineListCostModels
@@ -13353,7 +13370,7 @@ paths:
       description: |-
         Returns one legacy cost model of the organization, active or archived. Any read failure, including an unknown ID, returns `404`.
 
-        **Keys.** A secret `sk_` key or the trusted internal credential. A publishable `pk_` key returns `403`.
+        **Keys.** A secret `sk_` key or the trusted internal credential. A publishable `pk_` key returns `403`. With API key permissions, the secret key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`.
       operationId: engineGetCostModel
       security:
         - bearerAuth: []
@@ -13384,7 +13401,7 @@ paths:
       description: |-
         Archives a legacy cost model: its `status` becomes `archived` and it stops being used for margin calculations. The row is kept and still appears in the list and by ID. Archiving an already archived model returns `200` again. An unknown ID returns `404`.
 
-        **Keys.** A secret `sk_` key or the trusted internal credential. A publishable `pk_` key returns `403`.
+        **Keys.** A secret `sk_` key or the trusted internal credential. A publishable `pk_` key returns `403`. With API key permissions, the secret key needs `analytic:write`; without it the answer is `403` with `code: permission_denied`.
       operationId: engineDeleteCostModel
       security:
         - bearerAuth: []
@@ -26708,7 +26725,7 @@ components:
                           colorPrimary: '#e11d48'
                 nozle_branding:
                   type: boolean
-                  description: Whether the SDK components show "Powered by Nozle". Returned for publishable keys only.
+                  description: Whether the SDK components show "Powered by Nozle". `false` only when the organization's Nozle plan lets it remove the branding and `sdk_appearance.hideBranding` is `true`. Invoice, credit note and payment receipt PDFs always show it. Returned for publishable keys only.
                   example: true
     MinimumCommitmentInput:
       type:

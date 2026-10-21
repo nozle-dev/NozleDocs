@@ -33,6 +33,30 @@ A secret key can be limited to read or write access per resource, for example `c
 - Rotating a key gives the new key the same permissions as the old one.
 - Plan transition policies have their own resource, `plan_transition_policy`. Keys that existed before it have the same access to it that they have to `plan`.
 - [Check credit usage](/api/usage-check) needs `credit_system:read` and [Track and consume credits](/api/usage-track) needs `credit_system:write`.
+- Set a key's permissions in the dashboard under **Developers > API keys**, when you create a secret key or with **Edit**. The read and write picker shows only for secret keys on organizations with API key permissions. With API key permissions, a secret key with read and write on every resource is labelled **Full access**, and any other key **Restricted** with its grants, for example **Restricted · plan: read**. On other organizations, every secret key is labelled **Full access (permissions not enforced on this plan)**. A publishable key is labelled **Plan catalog · read only**.
+
+### Engine routes
+
+On organizations with API key permissions, these Engine routes check the key too. A key without the permission gets `403` with `code: permission_denied` and the message `API key requires <resource>:<mode> permission`. Organizations without API key permissions see no change.
+
+| Route | Permission |
+|---|---|
+| `POST /customers` | `customer:write` |
+| `POST /usage/check` | `credit_system:read` |
+| `POST /usage/track`, `POST /check-and-deduct` | `credit_system:write` |
+| `GET /auth/centrifugo-token` | `customer_usage:read` |
+| `POST /cost-events` | `event:write` |
+| `GET /cost-models`, `GET /cost-models/{id}` | `analytic:read` |
+| `POST /cost-models`, `DELETE /cost-models/{id}` | `analytic:write` |
+| `POST /cost-intelligence/shared-costs/{id}/preview`, `GET /cost-intelligence/report` | `analytic:read` |
+| `POST /cost-intelligence/shared-costs/{id}/allocate` | `analytic:write` |
+| `GET /analytics/*`, `GET /margin/*`, `POST /margin/simulate` | `analytic:read` |
+
+`POST /analytics/snapshot` and `POST /onboarding/chat` are internal to Nozle. They accept only Nozle's internal service token, and a secret key gets `403` with `internal service authentication required`.
+
+## Browser access (CORS)
+
+The publishable-key plan catalog, `GET /plans` and `GET /plans/{code}` on the Engine, answers CORS from any origin, so the [React components](/sdks/react/components) can load plans on your own site. The catalog and its preflight return `Access-Control-Allow-Origin: *` and `Access-Control-Allow-Methods: GET, OPTIONS`, never `Access-Control-Allow-Credentials`. Every other route answers only the origins Nozle allows, so call them from your backend.
 
 <Warning>
 Never expose a secret or master key in client-side code. CORS and `Origin` headers do not authenticate a caller.
@@ -44,4 +68,4 @@ Never expose a secret or master key in client-side code. CORS and `Origin` heade
 - `POST /api/v1/auth/verify-otp`
 - `POST /api/v1/auth/signup`
 
-Get API keys from [app.nozle.dev](https://app.nozle.dev) under **Settings → API Keys**.
+Get API keys from [app.nozle.dev](https://app.nozle.dev) under **Developers > API keys**.

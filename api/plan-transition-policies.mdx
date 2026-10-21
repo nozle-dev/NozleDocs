@@ -18,6 +18,8 @@ Changing an existing subscription's plan needs a policy for that exact pair. Wit
 
 Withdrawing a pending change does not need a policy. Subscription options leave out every target plan that has no policy, so an empty `eligible_plans` list usually means no policy is configured.
 
+A subscription on an override plan (a plan made from a catalog plan for one customer, for example a negotiated price or a subscription created from a quote) uses the policies of the catalog plan it was made from. Its options list the same eligible plans as a subscription on the catalog plan, and preview, checkout and transitions use the catalog plan's policy. The change replaces the override plan with the target catalog plan, so the negotiated price and other overrides do not carry over. A self-serve change from an override plan to its own catalog plan returns `422 plan_already_active`; a merchant plan change through `POST /subscriptions` can still replace it with the catalog plan.
+
 <Info>
 One fallback exists. When the current plan is free and the target plan is paid, Nozle uses the organization's free-to-paid policy (Settings, General, "Checkout & billing policy" in the dashboard) as an upgrade. Every other pair, including paid to paid, paid to free, and free to free, needs its own policy. The dashboard sets only the free-to-paid default; create pair policies with this API.
 </Info>

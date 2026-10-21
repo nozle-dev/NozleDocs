@@ -7,7 +7,7 @@ Base URL: `https://api.nozle.app/engine/api/v1`.
 
 Get a WebSocket authentication token for real-time entitlement updates via Centrifugo.
 
-**Auth:** secret key only. Publishable keys are rejected.
+**Auth:** secret key only. Publishable keys are rejected. With [API key permissions](/api/authentication#key-permissions), the key needs `customer_usage:read`; without it the call returns `403` with `code: permission_denied`.
 
 <ResponseField name="token" type="string" required>
   JWT token for authenticating WebSocket connections to Centrifugo
@@ -20,7 +20,7 @@ The token is signed with HS256 and expires 24 hours after it is issued. Its `sub
 | Status | Body | Meaning |
 |--------|------|---------|
 | `401` | `{"error": "..."}` | The `Authorization` header is missing or malformed, or the key is unknown. |
-| `403` | `{"error": "..."}` | A publishable key was used. |
+| `403` | `{"error": "..."}` | A publishable key was used, or the key lacks `customer_usage:read` (`code: permission_denied`). |
 | `404` | `{"error": "centrifugo not configured"}` | Real-time updates are not configured on this Engine. |
 | `500` | `{"error": "failed to sign token"}` | The token could not be signed. |
 | `503` | `{"error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |
