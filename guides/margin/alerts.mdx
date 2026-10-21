@@ -1,12 +1,23 @@
 ---
-title: Margin Alerts
-description: Margin floor alerts and cost spike detection
+title: Monitor margin yourself
+description: Nozle has no server-side margin alerts. Build your own checks from can() economics and the Cost Intelligence report.
 ---
 
-Margin alerts help you detect when profitability drops below acceptable thresholds.
+Nozle does not send margin alerts today. There is no margin alert type, webhook, email or scheduled check, and no way to set a margin floor that notifies you. The [dashboard](/guides/margin/dashboard) margin views are lists you open and read. If you want to be told when margin drops, run the check in your own code, on your own schedule, and send the notification yourself.
 
-**Estimated margin:**
-The `can()` endpoint can include a point-in-time `economics` estimate. Check its status and exclusions before using it for an operational warning.
+What Nozle does provide:
+
+- **`can()` economics:** a point-in-time estimate of cost, revenue and margin for one call, with the status and the costs it leaves out. See [The can() endpoint](/guides/entitlements/can-endpoint#field-reference).
+- **A margin policy:** a versioned policy (`mode`, `on_unavailable`, thresholds) that `can()` applies to that estimate. In `deny` mode it denies the call with `economic_policy_denied`. In `warn` mode it returns `decision: "warn"` and the call stays allowed. `on_unavailable` (`allow`, `warn` or `deny`) decides what happens when the estimate is `unavailable` or `stale`. A policy never notifies anyone: it only changes the response of the call.
+- **The Cost Intelligence report:** ledger-backed costs per Feature and customer, built from your Cost Sheets. See [Cost Intelligence report](/api/cost-intelligence-report).
+
+<Warning>
+Do not build a margin check on `margin.trend` or the other `/margin/*` queries. They sum stored margin events only and do not include Cost Sheet costs, so a script built on them can report a cost of 0 while the Cost Intelligence report shows real costs. See [Margin Intelligence](/guides/margin/overview).
+</Warning>
+
+## Check the margin of one call
+
+Call `can()` from your backend before protected work and act on the estimate. Check `status` first: only `estimated` carries a margin.
 
 ```typescript
 import { Nozle } from '@nozle-js/node'
@@ -18,7 +29,7 @@ if (
   check.economics?.status === 'estimated' &&
   Number(check.economics.estimated_incremental_margin) < 0
 ) {
-  // This customer is costing you money
+  // This call costs more than it earns. Notify yourself here.
   logger.alert('Negative margin detected', {
     customer: 'cust_123',
     margin: check.economics.estimated_incremental_margin,
@@ -29,14 +40,25 @@ if (
 }
 ```
 
-**Using trend data for spike detection:**
-```typescript
-const trend = await nozle.margin.trend({ granularity: 'hour' });
-// Check for sudden margin drops in the last 24 hours
+`can()` estimates one call. It excludes `shared_period_costs` and `finalized_invoice_adjustments`, so it is not a customer or plan margin.
+
+## Watch costs over a period
+
+Poll the Cost Intelligence report on a schedule you run, and compare `summary.total_cost` with a limit you keep in your own code. The report returns cost only. It does not return revenue or margin.
+
+```bash
+curl "https://api.nozle.app/engine/api/v1/cost-intelligence/report?from=2026-07-01&to=2026-07-31" \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY"
 ```
 
-**React-side usage alerts:**
-The UsageAlert component shows warnings when usage approaches limits:
+Read `summary.total_cost`, `summary.currency`, and the per-customer `customers` breakdown. To compare cost with revenue, read the revenue of the same period from your finalized invoices. Check the `uncosted` array too: usage without a Cost Sheet rule is listed there instead of being counted as zero.
+
+The key needs `analytic:read` when [API key permissions](/api/authentication#key-permissions) are on.
+
+## Usage alerts in React
+
+Usage alerts are separate from margin. The `UsageAlert` component shows a warning when usage approaches a limit:
+
 ```tsx
 import { UsageAlert } from '@nozle-js/react'
 
