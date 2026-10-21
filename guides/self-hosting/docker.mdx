@@ -1,18 +1,12 @@
 ---
 title: Self-Hosting with Docker
-description: Run Nozle's billing engine locally with Docker
+description: Self-hosting Nozle is not supported today. Use Nozle Cloud.
 ---
 
-For local development or self-hosted deployments, Nozle provides a Docker Compose setup.
+Nozle does not support self-hosting today. Use Nozle Cloud at [app.nozle.app](https://app.nozle.app).
 
-## Quick Start
+The `docker-compose.yml` in the Core repository does not start Nozle. It starts the upstream open-source billing engine (version 1.46.0 images of its API and dashboard) with PostgreSQL and Redis, and has none of the Nozle features: no margin intelligence, no Nozle entitlements, no embedded checkout and no Engine.
 
-```bash
-docker compose up
-```
+## Local development
 
-This starts the billing API, dashboard, PostgreSQL, and Redis.
-
-## Nozle Cloud
-
-For the full Nozle experience — including margin intelligence, real-time entitlements, embedded checkout, and the React SDK — use Nozle Cloud at [app.nozle.dev](https://app.nozle.dev). No infrastructure to manage.
+For development on Nozle itself, use the `docker-compose.yml` of the deploy repository. It builds the Nozle services (Core, Engine, workers and the dashboard) but does not include PostgreSQL or Redis. It reads their addresses from `CLOUD_SQL_IP` and `MEMORYSTORE_IP`, so you must provide both before it starts. It is a development reference, not a supported way to run Nozle for customers.
