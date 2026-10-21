@@ -21,4 +21,6 @@ Authorization: Bearer sk_nozle_...
 
 Each operation includes exact decimal amounts, status, metric and rate snapshots, occurrence time, and source-level allocations. A denied consume shows the required amount and reason but has no allocations.
 
+A `revoke` operation that takes back a paid top-up's credits after a credit note or a lost dispute has the reason `top_up_credit_note` or `top_up_dispute_lost`. On a `revoke`, `requested_credit_amount` is what was asked to be taken back and `credit_amount` is what was actually revoked; the difference had already been spent. `requested_credit_amount` is `null` for other operation types. See [Refunds and lost disputes](/guides/credits/top-ups#refunds-and-lost-disputes).
+
 Use `next_cursor` unchanged for the next page. Do not construct or decode cursors in application code.

@@ -6,7 +6,7 @@ description: Atomically consume credits and queue the matching billing event
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-**Auth:** secret key only. The customer, Feature, and optional Credit System must belong to the authenticated organization.
+**Auth:** secret key only. The customer, Feature, and optional Credit System must belong to the authenticated organization. When your organization has API key permissions, the key requires `credit_system:write`; a key without it returns `403 permission_denied`.
 
 ```http
 POST /usage/track
@@ -20,12 +20,29 @@ Content-Type: application/json
   "customer_id": "customer_123",
   "feature_code": "agent_execution",
   "credit_system_code": "ai_credits",
+  "subscription_id": "sub_pro_123",
   "properties": {},
   "timestamp": "2026-07-20T12:00:00.750Z"
 }
 ```
 
-`customer_id` and `feature_code` are required. Add `entity_id` to attribute the usage to one Entity of the customer and spend under its pool policy. Unknown fields return `400 invalid_request`. An unknown Entity returns `404 entity_not_found`, an inactive Entity returns `422 entity_inactive`, and Entity usage without an explicit pool policy on the plan returns `422 credit_pool_policy_not_configured`.
+`customer_id` and `feature_code` are required. Add `entity_id` to attribute the usage to one Entity of the customer and spend under its pool policy. Add `subscription_id` to choose the subscription that pays; see [Which subscription pays](#which-subscription-pays). Unknown fields return `400 invalid_request`. An unknown Entity returns `404 entity_not_found`, an inactive Entity returns `422 entity_inactive`, and Entity usage without an explicit pool policy on the plan returns `422 credit_pool_policy_not_configured`.
+
+## Which subscription pays
+
+Nozle picks the subscription that pays for the usage, and that receives the billing event, in this order:
+
+1. `subscription_id` given: that active subscription of the customer, by its external id. A subscription that is not active, not the customer's, or (with `entity_id`) owned by another Entity returns `404 active_subscription_not_found`.
+2. `entity_id` given: the Entity's own active subscription, else the customer's own active subscription (one not owned by an Entity). Another Entity's subscription never pays.
+3. Neither: the customer's one active subscription.
+
+When a step finds several active subscriptions, the request returns `422 active_subscription_ambiguous`, and the message names `subscription_id` and `entity_id`. Send one of them to choose.
+
+A customer with no active subscription can still spend credits that do not need one: paid top-ups, opening balances, and plan credits left after a cancellation until they expire. That usage sends no billing event, because usage is billed only through a subscription.
+
+`subscription_id` is part of the request body, so a replay with the same `Idempotency-Key` must send the same value.
+
+## Response
 
 A successful response includes the operation ID, exact credits consumed,
 remaining total, and source deductions with their balance-source IDs:
@@ -53,6 +70,8 @@ remaining total, and source deductions with their balance-source IDs:
 Insufficient credits return `200` with `allowed=false`, `credits_required`,
 `available`, and `reason`, without allocations or a Core event. `entity_id`
 and `pool_policy` are included when they apply. Empty fields are omitted.
+
+## Timestamp and retries
 
 `timestamp` is required. A missing or empty value returns `400 invalid_request` with `timestamp is required`; the API does not default it. The Node.js, Python and Go SDKs fill it with the current time when you omit it, and reuse that time when the same idempotency key is sent again on the same client. It must be Unix seconds (a JSON number such as `1788345001` or `1788345001.5`, or a numeric string such as `"1788345001"`) or an RFC 3339 string with a time zone offset or `Z`. A date without a time, a time without an offset, zero or negative seconds, and any other JSON type return `400 invalid_request` with `timestamp must be Unix seconds (a number or a numeric string) or an RFC 3339 timestamp with an offset or Z` (zero or negative seconds: `timestamp must be greater than zero`). Unix seconds are available from the Engine release that includes this change; before it, only RFC 3339 is accepted. RFC 3339 keeps its nanoseconds, so a replay must send the same value; the same instant sent in another form is a different request body. The time must also fall after the Credit System rate became effective; an earlier time returns `422` with code `credit_usage_configuration_invalid` and the message `no effective credit rate`.
 

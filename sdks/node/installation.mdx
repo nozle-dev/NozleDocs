@@ -8,11 +8,11 @@ description: "Install and configure the server-only @nozle-js/node SDK."
 Entity subscription APIs are introduced in `0.5.0`.
 
 ```bash
-npm install @nozle-js/node@0.13.0
+npm install @nozle-js/node@0.13.1
 ```
 
 <Info>
-Version `0.13.0` adds `NozleApiError` on every failed call (with `requestId` and `retryAfter`), opt-in retries, the `host` option, an optional `apiKey` that reads `NOZLE_SECRET_KEY`, `captureFetch()` and `recordUsage()`, Core usage reads, the `invoices`, `alerts` and `webhooks` namespaces, and `createBillingHandler()` for the React billing hooks. Version `0.12.0` adds `billingConfiguration` to `customers.upsert()`. Version `0.11.0` sends Feature Events through the Go Engine endpoint. Version `0.10.0` adds `NozleApiError` with `status`, `code` and `hasCode()`, richer checkout result types, and no longer sends `feature` from `checkAndDeduct()`. Version `0.9.1` fixes Feature Event timestamp serialization, including events created by the OpenAI and Anthropic wrappers. Version `0.9.0` introduced subscription options, signed quotes, pending-change withdrawal, and scoped checkout recovery. See [subscription self-service](/sdks/node/billing#subscription-self-service) and the [release notes](/changelog#razorpay-and-stripe-guides-new-sdk-releases-api-fixes).
+Version `0.13.1` changes `wrapOpenAI()` and `wrapAnthropic()` to return a client view instead of patching the client you pass in; use the returned client. See [Client wrappers](/sdks/node/llm-auto-capture#client-wrappers). Version `0.13.0` adds `NozleApiError` on every failed call (with `requestId` and `retryAfter`), opt-in retries, the `host` option, an optional `apiKey` that reads `NOZLE_SECRET_KEY`, `captureFetch()` and `recordUsage()`, Core usage reads, the `invoices`, `alerts` and `webhooks` namespaces, and `createBillingHandler()` for the React billing hooks. Version `0.12.0` adds `billingConfiguration` to `customers.upsert()`. Version `0.11.0` sends Feature Events through the Go Engine endpoint. Version `0.10.0` adds `NozleApiError` with `status`, `code` and `hasCode()`, richer checkout result types, and no longer sends `feature` from `checkAndDeduct()`. Version `0.9.1` fixes Feature Event timestamp serialization, including events created by the OpenAI and Anthropic wrappers. Version `0.9.0` introduced subscription options, signed quotes, pending-change withdrawal, and scoped checkout recovery. See [subscription self-service](/sdks/node/billing#subscription-self-service) and the [release notes](/changelog#razorpay-and-stripe-guides-new-sdk-releases-api-fixes).
 </Info>
 
 ## Create a client

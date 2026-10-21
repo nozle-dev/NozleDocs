@@ -18,7 +18,12 @@ Initial grants are asynchronous. The hosted scheduler checks for grants once per
 - **Downgrade:** do not claw back; the lower target applies next period.
 - **Cycle-end transition:** create no immediate difference grant.
 - **Cancellation:** subscription sources expire at their own period boundary; lifetime sources retain their configured lifetime behavior.
+- **Cadence change:** a plan change that grants a Credit System on another cadence, for example monthly to yearly inside a plan family, grants the new rule's full amount once, starting at the new subscription's billing anchor. Credits of the old cadence are removed only by the plan change's own revocations. A Credit System whose cadence does not change follows the upgrade rule above.
+- **Cancel and subscribe again:** the cancelled subscription's plan credits stay spendable until they expire. A new subscription for the same customer (or Entity) grants only the part of its period that those unexpired credits do not cover, prorated by time. For example, resubscribing to a 100-credit monthly plan in the same calendar month leaves 100 credits for that month, not 200. Credits already spent on the cancelled subscription do not increase the new grant.
+- **Lifetime credits:** granted once per customer (or Entity) and Credit System. Cancelling and subscribing again does not grant them again.
 
-Cadence cannot change unsafely across a subscription lineage. Removing and later reintroducing a rule does not bypass historical cadence validation.
+Plan changes inside one subscription, resubscribing after the cancelled credits expired, and other subscriptions that are still active (add-ons, Entity subscriptions) are not reduced by the resubscribe rule.
+
+Each Credit System is granted on its own: a grant that fails for one Credit System does not hold back the grants of the others on the same subscription.
 
 Paid top-ups remain separate sources and are not reduced by plan changes.

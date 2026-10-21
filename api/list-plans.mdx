@@ -33,6 +33,9 @@ All top-level plans of the organization, newest first. There is no listed, publi
 
 - A `pk_` key does not receive plans that are pending deletion. `GET /plans/{code}` returns `404` with `"code": "plan_not_found"` for one.
 - An `sk_` key receives them, with `pending_deletion: true`.
+- A `pk_` key, or an `sk_` key with `include_hidden=false`, does not receive plans whose plan family is hidden from the pricing table. `GET /plans/{code}` returns `404` with `"code": "plan_not_found"` for one in the same cases.
+
+A plan created through `POST /plans`, the dashboard onboarding or the Agent Kit starts in a new plan family that is shown on the pricing table, so it is listed at once. Send `show_on_pricing: false` in `plan` (GraphQL `showOnPricing: false`) to create it hidden. A plan that joins an existing family with `plan_family_code` keeps that family's visibility.
 
 ### Pagination
 
