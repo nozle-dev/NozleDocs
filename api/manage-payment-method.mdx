@@ -85,7 +85,7 @@ Razorpay:
 
 ## Razorpay behaviour
 
-Razorpay has no hosted page for managing a mandate. Instead Nozle starts a new mandate authorization on the customer's latest payable subscription invoice and returns it as `checkout`. Open it with Razorpay Checkout exactly like a [mandate checkout](/guides/billing/checkout#razorpay): pass `key_id`, `order_id` and `customer_id` with `recurring` set, then let the webhook confirm the result. The mandate is limited to the connection's mandate maximum amount, and the invoice must be in INR.
+Razorpay has no hosted page for managing a mandate. Instead Nozle starts a new mandate authorization on the customer's latest payable subscription invoice and returns it as `checkout`. Open it with Razorpay Checkout exactly like a [mandate checkout](/guides/billing/checkout#razorpay): pass `key_id`, `order_id` and `customer_id` with `recurring` set, then let the webhook confirm the result. If Razorpay rejects the order, the `422` detail carries Razorpay's own error description. The mandate is limited to the connection's mandate maximum amount, and the invoice must be in INR.
 
 ## Errors
 
@@ -98,7 +98,8 @@ The request is checked in this order: valid JSON body, `return_url`, then Core.
 | `404` | `customer_not_found` | Unknown customer. |
 | `422` | `provider_not_supported` | The customer's provider is neither Stripe nor Razorpay (Adyen, Cashfree, Flutterwave, GoCardless and Moneyhash are not supported). |
 | `422` | `no_linked_payment_provider` | The customer has no payment provider. |
-| `422` | `razorpay_mandate_registration_unavailable` | Razorpay only: mandate registration is not enabled on the connection, or the customer has no payable subscription invoice. |
+| `422` | `razorpay_no_payable_invoice` | Razorpay only: the customer has no payable subscription invoice to attach the mandate to. |
+| `422` | `razorpay_mandate_registration_unavailable` | Razorpay only: recurring payments are not enabled on the connection or the Razorpay account, so Razorpay's order came back without a mandate. No `checkout` is returned. |
 | `422` | `razorpay_requires_inr` | Razorpay only: the invoice is not in INR. |
 | `422` | `razorpay_mandate_amount_exceeds_limit` | Razorpay only: the amount is above the connection's mandate maximum. |
 
@@ -110,8 +111,10 @@ The SDK methods return the inner `manage_payment_method` object.
 
 | SDK | Method |
 | --- | --- |
-| Node | `nozle.managePaymentMethod(customerId, returnUrl?)` |
-| Python | `nozle.manage_payment_method(customer_id, return_url=None)` |
-| Go | `client.ManagePaymentMethod(ctx, customerID, returnURL)` |
+| Node | `client.managePaymentMethod(customerId, returnUrl?, { idempotencyKey? })` |
+| Python | `manage_payment_method(customer_id, return_url=None, *, idempotency_key=None)` |
+| Go | `ManagePaymentMethod(ctx, customerID, returnURL, key)` |
+
+The idempotency option (`idempotencyKey`, `idempotency_key`, or `key` in Go) is optional. Send the same value when retrying the same request.
 
 See the Billing pages: [Node](/sdks/node/billing#manage-a-payment-method), [Python](/sdks/python/billing#manage-a-payment-method) and [Go](/sdks/go/billing#manage-a-payment-method).

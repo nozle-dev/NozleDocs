@@ -41,7 +41,7 @@ Checkout errors: `400 invalid_return_url` when the `return_url` origin is not al
 ## Manage a payment method
 
 ```go
-page, err := client.ManagePaymentMethod(ctx, "workspace_123", "https://app.example.com/settings/billing")
+page, err := client.ManagePaymentMethod(ctx, "workspace_123", "https://app.example.com/settings/billing", "") // last argument: optional idempotency key
 if err != nil {
 	return err
 }
@@ -52,7 +52,7 @@ if page.URL != "" {
 }
 ```
 
-Requires an `sk_` key. A `pk_` key is refused with `403`. Nozle stores no card data: the customer changes their payment method at the provider.
+Requires an `sk_` key. A `pk_` key is refused with `403` (no error code, only a message). Nozle stores no card data: the customer changes their payment method at the provider.
 
 See [Manage Payment Method](/api/manage-payment-method) for the HTTP contract, Razorpay behaviour and error codes.
 
