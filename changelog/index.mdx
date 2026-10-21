@@ -5,6 +5,29 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Engine webhook verification (Engine 2.0.3)
+
+_October 21, 2026_
+
+- Core webhooks to Nozle's Engine are verified with the sending organization's own `hmac_key`. Every organization's `hmac` endpoint is accepted; an unsigned, forged or cross-organization request, or one whose organization is unknown, gets `401` in every environment, and the Engine answers `503` if the key cannot be read so that Core retries. **Engine webhook endpoints must use the `hmac` signature algorithm**: `jwt` endpoints are rejected. See [Webhooks to the Engine](/api/receive-webhooks#webhooks-to-the-engine).
+- A signed webhook that names another organization's subscription no longer creates that subscription's credit grants.
+- The `NOZLE_WEBHOOK_SECRET` setting is removed and ignored.
+
+### Razorpay, Stripe and plan configuration fixes (API 3.8.11)
+
+_October 21, 2026_
+
+- Razorpay customers created in the dashboard, or assigned to a Razorpay connection without a link, can pay credit top-ups, invoice payment URLs and overdue-invoice payment links without a plan checkout first: the missing link is created on the next attempt (3.8.3). See [Razorpay](/integrations/razorpay#assign-the-connection-to-customers).
+- Razorpay customer sync links a buyer who already exists in your Razorpay account, sends a new request after the customer's details are corrected, reconciles requests with an unknown outcome, and sends the phone as E.164 digits (3.8.4).
+- **Retry payment** on an invoice whose UPI AutoPay debit failed debits the mandate again right away instead of doing nothing for 24 hours, and each failed attempt sends exactly one failure notification (3.8.5). See [Recurring payments with UPI AutoPay](/integrations/razorpay#recurring-payments-with-upi-autopay).
+- Razorpay reconciliation stops checking abandoned checkouts after their expiry plus one hour and checks older operations hourly. Razorpay rate limits (HTTP `429`) on orders, links, debits, refunds and customer sync are retried instead of failing the refund or the collection (3.8.6). See [Reconciliation and rate limits](/integrations/razorpay#reconciliation-and-rate-limits).
+- Razorpay invoice and payment-request checkouts paid before their expiry settle the invoice even when the payment is processed later, and checkout status reports `needs_review` for a capture held behind another payment in progress (3.8.7). See [Status](/integrations/razorpay#status).
+- At a downgrade, the terminating invoice, the new plan's pay-in-advance fee and the `subscription.terminated` and `subscription.started` webhooks are produced only after the change is saved, so they always describe the committed state (3.8.8).
+- Fees of a deleted Feature count again in the minimum commitment true-up (no more over-billing), appear in the invoice's recurring breakdown and are returned by `GET /fees?feature_code=` (3.8.9). See [Fees of deleted Features](/guides/billing/invoices#fees-of-deleted-features).
+- Connecting Stripe during a short Stripe outage or rate limit retries the webhook registration, and when it still fails a `payment_provider.error` webhook is sent. Renaming a Stripe connection code registers the endpoint if it was missing, reports a missing webhook permission as `payment_provider.error`, and Stripe events sent to the previous code's URL are still accepted until the endpoint URL is updated (3.8.10). See [Webhook setup](/integrations/stripe#webhook-setup).
+- GraphQL `createOrUpdatePlanConfig` answers `not_found` for a plan of another organization or an unknown plan, and a plan never shows a plan configuration written by another organization. Such configurations written before are removed (3.8.11).
+- Includes API 3.8.3, 3.8.4, 3.8.5, 3.8.6, 3.8.7, 3.8.8, 3.8.9 and 3.8.10.
+
 ### Dashboard 1.7.0
 
 _October 21, 2026_

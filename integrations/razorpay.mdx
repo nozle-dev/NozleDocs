@@ -38,7 +38,9 @@ To rotate the webhook secret, edit the connection and enter the new value. Nozle
 
 A customer pays through Razorpay only when that customer uses a Razorpay connection. Select it in the customer's **Payment provider** setting in the dashboard, which lists connections as name and code. A customer who is not assigned to Razorpay goes through the Stripe path, and checkout returns `payment_provider_required` if the customer has no assigned Stripe connection either. If the customer's connection code matches no Razorpay connection, checkout returns `404 payment_provider_not_found`.
 
-Nozle links the customer to the connection at checkout. It creates the customer in Razorpay for mandate registration, which needs the customer's name, email and phone number.
+Nozle links the customer to the connection when you create the customer in the dashboard or assign the connection. A customer without that link, for example one assigned before this change, is linked on its next payment attempt, so credit top-ups, invoice payment URLs and the payment links of overdue-invoice reminders work without a plan checkout first. Nozle creates the customer in Razorpay when it needs one, for mandate registration, which needs the customer's name, email and phone number.
+
+Customer sync reuses a buyer who already exists in your Razorpay account instead of failing with "Customer already exists", and links that Razorpay customer. A request Razorpay rejected is not sent again while the customer's details are unchanged; after you correct the phone number or email, the next sync sends a new request. A request whose outcome is unknown is reconciled automatically. The phone number is sent as E.164 digits.
 
 Once a customer has started a Razorpay checkout, it stays linked to that connection. Switching the customer to another Razorpay connection then fails with `422 razorpay_customer_connection_cannot_change`. Nozle also stores the new code on the customer even though the call fails. This is a known bug, so do not switch: create a new customer for the other connection instead.
 
@@ -297,7 +299,9 @@ A browser success callback alone never activates a plan.
 
 Show success only when both are `succeeded`, then reload the subscription. The response also carries `checkout_id`, `provider`, `amount_cents`, `currency` and `invoice_id`, plus a nested `checkout` result while the checkout is `awaiting_payment`, so a client can resume after a reload. The nested `checkout` can also appear while the top-level `status` is `expired`: for an unpaid order that has passed its `expires_at`, it is `{"type": "processing", "status": "ready", ...}`, not a `razorpay` result. `ready` is an internal operation status. Do not reopen the modal for it.
 
-`needs_review` means a captured payment could not settle its invoice. Causes are a changed amount or currency, a checkout that expired before capture, an invoice that is no longer payable, a changed provider connection, or another payment in progress. Nozle grants no plan, credits or successful payment for it. Check the payment in the Razorpay dashboard and refund or reconcile it deliberately. Nozle cannot cancel a Razorpay order, so an expired order can still be paid late.
+`needs_review` means a captured payment could not settle its invoice. Causes are a changed amount or currency, a payment made after the checkout expired, an invoice that is no longer payable, a changed provider connection, or another payment in progress. A capture that is held behind another payment in progress also moves the checkout to `needs_review`, so checkout status no longer keeps reporting `awaiting_payment` or `expired` for it. Nozle grants no plan, credits or successful payment for it. Check the payment in the Razorpay dashboard and refund or reconcile it deliberately. Nozle cannot cancel a Razorpay order, so an expired order can still be paid late.
+
+Expiry is judged by when the customer paid, not by when Nozle processed the payment. An invoice order or payment-request link paid before its expiry settles the invoice even when the webhook or the verify call arrives later, and even when reconciliation has already closed the checkout. Only a payment that Razorpay created after the expiry goes to `needs_review`.
 
 If the customer closes or fails the modal, a one-time order stays open until it expires, and reopening the modal on the same order works. Checkout status returns the order as the nested `checkout` while the status is `awaiting_payment`, so store the `checkout` you received, or fetch it again from status, and open the modal with it.
 
@@ -341,7 +345,7 @@ To register a mandate:
 3. Open the modal with `customer_id` and `recurring: '1'`. Nozle creates the order as a UPI authorization with the connection's maximum amount.
 4. Razorpay sends `token.confirmed`. Only then does the mandate become usable, and only for the subscriptions covered by that registration.
 
-For a renewal, Nozle uses a confirmed, unexpired UPI mandate that covers every subscription on the invoice and whose maximum is at least the amount due. If the debit is rejected, the invoice returns to needing an interactive payment and Nozle sends the invoice payment-failure notification.
+For a renewal, Nozle uses a confirmed, unexpired UPI mandate that covers every subscription on the invoice and whose maximum is at least the amount due. If the debit is rejected, the invoice returns to needing an interactive payment and Nozle sends the invoice payment-failure notification, once per failed attempt. **Retry payment** on that invoice (dashboard, API or dunning) debits the confirmed mandate again right away with a new order, instead of doing nothing for 24 hours. A retry that cannot debit sends no further notification.
 
 Mandate registration errors:
 
@@ -350,6 +354,10 @@ Mandate registration errors:
 | `razorpay_mandate_registration_unavailable` | Recurring is off on the connection, the invoice is not a subscription invoice, or a hosted link was requested |
 | `razorpay_mandate_amount_exceeds_limit` | The amount due is above the mandate maximum |
 | `razorpay_mandate_requires_name_email_phone` | The customer lacks a name, email or phone number |
+
+## Reconciliation and rate limits
+
+Nozle checks the status of open Razorpay orders, payment links, debits and refunds with your connection's key. It checks operations from the last hour every few minutes and older ones once an hour. A checkout that nobody paid stops being checked once its expiry plus one hour has passed, or once its invoice or upgrade can no longer be paid through it. When Razorpay rate-limits your key (HTTP `429`), Nozle sends the order, link, debit, refund or customer sync again after the `Retry-After` delay (60 seconds when Razorpay sends none), instead of failing the refund or the collection or falling back to interactive payment.
 
 ## Refunds and disputes
 
@@ -366,7 +374,7 @@ Checkout errors that are specific to Razorpay. See [Create checkout](/api/create
 | `422` | `payment_already_processing` | A payment for the invoice is already in progress |
 | `409` | `subscription_checkout_in_progress` | A new-subscription checkout for this customer on a different plan is still being paid. See [Retry a new-subscription checkout](#retry-a-new-subscription-checkout) |
 | `422` | `validation_errors` | `error_details.base` is `invalid_invoice_status_or_payment_status`: the invoice is paid, voided, a draft, closed, failed or has nothing due |
-| `422` | `missing_payment_provider_customer` | The customer is not linked to the Razorpay connection that the checkout needs |
+| `422` | `missing_payment_provider_customer` | The customer is not linked to the Razorpay connection that the checkout needs. Nozle links the customer on the next payment attempt, so a repeat of the call after a moment succeeds unless the customer lacks the details Razorpay needs |
 | `422` | `razorpay_customer_connection_cannot_change` | The customer already started a Razorpay checkout and was switched to another Razorpay connection. Create a new customer instead |
 | `404` | `payment_provider_not_found` | The customer's connection code matches no Razorpay connection |
 | `422` | `checkout_amount_changed`, `checkout_payment_provider_changed` | The open checkout no longer matches the invoice or the customer's connection |
