@@ -3194,6 +3194,79 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /customers/{customer_id}/payment-method/manage:
+    post:
+      servers:
+        - url: https://api.nozle.app/engine/api/v1
+          description: Engine payment method management
+      tags:
+        - Customers
+      summary: Manage a customer payment method
+      description: Returns the payment provider page where a customer adds or changes their payment method. Stripe returns a Billing Portal `url`. Razorpay returns `url` null and a mandate `checkout` payload to open with Razorpay Checkout. Nozle stores no card data. Secret key only, publishable keys are refused with 403.
+      operationId: manageCustomerPaymentMethod
+      parameters:
+        - name: customer_id
+          in: path
+          description: The customer external unique identifier (provided by your own application).
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                return_url:
+                  type: string
+                  format: uri
+                  description: HTTPS URL on an allowlisted origin that Stripe returns to. Defaults to the organization return URL.
+      responses:
+        '200':
+          description: Provider page or Razorpay mandate checkout
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - manage_payment_method
+                properties:
+                  manage_payment_method:
+                    type: object
+                    required:
+                      - url
+                      - provider
+                    properties:
+                      url:
+                        type: [string, 'null']
+                        description: Stripe Billing Portal URL. Null for Razorpay.
+                      provider:
+                        type: string
+                        enum:
+                          - stripe
+                          - razorpay
+                      expires_at:
+                        type: [string, 'null']
+                        format: date-time
+                      checkout:
+                        type: object
+                        description: Razorpay only. Mandate checkout payload for Razorpay Checkout.
+                        additionalProperties: true
+        '400':
+          description: invalid_return_url, or the body is not valid JSON.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A publishable key was used, or the caller lacks payment:write.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: One of provider_not_supported, no_linked_payment_provider, razorpay_mandate_registration_unavailable, razorpay_requires_inr, razorpay_mandate_amount_exceeds_limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
   /events:
     post:
       servers:

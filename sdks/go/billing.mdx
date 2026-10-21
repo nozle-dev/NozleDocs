@@ -38,6 +38,24 @@ A paid upgrade returns `plan_upgrade_intent_id` instead of `invoice_id` on `stri
 
 Checkout errors: `400 invalid_return_url` when the `return_url` origin is not allowed (checked before anything else); `404 plan_not_found` or `customer_not_found`; `409 subscription_selection_required` when the customer has several active subscriptions and no `SubscriptionID` was given; `422 checkout_not_required` when the plan needs no up-front payment (free, trial, or pay-in-arrears) and the customer has no subscription, so use `Subscribe` instead; `422 payment_provider_required` when no payment provider is connected; `422 plan_already_active` when the customer is already on that plan; `409 subscription_checkout_in_progress` when a payment for the customer's new-subscription checkout on a different plan is still processing, or it was paid (an abandoned checkout is replaced instead, and the same plan reopens it).
 
+## Manage a payment method
+
+```go
+page, err := client.ManagePaymentMethod(ctx, "workspace_123", "https://app.example.com/settings/billing")
+if err != nil {
+	return err
+}
+if page.URL != "" {
+	http.Redirect(w, r, page.URL, http.StatusSeeOther) // Stripe Billing Portal
+} else {
+	openRazorpayMandate(page.Checkout) // Razorpay mandate checkout
+}
+```
+
+Requires an `sk_` key. A `pk_` key is refused with `403`. Nozle stores no card data: the customer changes their payment method at the provider.
+
+See [Manage Payment Method](/api/manage-payment-method) for the HTTP contract, Razorpay behaviour and error codes.
+
 ## Direct subscription and cancellation
 
 `Subscribe` and `CancelSubscription` expose the returned nested `Subscription` and fill the convenience `SubscriptionID` and `Status` fields.
