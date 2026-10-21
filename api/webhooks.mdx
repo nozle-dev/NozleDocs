@@ -34,7 +34,7 @@ Nozle registers the Stripe webhook automatically in a background job right after
 https://api.nozle.app/core/webhooks/stripe/{organization_id}?code={stripe_provider_code}
 ```
 
-Your Stripe account must allow webhook endpoint creation, and your public Nozle API URL must be reachable by Stripe. Registration is not retried. When Stripe refuses it (a key without permission, the limit of 16 test-mode endpoints, or a URL that is not public), Nozle sends a `payment_provider.error` webhook with Stripe's message. Check your Stripe dashboard for the endpoint to confirm registration. See the [Stripe integration](/integrations/stripe#webhook-setup) for the events, recovery and limits.
+Your Stripe account must allow webhook endpoint creation, and your public Nozle API URL must be reachable by Stripe. Registration is retried (up to 6 attempts) when Stripe rate-limits or is briefly unavailable. When Stripe refuses it (a key without permission, the limit of 16 test-mode endpoints, or a URL that is not public), Nozle sends a `payment_provider.error` webhook with Stripe's message. Check your Stripe dashboard for the endpoint to confirm registration. See the [Stripe integration](/integrations/stripe#webhook-setup) for the events, recovery and limits.
 
 ## Razorpay
 

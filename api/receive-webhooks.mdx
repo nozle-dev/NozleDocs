@@ -152,6 +152,10 @@ const isGenuine = claims.data === rawBody.toString('utf8')
 
 Cache the key; it changes only when Nozle rotates it. The older `GET /webhooks/public_key` returns the same key as plain text and is deprecated.
 
+## Webhooks to the Engine
+
+An endpoint that points at Nozle's Engine (`/webhooks/nozle`) is verified with the sending organization's own signing key, the same `hmac_key` as above. It must use the `hmac` signature algorithm: `jwt` endpoints are rejected. An unsigned, forged or cross-organization request, or one whose organization is unknown, gets `401` in every environment and nothing is processed. If Nozle cannot read the key, the Engine answers `503` and Core retries. A signed webhook that names another organization's subscription does not create that subscription's credit grants.
+
 ## Delivery, retries and ordering
 
 - Respond with a `2xx` within 30 seconds. Any other status, a timeout or a connection error is a failed attempt.
