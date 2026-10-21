@@ -14,6 +14,16 @@ Authorization: Bearer sk_nozle_...
 
 Call this endpoint from a trusted backend with a restricted secret key. Derive `cust_123` from the authenticated application user; publishable keys are rejected.
 
+| Query parameter | Required | Description |
+|---|---|---|
+| `customer_id` | yes | External customer ID |
+| `feature` | yes | Feature code |
+| `subscription_id` | no | External ID of one current subscription of the customer. Evaluates that subscription |
+| `entity_id` | no | External ID of an Entity. Evaluates the Entity's own subscription, else the customer's own subscription |
+| `metadata` | no | URL-encoded JSON object of event properties for the economics estimate |
+
+See [Which subscription is checked](#which-subscription-is-checked).
+
 ## Response
 
 ```json
@@ -54,8 +64,8 @@ Call this endpoint from a trusted backend with a restricted secret key. Derive `
 | `reason` | `string?` | Why access was denied. Omitted when `allowed` is `true`. See [Denial reasons](#denial-reasons) |
 | `feature_type` | `string?` | Type of the feature. Not returned when the feature or the subscription is missing |
 | `configuration` | `object?` | Configuration values granted by the plan for a non-metered feature |
-| `used` | `number` | Current usage count this billing period. `0` when the denial is decided before usage is read |
-| `limit` | `number \| null` | Usage cap for this feature. `null` when there is no cap |
+| `used` | `number` | Usage in the current billing period, or the running total for a recurring Feature. Also the real usage of a metered Feature that has no entitlement and is only priced by a charge. `0` when the denial is decided before usage is read |
+| `limit` | `number \| null` | Usage cap for this feature. `null` when there is no cap, and for a Feature priced only by a charge |
 | `remaining` | `number \| null` | `limit - used`, never below `0`. `null` when `limit` is `null` |
 | `overage` | `boolean?` | `true` when usage has reached a soft limit; the request is still allowed. Omitted otherwise |
 | `economics.status` | `string` | `estimated`, `not_configured`, `unavailable`, or `stale` |
@@ -80,6 +90,27 @@ The optional `economics` object is also point-in-time, but it is not a financial
 
 Estimated revenue is the standard charge's unit price × the units of this call. A count Feature adds 1 unit. A sum Feature adds the value of its value property (`field_name`) in the call's `metadata`, for example `{"tokens": 500}`; without that value the estimate is `unavailable` with `revenue_quantity_missing` in `excludes`. Max, latest, unique count, weighted sum and custom aggregations do not add a fixed amount per call, so their estimate is `unavailable` with `non_additive_revenue_aggregation`. When the estimate is `unavailable`, a margin policy decides with its `on_unavailable` value (`allow`, `warn` or `deny`), and `policy.reason` is `economics_unavailable`.
 
+## Which subscription is checked
+
+Plan, entitlements, limits and usage all come from one subscription, and only subscriptions that are current at this moment count: started, not ended, and before their end date.
+
+- With `subscription_id`, `/can` evaluates that subscription of the customer. With `entity_id`, it evaluates the Entity's own subscription, else the customer's own subscription (not owned by an Entity). When both are sent, the subscription must belong to that Entity. An unknown or ended selection answers `no_subscription`.
+- Without either, `/can` evaluates the customer's only current subscription. A customer with several current subscriptions is evaluated on its own subscription (not owned by an Entity) when there is exactly one. Otherwise the answer is `allowed: false` with the reason `subscription_required`: send `subscription_id` or `entity_id`. The newest subscription is never picked for you.
+
+A customer with one current subscription sees no change. Usage is counted per subscription, so the usage of one Entity's seat never counts against another subscription's limit, and the counter continues across plan changes of the same subscription.
+
+[`POST /billing/upgrade`](/api/upgrade) selects the subscription the same way. For a customer with several current subscriptions it answers `409 subscription_required` unless exactly one of them is the customer's own.
+
+## Usage and billing periods
+
+`used` follows the billing period in which Nozle invoices the usage, for every plan interval (weekly, monthly, quarterly, semiannual, yearly), for calendar and anniversary billing, and in the customer's time zone (the customer's, else its billing entity's):
+
+- Periods start at midnight in that time zone. A weekly calendar period starts on Monday.
+- An anniversary subscription that starts on the 29th to the 31st starts on the last day of shorter months.
+- A yearly or semiannual plan that bills its charges monthly resets monthly.
+
+A recurring Feature, such as seats or storage, keeps one running total across billing periods: a hard limit keeps blocking after a period ends instead of reopening on the first day. For these limits, a weighted sum or custom Feature counts the running sum of event values, not its time-weighted or custom billing value.
+
 ## Denial reasons
 
 A denial is an HTTP `200` response with `allowed: false` and one of these `reason` values:
@@ -87,7 +118,8 @@ A denial is an HTTP `200` response with `allowed: false` and one of these `reaso
 | `reason` | Meaning |
 |----------|---------|
 | `feature_not_found` | No feature with this code exists in the organization |
-| `no_subscription` | The customer has no active subscription: none started, ended or cancelled, or the customer does not exist |
+| `no_subscription` | The customer has no active subscription: none started, ended or cancelled, or the customer does not exist. Also an unknown or ended `subscription_id` or `entity_id` |
+| `subscription_required` | The customer has several current subscriptions and not exactly one of them is the customer's own (not Entity-owned). Send `subscription_id` or `entity_id` |
 | `no_entitlement` | The customer's plan does not include the feature |
 | `usage_limit_exceeded` | A hard limit is reached. A soft limit never denies; it sets `overage` to `true` |
 | `economic_policy_denied` | A margin policy in `deny` mode rejected the estimated cost or margin. The `policy` object has the detail |

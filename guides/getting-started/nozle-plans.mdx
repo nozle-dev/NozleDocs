@@ -68,6 +68,12 @@ Premium features come with the plan. They switch on when you pay for Growth or S
 | Manual payments | | | Yes |
 | Multi-entity | | | Yes |
 
+Without the feature, the API says so instead of dropping your input:
+
+- **Progressive billing:** creating or updating a plan or subscription with a non-empty `usage_thresholds` list (or `plan_overrides.usage_thresholds`) answers `422` with `feature_not_available`, and nothing is saved. An empty list is accepted. Before, the thresholds were dropped and the call answered `200`.
+- **Lifetime usage:** reading or updating a subscription's lifetime usage answers `403` with `feature_not_available` (progressive billing also grants it). Before, it returned amounts that were never computed.
+- **Auto-dunning:** Growth and Scale organizations can create dunning campaigns, and the hourly run creates payment requests for overdue invoices on the campaign's schedule. A payment request retries the payment with the customer's payment provider, or emails the customer the payment link when there is none. On Starter, creating or updating a dunning campaign is refused with `forbidden`. A customer or billing entity accepts only a campaign of your own organization; another organization's campaign id answers `not_found`.
+
 Remove branding hides "Powered by Nozle" in the SDK components and the customer portal only. Invoice, credit note and payment receipt PDFs always show it. See [Powered by Nozle](/sdks/react/components#powered-by-nozle).
 
 Revenue analytics, analytics dashboards and forecasted usage are not available on any plan.
