@@ -92,7 +92,9 @@ Components that show customer data take `isLoading` (or `loading`), `error` and 
 
 `PricingTable`, `PlanComparison`, `CurrentPlan`, `Checkout`, `UpgradeModal` and `BillingPortal` show "Powered by" and the Nozle logo below their content, linking to nozle.dev. Nozle decides this on the server: the publishable-key plan catalog returns `meta.nozle_branding`, and the billing portal reads it from its session. When one of these components renders another, for example a modal inside the portal, only the outer one shows the badge. Without a `BillingProvider`, only `BillingPortal` can show it.
 
-The badge shows by default. If your Nozle plan removes the branding, turn off **Show "Powered by Nozle"** under Developers > Customize SDK > Global settings > Branding. The setting is saved for your organization and applies to every component. On other plans the switch stays off-limits and the badge keeps showing.
+The badge shows by default. If your Nozle plan removes the branding, turn off **Show "Powered by Nozle"** under Developers > Customize SDK > Global settings > Branding. The setting is saved for your organization (`hideBranding: true`) and applies to every component and the customer portal. On other plans the switch stays off-limits and the badge keeps showing. Organizations whose plan already removed the branding before the badge became the default, and that never saved a choice, keep it hidden; turn the switch back on to show it.
+
+Invoice, credit note and payment receipt PDFs always show "Powered by Nozle", whatever your plan and this setting.
 
 If you build your own billing UI from the hooks, `useNozleBranding()` returns the same answer and [`<PoweredByNozle />`](/sdks/react/components/powered-by-nozle) renders the badge.
 

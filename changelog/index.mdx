@@ -5,6 +5,39 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Dashboard 1.4.8
+
+_October 21, 2026_
+
+- Onboarding, Connect step: **Reveal and copy** shows and copies the full secret key, and the sample `curl` carries it. Before, it copied the masked key and the request failed with `401`. A key created in the step is the one shown.
+- The sample event no longer sends a `timestamp`, so Nozle stamps the time it receives it and the event counts for a new subscription. Its transaction id is `onboarding-` plus 8 random hex characters, new on each visit to the step, so running the sample again is not dropped as a duplicate. The step's documentation links open working pages.
+- Developers > API keys: a publishable key reads **Plan catalog · read only**. Without API key permissions, every secret key reads **Full access (permissions not enforced on this plan)**. With them, a key reads **Full access** only when it has read and write on every resource, and otherwise **Restricted** with its grants, for example **Restricted · plan: read**. Creating a secret key, or **Edit** (formerly **Rename**), shows a read and write picker per resource. See [Key permissions](/api/authentication#key-permissions).
+- Settings > Access: members show their roles, and editing roles keeps the ones they have. Before, every member showed "No role assigned" next to the Admin badge, and adding a role removed Admin. Administrator now stands on its own: ticking it selects Administrator only, and the other roles show as included. A member stored as Administrator plus other roles opens as Administrator, and saving stores Administrator only.
+- Includes dashboard 1.4.6 and 1.4.7.
+
+### Analytics, API key permissions and catalog CORS (Engine 1.4.0)
+
+_October 21, 2026_
+
+- With API key permissions, every Engine secret-key route now checks the key: `POST /customers` needs `customer:write`, `POST /check-and-deduct` `credit_system:write`, `GET /auth/centrifugo-token` `customer_usage:read`, `POST /cost-events` `event:write`, cost models and Cost Intelligence `analytic:read` or `analytic:write`, and `/analytics/*`, `/margin/*` and `POST /margin/simulate` `analytic:read`. A key without it gets `403 permission_denied`. Organizations without API key permissions see no change. See [Engine routes](/api/authentication#engine-routes).
+- `POST /analytics/snapshot` and `POST /onboarding/chat` are internal to Nozle and accept only its internal service token. Secret keys get `403`.
+- The publishable-key plan catalog, `GET /plans` and `GET /plans/{code}`, answers CORS from any origin with `Access-Control-Allow-Origin: *` and no credentials, so `PricingTable` and `usePlans` load plans on your own site. Every other route keeps the origin allow-list. See the [public plan catalog](/api/list-plans).
+- `GET /analytics/overview` returns `currency` and `mrr_by_currency` (`currency`, `mrr_cents`, `arr_cents` per plan currency). `GET /analytics/invoices-summary` returns `currency` and `by_currency` (`currency`, `outstanding_cents`, `overdue_cents` per invoice currency). `mrr_cents`, `arr_cents`, `outstanding_cents` and `overdue_cents` are in `currency`: the organization's default currency, or the only currency it bills in. Before, amounts in different currencies were added together. Invoice counts still cover every currency.
+- MRR is the monthly equivalent of each active subscription's plan amount: weekly × 52 / 12, monthly × 1, quarterly / 3, semiannual / 6, yearly / 12. ARR is the yearly equivalent. A 1,200.00 yearly plan now counts 100.00 MRR and 1,200.00 ARR (before: 1,200.00 MRR and 14,400.00 ARR). Subscriptions still in their trial and subscriptions of deleted customers are left out. This MRR is subscription-based, so it can differ from the invoice-based `GET /analytics/mrr`.
+- When the billing data or the analytics store cannot be read, the analytics overview, the invoices summary and the `/analytics/*` and `/margin/*` reads answer `503 analytics_unavailable`, instead of zero revenue or `500 internal_error`. A missing analytics schema still answers `503 analytics_schema_missing`. The MRR history gets no zero day from such a failure. See [Margin dashboard](/guides/margin/dashboard).
+
+### Plan catalog, analytics and branding (API 3.1.17)
+
+_October 21, 2026_
+
+- GraphQL `nozleAnalyticsOverview` adds `currency` and `mrrByCurrency` (`currency`, `mrrCents`, `arrCents`), and `nozleAnalyticsInvoicesSummary` adds `currency` and `byCurrency` (`currency`, `outstandingCents`, `overdueCents`), from Engine 1.4.0. When analytics cannot be computed, these queries answer a GraphQL error with the code `analytics_unavailable` and `status: 503` instead of an internal error.
+- Hiding a plan family or a feature from the pricing table only removes it from the pricing table list. `GET /plans/{code}` with a publishable key returns a plan of a hidden or deleted family instead of `404`, and every plan, listed or read by code, carries all its entitlements and charges, including those of hidden features. Plans pending deletion still answer `404` to publishable keys. See [Which plans are returned](/api/list-plans#which-plans-are-returned).
+- A subscription on an override plan, such as one created from a quote, changes plan with the transition policies of the catalog plan it was made from: options, preview, checkout and transitions no longer answer `plan_transition_policy_required`. The new plan is the target catalog plan, so the negotiated price does not carry over. A self-serve change to its own catalog plan answers `plan_already_active`. See [Plan transition policies](/api/plan-transition-policies).
+- "Powered by Nozle": organizations whose Nozle plan removes the branding and that never saved a choice keep it hidden in the SDK components and the customer portal, as before 3.1.0; this corrects the React SDK 0.13.0 note of October 19. Saving `hideBranding: false` shows it again. Invoice, credit note and payment receipt PDFs now always show it. GraphQL `CurrentOrganization.canHideBranding` says whether your plan lets you hide it. See [Powered by Nozle](/sdks/react/components#powered-by-nozle).
+- Approving a one-off quote version (GraphQL `approveQuoteVersion`) no longer needs `totalAmountCents` in each add-on item. Nozle computes it as `round(unitAmountCents × units)`, also in `overrides` that change the units or the unit amount, and replaces any total the client sends.
+- **Breaking:** the GraphQL mutations `createRole`, `updateRole` and `destroyRole` and their input types are removed. Custom roles are no longer part of the product. The built-in roles are `admin`, `finance` and `manager`, and the `roles` query lists them.
+- Revenue analytics, analytics dashboards and forecasted usage are not available. `GET /analytics/usage` answers `503 analytics_unavailable`.
+
 ### Node.js SDK 0.13.1
 
 _October 21, 2026_

@@ -13,7 +13,7 @@ Responses carry `Deprecation: true` and `Link: </api/v1/usage/track>; rel="succe
 
 Atomically check whether a customer's wallet has enough credits and deduct them in a single database transaction. The customer's newest active wallet is locked while it is read, so concurrent requests cannot overspend it. A successful deduction moves the wallet's money balance with the credits and records a wallet transaction.
 
-**Auth:** `sk_` only. Publishable keys are rejected with `403`. API key permissions are not checked on this endpoint.
+**Auth:** `sk_` only. Publishable keys are rejected with `403`. With [API key permissions](/api/authentication#key-permissions), the key needs `credit_system:write`; without it the call returns `403` with `code: permission_denied`.
 
 <ParamField body="customer_id" type="string" required>
   External customer ID

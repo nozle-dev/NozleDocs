@@ -25,6 +25,8 @@ A publishable key ships in browsers, so everything it receives is readable by an
 
 See [Authentication](/api/authentication) for the full credential model.
 
+The Engine catalog answers CORS from any origin, so a browser on your own site can call it with the publishable key. `GET /plans`, `GET /plans/{code}` and their preflight return `Access-Control-Allow-Origin: *` and `Access-Control-Allow-Methods: GET, OPTIONS`, never `Access-Control-Allow-Credentials`, so do not send cookies. Every other Engine route keeps its origin allow-list.
+
 Engine forwards the request, with its query string, to Core and returns Core's status code and body unchanged, including Core's errors. If Engine cannot reach Core within 10 seconds, it returns `502` with `{"code": "billing_unavailable", "error": "failed to reach billing service"}`.
 
 ## Which plans are returned
@@ -33,7 +35,8 @@ All top-level plans of the organization, newest first. There is no listed, publi
 
 - A `pk_` key does not receive plans that are pending deletion. `GET /plans/{code}` returns `404` with `"code": "plan_not_found"` for one.
 - An `sk_` key receives them, with `pending_deletion: true`.
-- A `pk_` key, or an `sk_` key with `include_hidden=false`, does not receive plans whose plan family is hidden from the pricing table. `GET /plans/{code}` returns `404` with `"code": "plan_not_found"` for one in the same cases.
+- A `pk_` key, or an `sk_` key with `include_hidden=false`, does not receive plans whose plan family is hidden from the pricing table in the list. Hiding a family is a listing setting only: `GET /plans/{code}` still returns a plan of a hidden family, or of a deleted family, to a `pk_` key, so the SDK can describe a subscriber's own plan.
+- Every plan, listed or read by code, carries all its entitlements and charges, including those of features hidden from the pricing table. Only the pricing table rows (`families[].features`) leave hidden features out.
 
 A plan created through `POST /plans`, the dashboard onboarding or the Agent Kit starts in a new plan family that is shown on the pricing table, so it is listed at once. Send `show_on_pricing: false` in `plan` (GraphQL `showOnPricing: false`) to create it hidden. A plan that joins an existing family with `plan_family_code` keeps that family's visibility.
 

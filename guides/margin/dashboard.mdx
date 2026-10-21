@@ -3,7 +3,9 @@ title: Dashboard
 description: Query margin data by customer, metric, plan, and model
 ---
 
-The summary, customer, metric, plan, model and trend queries are available via the [Node SDK](/sdks/node/margin-queries), [Python SDK](/sdks/python/margin-queries), [Go SDK](/sdks/go/margin-queries), and the REST API. The REST endpoints live under `https://api.nozle.app/engine/api/v1/margin/*`. They are `GET` requests, except `POST /margin/simulate`. The examples below use Node unless they show `curl`. Secret key required.
+The summary, customer, metric, plan, model and trend queries are available via the [Node SDK](/sdks/node/margin-queries), [Python SDK](/sdks/python/margin-queries), [Go SDK](/sdks/go/margin-queries), and the REST API. The REST endpoints live under `https://api.nozle.app/engine/api/v1/margin/*`. They are `GET` requests, except `POST /margin/simulate`. The examples below use Node unless they show `curl`. Secret key required; with [API key permissions](/api/authentication#key-permissions), the key needs `analytic:read`.
+
+When the analytics store cannot be reached or a query fails, these reads answer `503` with `code: analytics_unavailable` (before Engine 1.4.0, `500 internal_error`). Retry later. A missing analytics schema answers `503` with `code: analytics_schema_missing`.
 
 **Summary** — overall margin overview:
 
