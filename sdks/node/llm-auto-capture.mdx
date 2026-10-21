@@ -92,7 +92,22 @@ await nozle.recordUsage({
 
 ## Client wrappers
 
-`wrapOpenAI` and `wrapAnthropic` patch one client's `create` method instead. They are kept for existing integrations; `captureFetch` covers more APIs and providers.
+`wrapOpenAI` and `wrapAnthropic` record the usage of one client's `create` method instead. They are kept for existing integrations; `captureFetch` covers more APIs and providers.
+
+<Warning>
+From `0.13.1`, `wrapOpenAI` and `wrapAnthropic` return a new view of the client and never change the client you pass in. Always call the returned client: calls on the original client record nothing. Code that ignored the return value and kept calling the original client recorded usage in `0.13.0` and earlier, and records nothing from `0.13.1`.
+</Warning>
+
+Each view records usage once per call, for its own `customerId`, so a server can keep one provider client and wrap it per request. Views over the same client are independent, including concurrent calls, and wrapping an already wrapped client wraps its original, so wrappers never stack. Before `0.13.1`, each wrap replaced `create` on the shared client, so one call recorded an event for every customer the client had been wrapped for.
+
+```ts
+const openai = new OpenAI()
+
+app.post('/chat', async (req) => {
+  const client = wrapOpenAI(openai, nozle, { customerId: req.team.id })
+  return client.chat.completions.create({ model: 'example-chat-model', messages: req.body.messages })
+})
+```
 
 The wrapped client keeps the full SDK surface. `create` returns the SDK's own `APIPromise` or `Stream`, so `withResponse()`, `asResponse()`, `chat.completions.parse()`, `messages.stream()` / `finalMessage()`, `stream.controller` and `toReadableStream()` work as without the wrapper. Usage is recorded once, when your code reads the response. `asResponse()` leaves the body to you, so nothing is recorded for it. A provider error rejects to your code only and records nothing.
 

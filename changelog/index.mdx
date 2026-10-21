@@ -5,6 +5,62 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Node.js SDK 0.13.1
+
+_October 21, 2026_
+
+- [`@nozle-js/node` 0.13.1](https://www.npmjs.com/package/@nozle-js/node/v/0.13.1): **Behaviour change:** `wrapOpenAI` and `wrapAnthropic` return a new view of the client and never change the client you pass in. Use the returned client: code that ignored the return value and kept calling the original client no longer records usage.
+- Fixed: wrapping one shared client for several customers recorded an event for every one of them on each call. Each view now records once, for its own `customerId`, so you can keep one provider client and wrap it per request. Wrapping an already wrapped client wraps its original. `withResponse()`, `parse()`, `stream()` and streaming keep working and record once. See [Client wrappers](/sdks/node/llm-auto-capture#client-wrappers).
+- Install with `npm install @nozle-js/node@0.13.1`.
+
+### Python SDK 0.13.1
+
+_October 21, 2026_
+
+- [`nozle-sdk` 0.13.1](https://pypi.org/project/nozle-sdk/0.13.1/): **Behaviour change:** `wrap_openai` and `wrap_anthropic` return a view of the client and never change the client you pass in. Use the returned client: code that ignored the return value and kept calling the original client no longer records usage.
+- Fixed: wrapping one shared client for several customers recorded an event for every one of them on each call. Each view now records once, for its own `customer_id`, for sync and async clients and streams. Every other attribute is read from the original client, `isinstance` checks still pass, and wrapping an already wrapped client wraps its original. See [Client wrappers](/sdks/python/llm-auto-capture#client-wrappers).
+- Install with `pip install nozle-sdk==0.13.1`.
+
+### Dashboard 1.4.5
+
+_October 21, 2026_
+
+- Saving the General, Invoicing, Address or Notifications settings sends only the fields you edited, so it no longer resets the default billing entity's email, email settings, net payment term or grace period. Notifications edits the default billing entity's email settings.
+- Editing a usage limit in a plan family sets the limit of that plan only, so a monthly and a yearly plan keep their own limits.
+- Adding a billing interval to a plan pre-fills the form from the source plan, as Duplicate does: charges, fixed charges, trial and taxes. A note lists what was copied. Amounts are copied unchanged, so adjust them for the new interval.
+- Includes dashboard 1.4.4. Version 1.4.5 changes only tests.
+
+### Usage, credits and entitlements (Engine 1.3.3)
+
+_October 21, 2026_
+
+- [`/usage/check`](/api/usage-check) and [`/usage/track`](/api/usage-track) accept an optional `subscription_id`, the external id of the active subscription that pays. With `entity_id`, the Entity's own active subscription pays, else the customer's own; customers with one subscription per Entity no longer get `422 active_subscription_ambiguous` on every call. See [Which subscription pays](/api/usage-track#which-subscription-pays).
+- A customer with no active subscription can spend credits that do not need one: paid top-ups, opening balances, and plan credits left after a cancellation until they expire. That usage sends no billing event. Before, every call returned `404 active_subscription_not_found`.
+- Several candidate subscriptions and no selector still return `422 active_subscription_ambiguous`; the message now names `subscription_id` and `entity_id`. Event ingestion and the LLM proxy choose subscriptions as before.
+- With API key permissions, `/usage/check` needs `credit_system:read` and `/usage/track` needs `credit_system:write`; a key without it gets `403 permission_denied`. Before, any secret key could spend credits. See [Key permissions](/api/authentication#key-permissions).
+- [`/can`](/api/check-entitlement) gives a subscription on an override plan, such as one created from a quote, the entitlements and usage limits of the catalog plan it was made from. Before, boolean and config features were denied with `no_entitlement`, and metered features had no limit.
+- Cancelling and subscribing again no longer grants plan credits twice for a period the cancelled subscription's unexpired credits still cover; the new grant is reduced by them, prorated by time. Lifetime plan credits are granted once per customer (or Entity) and Credit System. See [Included Plan Credits](/guides/credits/plan-grants#lifecycle-policy).
+- A plan change that moves a Credit System to another cadence, such as monthly to yearly inside a plan family, grants the new cadence once. Before, it granted nothing and usage was denied with `insufficient_credits`. A grant that fails for one Credit System no longer holds back the others.
+- Refunded or lost-dispute top-ups lose their unspent credits once, as `revoke` operations with the reason `top_up_credit_note` or `top_up_dispute_lost`. Credit operations add `requested_credit_amount` on `revoke`. See [Refunds and lost disputes](/guides/credits/top-ups#refunds-and-lost-disputes).
+- The Entity credit balance reads `pool_policy` and `effective_available` from the subscription that pays for that Entity's usage.
+- The `/admin/*` routes accept only Nozle's internal service token. Organization secret and publishable keys get `403`.
+- Reliability: an event accepted by `POST /events` is always post-processed (pay-in-advance fees, wallet refresh), even when an internal queue is briefly unavailable.
+
+### Billing, checkout and API keys (API 3.1.10)
+
+_October 21, 2026_
+
+- **Breaking:** a plan created through `POST /plans`, GraphQL, the dashboard onboarding or the Agent Kit is shown on the pricing table by default again, so the [public plan catalog](/api/list-plans) lists it at once. Since 3.0.0 its new plan family started hidden, and `GET /plans/{code}` answered `404 plan_not_found`. Send `show_on_pricing: false` (GraphQL `showOnPricing: false`) to create it hidden. Existing families keep their visibility.
+- Usage limits stay per plan inside a plan family. Entitlement writes set `usage_limit` and `hard_limit` on the plan in the path only; features and privileges are still shared by the family. GraphQL `updatePlanFamilyEntitlements` accepts `planId`.
+- Stripe invoice checkout keeps one payable Checkout Session per invoice: calling it again returns the open session, and a payment in progress answers `422` with `payment_already_processing`. A second successful payment for an invoice that is already paid is refunded in full, and you get the `invoice.payment_failure` webhook with `duplicate_payment_refunded`. See [Stripe checkout flow](/integrations/stripe#checkout-flow).
+- Payment provider webhooks act only on records of the organization that received them, for Stripe and every other provider.
+- A credit note or a lost dispute on a paid top-up invoice takes back the top-up's unspent credits. See [Refunds and lost disputes](/guides/credits/top-ups#refunds-and-lost-disputes).
+- A customer upsert sends Stripe only the name, email, phone and address that changed, so edits made in Stripe are no longer overwritten. See [Assign the connection to customers](/integrations/stripe#assign-the-connection-to-customers).
+- Wallet endpoints accept and return `grants_target_top_up` on recurring rules, as documented. Before, it was dropped, and a rule meant to grant free credits created a paid top-up invoice. `true` on a rule that is not `method: target` returns `422 invalid_recurring_rule`.
+- API key permissions: creating a key with permissions on an organization without API key permissions is refused with `premium_integration_missing`. Rotating a key keeps its permissions. Plan transition policies have their own `plan_transition_policy` permission. See [Key permissions](/api/authentication#key-permissions).
+- Saving organization settings (`PUT /api/v1/organizations`) copies to the default billing entity only the fields it changes. Before, a save such as a logo change could blank the billing entity's email and email settings, and customer emails stopped. Edit the billing entity itself to change its own values.
+- Executing a signed quote applies package, graduated, volume and percentage charge settings from the dashboard, and stores a charge minimum in cents (a $50 minimum was stored as $0.50). Quotes already signed are fixed without changes.
+
 ### React SDK 0.13.0
 
 _October 19, 2026_

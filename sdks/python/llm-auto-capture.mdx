@@ -77,7 +77,13 @@ nozle.record_usage(
 
 ## Client wrappers
 
-`wrap_openai` and `wrap_anthropic` patch `chat.completions.create` (OpenAI) and `messages.create` (Anthropic) in place instead, for synchronous and asynchronous calls and streams. They are kept for existing integrations; `wrap_http_client` also covers the Responses API, Gemini and OpenAI-compatible providers.
+`wrap_openai` and `wrap_anthropic` record the usage of `chat.completions.create` (OpenAI) and `messages.create` (Anthropic) instead, for synchronous and asynchronous calls and streams. They are kept for existing integrations; `wrap_http_client` also covers the Responses API, Gemini and OpenAI-compatible providers.
+
+<Warning>
+From `0.13.1`, `wrap_openai` and `wrap_anthropic` return a view of the client and never change the client you pass in. Always call the returned client: calls on the original client record nothing. Code that ignored the return value and kept calling the original client recorded usage in `0.13.0` and earlier, and records nothing from `0.13.1`.
+</Warning>
+
+Each view records usage once per call, for its own `customer_id`, for sync and async clients and streams, so a server can keep one provider client and wrap it per request: `wrap_openai(shared_openai, nozle, customer_id=request.team_id)`. Every other attribute is read from the original client, and `isinstance(view, OpenAI)` / `isinstance(view, Anthropic)` still holds. Views over the same client are independent, including concurrent async streams, and wrapping an already wrapped client wraps its original, so wrappers never stack. Before `0.13.1`, each wrap replaced `create` on the shared client, so one call recorded an event for every customer the client had been wrapped for.
 
 ### OpenAI
 

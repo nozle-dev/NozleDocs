@@ -25,6 +25,15 @@ Authorization: Bearer sk_nozle_your_secret_key
 
 The publishable-key boundary is unconditional: customer reads and mutations return HTTP 403 even if a browser supplies an arbitrary customer ID. Use an authenticated merchant backend for checkout, invoices, subscription status, cancellation, top-ups, entitlements, and credits. That backend derives the Nozle customer from the logged-in user or team and calls Nozle with a least-privilege `sk_`.
 
+## Key permissions
+
+A secret key can be limited to read or write access per resource, for example `credit_system:read` or `plan:write`. A key without the permission a route needs gets `403`.
+
+- Permissions restrict a key only when your organization has the API key permissions feature. On other organizations, creating a key with permissions is refused with `premium_integration_missing` instead of storing permissions that would not apply. A key created without permissions has full access.
+- Rotating a key gives the new key the same permissions as the old one.
+- Plan transition policies have their own resource, `plan_transition_policy`. Keys that existed before it have the same access to it that they have to `plan`.
+- [Check credit usage](/api/usage-check) needs `credit_system:read` and [Track and consume credits](/api/usage-track) needs `credit_system:write`.
+
 <Warning>
 Never expose a secret or master key in client-side code. CORS and `Origin` headers do not authenticate a caller.
 </Warning>

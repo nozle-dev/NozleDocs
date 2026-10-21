@@ -34,4 +34,13 @@ See [Entity Credit Transfers](/api/entity-credit-transfers) for request examples
 The package's money-to-credit exchange is different from a metric rate. `$10 -> 250 AI credits` defines a product package; `1 agent execution -> 2 AI credits` defines usage cost.
 </Warning>
 
-Refunds after credits were spent require an explicit operator policy. Nozle never forces a source below zero silently.
+## Refunds and lost disputes
+
+When the money for a paid top-up comes back, Nozle takes back the credits it bought, once:
+
+- A credit note on a paid top-up invoice (refund or credit) takes back the credit note's share of the top-up's credits. A full credit note takes back the whole package; a credit note for 40% of the invoice total takes back 40% of the credits.
+- A lost payment dispute on a paid top-up invoice (`POST /api/v1/invoices/{id}/lose_dispute`, or a Stripe, Adyen or Razorpay chargeback) takes back every top-up credit that earlier credit notes did not. Repeating it takes nothing more.
+- Credits the customer already spent stay spent. Nozle revokes only what is still remaining in the top-up's source and never forces a source below zero.
+- An unpaid top-up invoice was never granted, so a credit note on it takes nothing back.
+
+The Engine applies the revocation within about a minute. It appears in [credit operations](/api/customer-credit-operations) as a `revoke` operation with the reason `top_up_credit_note` or `top_up_dispute_lost`. `requested_credit_amount` is what was asked to be taken back and `credit_amount` is what was revoked; the difference had already been spent.
