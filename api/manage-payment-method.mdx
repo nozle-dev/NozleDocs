@@ -1,0 +1,117 @@
+---
+title: "Manage Payment Method"
+api: "POST https://api.nozle.app/engine/api/v1/customers/{customer_id}/payment-method/manage"
+---
+
+Base URL: `https://api.nozle.app/engine/api/v1`.
+
+Return the provider page where a customer adds or changes their payment method.
+
+**Auth:** secret key (`sk_`) with `payment:write`, or trusted internal auth. Publishable keys are always refused with `403`. A customer-scoped credential reaches only its own customer.
+
+<Info>
+Nozle stores no card data and never shows card details. The payment method lives at the payment provider, so this endpoint sends the customer there. Call it from your backend for the logged-in user or team, then redirect the browser (Stripe) or open the embedded checkout (Razorpay).
+</Info>
+
+## Request
+
+<ParamField path="customer_id" type="string" required>
+  External customer ID. The customer must already exist and be linked to a payment provider.
+</ParamField>
+
+<ParamField body="return_url" type="string">
+  Where Stripe sends the customer when they leave the Billing Portal. It must be an absolute HTTPS URL on an allowlisted origin, the same list as [checkout](/api/create-checkout#return-url). If omitted, Nozle uses the organization's default return URL. The body can be empty.
+</ParamField>
+
+```json
+{ "return_url": "https://app.example.com/settings/billing" }
+```
+
+## Response
+
+Core's body is returned unchanged:
+
+<ResponseField name="manage_payment_method.provider" type="string" required>
+  `stripe` or `razorpay`.
+</ResponseField>
+
+<ResponseField name="manage_payment_method.url" type="string | null" required>
+  Stripe: a Stripe Billing Portal URL. Redirect the customer to it. Razorpay: `null`.
+</ResponseField>
+
+<ResponseField name="manage_payment_method.checkout" type="object">
+  Razorpay only: the mandate checkout payload to open with Razorpay Checkout. Absent for Stripe.
+</ResponseField>
+
+<ResponseField name="manage_payment_method.expires_at" type="string | null">
+  When the page or checkout stops working, as an RFC 3339 UTC timestamp.
+</ResponseField>
+
+Stripe:
+
+```json
+{
+  "manage_payment_method": {
+    "url": "https://billing.stripe.com/p/session/test_...",
+    "expires_at": null,
+    "provider": "stripe"
+  }
+}
+```
+
+Razorpay:
+
+```json
+{
+  "manage_payment_method": {
+    "url": null,
+    "expires_at": "2026-10-22T00:00:00Z",
+    "provider": "razorpay",
+    "checkout": {
+      "checkout_id": "…",
+      "type": "razorpay",
+      "key_id": "rzp_live_…",
+      "order_id": "order_…",
+      "customer_id": "cust_…",
+      "recurring": true,
+      "amount_cents": 100,
+      "currency": "INR",
+      "mandate_max_amount_cents": 1500000,
+      "expires_at": "2026-10-22T00:00:00Z"
+    }
+  }
+}
+```
+
+## Razorpay behaviour
+
+Razorpay has no hosted page for managing a mandate. Instead Nozle starts a new mandate authorization on the customer's latest payable subscription invoice and returns it as `checkout`. Open it with Razorpay Checkout exactly like a [mandate checkout](/guides/billing/checkout#razorpay): pass `key_id`, `order_id` and `customer_id` with `recurring` set, then let the webhook confirm the result. The mandate is limited to the connection's mandate maximum amount, and the invoice must be in INR.
+
+## Errors
+
+The request is checked in this order: valid JSON body, `return_url`, then Core.
+
+| Status | Code | Cause |
+| --- | --- | --- |
+| `400` | `invalid_return_url` | `return_url` is not an absolute HTTPS URL, or its origin is not allowlisted. |
+| `403` | — | A publishable key was used. The Engine answers with an `error` message, not a code. |
+| `404` | `customer_not_found` | Unknown customer. |
+| `422` | `provider_not_supported` | The customer's provider is neither Stripe nor Razorpay (Adyen, Cashfree, Flutterwave, GoCardless and Moneyhash are not supported). |
+| `422` | `no_linked_payment_provider` | The customer has no payment provider. |
+| `422` | `razorpay_mandate_registration_unavailable` | Razorpay only: mandate registration is not enabled on the connection, or the customer has no payable subscription invoice. |
+| `422` | `razorpay_requires_inr` | Razorpay only: the invoice is not in INR. |
+| `422` | `razorpay_mandate_amount_exceeds_limit` | Razorpay only: the amount is above the connection's mandate maximum. |
+
+For `422` errors the code is in `error_details`, for example `{"code": "validation_errors", "error_details": {"base": ["provider_not_supported"]}}`. Match on the code, never on the message text.
+
+## SDKs
+
+The SDK methods return the inner `manage_payment_method` object.
+
+| SDK | Method |
+| --- | --- |
+| Node | `nozle.managePaymentMethod(customerId, returnUrl?)` |
+| Python | `nozle.manage_payment_method(customer_id, return_url=None)` |
+| Go | `client.ManagePaymentMethod(ctx, customerID, returnURL)` |
+
+See the Billing pages: [Node](/sdks/node/billing#manage-a-payment-method), [Python](/sdks/python/billing#manage-a-payment-method) and [Go](/sdks/go/billing#manage-a-payment-method).

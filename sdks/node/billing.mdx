@@ -62,6 +62,22 @@ See [Create checkout](/api/create-checkout) for the HTTP contract.
 Nozle payment fulfillment is authoritative. A browser callback or redirect does not prove activation; Razorpay upgrades require capture and Stripe requires backend settlement.
 </Warning>
 
+## Manage a payment method
+
+```ts
+const page = await nozle.managePaymentMethod(
+  'workspace_123',
+  'https://app.example.com/settings/billing',
+)
+
+if (page.url) redirect(page.url) // Stripe Billing Portal
+else openRazorpayMandate(page.checkout) // Razorpay mandate checkout
+```
+
+Requires an `sk_` key. A `pk_` key is refused with `403`. Nozle stores no card data: the customer changes their payment method at the provider.
+
+See [Manage Payment Method](/api/manage-payment-method) for the HTTP contract, Razorpay behaviour and error codes.
+
 ## Direct subscription
 
 ```ts

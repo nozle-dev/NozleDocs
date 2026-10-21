@@ -74,6 +74,24 @@ The SDK raises `NozleValidationError` before any request when `register_mandate`
 Nozle payment fulfillment is authoritative. Browser callbacks and redirects do not prove activation; Razorpay upgrades require capture and Stripe requires backend settlement.
 </Warning>
 
+## Manage a payment method
+
+```python
+page = nozle.manage_payment_method(
+    "workspace_123",
+    "https://app.example.com/settings/billing",
+)
+
+if page["url"]:
+    redirect(page["url"])  # Stripe Billing Portal
+else:
+    open_razorpay_mandate(page["checkout"])  # Razorpay mandate checkout
+```
+
+Requires an `sk_` key. A `pk_` key is refused with `403`. Nozle stores no card data: the customer changes their payment method at the provider.
+
+See [Manage Payment Method](/api/manage-payment-method) for the HTTP contract, Razorpay behaviour and error codes.
+
 ## Direct subscription
 
 ```python
