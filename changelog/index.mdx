@@ -5,6 +5,40 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Dashboard 1.6.0
+
+_October 21, 2026_
+
+- Settings > Billing settings > Plan: the plan cards show the prices, limits and descriptions of [nozle.dev/pricing](https://nozle.dev/pricing), including $0.04 per 1,000 events over the included amount on Starter, Growth and Scale and "+ 0.6%" / "+ 0.5%" revenue share. A note says that passing the MRR limit upgrades the workspace automatically, from Starter to Growth and from Growth to Scale. See [Nozle plans and pricing](/guides/getting-started/nozle-plans).
+- The current plan shows two usage bars: **Events used this period** (events used against the included events) and **MRR tracked** (tracked MRR in USD against the plan's MRR limit). A bar without a number reads **Not reported** instead of 0%. See [Usage on the Plan page](/guides/getting-started/nozle-plans#usage-on-the-plan-page).
+- Overview and analytics: MRR, ARR, Outstanding and Overdue show one total converted to your organization's default currency, with a label that names the currency and the ECB rate date, and the amount per currency underneath ("By currency: ¥50,000 · $434.80"). This covers the Overview tiles, the overdue balance panel, the attention queue, the overdue balance card and the invoice aging report. Before, these amounts were shown as USD whatever the currency. An organization that bills only in its default currency sees no extra lines.
+- Analytics panels that are not available, such as MRR movement and retention, say so and offer no Retry button. Before, they showed "Could not load" with a Retry that could never work.
+- Includes dashboard 1.5.0.
+
+### Workspace billing and converted totals (Engine 1.8.1)
+
+_October 21, 2026_
+
+- Your workspace's usage is now billed through Nozle's own billing: its processed events are reported to your Nozle plan every hour, and events over the included amount are billed at $0.04 per 1,000 events at the end of the month. A plan change in the middle of a month bills every event once. See [Nozle plans and pricing](/guides/getting-started/nozle-plans).
+- The Growth and Scale revenue share is charged on collected revenue: your paid invoices excluding tax, minus refunds, converted to USD at the rate of the payment date (the official peg for AED, SAR, QAR, BHD, OMR and JOD, otherwise the ECB reference rate, with a second daily public source for currencies the ECB does not publish). See [Revenue share](/guides/getting-started/nozle-plans#revenue-share).
+- `GET /analytics/overview` returns `mrr_total_default_cents`, `arr_total_default_cents` and `fx_date`, and `GET /analytics/invoices-summary` returns `outstanding_total_default_cents`, `overdue_total_default_cents` and `fx_date`: the amounts of every currency converted into `currency`, the organization's default currency. `fx_date` is the date of the market rates used; it is null when nothing needed converting or only pegs were needed. A total is null when one of its currencies has no rate. The per-currency split (`mrr_by_currency`, `by_currency`) is unchanged.
+- Nozle's billing status of your workspace adds `events_used`, `events_included`, `events_used_percent`, `mrr_tracked_usd_cents`, `mrr_limit_usd_cents`, `mrr_used_percent` and `plan_limits`, which the Plan page shows as usage bars. The [billing status](/api/billing-status) of your own customers is unchanged. See [Plan status fields](/guides/getting-started/nozle-plans#plan-status-fields).
+- Includes Engine 1.5.0, 1.6.0, 1.7.0 and 1.8.0.
+
+### Nozle plans, converted totals and security logs (API 3.4.0)
+
+_October 21, 2026_
+
+- Nozle plans: events over the included 50K (Starter), 10M (Growth) or 100M (Scale) are billed at $0.04 per 1,000 events in 1,000-event blocks at the end of the month and are never blocked. The revenue share, 0.6% on Growth and 0.5% on Scale, is charged on collected revenue in USD. The MRR limits are $5K, $100K and $1M. See [Nozle plans and pricing](/guides/getting-started/nozle-plans).
+- Your tracked MRR is checked once a day. Passing the limit upgrades Starter to Growth and Growth to Scale, with the same plan change as the dashboard's upgrade: charged and applied at once with a saved payment method, otherwise when its checkout is paid. There is no automatic downgrade. Scale over $1M stays on Scale; contact sales for Enterprise. Usage emails at 50%, 80%, 90% and 100% are coming later. See [MRR limit and automatic upgrade](/guides/getting-started/nozle-plans#mrr-limit-and-automatic-upgrade).
+- Premium features come with your plan. Growth includes remove branding, auto-dunning, progressive billing and lifetime usage; Scale adds API key permissions, security logs, custom from-email, payment receipts, manual payments and multi-entity. They switch on when you pay for the plan and off when you downgrade or the subscription ends. See [Premium features](/guides/getting-started/nozle-plans#premium-features).
+- Upgrading from Growth to Scale works. Before, it was refused with `plan_transition_policy_required`.
+- Your Nozle invoice stays a draft for one day after the period ends, so usage that arrives late within that day is still billed in its own period. The Growth and Scale fee of a renewal is collected one day later.
+- GraphQL `nozleAnalyticsOverview` adds `mrrTotalDefaultCents`, `arrTotalDefaultCents` and `fxDate`, and `nozleAnalyticsInvoicesSummary` adds `outstandingTotalDefaultCents`, `overdueTotalDefaultCents` and `fxDate`: the amounts of all currencies converted to your default currency, from Engine 1.8.1. All are nullable; existing fields are unchanged.
+- Listing security logs (GraphQL `securityLogs`, REST `GET /security_logs`) no longer fails with a server error when a log holds a null value, such as no operating system for an API client or a rotated API key without a name. Null values are returned as `null`, and a log without device info or resources returns `{}`.
+- Revenue analytics, analytics dashboards and forecasted usage remain unavailable. Their GraphQL queries and `GET /analytics/usage` answer `analytics_unavailable` in every case, never an internal error.
+- Includes API 3.1.18, 3.1.19, 3.2.0 and 3.3.0.
+
 ### Dashboard 1.4.8
 
 _October 21, 2026_
