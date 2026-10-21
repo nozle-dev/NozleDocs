@@ -29942,7 +29942,7 @@ components:
         - $ref: '#/components/schemas/BillingCoreError'
     BillingStatusResponse:
       type: object
-      description: Most recently started active subscription of the customer. Built from Engine's billing database, not from Core's API.
+      description: Most recently started active subscription of the customer. Built from Engine's billing database, not from Core's API. The usage fields (`events_used` to `plan_limits`) appear only in Nozle's status of your own workspace on its Nozle plan (shown under Settings > Billing settings > Plan and in GraphQL `nozlePlanStatus`); the status of your customers never includes them.
       required:
         - plan
         - planName
@@ -29981,6 +29981,55 @@ components:
         currency:
           type: string
           example: USD
+        events_used:
+          type: integer
+          format: int64
+          description: Workspace plan status only. Events reported in the current billing period, across a plan change in that period.
+          example: 60000
+        events_included:
+          type: integer
+          format: int64
+          nullable: true
+          description: Workspace plan status only. Events included in the plan; null when the plan has none.
+          example: 50000
+        events_used_percent:
+          type: number
+          nullable: true
+          description: Workspace plan status only. `events_used` / `events_included` in percent, one decimal; null without a limit.
+          example: 120
+        mrr_tracked_usd_cents:
+          type: integer
+          format: int64
+          nullable: true
+          description: Workspace plan status only. Tracked MRR of every currency, in USD cents at the latest ECB rates; null while a currency has no rate.
+          example: 0
+        mrr_limit_usd_cents:
+          type: integer
+          format: int64
+          nullable: true
+          description: Workspace plan status only. The plan's MRR limit in USD cents; null when the plan has none.
+          example: 500000
+        mrr_used_percent:
+          type: number
+          nullable: true
+          description: Workspace plan status only. `mrr_tracked_usd_cents` / `mrr_limit_usd_cents` in percent, one decimal; null without a limit or a rate.
+          example: 0
+        plan_limits:
+          type: object
+          description: Workspace plan status only. The plan's limits.
+          properties:
+            events:
+              type: integer
+              format: int64
+              nullable: true
+              description: Included events.
+              example: 50000
+            mrr_cents:
+              type: integer
+              format: int64
+              nullable: true
+              description: MRR limit in USD cents.
+              example: 500000
     BillingInvoiceSummary:
       type: object
       required:

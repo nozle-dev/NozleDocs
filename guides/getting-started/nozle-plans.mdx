@@ -1,0 +1,98 @@
+---
+title: Nozle plans and pricing
+description: What your workspace pays Nozle, how events and revenue are counted, and what each plan includes
+---
+
+Your workspace is on one of Nozle's plans. Prices match [nozle.dev/pricing](https://nozle.dev/pricing). See and change your plan in the dashboard under **Settings > Billing settings > Plan**.
+
+These plans and limits apply only to your workspace. They never limit or bill your own customers: you set their plans, limits and alerts yourself.
+
+## Plans
+
+| | Starter | Growth | Scale | Enterprise |
+|---|---|---|---|---|
+| Price | $0, free forever | $199 + 0.6% | $799 + 0.5% | Custom |
+| Included events | 50K events / mo | 10M events / mo | 100M events / mo | Unlimited |
+| Events over the included amount | $0.04 per 1,000 events | $0.04 per 1,000 events | $0.04 per 1,000 events | Negotiated rates |
+| Revenue share | None | 0.6% of collected revenue | 0.5% of collected revenue | Volume + revenue-share |
+| MRR limit | Up to $5K MRR tracked / billed | Up to $100K MRR tracked / billed | Up to $1M MRR tracked / billed | Unlimited |
+
+For Enterprise, [contact sales](mailto:sales@nozle.dev).
+
+## Events over the included amount
+
+Nozle counts the events your workspace processes in each billing period. The count is reported to your plan every hour.
+
+- Events over the included amount are never blocked. They are billed as overage at $0.04 per 1,000 events at the end of the month.
+- Overage is billed in blocks of 1,000 events. A started block counts as a full block.
+- Example: 60,000 events on Starter are 10,000 over the included 50,000, so 10 blocks: $0.40.
+- After a plan change in the middle of a month, every event is billed once: events before the change on the old plan's final invoice, events after it on the new plan.
+- Your Nozle invoice stays a draft for one day after the period ends. Events that reach Nozle late but belong to the period are billed on that invoice while it is a draft, and on your next invoice after that. For the same reason, the Growth and Scale fee of a renewal is collected one day later.
+
+## Revenue share
+
+Growth and Scale charge a share of the revenue you collect through Nozle in the billing period: 0.6% on Growth, 0.5% on Scale. Starter has no revenue share.
+
+- Collected revenue is your paid invoices, excluding tax, minus refunds. An invoice counts through its successful payments, or once as marked paid when it has no successful payment, never both.
+- Each payment or refund is converted to USD at the rate of its date: the official peg for AED, SAR, QAR, BHD, OMR and JOD, otherwise the ECB reference rate. Currencies the ECB does not publish use a second daily public source. A payment in a currency with no rate yet waits until a rate exists; a rate is never guessed.
+- Example: $10,000 collected on Growth adds $60.00.
+
+## MRR limit and automatic upgrade
+
+Each plan tracks your MRR against its limit: $5K on Starter, $100K on Growth, $1M on Scale. Tracked MRR is the MRR of your active subscriptions in every currency, converted to USD at the latest ECB rates. It is used only for the limit; the revenue share is charged on collected revenue.
+
+Nozle checks the limit once a day. When your tracked MRR passes it, your workspace is upgraded to the next plan automatically:
+
+- Starter goes to Growth, and Growth goes to Scale. This is the same plan change as the upgrade under **Settings > Billing settings > Plan**: it applies now, prorated, and unused prepaid time is credited. An upgrade from Starter bills any unpaid overage and the prorated new fee on one invoice.
+- With a saved payment method, the change is charged and applied at once. Without one, the upgrade waits until its checkout is paid.
+- The premium features of the new plan switch on with it.
+- There is no automatic downgrade.
+- Scale over $1M MRR stays on Scale. [Contact sales](mailto:sales@nozle.dev) for Enterprise.
+
+Emails when you reach 50%, 80%, 90% and 100% of your included events or MRR limit are coming later.
+
+## Premium features
+
+Premium features come with the plan. They switch on when you pay for Growth or Scale, and off when you downgrade or your Nozle subscription ends. A downgrade takes effect at the end of the current billing period.
+
+| Feature | Starter | Growth | Scale |
+|---|---|---|---|
+| Remove branding | | Yes | Yes |
+| Auto-dunning | | Yes | Yes |
+| Progressive billing | | Yes | Yes |
+| Lifetime usage | | Yes | Yes |
+| [API key permissions](/api/authentication#key-permissions) | | | Yes |
+| Security logs | | | Yes |
+| Custom from-email | | | Yes |
+| Payment receipts | | | Yes |
+| Manual payments | | | Yes |
+| Multi-entity | | | Yes |
+
+Remove branding hides "Powered by Nozle" in the SDK components and the customer portal only. Invoice, credit note and payment receipt PDFs always show it. See [Powered by Nozle](/sdks/react/components#powered-by-nozle).
+
+Revenue analytics, analytics dashboards and forecasted usage are not available on any plan.
+
+## Usage on the Plan page
+
+**Settings > Billing settings > Plan** shows your current plan and two usage bars:
+
+- **Events used this period**: events used against the events included in your plan.
+- **MRR tracked**: tracked MRR in USD against your plan's MRR limit.
+
+At 80% of your included events, a banner shows the percentage used. On Starter and Growth, a note says that passing the MRR limit upgrades the workspace automatically. A bar reads **Not reported** when Nozle has no number for it yet; it never shows 0% for a missing number. After a plan change in the middle of a period, the events bar keeps counting from the start of the period.
+
+### Plan status fields
+
+The dashboard reads the bars from your workspace's plan status (GraphQL `nozlePlanStatus`, from Nozle's billing status of your workspace). Besides the plan, it carries:
+
+| Field | Meaning |
+|---|---|
+| `events_used` | Events reported in the current billing period, across a plan change in that period. |
+| `events_included` | Events included in your plan. |
+| `events_used_percent` | `events_used` / `events_included`, one decimal. |
+| `mrr_tracked_usd_cents` | Tracked MRR of every currency, in USD cents at the latest ECB rates. |
+| `mrr_limit_usd_cents` | Your plan's MRR limit, in USD cents. |
+| `mrr_used_percent` | `mrr_tracked_usd_cents` / `mrr_limit_usd_cents`, one decimal. |
+| `plan_limits` | `{events, mrr_cents}`: the plan's included events and MRR limit in USD cents. |
+
+Limits and percentages are `null` when the plan has none, and the MRR values are `null` while a currency has no rate. These fields describe your workspace only. The [billing status](/api/billing-status) of your own customers never includes them.
