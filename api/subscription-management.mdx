@@ -57,6 +57,8 @@ It also includes `subscription_id` (Core's internal UUID of the current subscrip
 
 Previewing a change between two plans with no [transition policy](/api/plan-transition-policies) returns `422 plan_transition_policy_required` (except from a free plan to a paid plan). The response also echoes the policy it applied: `transition_policy`, `billing_anchor`, `proration_behavior`, `credit_action`, `refund_mode`, and `final_invoice_action`.
 
+A plan that is pending deletion cannot be a target: the preview, the checkout and `POST /subscriptions` return `422` with `plan_code: [plan_pending_deletion]`. Applying an immediate downgrade that leaves an amount due returns `422 payment_required`; the customer pays that change first through [Create checkout](/api/create-checkout).
+
 Quotes expire after five minutes. Show the returned amounts and dates for confirmation, and forward the opaque `quote_id` unchanged. State, policy or amount changes invalidate the quote with HTTP 409. Refresh and obtain a new confirmation instead of silently applying a different price.
 
 For an upgrade, send that quote with an `Idempotency-Key` header to [Create checkout](/api/create-checkout):

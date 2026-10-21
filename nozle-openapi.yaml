@@ -4719,6 +4719,13 @@ paths:
       parameters:
         - $ref: '#/components/parameters/page'
         - $ref: '#/components/parameters/per_page'
+        - name: include_hidden
+          in: query
+          description: Secret keys only. Send `false` to get the pricing table view that a publishable key always gets, without the plans of plan families hidden from the pricing table and without hidden features in `families[].features`. Any other value, or no value, returns everything. A publishable key ignores it.
+          required: false
+          schema:
+            type: boolean
+            example: false
       responses:
         '200':
           description: Plans
@@ -5787,7 +5794,8 @@ paths:
       tags:
         - Subscriptions
       summary: Assign a plan to a customer
-      description: This endpoint assigns a plan to a customer, creating or modifying a subscription. Ideal for initial subscriptions or plan changes (upgrades/downgrades). `usage_thresholds` and `plan_overrides.usage_thresholds` need progressive billing (Growth, Scale and Enterprise Nozle plans); without it a non-empty list answers `422` with `feature_not_available` in `error_details.usage_thresholds`, and nothing is saved.
+      description: |-
+        This endpoint assigns a plan to a customer, creating or modifying a subscription. Ideal for initial subscriptions or plan changes (upgrades/downgrades). `usage_thresholds` and `plan_overrides.usage_thresholds` need progressive billing (Growth, Scale and Enterprise Nozle plans); without it a non-empty list answers `422` with `feature_not_available` in `error_details.usage_thresholds`, and nothing is saved. A plan that is pending deletion (`pending_deletion: true`) cannot start a subscription or receive a plan change; the call returns `422` with `plan_code: [plan_pending_deletion]`. Posting the plan the subscription is already on still works.
       operationId: createSubscription
       requestBody:
         description: Subscription payload
@@ -8349,7 +8357,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingEngineOrCoreError'
         '422':
-          description: 'Core `validation_errors`, for example `credit_action: [not_supported_for_pay_in_arrears]`, `expected_effective_at: [only_for_end_of_period_cancellation]`, `idempotency_key: [idempotency_key_reused]`. Refused in the current state: Core refused the transition, for example `externally_billed_subscription`, `target_plan_is_not_a_downgrade`, `subscription_is_not_canceling`, `subscription_cancellation_already_effective`, `plan_transition_policy_required`.'
+          description: 'Core `validation_errors`, for example `credit_action: [not_supported_for_pay_in_arrears]`, `expected_effective_at: [only_for_end_of_period_cancellation]`, `idempotency_key: [idempotency_key_reused]`. Refused in the current state: Core refused the transition, for example `externally_billed_subscription`, `target_plan_is_not_a_downgrade`, `subscription_is_not_canceling`, `subscription_cancellation_already_effective`, `plan_transition_policy_required`, `plan_code: [plan_pending_deletion]` (the target plan is being deleted).'
           content:
             application/json:
               schema:
@@ -8471,7 +8479,7 @@ paths:
                 error: Conflict
                 code: subscription_cancellation_date_changed
         '422':
-          description: 'Core `validation_errors`, for example `credit_action: [not_supported_for_pay_in_arrears]`, `expected_effective_at: [only_for_end_of_period_cancellation]`, `idempotency_key: [idempotency_key_reused]`. Refused in the current state: Core refused the transition, for example `externally_billed_subscription`, `target_plan_is_not_a_downgrade`, `subscription_is_not_canceling`, `subscription_cancellation_already_effective`, `plan_transition_policy_required`.'
+          description: 'Core `validation_errors`, for example `credit_action: [not_supported_for_pay_in_arrears]`, `expected_effective_at: [only_for_end_of_period_cancellation]`, `idempotency_key: [idempotency_key_reused]`. Refused in the current state: Core refused the transition, for example `externally_billed_subscription`, `target_plan_is_not_a_downgrade`, `subscription_is_not_canceling`, `subscription_cancellation_already_effective`, `plan_transition_policy_required`, `plan_code: [plan_pending_deletion]` (the target plan is being deleted), `payment_required` (an immediate downgrade leaves an amount due; the customer pays it first through `POST /checkout`).'
           content:
             application/json:
               schema:
@@ -26297,6 +26305,12 @@ components:
           format: uuid
           description: Identifier of the parent plan when this plan is a per-customer override of another plan. `null` for a regular plan. Override plans are not returned by `GET /plans` or `GET /plans/{code}`, so it is `null` there.
           example: null
+        plan_family_code:
+          type:
+            - string
+            - 'null'
+          description: Code of the plan family the plan belongs to. A plan family groups the billing intervals of one offer (for example "Pro" monthly and yearly). `null` for a per-customer override plan, which has no family.
+          example: startup
         pending_deletion:
           type: boolean
           description: '`true` when deletion of the plan was requested and is still being processed in the background. The plan is going away and should not be offered to new customers; `GET /plans` still lists it until the deletion finishes. Filter on `pending_deletion` when you build a pricing page.'
@@ -26903,7 +26917,7 @@ components:
                 - string
                 - 'null'
               example: startup
-              description: Code of the plan family the plan belongs to, for example the monthly and yearly versions of one plan. Without it, or with a code that does not exist yet, the call creates a new family for the plan.
+              description: Code of the plan family the plan belongs to, for example the monthly and yearly versions of one plan. Without it, or with a code that does not exist yet, the call creates a new family for the plan. A family holds at most one plan per `interval`, all in the same `amount_currency`; otherwise the call returns `422` with the error `plan_family_interval_already_exist` on `interval` or `plan_family_currency_mismatch` on `amount_currency`. A plan that joins a family that already has plans takes the family's features and privileges.
             show_on_pricing:
               type: boolean
               default: true
@@ -27258,7 +27272,7 @@ components:
                 - string
                 - 'null'
               example: startup
-              description: Code of the plan family the plan belongs to, for example the monthly and yearly versions of one plan. Without it, or with a code that does not exist yet, the call creates a new family for the plan.
+              description: Code of the plan family the plan belongs to, for example the monthly and yearly versions of one plan. Without it, or with a code that does not exist yet, the call creates a new family for the plan. A family holds at most one plan per `interval`, all in the same `amount_currency`; otherwise the call returns `422` with the error `plan_family_interval_already_exist` on `interval` or `plan_family_currency_mismatch` on `amount_currency`. A plan that joins a family that already has plans takes the family's features and privileges.
             show_on_pricing:
               type: boolean
               default: true
