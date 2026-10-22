@@ -93,11 +93,13 @@ After confirming a downgrade quote, send `POST /subscriptions/transitions` with 
 
 The existing transition result is nested under `subscription_transition`. Reload options to display the current plan separately from the pending plan and its effective date. The self-service flow uses end-of-period timing and preserves the billing anchor.
 
+Scheduling or replacing a downgrade sends the `subscription.updated` webhook for the pending subscription. A downgrade cannot be scheduled while the subscription is cancelling at period end: the call returns `409 subscription_change_pending`. Keep the subscription first, then schedule the downgrade.
+
 ## Cancel and Keep
 
 Preview `operation: "cancel"` with `timing: "end_of_period"` through `/subscriptions/transitions/preview`. Send the same parameters to `/subscriptions/transitions` with `expected_effective_at` set to the exact preview's `subscription_transition.effective_at`, plus an `Idempotency-Key` header. A stale date returns HTTP 409 before cancellation.
 
-Keep uses `operation: "uncancel"`, the customer/subscription identifiers and an `Idempotency-Key`. It accepts no settlement overrides. Keep is available only before the ending is due; it does not restart a terminated subscription. Cancellation removes a pending downgrade and cancels an open paid upgrade checkout, and Keep does not recreate them.
+Keep uses `operation: "uncancel"`, the customer/subscription identifiers and an `Idempotency-Key`. It accepts no settlement overrides. Keep also clears the settlement the cancellation stored, such as skipping the credit note or the final invoice, so a later cancellation follows its own request or your organization's policy again. Keep is available only before the ending is due; it does not restart a terminated subscription. Cancellation removes a pending downgrade and cancels an open paid upgrade checkout, and Keep does not recreate them.
 
 ## Withdraw a pending downgrade
 

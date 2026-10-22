@@ -23,7 +23,7 @@ If one session cannot see both repositories, run the backend session first. A se
 
 1. **Stack check.** The agent runs `nozle-check env` and says which Nozle SDK fits your backend and frontend.
 2. **Login,** if this agent has not logged in yet.
-3. **Account and code.** The agent reads your plans, meters, entitlements, credit systems, and payment providers. Then it reads your authentication, your payer, your AI calls, and every action that spends, sends, or generates something.
+3. **Account and code.** The agent reads your plans, meters, entitlements, credit systems, and payment providers. It reads catalog plans only, not plans made for one customer. A capability counts as set up only with usable records: a Cost Sheet with a published version in effect, a credit system that is not archived, and a plan that is not being deleted. Drafts and archived items are listed but do not count. Then it reads your authentication, your payer, your AI calls, and every action that spends, sends, or generates something.
 4. **Existing work.** If Nozle code or a record already exists, the agent shows what is integrated and works only on the gaps.
 5. **Choices.** The agent shows each goal with what your account already has, its advice, and where the code changes. You pick the goals.
 6. **Questions.** For each activity it found, you choose: track as billable usage, track cost only, do not track, or decide later. The agent never decides for you. Then it asks about the payer, when to charge, and your payment provider. Billing runs through Nozle checkout and Nozle subscriptions, with a provider the Nozle docs cover. If your app uses another provider, the agent recommends moving to a supported one, or leaving paid customers out of the integration.
@@ -79,7 +79,13 @@ Never paste an `sk_` secret key into the agent chat. The agent does not need it,
 
 <AccordionGroup>
 <Accordion title="The login ends with onboarding_incomplete">
-The organization is not onboarded. Create a meter and a plan in the dashboard, then log in again.
+An agent can connect only when the organization has all three:
+
+- **A metered feature (meter).** Create one in the dashboard.
+- **A plan.** Create one in the dashboard.
+- **Onboarding complete.** Finish the **Launch** step of the dashboard onboarding.
+
+Publishing a setup with Pricing Architect in the dashboard onboarding creates the meters and plans and completes onboarding in one step, so the login works right after the publish. The setup takes effect when you publish it: Pricing Architect does not accept a later start date. Then log in again.
 </Accordion>
 <Accordion title="The account tools are missing, or the agent says the login ended">
 The login was unused for 7 days, was revoked, or was never done in this agent. Log in again (see [Log in](/guides/agent-kit/install#log-in)), then say "continue".

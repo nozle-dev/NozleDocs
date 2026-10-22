@@ -67,4 +67,10 @@ Never expose a secret or master key in client-side code. CORS and `Origin` heade
 - `POST /api/v1/auth/verify-otp`
 - `POST /api/v1/auth/signup`
 
+The signup code endpoints answer the same way for every email, so they do not reveal whether an email already has an account:
+
+- `send-otp` (`email`) answers `200` with `{"success": true, "expiresIn": 300}`. A new email receives a 6-digit code that is valid for 5 minutes; an email that already has an account receives a login email instead of a code. A second request for the same email within 60 seconds, or more than 10 requests from one IP address in an hour, answers `429` with `retryAfter` in seconds.
+- `verify-otp` (`email`, `code`) answers `200` with `{"verified": true, "verificationToken": "..."}`, which `signup` accepts for 10 minutes. A wrong, expired or missing code answers `401` with `{"error": "invalid code"}`. Before, an expired code answered `410`: treat `401` as "invalid or expired, request a new code". A code that is not 6 digits answers `400`.
+- Each email has 5 attempts per 15 minutes, and each IP address 20 per hour. Requesting a new code does not reset the attempts. Past the limit, `verify-otp` answers `429` with `too many attempts, try again later`.
+
 Get API keys from [app.nozle.dev](https://app.nozle.dev) under **Developers > API keys**.

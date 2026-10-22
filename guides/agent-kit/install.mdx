@@ -12,7 +12,7 @@ keywords: ["agent kit", "install", "update", "uninstall", "login", "OAuth", "Cla
 | Claude Code, Codex CLI, or OpenCode | The agent that runs the skills |
 | Node.js 18 or later on `PATH` | `nozle-check` and the guard hooks are Node.js scripts |
 | Your application in a git repository, on a clean branch | The guards, `nozle-undo`, and the hand-off use git |
-| An onboarded Nozle organization at [app.nozle.dev](https://app.nozle.dev), with at least one meter and one plan | The agent reads it during the run. An organization that is not onboarded cannot connect an agent |
+| An onboarded Nozle organization at [app.nozle.dev](https://app.nozle.dev), with at least one meter and one plan | The agent reads it during the run. An organization that is not onboarded cannot connect an agent. Publishing a setup with Pricing Architect creates the meter and plan and completes onboarding |
 | Internet access to GitHub | The install commands fetch `nozle-dev/nozle-agent-kit` |
 
 ## Where it works
@@ -113,6 +113,8 @@ The agent starts the login the first time it needs your account. You can also st
 | OpenCode | `opencode mcp auth nozle-account` |
 
 A browser opens the Nozle sign-in page. Sign in, choose the organization, and click **Allow**.
+
+The login asks for one scope, `mcp:config:read`: read access to the organization's configuration. Your member role needs permission to view that configuration, not customers or subscriptions. The former `mcp:billing:read` scope granted nothing and is no longer offered; a client that requests or registers it gets `unsupported_scope`.
 
 <Tip>
 If your browser runs on another machine, the page after **Allow** does not load. Copy the full address from the address bar and paste it into the agent when it asks.

@@ -4342,7 +4342,10 @@ paths:
       tags:
         - Invoices
       summary: Create an invoice preview
-      description: This endpoint is used for generating invoice preview.
+      description: |-
+        This endpoint is used for generating invoice preview.
+
+        To preview a plan change of existing subscriptions, send `subscriptions.external_ids` and the target `subscriptions.plan_code`. Without an explicit `transition_policy` and `transition_direction`, the preview resolves the change as the real change does: the plan transition policy of the pair of plans, then the organization's downgrade defaults (so a downgrade at the end of the period previews with that date), and otherwise an immediate upgrade.
       operationId: invoicePreview
       requestBody:
         description: Invoice preview payload
@@ -4505,7 +4508,10 @@ paths:
       tags:
         - Payment Requests
       summary: Create a payment request
-      description: This endpoint is used to create a payment request to collect payments of overdue invoices of a given customer
+      description: |-
+        This endpoint is used to create a payment request to collect payments of overdue invoices of a given customer. `payment_method` is used when given.
+
+        For a customer who pays through Razorpay, the request reaches the customer only as a payment link sent by email. When the customer's billing entity has no email, the call returns `422` with `billing_entity: [billing_entity_email_missing]`, and without a recipient `email`, `email: [email_missing]`. Nothing is created in either case. Add an email to the billing entity first.
       operationId: createPaymentRequest
       requestBody:
         description: PaymentRequest payload
@@ -7901,13 +7907,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '409':
-          description: 'Core: `subscription_selection_required`, `plan_upgrade_checkout_in_progress`, `subscription_checkout_in_progress` or `entity_subscription_checkout_in_progress` (a payment for the abandoned new-subscription checkout on another plan is still processing, or it was paid; an abandoned checkout is otherwise replaced), `billing_anchor_checkout_in_progress`, `idempotency_key_reused` (quoted checkout), `plan_change_quote_changed`, `subscription_change_pending` (a paid upgrade while the subscription has a scheduled cancellation or plan change, or an upgrade payment in progress).'
+          description: 'Core: `subscription_selection_required`, `plan_upgrade_checkout_in_progress` (another upgrade checkout is open, or its time ran out while the provider reports a payment in progress or cannot be reached), `subscription_checkout_in_progress` or `entity_subscription_checkout_in_progress` (a payment for the abandoned new-subscription checkout on another plan is still processing, or it was paid; an abandoned checkout is otherwise replaced), `billing_anchor_checkout_in_progress`, `idempotency_key_reused` (quoted checkout), `plan_change_quote_changed`, `subscription_change_pending` (a paid upgrade while the subscription has a scheduled cancellation or plan change, or an upgrade payment in progress).'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '422':
-          description: 'Core: `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active`, `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`, or `base: [invalid_invoice_status_or_payment_status]` for an invoice checkout of an invoice that is paid, voided, draft, closed, failed or has nothing due, or `base: [payment_already_processing]` while a Stripe payment of the invoice''s last Checkout Session is processing or has succeeded). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
+          description: 'Core: `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active` (also right after a late upgrade payment for this plan was applied), `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`, or `base: [invalid_invoice_status_or_payment_status]` for an invoice checkout of an invoice that is paid, voided, draft, closed, failed or has nothing due, or `base: [payment_already_processing]` while a Stripe payment of the invoice''s last Checkout Session is processing or has succeeded). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
           content:
             application/json:
               schema:
@@ -26709,6 +26715,7 @@ components:
                   - 'null'
               plan_codes:
                 type: array
+                description: Codes of the family's plans. A publishable key does not receive the codes of plans pending deletion.
                 items:
                   type: string
               features:
