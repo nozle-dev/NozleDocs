@@ -3203,7 +3203,7 @@ paths:
       tags:
         - Customers
       summary: Manage a customer payment method
-      description: Returns the payment provider page where a customer adds or changes their payment method. Stripe returns a Billing Portal `url`. Razorpay returns `url` null and a mandate `checkout` payload to open with Razorpay Checkout. Nozle stores no card data. Secret key only, publishable keys are refused with 403.
+      description: Returns the Stripe Billing Portal `url` where a customer adds or changes their payment method. Stripe only. Razorpay customers pay each invoice by payment link and get 422 razorpay_pays_by_link. Nozle stores no card data. Secret key only, publishable keys are refused with 403.
       operationId: manageCustomerPaymentMethod
       parameters:
         - name: customer_id
@@ -3225,7 +3225,7 @@ paths:
                   description: HTTPS URL on an allowlisted origin that Stripe returns to. Defaults to the organization return URL.
       responses:
         '200':
-          description: Provider page or Razorpay mandate checkout
+          description: Stripe Billing Portal page
           content:
             application/json:
               schema:
@@ -3240,20 +3240,15 @@ paths:
                       - provider
                     properties:
                       url:
-                        type: [string, 'null']
-                        description: Stripe Billing Portal URL. Null for Razorpay.
+                        type: string
+                        description: Stripe Billing Portal URL.
                       provider:
                         type: string
                         enum:
                           - stripe
-                          - razorpay
                       expires_at:
                         type: [string, 'null']
                         format: date-time
-                      checkout:
-                        type: object
-                        description: Razorpay only. Mandate checkout payload for Razorpay Checkout.
-                        additionalProperties: true
         '400':
           description: invalid_return_url, or the body is not valid JSON.
         '401':
@@ -3263,7 +3258,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
-          description: One of provider_not_supported, no_linked_payment_provider, razorpay_mandate_registration_unavailable, razorpay_requires_inr, razorpay_mandate_amount_exceeds_limit.
+          description: One of no_linked_payment_provider, razorpay_pays_by_link (Razorpay customers pay each invoice by payment link), provider_not_supported, missing_payment_provider_customer.
           content:
             application/json:
               schema:
