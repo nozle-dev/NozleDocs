@@ -10,7 +10,7 @@ Customer  = workspace or company
 Entity    = one stable subject inside that customer
 ```
 
-An Entity belongs to exactly one customer and organization. Recreating an Entity with the same external ID produces a different incarnation; financial history remains bound to the original durable Entity UUID.
+An Entity belongs to exactly one customer and organization. An Entity keeps the same durable UUID for its whole life, and financial history stays bound to it. Entities cannot be deleted.
 
 ## Pool policies
 
@@ -55,17 +55,18 @@ Keep amounts as decimal strings throughout your application. Do not convert them
 
 ## Lifecycle
 
-Entities can be `active`, `suspended`, or `deleted`.
+Entities are `active` or `suspended`. An Entity cannot be deleted: `DELETE` on an Entity and status `deleted` are refused (see [Customer Entities](/api/customer-entities#delete-is-not-supported)).
 
 - Active Entities can read and spend according to their pool policy.
-- Suspension or deletion blocks new usage, expires unused Entity subscription grants, and returns unused allocated top-ups to their original parents.
+- Suspension blocks new usage, expires unused Entity subscription grants, and returns unused allocated top-ups to their original parents.
 - Operations, allocations, source provenance, and status history remain immutable.
-- Reactivation does not reuse an older incarnation's idempotency results or mint duplicate period grants.
+- Activating a suspended Entity does not mint duplicate period grants.
+- Suspending an Entity does not cancel its subscription. To stop billing, cancel the [Entity subscription](/api/entity-subscriptions#cancel) yourself, before or after suspending.
 
 ## Seat billing
 
 Entities and billable seats are separate contracts. Creating, suspending,
-reactivating, or deleting an Entity never changes billed usage.
+or activating an Entity never changes billed usage.
 
 Entity subscriptions are also separate from credit pools and seat metrics. Use an Entity subscription only when that Entity owns an independent plan. Credit allocation still follows the configured pool policy, while seat billing still follows explicit usage events.
 
@@ -108,7 +109,7 @@ not create a second usage effect.
 
 The customer **Entities** tab provides:
 
-- active, suspended, and deleted Entity filters;
+- active and suspended Entity filters;
 - create/edit, bulk upsert, activation, and suspension flows;
 - plan, allocated top-up, shared, consumed, and effective balances;
 - source provenance and expiry;
