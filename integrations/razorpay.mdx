@@ -323,7 +323,7 @@ Nozle uses a Razorpay payment link where the customer is not inside your checkou
 
 Neither result has a checkout ID, so there is nothing to poll. Redirect the customer to `payment_url`. The `payment_link.paid` webhook settles it, Payment links are not verified with the verify call, which is for orders.
 
-`POST /checkout` never returns `type: "hosted"` for Razorpay: it returns an order. Only the deprecated `POST https://api.nozle.app/engine/api/v1/credits/purchase` returns `type: "hosted"` with a `payment_url`. The SDK result types still declare `hosted`.
+`POST /checkout` never returns `type: "hosted"` for Razorpay: it returns an order. Only the deprecated `POST https://api.nozle.app/engine/api/v1/credits/purchase` returns `type: "hosted"` with a `payment_url`. That endpoint requires an `Idempotency-Key` header and a `currency` field (the ISO 4217 code of the top-up package, for example `USD`), and answers `400` with the code `idempotency_key_required` or `currency_required` without them; a retry with the same key returns the first purchase. Use [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase) (`POST /credit-top-up-purchases`) instead. The SDK result types still declare `hosted`.
 
 ## Credit top-ups
 
