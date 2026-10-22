@@ -164,8 +164,6 @@ tags:
     description: LLM Proxy operations
   - name: Margin
     description: Margin operations
-  - name: Realtime
-    description: Realtime operations
   - name: Subscription Changes
     description: Subscription Changes operations
   - name: Usage
@@ -3599,6 +3597,7 @@ paths:
       description: |
         Freezes the eligible customer population for a closed allocation period and writes immutable
         customer allocation entries to the PostgreSQL cost ledger. Repeating the same request is idempotent.
+        Nozle also allocates every closed period automatically within about 15 minutes of its close, so this call is only needed to book a closed period sooner. A period that is already allocated, by hand or automatically, returns the finished allocation.
         Requires a secret key. With API key permissions, the key needs `analytic:write`; without it the answer is `403` with `code: permission_denied`.
       operationId: createSharedCostAllocation
       requestBody:
@@ -12714,50 +12713,6 @@ paths:
           label: Go
           source: |-
             health, err := client.Ping(ctx)
-  /auth/centrifugo-token:
-    get:
-      servers:
-        - url: https://api.nozle.app/engine/api/v1
-          description: Engine API
-      tags:
-        - Realtime
-      summary: Get a WebSocket token
-      description: |-
-        Returns an HS256 JWT for connecting to Centrifugo to receive real-time entitlement updates. The token's `sub` is the organization ID, it expires 24 hours after issue, and its `channels` claim is `["customer:<organization_id>"]`.
-
-        **Keys.** A secret `sk_` key or the trusted internal credential. A publishable `pk_` key returns `403`. With API key permissions, the secret key needs `customer_usage:read`; without it the answer is `403` with `code: permission_denied`.
-
-        Returns `404` when Centrifugo is not configured on the Engine.
-      operationId: engineGetCentrifugoToken
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Signed token.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PlatformCentrifugoToken'
-              example:
-                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvcmdfMTIzIn0.signature
-        '400':
-          $ref: '#/components/responses/EngineBadRequest'
-        '401':
-          $ref: '#/components/responses/EngineUnauthorized'
-        '403':
-          $ref: '#/components/responses/EngineForbidden'
-        '404':
-          $ref: '#/components/responses/EngineNotFound'
-        '500':
-          description: The token could not be signed.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EngineError'
-              example:
-                error: failed to sign token
-        '503':
-          $ref: '#/components/responses/EngineUnavailable'
   /api/v1/plans:
     get:
       servers:
@@ -33267,14 +33222,6 @@ components:
           enum:
             - ok
             - error
-    PlatformCentrifugoToken:
-      type: object
-      required:
-        - token
-      properties:
-        token:
-          type: string
-          description: HS256 JWT for Centrifugo. Claims `sub` (organization ID), `iat`, `exp` (24 hours later) and `channels` (`["customer:<organization_id>"]`).
     PlatformProviderPayload:
       type: object
       description: A request or response body of the LLM provider, passed through unchanged. Its shape is defined by the provider.
