@@ -55,7 +55,7 @@ Core's body is returned unchanged:
 
 ## Razorpay customers
 
-Razorpay customers have no payment method to manage here. They pay each invoice through a Razorpay payment link. For a Razorpay customer this endpoint answers `422 razorpay_pays_by_link` and creates nothing at Razorpay.
+Razorpay customers have no payment method to manage here. They pay each invoice through a Razorpay payment link: when an invoice is finalized and no mandate charges it, Nozle emails the customer a payment request for that invoice with a **Pay invoice** button (the billing entity and the customer need an email address). The button always opens a current Razorpay payment link, also after an earlier link expired, and paying it marks the invoice paid. Dunning campaigns do not send a second request for such an invoice. For a Razorpay customer this endpoint answers `422 razorpay_pays_by_link` and creates nothing at Razorpay.
 
 ## Errors
 
