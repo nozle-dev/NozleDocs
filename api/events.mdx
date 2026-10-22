@@ -43,7 +43,7 @@ An event needs `external_subscription_id` or `external_customer_id`. With only t
 For direct HTTP ingestion, send this envelope to `POST https://api.nozle.app/engine/api/v1/events` with a secret key. Send batches of 1–100 events to `POST https://api.nozle.app/engine/api/v1/events/batch` using an `events` array. Event reads and fee estimates use the Core API. Prefer the SDKs so subscription lookup, UUID generation, timeout handling, and errors remain consistent.
 
 <Note>
-For retry safety, preserve the complete event payload and reuse the same `transaction_id`. Within an organization, the first accepted event owns that identifier even if a later request changes the subscription or timestamp.
+For retry safety, preserve the complete event payload, including `timestamp`, and reuse the same `transaction_id`. When an event with that `transaction_id` is already stored, the same event returns the stored one, and a different one (another code, subscription, properties or sent `timestamp`) returns `409 transaction_id_conflict`. Organizations on the ClickHouse event store do not get this check: there a repeat can be deduplicated only when `transaction_id` and `timestamp` both match. Without a `timestamp`, each attempt is stamped when it arrives, so send one and reuse it.
 </Note>
 
 ## Responses and limits
