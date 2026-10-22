@@ -26,7 +26,7 @@ A subscription assigns a customer to a plan. When a customer checks out, Nozle c
 Subscriptions support:
 
 - **Upgrades** -- move to a higher plan mid-cycle with prorated charges
-- **Downgrades** -- move to a lower plan, effective at the next billing period
+- **Downgrades** -- move to a lower plan, at once or at the next billing period, depending on the [plan transition policy](/api/plan-transition-policies)
 - **Cancellation** -- end access immediately or at the renewal boundary under merchant-defined settlement rules
 
 <CardGroup cols={2}>
@@ -103,8 +103,10 @@ Nozle uses two types of API keys to separate client-safe and server-only operati
 
 | Key prefix | Name | Use case |
 |------------|------|----------|
-| `pk_` | Publishable | Safe for `GET /api/v1/plans` only. Every customer read and mutation returns HTTP 403. |
-| `sk_` | Secret | Server-only. Used for sending events, managing subscriptions, configuring cost models, and reading margin data. Never expose in a browser. |
+| `pk_nozle_` | Publishable | Safe for `GET /api/v1/plans` only. Every customer read and mutation returns HTTP 403. |
+| `sk_nozle_` | Secret | Server-only. Used for sending events, managing subscriptions, configuring cost models, and reading margin data. Never expose in a browser. |
+
+There are no separate live and test keys. Create keys under **Developers > API keys**.
 
 <CardGroup cols={2}>
   <Card title="Node SDK (secret key)" href="/sdks/node/installation" />
