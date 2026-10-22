@@ -1,0 +1,414 @@
+---
+title: "Webhook events"
+description: "Every event type Nozle sends to your webhook endpoints: when it fires, what the payload holds, and which events are new"
+---
+
+Nozle sends one JSON `POST` per event to every endpoint of your organization that subscribes to the event type. There are 72 types. This page lists them all. Registering an endpoint, verifying the signature and the retry rules are in [Receive Nozle webhooks](/api/receive-webhooks).
+
+Each event has its own page in the API reference under **Webhook Events**, with the payload schema and an example captured from Core.
+
+## The delivery
+
+Every delivery has the same envelope. `webhook_type` is the event type, `object_type` names the key that holds the object, and `organization_id` is your organization:
+
+```json
+{
+  "webhook_type": "plan_upgrade_intent.needs_review",
+  "object_type": "plan_upgrade_intent",
+  "organization_id": "00000000-0000-4000-8000-000000000001",
+  "plan_upgrade_intent": {
+    "nozle_id": "00000000-0000-4000-8000-000000000002",
+    "status": "needs_review",
+    "error_code": "plan_upgrade_apply_failed",
+    "customer_id": "00000000-0000-4000-8000-000000000003",
+    "subscription_id": "00000000-0000-4000-8000-000000000004",
+    "target_plan_id": "00000000-0000-4000-8000-000000000005",
+    "amount_cents": 919,
+    "currency": "USD",
+    "provider_payment_id": "pi_example",
+    "created_at": "2026-10-12T22:20:28Z",
+    "updated_at": "2026-10-22T07:10:02Z"
+  }
+}
+```
+
+- The object under `object_type` is the same object the REST API returns for that resource, so you can use one parser for both. A few events wrap it, for example `invoice.payment_dispute_lost` holds `{ "invoice": {...}, "provider_error": "..." }` under `payment_dispute_lost`.
+- Until January 19, 2027, payloads also carry the old, former-prefix key names beside the new keys. Read the new keys: see [legacy key names](/api/api-standards#legacy-key-names-removal-january-19-2027). The examples on this page show the new keys only.
+- Examples are captured from Core with real identifiers replaced by placeholders.
+
+## Choose the events you receive
+
+An endpoint with no `event_types` receives every type, and gets every type Nozle adds later. To receive only some, send an array when you create or update the endpoint:
+
+```json
+{
+  "webhook_endpoint": {
+    "webhook_url": "https://app.example.com/nozle/webhooks",
+    "name": "Production",
+    "event_types": ["subscription.started", "invoice.payment_status_updated"]
+  }
+}
+```
+
+- `null` or `["*"]` means every type. An empty array is rejected.
+- Names are trimmed and lower-cased. An unknown type is rejected with a `422` `invalid_types` error.
+- `credit_note.provider_refund_failure` is the former name of `credit_note.refund_failure`. It is still accepted and saved under the new name.
+- Respond `2xx` to types you do not handle, so Nozle does not retry them.
+
+## All events
+
+### Alerts
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `alert.triggered` | `triggered_alert` | A usage alert on a subscription (or a wallet balance alert) crosses one of its thresholds. |
+
+### Customers
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `customer.created` | `customer` | A customer is created, from the API, the dashboard or an upsert that creates one. |
+| `customer.updated` | `customer` | A customer is updated, from the API (an upsert on an existing `external_id`) or the dashboard. |
+| `customer.accounting_provider_created` | `customer` | A customer is created in an accounting integration (for example NetSuite or Xero). |
+| `customer.accounting_provider_error` | `accounting_provider_customer_error` | Syncing a customer to an accounting integration fails. |
+| `customer.crm_provider_created` | `customer` | A customer is created in a CRM integration (for example HubSpot or Salesforce). |
+| `customer.crm_provider_error` | `crm_provider_customer_error` | Syncing a customer to a CRM integration fails. The error object names the provider in `accounting_provider` and `accounting_provider_code`, the same keys as the accounting error. |
+| `customer.payment_provider_created` | `customer` | A customer is created at a payment provider (Stripe, Razorpay and the other providers). |
+| `customer.payment_provider_error` | `payment_provider_customer_error` | Creating or syncing a customer at a payment provider fails. |
+| `customer.checkout_url_generated` | `payment_provider_customer_checkout_url` | A provider checkout URL is generated for a customer, for example to add a payment method. |
+| `customer.tax_provider_error` | `tax_provider_customer_error` | Fetching taxes for a customer from a tax integration (Anrok or Avalara) fails. |
+| `customer.vies_check` | `customer` | The EU VAT number of a customer is checked against VIES. The `vies_check` field has the VIES answer, or the error when the check fails. |
+
+### Credit Notes
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `credit_note.created` | `credit_note` | A credit note is created, including the one made when a draft invoice is refreshed and finalized. |
+| `credit_note.generated` | `credit_note` | The PDF of a credit note has been generated. `file_url` is set. |
+| `credit_note.refund_failure` | `credit_note_payment_provider_refund_error` | Refunding a credit note at the payment provider fails. Endpoints that subscribed with the former name `credit_note.provider_refund_failure` receive it under this name. |
+
+### Dunning Campaigns
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `dunning_campaign.finished` | `dunning_campaign` | A dunning campaign has run its last attempt for a customer. |
+
+### Event Ingestion
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `event.error` | `event_error` | Deprecated. An ingested usage event cannot be processed, for example when its target wallet does not exist. Use `events.errors`. |
+| `events.errors` | `events_errors` | The periodic check of ingested events finds events with an unknown billable metric code, a missing aggregation property or invalid filter values. |
+
+### Features
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `feature.created` | `feature` | A feature is created. |
+| `feature.updated` | `feature` | A feature is updated, or one of its privileges is removed. |
+| `feature.deleted` | `feature` | A feature is deleted. |
+
+### Subscriptions and Fees
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `fee.created` | `fee` | A pay-in-advance fee is created (an instant usage charge or a non-invoiceable fee). |
+| `fee.tax_provider_error` | `tax_provider_fee_error` | Reserved. Core accepts this type in `event_types` but no code path sends it today. |
+| `subscription.canceled` | `subscription` | A payment-gated subscription is canceled because an activation rule failed. |
+| `subscription.incomplete` | `subscription` | A subscription waits for its first payment and stays incomplete. |
+| `subscription.terminated` | `subscription` | A subscription is terminated, by the API, at its end date or when it is replaced. |
+| `subscription.started` | `subscription` | A subscription starts or is activated, including the new subscription of a plan change. |
+| `subscription.updated` | `subscription` | A subscription is updated, a plan change is scheduled or canceled, or its entitlements change. A subscription that a plan change replaces also gets this event. |
+| `subscription.termination_alert` | `subscription` | A subscription is about to end, ahead of its `ending_at`. |
+| `subscription.trial_ended` | `subscription` | The free trial of a subscription ends. |
+| `subscription.usage_threshold_reached` | `subscription` | The lifetime usage of a subscription reaches a usage threshold. `usage_threshold` is the threshold that was reached. |
+
+### Invoices
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `invoice.created` | `invoice` | An invoice is finalized: a subscription invoice, a pay-in-advance or progressive billing invoice, or an invoice regenerated from a voided one. |
+| `invoice.one_off_created` | `invoice` | A one-off invoice is created. |
+| `invoice.paid_credit_added` | `invoice` | An invoice for prepaid credits (a wallet top-up) is finalized. |
+| `invoice.generated` | `invoice` | The PDF of an invoice has been generated. `file_url` is set. |
+| `invoice.drafted` | `invoice` | An invoice is created as a draft, while it is in its grace period or has been refreshed. |
+| `invoice.voided` | `invoice` | An invoice is voided. |
+| `invoice.payment_dispute_lost` | `payment_dispute_lost` | A payment dispute on an invoice is lost. The payload wraps the invoice in `payment_dispute_lost` with the provider reason. |
+| `invoice.payment_status_updated` | `invoice` | The payment status of an invoice changes (pending, succeeded, failed). |
+| `invoice.payment_overdue` | `invoice` | An unpaid invoice passes its due date and is marked overdue. |
+| `invoice.payment_failure` | `payment_provider_invoice_payment_error` | A payment attempt for an invoice fails at the provider, or a duplicate payment is refunded. `provider_error` says why. |
+| `invoice.resynced` | `invoice` | An invoice is synced again to a CRM integration (Salesforce). |
+
+### Integrations
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `integration.provider_error` | `provider_error` | An integration (accounting, CRM or tax) reports an error that is not tied to one customer. |
+
+### Quotes
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `order.created` | `order` | An order form is signed and the order is created. |
+| `order.executed` | `order` | An order is executed. `execution_record` lists what was created. |
+| `order.failed` | `order` | Executing an order fails and the order is marked `failed`, for example when the customer was deleted. `execution_record.errors` has the reasons. Sent once per failed execution. |
+| `order_form.created` | `order_form` | An order form is created for an approved quote. |
+| `order_form.signed` | `order_form` | An order form is signed. |
+| `order_form.expired` | `order_form` | An order form passes its expiry date and expires. |
+| `order_form.voided` | `order_form` | An order form is voided. |
+| `quote.created` | `quote` | A quote is created. The payload is the quote with the version it was created with. |
+| `quote.approved` | `quote` | A quote version is approved. |
+| `quote.voided` | `quote` | A quote version is voided. |
+
+### Payments
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `payment.succeeded` | `payment` | A payment succeeds at the provider (Stripe, Razorpay and the other providers). |
+| `payment.requires_action` | `payment` | A payment needs the customer to act, for example 3D Secure authentication. `next_action` has the details. |
+| `payment_provider.error` | `payment_provider_error` | A payment provider connection reports an error, for example when Nozle cannot register its webhook at Stripe. |
+| `payment_request.created` | `payment_request` | A payment request is created, by dunning or automatically for an invoice that Core did not charge (`automatic` is `true`). |
+| `payment_request.payment_failure` | `payment_provider_payment_request_payment_error` | A payment attempt for a payment request fails, or its Pay link cannot be built. `provider_error` says why, for example `payment_request_invoices_changed`. |
+| `payment_request.payment_status_updated` | `payment_request` | The payment status of a payment request changes. An automatic request is closed when its invoice is paid another way, settled by a credit note or voided. |
+| `plan_upgrade_intent.needs_review` | `plan_upgrade_intent` | A paid plan change cannot be applied and its intent goes to review. The payment is refunded. Sent once per intent, even when two payments of the same checkout are reviewed at the same moment. |
+
+### Payment Receipts
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `payment_receipt.created` | `payment_receipt` | A payment receipt is created for a successful payment. |
+| `payment_receipt.generated` | `payment_receipt` | The PDF of a payment receipt has been generated. `file_url` is set. |
+
+### Plans
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `plan.created` | `plan` | A plan is created. |
+| `plan.updated` | `plan` | A plan is updated, including changes to its entitlements or pricing display. |
+| `plan.deleted` | `plan` | A plan is deleted. |
+
+### Wallets and Credits
+
+| Event | Object key | When it fires |
+|---|---|---|
+| `wallet.created` | `wallet` | A wallet is created. |
+| `wallet.depleted_ongoing_balance` | `wallet` | The ongoing balance of a wallet reaches zero. |
+| `wallet.terminated` | `wallet` | A wallet is terminated. |
+| `wallet.updated` | `wallet` | A wallet is updated or its balance changes. |
+| `wallet_transaction.created` | `wallet_transaction` | A wallet transaction (a top-up, a grant or a void) is created. |
+| `wallet_transaction.updated` | `wallet_transaction` | A wallet transaction is settled or marked as failed. |
+| `wallet_transaction.payment_failure` | `payment_provider_wallet_transaction_payment_error` | The payment for a wallet top-up fails at the provider. `provider_error` says why. |
+
+## Events to know about
+
+### Sent only on some paths
+
+- `fee.tax_provider_error` is reserved. You can subscribe to it, but Core has no code path that sends it today.
+- `event.error` is deprecated. Use `events.errors`.
+- `invoice.add_on_added` is not a Nozle event. Earlier versions of the API reference listed it, and no endpoint can subscribe to it.
+- `customer.crm_provider_error` names the CRM in `accounting_provider` and `accounting_provider_code`, the keys the accounting error uses.
+
+### `order.failed`
+
+Sent once when executing an order fails and the order is marked `failed`. The reasons are in `execution_record.errors`:
+
+```json
+{
+  "webhook_type": "order.failed",
+  "object_type": "order",
+  "organization_id": "00000000-0000-4000-8000-000000000001",
+  "order": {
+    "nozle_id": "00000000-0000-4000-8000-000000000002",
+    "number": "OR-2026-0001",
+    "status": "failed",
+    "order_type": "subscription_creation",
+    "execution_mode": "execute_in_nozle",
+    "currency": "USD",
+    "executed_at": null,
+    "execution_record": {
+      "executed_at": null,
+      "execution_mode": "execute_in_nozle",
+      "invoice_id": null,
+      "subscription_ids": [],
+      "terminated_subscription_ids": [],
+      "applied_coupon_ids": [],
+      "wallet_ids": [],
+      "errors": [
+        "customer_not_found"
+      ]
+    },
+    "organization_id": "00000000-0000-4000-8000-000000000001",
+    "customer_id": "00000000-0000-4000-8000-000000000003",
+    "order_form_id": "00000000-0000-4000-8000-000000000004",
+    "created_at": "2026-10-07T23:41:36Z",
+    "updated_at": "2026-10-22T07:10:02Z"
+  }
+}
+```
+
+### `plan_upgrade_intent.needs_review`
+
+Sent once when a paid plan change cannot be applied: the intent goes to review and the payment is refunded. The envelope example at the top of this page is this event.
+
+### `credit_note.refund_failure`
+
+Sent when refunding a credit note at the payment provider fails:
+
+```json
+{
+  "webhook_type": "credit_note.refund_failure",
+  "object_type": "credit_note_payment_provider_refund_error",
+  "organization_id": "00000000-0000-4000-8000-000000000001",
+  "credit_note_payment_provider_refund_error": {
+    "credit_note_id": "00000000-0000-4000-8000-000000000002",
+    "customer_id": "00000000-0000-4000-8000-000000000003",
+    "external_customer_id": "sdkv3x-1791863030",
+    "provider_customer_id": "cust_example",
+    "payment_provider": "stripe",
+    "payment_provider_code": "stripe_sdkv3_test",
+    "provider_error": "Refund could not be processed"
+  }
+}
+```
+
+### `payment_request.payment_failure`
+
+Sent when a payment attempt for a payment request fails, or when its Pay link cannot be built. `provider_error.error_code` says why, for example `payment_request_invoices_changed`:
+
+```json
+{
+  "webhook_type": "payment_request.payment_failure",
+  "object_type": "payment_provider_payment_request_payment_error",
+  "organization_id": "00000000-0000-4000-8000-000000000001",
+  "payment_provider_payment_request_payment_error": {
+    "payment_request_id": "00000000-0000-4000-8000-000000000002",
+    "invoice_ids": [
+      "00000000-0000-4000-8000-000000000003"
+    ],
+    "customer_id": "00000000-0000-4000-8000-000000000004",
+    "external_customer_id": "vfy-rest-c1",
+    "provider_customer_id": "cus_example",
+    "payment_provider": null,
+    "payment_provider_code": null,
+    "provider_error": {
+      "message": "Your card was declined.",
+      "error_code": "card_declined"
+    }
+  }
+}
+```
+
+### `payment_request.created` and `payment_request.payment_status_updated`
+
+The payment request carries `automatic`: `true` for a request Core created itself for a finalized invoice it did not charge, `false` for one created by dunning or by hand. An automatic request is closed (`succeeded`, or `failed` when its invoice is voided) when its invoice is paid another way or settled by a credit note, and `payment_request.payment_status_updated` is sent. The `customer` and `invoices` fields are omitted from this example:
+
+```json
+{
+  "webhook_type": "payment_request.payment_status_updated",
+  "object_type": "payment_request",
+  "organization_id": "00000000-0000-4000-8000-000000000001",
+  "payment_request": {
+    "nozle_id": "00000000-0000-4000-8000-000000000002",
+    "amount_cents": 330,
+    "amount_currency": "USD",
+    "email": "jane@example.com",
+    "payment_status": "succeeded",
+    "automatic": false,
+    "created_at": "2026-10-13T00:20:30Z"
+  }
+}
+```
+
+### `subscription.updated`
+
+Sent for a change to the subscription itself, for a plan change that is scheduled or canceled, and for the subscription that a plan change replaces. The `customer`, `plan` and entitlement fields are omitted from this example:
+
+```json
+{
+  "webhook_type": "subscription.updated",
+  "object_type": "subscription",
+  "organization_id": "00000000-0000-4000-8000-000000000001",
+  "subscription": {
+    "nozle_id": "00000000-0000-4000-8000-000000000002",
+    "external_id": "issue11_llm_sub",
+    "customer_id": "00000000-0000-4000-8000-000000000003",
+    "external_customer_id": "issue11_llm_cust",
+    "name": "Renamed in capture",
+    "plan_code": "issue11_llm_plan",
+    "plan_amount_cents": 0,
+    "plan_amount_currency": "USD",
+    "status": "active",
+    "billing_authority": "nozle",
+    "credit_import_completed_at": null,
+    "billing_time": "calendar",
+    "subscription_at": "2026-10-17T02:02:32Z",
+    "started_at": "2026-10-17T02:02:32.080Z",
+    "trial_ended_at": null,
+    "ending_at": null,
+    "terminated_at": null,
+    "canceled_at": null,
+    "created_at": "2026-10-17T02:02:32Z",
+    "previous_plan_code": null,
+    "next_plan_code": null,
+    "downgrade_plan_date": null,
+    "current_billing_period_started_at": "2026-10-17T02:02:32Z",
+    "current_billing_period_ending_at": "2026-10-31T18:29:59Z",
+    "on_termination_credit_note": null,
+    "on_termination_invoice": "generate",
+    "progressive_billing_disabled": false,
+    "consolidate_invoice": true,
+    "purchase_order_number": null,
+    "payment_method": {
+      "payment_method_id": null,
+      "payment_method_type": "provider"
+    }
+  }
+}
+```
+
+### Wallet events
+
+`wallet.created`, `wallet.updated`, `wallet.terminated` and `wallet.depleted_ongoing_balance` carry the wallet. `wallet.updated` is also sent when the balance changes:
+
+```json
+{
+  "webhook_type": "wallet.updated",
+  "object_type": "wallet",
+  "organization_id": "00000000-0000-4000-8000-000000000001",
+  "wallet": {
+    "nozle_id": "00000000-0000-4000-8000-000000000002",
+    "customer_id": "00000000-0000-4000-8000-000000000003",
+    "external_customer_id": "evalag1790953905_m1",
+    "status": "active",
+    "currency": "USD",
+    "name": "Renamed in capture",
+    "code": "default",
+    "rate_amount": "1.0",
+    "credits_balance": "0.0",
+    "credits_ongoing_balance": "0.0",
+    "credits_ongoing_usage_balance": "0.0",
+    "balance_cents": 0,
+    "ongoing_balance_cents": 0,
+    "ongoing_usage_balance_cents": 0,
+    "consumed_credits": "0.0",
+    "created_at": "2026-10-02T15:11:56Z",
+    "expiration_at": null,
+    "last_balance_sync_at": null,
+    "last_consumed_credit_at": null,
+    "terminated_at": null,
+    "invoice_requires_successful_payment": false,
+    "paid_top_up_min_amount_cents": null,
+    "paid_top_up_max_amount_cents": null,
+    "priority": 50,
+    "recurring_transaction_rules": [],
+    "payment_method": {
+      "payment_method_id": null,
+      "payment_method_type": "provider"
+    }
+  }
+}
+```
+
+## Delivery
+
+Headers, signatures, retries and ordering are the same for every event: see [Delivery, retries and ordering](/api/receive-webhooks#delivery-retries-and-ordering).
