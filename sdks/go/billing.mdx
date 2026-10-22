@@ -70,6 +70,21 @@ The customer must already exist, so call `UpsertCustomer` first; an unknown cust
 
 `Subscribe` to another plan adds a second active subscription. It does not replace the first, and plan credit grants are granted again. To move a customer, call `Checkout` with `SubscriptionID` (needs a [transition policy](/api/plan-transition-policies)), or cancel and then subscribe. Pass the new subscription ID as `SubscriptionID` to `Track`.
 
+### Plan versions
+
+Changing a plan's price while customers pay for it saves its next version; existing subscribers keep theirs. `Plans` returns current versions only (`Version`, `IsCurrent`). With `nozle-go` 0.14.0:
+
+```go
+client.Subscribe(ctx, nozle.SubscribeParams{CustomerID: "workspace_123", PlanCode: "pro", PlanVersion: 1}) // an older version
+versions, err := client.PlanVersions(ctx, "pro")
+preview, err := client.PreviewPlanVersionMigration(ctx, "pro", nozle.PlanVersionMigrationParams{FromVersion: 1})
+migration, err := client.CreatePlanVersionMigration(ctx, "pro", nozle.PlanVersionMigrationParams{FromVersion: 1})
+migration, err = client.GetPlanVersionMigration(ctx, "pro", migration.NozleID) // Items with MoveStatus
+_, err = client.CancelPlanVersionMigration(ctx, "pro", migration.NozleID)
+```
+
+These need a secret key. Another `PlanVersion` for an existing subscription returns a 422 `*APIError`; a second migration while one runs returns 409 with `HasCode("plan_version_migration_running")`. See [Plan versioning](/guides/billing/plan-versions).
+
 ## Subscription self-service
 
 Derive the customer from the authenticated application user and validate ownership of the selected **external** subscription ID. Do not pass Core's internal UUID. These methods support [the React billing portal](/sdks/react/billing-portal).

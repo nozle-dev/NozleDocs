@@ -5,6 +5,18 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Plan versioning (API 3.13.0, Engine 2.4.0, Node 0.15.0, React 0.15.0, Python 0.15.0, Go 0.14.0)
+
+_Unreleased_
+
+- Changing what a plan bills or grants while customers pay for it saves the plan's next version under the same code. Existing subscribers keep their version and price; new subscriptions get the current version. Plans have `version` and `is_current`, and `GET /plans` returns current versions only. See [Plan versioning](/guides/billing/plan-versions).
+- `PUT /plans/{code}` takes `disable_version` (change the current version for everyone) and `force_version`. An edit of an older version is refused with `409 plan_version_not_current`.
+- Sell an older version with `plan_version` on `POST /subscriptions` and on the Engine's `POST /subscribe`. The same plan code sent again for an existing subscription never moves it.
+- `GET /plans/{code}/versions` lists the versions; version migrations (`/plans/{code}/version-migrations`: preview, start, list, read, cancel) move one version's subscribers to another at the end of their billing periods, charging nothing when they run. See [Plan Versions and Migrations](/api/plan-versions).
+- Settings › Billing: `plan_version_credits` decides what a moved customer keeps of the old version's plan credits.
+- New webhook `plan.version_created`. Subscriptions carry `plan_version`, `previous_plan_version`, `next_plan_version` and `plan_version_migration_id`.
+- SDKs: plan versions and migrations in `@nozle-js/node`, `nozle-sdk` and `nozle-go`; `<CurrentPlan />` no longer shows the current version's limits to a customer on an older version.
+
 ### Engine webhook verification (Engine 2.0.3)
 
 _October 21, 2026_
