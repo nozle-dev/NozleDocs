@@ -14,7 +14,7 @@ if err == nil && result.Allowed {
 }
 ```
 
-`Can` reads Engine `/api/v1/can`; `CanWithMetadata` adds a JSON metadata filter. For credit-backed features, `CheckUsage` provides an advisory projection and `TrackUsage` enforces and records the deduction atomically.
+`Can` reads Engine `/api/v1/can`; `CanWithMetadata` also sends JSON metadata for the cost and margin estimate. For credit-backed features, `CheckUsage` provides an advisory projection and `TrackUsage` enforces and records the deduction atomically.
 
 ## Metadata
 
@@ -26,14 +26,14 @@ _ = result
 _ = err
 ```
 
-Metadata can include quantities required by a Cost Rule.
+Metadata can include quantities required by a Cost Rule. It is input to the cost and margin estimate only. It does not filter usage: `Used`, `Limit` and `Remaining` always cover all of the feature's usage, whatever `model` or other properties you send.
 
 ## `CanResult`
 
 | Field | Meaning |
 |---|---|
 | `Allowed`, `Reason` | Access decision and reason. |
-| `Used`, `Overage` | Usage so far, and whether it is past the limit. |
+| `Used`, `Overage` | Usage so far, and whether a soft limit is reached. `Overage` never denies by itself: the usage is billed as overage. Deny only on `Allowed == false`. |
 | `Limit`, `Remaining` | `*int`. `nil` when the feature is unlimited (the API sends `null`), never `0`: a `0` allowance means none left. Check `Limit != nil` before reading either. |
 | `Economics` | Optional point-in-time estimate with exact `nozle.Decimal` values, Cost Rule versions, and exclusions. |
 
