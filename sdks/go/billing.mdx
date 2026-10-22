@@ -45,16 +45,12 @@ page, err := client.ManagePaymentMethod(ctx, "workspace_123", "https://app.examp
 if err != nil {
 	return err
 }
-if page.URL != "" {
-	http.Redirect(w, r, page.URL, http.StatusSeeOther) // Stripe Billing Portal
-} else {
-	openRazorpayMandate(page.Checkout) // Razorpay mandate checkout
-}
+http.Redirect(w, r, page.URL, http.StatusSeeOther) // Stripe Billing Portal
 ```
 
-Requires an `sk_` key. A `pk_` key is refused with `403` (no error code, only a message). Nozle stores no card data: the customer changes their payment method at the provider.
+Stripe only. Requires an `sk_` key. A `pk_` key is refused with `403` (no error code, only a message). Nozle stores no card data: the customer changes their payment method in the Stripe Billing Portal. Razorpay customers pay each invoice through a Razorpay payment link, so for them the call fails with `422 razorpay_pays_by_link`.
 
-See [Manage Payment Method](/api/manage-payment-method) for the HTTP contract, Razorpay behaviour and error codes.
+See [Manage Payment Method](/api/manage-payment-method) for the HTTP contract and error codes.
 
 ## Direct subscription and cancellation
 
