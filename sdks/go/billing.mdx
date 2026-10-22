@@ -113,7 +113,7 @@ A \$0 to \$0 immediate upgrade returns `completed` with `payment_source: "credit
 
 ### Schedule or withdraw a downgrade
 
-`PreviewSubscriptionTransition` and `ApplySubscriptionTransition` support `cancel`, `downgrade`, and `uncancel`. Apply requires a caller-supplied idempotency key. `WithdrawPendingSubscriptionChange` requires the exact pending change ID. `CancelSubscription` provides the simpler immediate or end-of-period cancellation path.
+`PreviewSubscriptionTransition` and `ApplySubscriptionTransition` support `cancel`, `downgrade`, and `uncancel`. Apply requires a caller-supplied idempotency key. `WithdrawPendingSubscriptionChange` requires the exact pending change ID. `CancelSubscription` provides the simpler immediate or end-of-period cancellation path. Pass `immediate` or `end_of_period` as the policy. An empty policy sends no timing, so the organization's cancellation timing applies (Nozle's default is `end_of_period`). Settlement choices go in the optional `nozle.CancelSubscriptionOptions` (`CreditAction`, `RefundMode`), as in the [subscriptions guide](/guides/billing/subscriptions).
 
 ```go
 quote, err := client.PreviewSubscriptionChange(ctx, "workspace_123", "subscription_123", "growth_monthly")
