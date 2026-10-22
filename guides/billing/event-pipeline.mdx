@@ -63,7 +63,16 @@ The Go SDK defaults to `https://api.nozle.app/engine` and `https://api.nozle.app
 
 ## 2. Ingest and deduplicate
 
-Nozle accepts the event through the Go Engine at `https://api.nozle.app/engine/api/v1/events`. Preserve both the transaction ID and event timestamp when retrying the same logical event. Deployments using the high-volume event store deduplicate on both values.
+Nozle accepts the event through the Go Engine at `https://api.nozle.app/engine/api/v1/events`. Preserve the transaction ID, the timestamp and the rest of the payload when retrying the same logical event. A transaction ID is unique within the organization. What happens to a repeated one depends on the organization's event store:
+
+| Event store | Same transaction ID, same payload | Same transaction ID, different payload |
+|---|---|---|
+| Standard (PostgreSQL) | `200` with the event already stored. Nothing new is stored. | `409 transaction_id_conflict`. Nothing is stored; the first event keeps the ID. |
+| High-volume (ClickHouse) | `200`. Every request is published; billing removes the repeats (see below). | `200` as well: the Engine does not compare payloads, so the response does not tell you the change was ignored or counted. |
+
+On the standard store, "same payload" means the same feature code, subscription, `properties` and `precise_total_amount_cents`, and the same timestamp when the request sends one. In a batch, a reused ID with a different payload, or the same ID twice in one batch, rejects the whole batch with `422 validation_errors` and `transaction_id: ["value_already_exist"]` for that event.
+
+On the high-volume store, repeats are removed when usage is read for billing, not at ingestion. With deduplication turned on for the organization (off by default; Nozle sets it), only the first copy ingested for each transaction ID counts, whatever its timestamp or payload. Without it, copies that share the transaction ID, timestamp, feature code and subscription are merged into one by the store in the background, and a copy with a different timestamp counts as a separate event. Either way the response does not say which copy counts, so never reuse a transaction ID for a changed event.
 
 ## 3. Aggregate usage
 
