@@ -11720,7 +11720,7 @@ paths:
   /check-and-deduct:
     post:
       summary: Check and deduct legacy wallet credits
-      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet, and when its `credits_balance` covers `credits`, deducts them and records an outbound wallet transaction, in one database transaction. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; With API key permissions, the secret key needs `credit_system:write`, as on `POST /usage/track`.'
+      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet against concurrent check-and-deduct calls, and when its `credits_balance` covers `credits`, spends them through Core''s `POST /wallet_transactions` (`voided_credits`), which records a voided outbound wallet transaction, sends `wallet.updated` and `wallet_transaction.created` and runs wallet alerts. Not idempotent: an `Idempotency-Key` header is ignored and a retry deducts again; use `POST /usage/track` for retries. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; With API key permissions, the secret key needs `credit_system:write`, as on `POST /usage/track`, and `wallet_transaction:write`; without either the answer is `403` with `code: permission_denied` before any deduction.'
       operationId: engineCheckAndDeductCredits
       tags:
         - Credits
@@ -11780,7 +11780,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: 'A publishable key (body `{"error": "this endpoint requires a secret key (sk_)"}`), or `code: permission_denied` when API key permissions are enabled and the secret key lacks `credit_system:write`.'
+          description: 'A publishable key (body `{"error": "this endpoint requires a secret key (sk_)"}`), or `code: permission_denied` when API key permissions are enabled and the secret key lacks `credit_system:write` or `wallet_transaction:write`.'
         '404':
           description: The customer does not exist or has no active wallet.
           content:
@@ -11792,7 +11792,7 @@ paths:
                     code: wallet_not_found
                     error: No active wallet found for this customer.
         '500':
-          description: The deduction failed.
+          description: The deduction failed, for example Core refused the wallet transaction. Nothing was deducted.
           content:
             application/json:
               schema: *id001
