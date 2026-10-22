@@ -24,14 +24,19 @@ const check = await nozle.can('customer_123', 'api_calls')
 if (!check.allowed) {
   return Response.json(
     { error: check.reason ?? 'not_allowed', remaining: check.remaining },
-    { status: check.overage ? 429 : 403 },
+    { status: 403 },
   )
+}
+
+if (check.overage) {
+  // Allowed: a soft limit is reached, so this usage is billed as overage.
+  notifyOverage(check)
 }
 
 return performProtectedWork()
 ```
 
-Call `can()` immediately before protected work. The response can include usage and margin context in addition to the allow/deny decision.
+Call `can()` immediately before protected work. Deny only when `allowed` is `false`. `overage: true` never denies by itself: a soft limit is reached and the usage is billed as overage, so warn or notify instead of blocking. The response can include usage and margin context in addition to the allow/deny decision.
 
 ## React presentation
 
