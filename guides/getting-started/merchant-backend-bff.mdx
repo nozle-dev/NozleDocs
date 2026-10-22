@@ -112,7 +112,7 @@ Use one bulk request rather than one checkout call per seat. The bulk request cr
 
 The browser may decide requested quantities, but the backend owns generated Entity IDs, plan allowlists, customer mapping, billing mode, and return-origin validation.
 
-For cancellation, call `cancelSubscription(customerId, subscriptionId)` from Node.js, `cancel_subscription(customer_id, subscription_id)` from Python, or `CancelSubscription(ctx, customer, subscription, policy)` from Go. When the policy is omitted or empty, the SDKs and the raw API send no timing, so the organization's cancellation timing applies (Nozle's default is `immediate`); pass `end_of_period` to keep access until the renewal boundary. Resolve the customer from merchant-owned records and validate ownership of the selected external subscription ID. Use the guarded transition flow above for customer-facing Cancel/Keep.
+For cancellation, call `cancelSubscription(customerId, subscriptionId)` from Node.js, `cancel_subscription(customer_id, subscription_id)` from Python, or `CancelSubscription(ctx, customer, subscription, policy)` from Go. When the policy is omitted or empty, the SDKs and the raw API send no timing, so the organization's cancellation timing applies (Nozle's default is `end_of_period`); pass `immediate` only when access must end now. Resolve the customer from merchant-owned records and validate ownership of the selected external subscription ID. Use the guarded transition flow above for customer-facing Cancel/Keep.
 
 ## Payment authority
 
