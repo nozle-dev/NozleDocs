@@ -31,7 +31,7 @@ Plan checkout is payment-gated. Free-to-paid checkout uses an incomplete subscri
 
 If prepaid credits fully cover a paid plan change, Nozle applies it without an external payment and returns `type: "completed"`. A downgrade or other cycle-end transition may return `type: "scheduled"`.
 
-Checkout is only for plans that need an up-front payment. For a customer with no subscription, a free plan, a plan with a trial, or a plan billed in arrears returns `422 checkout_not_required`: start it with [`subscribe`](/api/subscribe) instead. Entity checkout is the exception and completes these plans with `payment_source: "none"`.
+Checkout is only for plans that need an up-front payment. For a customer with no subscription, a free plan, a plan with a trial, or a plan billed in arrears returns `422 checkout_not_required`: start it with [`subscribe`](/api/subscribe) instead. A plan with a pay-in-advance fixed charge is the exception, even with a trial or billed in arrears: checkout invoices the fixed charge in the request and returns a payable session for it, like any paid plan. The customer's saved card is never charged off-session for that invoice. Entity checkout is the exception and completes these plans with `payment_source: "none"`.
 
 Changing the plan of an existing subscription needs a [plan transition policy](/api/plan-transition-policies) for that pair of plans, except from a free plan to a paid plan. The selected self-service downgrade flow uses a signed quote with the end-of-period transition endpoint described below.
 
@@ -130,6 +130,16 @@ An unpaid plan checkout or single Entity checkout expires after 23 hours, the sa
 
 A checkout that was paid in time is activated instead. While the provider is still processing a payment, the checkout is kept and checked again an hour later. A checkout whose payment fails also closes its invoice and returns the same credits.
 
+### Upgrade checkout that ran out of time
+
+Before a paid upgrade checkout whose time ran out is reported `expired` or replaced, Nozle asks the payment provider what became of it:
+
+- **Closed without a payment** (a Stripe Checkout Session that is still open is expired at Stripe first, or a Razorpay order without a payment): the upgrade expires, and a new checkout opens a new session or order.
+- **Paid in time, webhook late:** Nozle settles the payment as the webhook would and applies the upgrade. No second checkout is offered, so the customer is not charged twice.
+- **Payment still processing, or the provider cannot be reached:** nothing changes and a new checkout answers `409 plan_upgrade_checkout_in_progress`. Poll the [checkout status](/api/subscription-management#payment-status-and-recovery) and try again later.
+
+Once a late payment has been applied, a new checkout of the same plan answers `422 plan_already_active`, with Stripe and Razorpay alike. If the checkout request that found the late payment asked for another plan, it answers `409 plan_upgrade_checkout_in_progress` with the `checkout_id` of the paid checkout; reload the subscription before you start the next change.
+
 ### Credit-funded response
 
 When no external payment remains due:
@@ -175,6 +185,8 @@ These limits were observed on a paid upgrade checkout that returns a `stripe` re
 - **Pending change.** A paid upgrade checkout is refused with `409 subscription_change_pending` while the subscription has a scheduled cancellation or a scheduled plan change. Withdraw the pending downgrade with [`POST /subscriptions/transitions/withdraw`](/api/subscription-management#withdraw-a-pending-downgrade), or keep the subscription, then start the upgrade. Cancelling at period end, scheduling a plan change or applying an immediate downgrade cancels an open upgrade checkout: its Stripe Checkout Session or Razorpay order is expired. A payment the provider is already processing is left to settle.
 - **Status.** Poll the upgrade with `GET /checkout/{plan_upgrade_intent_id}?customer_id=…&subscription_id=…` (Engine names). `status` is `awaiting_payment` until payment, then `succeeded` with `fulfillment_status` `succeeded` and an `invoice_id`. `needs_review` means the payment was taken but the upgrade was not applied. See [Subscription self-service](/api/subscription-management#payment-status-and-recovery).
 
+- **Failed upgrades leave nothing behind.** A quoted upgrade with nothing to pay that fails after the change was prepared (for example because the grace period keeps its invoice a draft) is rolled back: the subscription stays on its plan, no credit note is created, and the same request can be retried once the cause is fixed. An upgrade whose credit for the unused time of the old plan cannot be computed (the credit usage of a plan family interval switch is unavailable) fails with `503 credit_usage_unavailable` and applies nothing, instead of applying without the credit. Retry later.
+
 With a grace period of 0 and no pending change, a credited upgrade applies as quoted: the old subscription is terminated, the new one is active, and `billing_time` is unchanged.
 
 ## Errors
@@ -192,7 +204,7 @@ The Engine checks the request in this order: valid JSON body, customer scope, th
 | `422` | `plan_already_active`, `target_plan_is_not_a_downgrade` | See [transition policies](/api/plan-transition-policies). |
 | `422` | `subscription_not_active` | Raised by plan-transition calls on a subscription that is not active. A checkout that names a terminated subscription ID was treated as a new checkout in testing, so do not rely on this code from checkout. |
 | `409` | `subscription_selection_required` | The customer has several active subscriptions and no `subscription_id` was given. |
-| `409` | `plan_upgrade_checkout_in_progress` | Another upgrade checkout for the same subscription is open. Recover it with checkout status. |
+| `409` | `plan_upgrade_checkout_in_progress` | Another upgrade checkout for the same subscription is open, or its time ran out while the provider reports a payment in progress or cannot be reached. Recover it with checkout status. See [Upgrade checkout that ran out of time](#upgrade-checkout-that-ran-out-of-time). |
 | `409` | `entity_subscription_checkout_in_progress` | A single Entity checkout on a different plan is still being paid: the provider is processing its payment, or it was paid. An abandoned one is replaced instead. |
 | `409` | `billing_anchor_checkout_in_progress` | A single Entity checkout found that the customer's first paid Entity checkout is still open and no billing anchor is set yet. |
 | `422` | `validation_errors` | `error_details.checkout` is `billing_anchor_checkout_in_progress`: a bulk Entity checkout found an Entity with an incomplete subscription, or a first paid checkout for the customer still open. It is a `422`, not a `409`. |
@@ -203,13 +215,14 @@ The Engine checks the request in this order: valid JSON body, customer scope, th
 | `422` | `payment_provider_required` | The customer is not assigned to Razorpay and the organization has no Stripe connection. |
 | `422` | `stripe_customer_required` | Nozle could not create the customer in Stripe. A customer that is not in Stripe yet normally gets one at checkout, so this code appears only when that creation fails. See the [Stripe integration](/integrations/stripe#errors). |
 | `422` | `razorpay_requires_inr` | A Razorpay checkout for an invoice that is not in INR. See the [Razorpay integration](/integrations/razorpay#errors). |
-| `422` | `plan_already_active` | The customer, or Entity, is already on this plan. |
+| `422` | `plan_already_active` | The customer, or Entity, is already on this plan, including right after a late upgrade payment for it was applied. |
 | `409` | `subscription_checkout_in_progress` | A new-subscription checkout for this customer on a different plan is still being paid: the provider is processing its payment, or it was paid. An abandoned one is replaced instead. |
 | `422` | `validation_errors` | For an invoice checkout, `error_details.base` is `invalid_invoice_status_or_payment_status` when the invoice is paid, voided, a draft, closed, failed or has nothing due. |
 | `422` | `razorpay_customer_connection_cannot_change` | The customer already started a Razorpay checkout and was moved to another Razorpay connection. Create a new customer instead. See the [Razorpay integration](/integrations/razorpay#assign-the-connection-to-customers). |
 | `404` | `payment_provider_not_found` | The customer's connection code matches no Razorpay connection. |
 | `422` | `third_party_error` | The provider rejected the request, for example Razorpay with a wrong key secret. |
 | `422` | `subscription_and_idempotency_key_required` | `quote_id` sent without `subscription_id` or an `Idempotency-Key`. |
+| `503` | `credit_usage_unavailable` | The credit for the unused time of the old plan could not be computed. Nothing was applied. Retry later. |
 
 ## Webhook requirement
 

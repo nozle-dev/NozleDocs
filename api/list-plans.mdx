@@ -33,12 +33,22 @@ Engine forwards the request, with its query string, to Core and returns Core's s
 
 All top-level plans of the organization, newest first. There is no listed, public or draft flag, so trial plans, pay-in-arrears plans and free plans are all included. Per-customer override plans (plans with a `parent_id`) and deleted plans are not.
 
-- A `pk_` key does not receive plans that are pending deletion. `GET /plans/{code}` returns `404` with `"code": "plan_not_found"` for one.
+- A `pk_` key does not receive plans that are pending deletion, and `families[].plan_codes` leaves their codes out. `GET /plans/{code}` returns `404` with `"code": "plan_not_found"` for one.
 - An `sk_` key receives them, with `pending_deletion: true`.
 - A `pk_` key, or an `sk_` key with `include_hidden=false`, does not receive plans whose plan family is hidden from the pricing table in the list. Hiding a family is a listing setting only: `GET /plans/{code}` still returns a plan of a hidden family, or of a deleted family, to a `pk_` key, so the SDK can describe a subscriber's own plan.
+- `include_hidden` (secret keys only): send `include_hidden=false` to get the same pricing table view as a `pk_` key. Any other value, or none, returns every plan.
 - Every plan, listed or read by code, carries all its entitlements and charges, including those of features hidden from the pricing table. Only the pricing table rows (`families[].features`) leave hidden features out.
 
 A plan created through `POST /plans`, the dashboard onboarding or the Agent Kit starts in a new plan family that is shown on the pricing table, so it is listed at once. Send `show_on_pricing: false` in `plan` (GraphQL `showOnPricing: false`) to create it hidden. A plan that joins an existing family with `plan_family_code` keeps that family's visibility.
+
+### Plan families
+
+A plan family groups the billing intervals of one offer, for example "Pro" monthly and "Pro" yearly. Every plan has `plan_family_code`, and the list returns a `families` array with the display settings (`show_on_pricing`, `pricing_position`, `pricing_highlighted`, `badge_text`, `cta_text`, `plan_codes` and the feature rows) for the families of the returned plans.
+
+- `POST /plans` and `PUT /plans/{code}` accept `plan_family_code`. A code that does not exist yet creates the family; without a code the plan gets its own family.
+- A family holds at most one plan per `interval`, all in one currency. Otherwise the call returns `422` with `interval: plan_family_interval_already_exist` or `amount_currency: plan_family_currency_mismatch`.
+- A plan that joins a family with other plans takes the family's features and privileges.
+- `POST`, `PATCH` and `DELETE /plans/{code}/entitlements` (and `.../privileges/{code}`) change the features and privileges of every plan in the family. `usage_limit` and `hard_limit` apply only to the plan in the path, because usage is counted per billing period.
 
 ### Pagination
 
@@ -126,6 +136,7 @@ Identifiers are named `nozle_id`. Amounts named `*_cents` are integers in cents 
 | `code` | string | Unique plan code. Use it to start checkout. |
 | `name` | string | Plan name. |
 | `description` | string or `null` | Plan description. |
+| `plan_family_code` | string or `null` | Code of the plan family. See [Plan families](#plan-families). |
 | `interval` | string | `weekly`, `monthly`, `quarterly`, `semiannual` or `yearly`. |
 | `amount_cents` | integer | Base price per `interval`, before tax, in cents of `amount_currency`. `0` for a free or pure usage-based plan. Usage prices are in `charges`. |
 | `amount_currency` | string | ISO 4217 currency code, such as `USD`. |

@@ -32,7 +32,7 @@ import { PaymentMethodDisplay } from '@nozle-js/react'
 
 When a payment fails, Nozle records the failed payment status. Dunning and retries can be configured for recurring invoices:
 
-- Automatic dunning: configurable retry schedule. It is part of the Growth, Scale and Enterprise [Nozle plans](/guides/getting-started/nozle-plans#premium-features). The hourly run creates a payment request for each overdue invoice of a customer with a campaign, on the campaign's schedule: it retries the payment with the customer's payment provider, or emails the customer the payment link when there is none. A customer or billing entity can use only a dunning campaign of your own organization.
+- Automatic dunning: configurable retry schedule. It is part of the Growth, Scale and Enterprise [Nozle plans](/guides/getting-started/nozle-plans#premium-features). The hourly run creates a payment request for each overdue invoice of a customer with a campaign, on the campaign's schedule: it retries the payment with the customer's payment provider, or emails the customer the payment link when there is none. A customer or billing entity can use only a dunning campaign of your own organization. For a customer who pays through Razorpay the payment link goes out by email, so the billing entity needs an email: without one, the payment request is refused with `billing_entity_email_missing` instead of being created for nobody.
 - Manual dunning: manually trigger retry
 
 **Product credit top-ups:**

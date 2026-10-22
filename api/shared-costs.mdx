@@ -39,6 +39,8 @@ The default eligible population includes every free or paid customer with at lea
 
 After the allocation period closes, finalize it to freeze the customer population and append immutable entries to the PostgreSQL cost ledger.
 
+You do not have to call it. Nozle checks every 15 minutes and allocates each closed allocation period of every pool that has no finished allocation yet, so closed months appear in the margin report and customer profitability on their own. Open periods are never allocated, and a period that was already allocated, by hand or automatically, is left alone. Call the endpoint when you want a closed period booked before the next check.
+
 ```http
 POST /api/v1/cost-intelligence/shared-costs/{shared_cost_pool_id}/allocate
 Authorization: Bearer nozle_secret_key

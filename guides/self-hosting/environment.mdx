@@ -1,33 +1,30 @@
 ---
 title: Environment Variables
-description: Configuration for self-hosted deployments
+description: Environment variables that Nozle Core and Engine read. Self-hosting is not supported today.
 ---
 
-When self-hosting, you'll need to configure environment variables for the API, frontend, and worker processes. Nozle Cloud handles all of this automatically.
+Nozle does not support self-hosting today, and Nozle Cloud sets all of these for you. This page lists the variables that Core and Engine read, for people who develop on Nozle itself.
 
-## Core Configuration
+## Core
 
-Key variables include:
+Core reads its database, Redis, public URL and SMTP settings from environment variables with a Core-specific prefix. Take the exact names from the Core repository (`docker-compose.yml` and `api/config/environments/production.rb`), not from this page. The names below are the generic ones that Core does not read, so do not use them:
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis connection string |
-| `API_URL` | Self-referencing API URL |
-| `SMTP_ADDRESS` | SMTP server for invoice emails |
-| `SMTP_PORT` | SMTP port (typically 587) |
-| `SMTP_FROM_EMAIL` | From address for transactional emails |
+`API_URL`, `SMTP_ADDRESS`, `SMTP_PORT` and `SMTP_FROM_EMAIL`.
+
+Without the SMTP variables Core reads, no email is sent: sign-up verification codes and invoice emails never arrive. `DATABASE_URL` and `REDIS_URL` are the names Core uses for PostgreSQL and Redis. In Nozle Cloud the dashboard is at [app.nozle.app](https://app.nozle.app).
 
 ## Nozle API Keys
 
-Regardless of deployment model, you'll need Nozle API keys to use the SDKs:
+Regardless of deployment model, you need Nozle API keys to use the SDKs:
 
 | Key Type | Prefix | Use |
 |----------|--------|-----|
 | Publishable | `pk_` | Client-side public plan catalog only |
 | Secret | `sk_` | Server-side (Node.js, Python, Go SDKs) |
 
-## Credit API browser and checkout settings
+Get your keys from the Nozle dashboard at [app.nozle.app](https://app.nozle.app).
+
+## Engine: browser and checkout settings
 
 | Variable | Description |
 |----------|-------------|
@@ -37,5 +34,3 @@ Regardless of deployment model, you'll need Nozle API keys to use the SDKs:
 | `CHECKOUT_RETURN_URL_ALLOWED_ORIGINS` | Exact comma-separated HTTPS origins allowed for checkout returns. |
 
 Use separate values for browser CORS and checkout return validation. CORS controls which browser origins may call an endpoint; it does not authenticate callers or make a return URL safe.
-
-Get your keys from the Nozle dashboard at [app.nozle.dev](https://app.nozle.dev).
