@@ -85,6 +85,8 @@ nozle.track(
 )
 ```
 
+A timeout, a network error or a `5xx` can arrive after Nozle recorded the event. Nozle records an event once per `transaction_id`, so a retry with the same ID, the same event and the same `timestamp` does not bill it twice; a new ID is a new event. `track()` returns the ID only when it succeeds: when it raises, an ID the SDK generated is lost. Pass your own `transaction_id` and `timestamp` whenever you may retry.
+
 ## FastAPI worker pattern
 
 ```python

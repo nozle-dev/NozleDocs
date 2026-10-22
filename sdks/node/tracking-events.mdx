@@ -96,6 +96,22 @@ await nozle.track(customerId, 'text_generation', {
 }, { subscriptionId, transactionId, timestamp })
 ```
 
+### Safe retries
+
+A timeout, a network error or a `5xx` can arrive after Nozle recorded the event. Nozle records an event once per `transaction_id`, so a retry with the same ID, the same event and the same `timestamp` does not bill it twice. A new ID is a new event. Without a `timestamp`, each attempt is stamped with its own arrival time, so pass one and keep it.
+
+From `@nozle-js/node` 0.13.2, the error `track()` throws carries the ID it sent as `error.transactionId` (typed on `NozleApiError`), also when the SDK generated it. Earlier versions lose a generated ID when the call throws, so pass your own `transactionId` there.
+
+```ts
+const timestamp = new Date().toISOString()
+try {
+  await nozle.track(customerId, 'api_call', { tokens: 100 }, { subscriptionId, timestamp })
+} catch (error) {
+  const transactionId = (error as { transactionId?: string }).transactionId
+  await nozle.track(customerId, 'api_call', { tokens: 100 }, { subscriptionId, transactionId, timestamp })
+}
+```
+
 ## Operational guidance
 
 - Await `track()` when the request must know whether ingestion succeeded.
