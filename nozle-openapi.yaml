@@ -3293,6 +3293,19 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          description: 'Standard (PostgreSQL) event store only. The `transaction_id` is already used in the organization by an event with a different payload (feature code, subscription, `properties`, `precise_total_amount_cents`, or `timestamp` when sent). Nothing is stored; the first event keeps the ID. The same payload returns `200` with the stored event. Organizations on the high-volume (ClickHouse) event store get `200` for any repeat: billing removes repeats when usage is read.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+              example:
+                status: 409
+                error: Conflict
+                code: transaction_id_conflict
+                error_details:
+                  transaction_id:
+                    - value_already_exist
         '422':
           description: 'The event was not stored. `validation_errors` for an invalid field, including `external_subscription_id: [value_is_mandatory]` when neither `external_subscription_id` nor `external_customer_id` is sent. `active_subscription_not_found` or `active_subscription_ambiguous` when only `external_customer_id` is sent and the customer has no active subscription (or is unknown) or several.'
           content:
@@ -3431,7 +3444,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '422':
-          description: 'The batch was not stored. `code` is `validation_errors` and `error_details` is keyed by the position of each failing event, with the same field errors as a single event, for example `{"0": {"external_customer_id": ["active_subscription_not_found"]}}`. An empty batch returns `events: [no_events]`, more than 100 events `events: [too_many_events]`.'
+          description: 'The batch was not stored. `code` is `validation_errors` and `error_details` is keyed by the position of each failing event, with the same field errors as a single event, for example `{"0": {"external_customer_id": ["active_subscription_not_found"]}}`. An empty batch returns `events: [no_events]`, more than 100 events `events: [too_many_events]`. On the standard (PostgreSQL) event store, the same `transaction_id` twice in the batch, or one already used by an event with a different payload, fails that event with `transaction_id: [value_already_exist]`; the high-volume (ClickHouse) event store accepts repeats.'
           content:
             application/json:
               schema:
