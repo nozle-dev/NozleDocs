@@ -54,10 +54,10 @@ See [Node billing](/sdks/node/billing#subscription-self-service), [Python billin
 
 ## Simple cancellation
 
-The Node.js, Python, and Go SDKs default to end-of-period cancellation:
+Without a timing, a cancellation follows the organization's cancellation settings (dashboard **Settings → Billing → General → Cancellations**). Nozle's default timing is immediate, so pass `end_of_period` when access should last until the renewal boundary:
 
 ```ts
-const result = await nozle.cancelSubscription('customer_123', 'subscription_123')
+const result = await nozle.cancelSubscription('customer_123', 'subscription_123', 'end_of_period')
 console.log(result.subscription.ending_at)
 ```
 
@@ -66,7 +66,7 @@ from nozle import Nozle
 
 nozle = Nozle()  # reads NOZLE_SECRET_KEY
 
-result = nozle.cancel_subscription("customer_123", "subscription_123")
+result = nozle.cancel_subscription("customer_123", "subscription_123", policy="end_of_period")
 print(result["subscription"].get("ending_at"))
 ```
 
@@ -75,9 +75,30 @@ import nozle "github.com/nozle-dev/nozle-go"
 
 client := nozle.New("") // reads NOZLE_SECRET_KEY
 
-result, err := client.CancelSubscription(ctx, "customer_123", "subscription_123", "")
+result, err := client.CancelSubscription(ctx, "customer_123", "subscription_123", "end_of_period")
 if err != nil { return err }
 fmt.Println(result.Subscription.EndingAt)
+```
+
+Settlement options are optional as well: `credit_action` (`credit`, `refund`, `offset`, `none`) for unused paid time of a pay-in-advance plan, `refund_mode` (`prorated`, `full`) and `final_invoice_action` (`generate`, `skip`). Each one left out follows the subscription, then the organization's settings. Node.js takes them in an options object (`{ policy, creditAction, refundMode, finalInvoiceAction }`), Python as keyword arguments, Go as `nozle.CancelSubscriptionOptions`. See [Cancel Subscription](/api/cancel-subscription) for the rules.
+
+```ts
+await nozle.cancelSubscription('customer_123', 'subscription_123', {
+  policy: 'immediate',
+  creditAction: 'refund',
+  refundMode: 'prorated',
+})
+```
+
+```python
+nozle.cancel_subscription(
+    "customer_123", "subscription_123", "immediate", credit_action="refund", refund_mode="prorated"
+)
+```
+
+```go
+_, err := client.CancelSubscription(ctx, "customer_123", "subscription_123", "immediate",
+	nozle.CancelSubscriptionOptions{CreditAction: "refund", RefundMode: "prorated"})
 ```
 
 Pass `immediate` explicitly only after the merchant confirms that access should end now. For customer-facing Cancel/Keep, use the transition preview/apply flow and forward the exact `expectedEffectiveAt` / `expected_effective_at` / Go `ExpectedEffectiveAt` timestamp. Keep does not restart an ended subscription. Cancellation removes a pending downgrade; Keep does not recreate it.

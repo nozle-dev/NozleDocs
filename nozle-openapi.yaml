@@ -9829,7 +9829,7 @@ paths:
       tags:
         - Subscription Changes
       summary: Cancel a subscription
-      description: Cancels a subscription now or at its next renewal boundary. Engine checks that the subscription belongs to the customer, then forwards to Core `DELETE /subscriptions/{id}?cancellation_policy=...`. Requires `subscription:write`. For `end_of_period` the subscription stays `active` and `ending_at` is set; for `immediate` the terminated subscription is returned. Engine forwards Core's status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine's own `{error, code?}` errors.
+      description: Cancels a subscription now or at its next renewal boundary. Engine checks that the subscription belongs to the customer, then forwards to Core `DELETE /subscriptions/{id}` only the timing and settlement parameters that were sent (`credit_action` becomes Core `on_termination_credit_note`, with `none` as `skip`; `final_invoice_action` becomes `on_termination_invoice`). Each parameter left out follows the subscription, then the organization's cancellation settings. Requires `subscription:write`. For `end_of_period` the subscription stays `active` and `ending_at` is set; for `immediate` the terminated subscription is returned. Engine forwards Core's status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine's own `{error, code?}` errors.
       operationId: engineCancelSubscription
       security:
         - bearerAuth: []
@@ -9856,13 +9856,41 @@ paths:
         - name: cancellation_policy
           in: query
           required: false
-          description: '`immediate` terminates now; `end_of_period` schedules the ending at the next renewal boundary. Any other value returns `400`.'
+          description: '`immediate` terminates now; `end_of_period` schedules the ending at the next renewal boundary. Left out, the organization''s cancellation timing applies (Nozle''s default is `immediate`); a subscription that has not started is always canceled immediately. Any other value returns `400`.'
           schema:
             type: string
             enum:
               - immediate
               - end_of_period
-            default: immediate
+        - name: credit_action
+          in: query
+          required: false
+          description: 'Unused paid time of a pay-in-advance plan: `credit`, `refund`, `offset` (needs a final invoice) or `none`. Ignored for pay-in-arrears plans. Left out, the subscription''s, then the organization''s setting applies. Any other value returns `400`.'
+          schema:
+            type: string
+            enum:
+              - credit
+              - refund
+              - offset
+              - none
+        - name: refund_mode
+          in: query
+          required: false
+          description: '`prorated` refunds the unused part, `full` the whole amount. `full` on a pay-in-advance plan needs `credit_action: refund` (sent or inherited), else Core answers `422`. Left out, the organization''s setting applies. Any other value returns `400`.'
+          schema:
+            type: string
+            enum:
+              - prorated
+              - full
+        - name: final_invoice_action
+          in: query
+          required: false
+          description: '`generate` issues a final invoice; `skip` does not. Left out, the subscription''s, then the organization''s setting applies. Any other value returns `400`.'
+          schema:
+            type: string
+            enum:
+              - generate
+              - skip
       responses:
         '200':
           description: The subscription.

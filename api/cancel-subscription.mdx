@@ -5,7 +5,7 @@ api: "DELETE https://api.nozle.app/engine/api/v1/subscriptions/{id}"
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-Cancel a subscription immediately or schedule cancellation for the next renewal boundary.
+Cancel a subscription immediately or schedule cancellation for the next renewal boundary. Without a timing, the organization's cancellation settings decide.
 
 Use this endpoint only from an authenticated merchant backend. Derive the customer from the logged-in user or team; never accept an authoritative `customer_id` from browser input.
 
@@ -19,9 +19,23 @@ Use this endpoint only from an authenticated merchant backend. Derive the custom
   External customer ID derived by the trusted merchant backend. The subscription must belong to that customer and organization.
 </ParamField>
 
-<ParamField query="cancellation_policy" type="string" default="immediate">
-  `end_of_period` keeps the subscription active until its next renewal boundary. `immediate` terminates it now. The raw HTTP API defaults to `immediate` for backward compatibility; the Node.js, Python, and Go SDK methods default to `end_of_period`.
+<ParamField query="cancellation_policy" type="string">
+  `end_of_period` keeps the subscription active until its next renewal boundary. `immediate` terminates it now. Leave it out to use the organization's cancellation timing (dashboard **Settings → Billing → General → Cancellations → When it takes effect**; Nozle's default is `immediate`). A subscription that has not started yet is always canceled immediately.
 </ParamField>
+
+<ParamField query="credit_action" type="string">
+  What happens to the unused paid time of a pay-in-advance plan: `credit`, `refund`, `offset` (deducted from the final invoice, which needs `final_invoice_action=generate`), or `none`. Ignored for pay-in-arrears plans, which have nothing paid upfront.
+</ParamField>
+
+<ParamField query="refund_mode" type="string">
+  With a refund: `prorated` refunds the unused part, `full` the whole amount. `full` on a pay-in-advance plan needs `credit_action=refund`, sent or inherited, else Core answers `422` (`refund_mode: requires_refund_action`).
+</ParamField>
+
+<ParamField query="final_invoice_action" type="string">
+  `generate` issues a final invoice for the period up to the cancellation; `skip` does not.
+</ParamField>
+
+Engine sends Core only the parameters you send. Each one you leave out follows the value stored on the subscription, then the organization's cancellation settings. Any other value of these parameters returns `400` before Core is called.
 
 For customer-facing Cancel/Keep with a confirmed ending date, use [the transition preview/apply flow](/api/subscription-management#cancel-and-keep). It supports the atomic `expected_effective_at` guard and the `uncancel` operation.
 
