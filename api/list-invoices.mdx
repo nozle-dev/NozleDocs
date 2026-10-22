@@ -5,7 +5,7 @@ api: "GET https://api.nozle.app/engine/api/v1/invoices"
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-List a customer's invoices, newest first. The response holds at most 50 invoices and has no pagination. Draft invoices are not returned.
+List a customer's invoices, newest first. The response holds at most 50 invoices and has no pagination. It returns the invoices Core's API shows, other than drafts: `finalized`, `voided`, `failed` and `pending`. Invoices still being generated are not returned. Whether an invoice is paid is in `payment_status`, not in `status`. Only the live customer with this `customer_id` counts: a new customer that reuses a deleted customer's external ID does not see the deleted customer's invoices.
 
 **Auth:** secret key only. Publishable keys are always rejected.
 
@@ -38,9 +38,9 @@ Returns an object with an `invoices` array. The array is empty when the customer
 
 | Field | Values |
 | --- | --- |
-| `status` | `finalized`, `voided`, `pending`, `failed`, or `unknown` |
-| `payment_status` | `pending`, `succeeded`, `failed`, or `unknown` |
-| `invoice_type` | `subscription`, `add_on`, `credit`, `one_off`, or `other` |
+| `status` | `finalized`, `voided`, `failed`, or `pending` |
+| `payment_status` | `pending`, `succeeded` (paid), `failed`, or `unknown` |
+| `invoice_type` | `subscription`, `add_on`, `credit`, `one_off`, `advance_charges`, `progressive_billing`, or `other` for a type Engine does not know |
 | `amount_cents` | Invoice total, in the currency's smallest unit |
 | `issuing_date`, `payment_due_date` | `YYYY-MM-DD`, or `null` |
 

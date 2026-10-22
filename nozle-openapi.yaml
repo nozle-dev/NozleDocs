@@ -9780,7 +9780,7 @@ paths:
       tags:
         - Invoices
       summary: List invoices
-      description: Lists the customer's invoices from Engine's billing database, newest first, at most 50, excluding drafts. Requires `invoice:read`. There is no pagination.
+      description: 'Lists the customer''s invoices from Engine''s billing database, newest first, at most 50: the statuses Core''s API shows other than draft (`finalized`, `voided`, `failed`, `pending`), for the live customer with this external ID only. Requires `invoice:read`. There is no pagination.'
       operationId: engineListInvoices
       security:
         - bearerAuth: []
@@ -30174,10 +30174,9 @@ components:
           enum:
             - finalized
             - voided
-            - pending
             - failed
-            - unknown
-          description: Draft invoices are never returned.
+            - pending
+          description: Only the statuses Core's API shows, other than draft. Drafts and invoices still being generated are never returned. Whether the invoice is paid is in `payment_status`.
         payment_status:
           type: string
           enum:
@@ -30185,6 +30184,7 @@ components:
             - succeeded
             - failed
             - unknown
+          description: '`succeeded` means the invoice is paid.'
         invoice_type:
           type: string
           enum:
@@ -30192,7 +30192,10 @@ components:
             - add_on
             - credit
             - one_off
+            - advance_charges
+            - progressive_billing
             - other
+          description: '`other` is a type Engine does not know.'
         amount_cents:
           type: integer
           format: int64
