@@ -40,7 +40,7 @@ At least one attribution field is required:
 - `external_customer_id` records a customer-direct cost that is not linked to a Feature.
 - Both may be provided; asynchronous processing verifies that they resolve to the same customer.
 
-The endpoint returns `202 Accepted` with `{"status": "accepted", "cost_event_id": "..."}` after Kafka durably acknowledges the message; cost calculation and analytics happen asynchronously.
+The endpoint returns `202 Accepted` with `{"status": "accepted", "cost_event_id": "..."}` after Kafka durably acknowledges the message; cost calculation and analytics happen asynchronously. Once rated, the cost appears in the [cost intelligence report](/api/cost-intelligence-report) and in the margin views (`/margin/*` and the dashboard margin views), attributed to the customer and to the parent Feature Event's Feature and plan. A Cost Event never adds revenue. See [Margin Intelligence](/guides/margin/overview).
 
 If `cost_event_id` is omitted, Nozle generates and returns a version 7 universally unique identifier. Reuse the same identifier and payload when retrying a Cost Event. Posting the same `cost_event_id` again also returns `202`; the duplicate is removed when the event is processed.
 
