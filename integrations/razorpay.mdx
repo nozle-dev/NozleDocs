@@ -362,7 +362,7 @@ Nozle checks the status of open Razorpay orders, payment links, debits and refun
 
 ## Refunds and disputes
 
-- **Refunds.** A credit-note refund is sent to Razorpay against the captured payment at normal speed. It stays `pending` until Razorpay reports `processed`. If Razorpay reports `failed`, Nozle sends the `credit_note.provider_refund_failure` webhook.
+- **Refunds.** A credit-note refund is sent to Razorpay against the captured payment at normal speed. It stays `pending` until Razorpay reports `processed`. If Razorpay reports `failed`, Nozle sends the `credit_note.refund_failure` webhook.
 - **Disputes.** On `payment.dispute.lost`, Nozle fetches the dispute from Razorpay, validates it against the payment, and marks the invoice's dispute lost. A closed or won dispute is not treated as lost.
 
 ## Errors

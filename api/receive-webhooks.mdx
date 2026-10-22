@@ -24,6 +24,8 @@ Until January 19, 2027, payloads also carry the old, former-prefix key names bes
 
 Each delivery is a JSON body with a `webhook_type` such as `subscription.started` and the object it is about, for example `subscription`. The event types are listed in the API reference under Webhooks.
 
+A failed credit note refund is sent as `credit_note.refund_failure`. To receive only some types, send an `event_types` array when you create or update the endpoint (no array means every type). `credit_note.refund_failure` is accepted there; the former name `credit_note.provider_refund_failure` is still accepted and saved as `credit_note.refund_failure`, and endpoints saved with the former name are moved to it.
+
 ## Headers
 
 | Header | Value |
