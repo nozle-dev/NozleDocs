@@ -7,8 +7,8 @@ description: Public catalog and trusted-backend credentials
 
 | Base URL | Endpoints |
 |---|---|
-| `https://api.nozle.app/engine/api/v1` | Entitlements, checkout, margin, credits, and Nozle intelligence APIs |
-| `https://api.nozle.app/core/api/v1` | Customers, events, plans, subscriptions, invoices, wallets, and billing resources |
+| `https://api.nozle.app/engine/api/v1` | Usage events (`/events`, `/events/batch`), entitlements, checkout, margin, credits, and Nozle intelligence APIs |
+| `https://api.nozle.app/core/api/v1` | Customers, plans, subscriptions, invoices, wallets, billing resources, and the public sign-up endpoints (`/auth/*`) |
 
 ## Credential model
 
@@ -16,6 +16,8 @@ description: Public catalog and trusted-backend credentials
 |---|---|---|---|
 | Publishable | `pk_nozle_` | Browser | `GET /api/v1/plans` and `GET /api/v1/plans/{code}` only, which return each plan in full. See the [public plan catalog](/api/list-plans). |
 | Secret | `sk_nozle_` | Trusted backend | Organization-scoped server operations allowed by the key's permissions |
+
+There are no separate live and test keys: every key belongs to one organization.
 
 Send server credentials as a Bearer token:
 
@@ -43,7 +45,8 @@ On organizations with API key permissions, these Engine routes check the key too
 |---|---|
 | `POST /customers` | `customer:write` |
 | `POST /usage/check` | `credit_system:read` |
-| `POST /usage/track`, `POST /check-and-deduct` | `credit_system:write` |
+| `POST /usage/track` | `credit_system:write` |
+| `POST /check-and-deduct` | `credit_system:write` and `wallet_transaction:write` |
 | `POST /cost-events` | `event:write` |
 | `GET /cost-models`, `GET /cost-models/{id}` | `analytic:read` |
 | `POST /cost-models`, `DELETE /cost-models/{id}` | `analytic:write` |
@@ -62,6 +65,8 @@ Never expose a secret or master key in client-side code. CORS and `Origin` heade
 </Warning>
 
 ## Public authentication endpoints
+
+These are Core routes, for example `https://api.nozle.app/core/api/v1/auth/send-otp`. The Engine does not serve them.
 
 - `POST /api/v1/auth/send-otp`
 - `POST /api/v1/auth/verify-otp`

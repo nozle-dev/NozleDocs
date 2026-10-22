@@ -16,7 +16,7 @@ if not check["allowed"]:
 
 ## Metadata
 
-Metadata is encoded as a JSON query parameter and may include numeric quantities required by a Cost Rule.
+Metadata is encoded as a JSON query parameter and may include numeric quantities required by a Cost Rule. It is input to the cost and margin estimate only. It does not filter usage: `used`, `limit` and `remaining` always cover all of the feature's usage, whatever `model` or other properties you send.
 
 ```python
 check = nozle.can(
@@ -35,7 +35,7 @@ check = nozle.can(
 | `used` | `int` | Current usage. |
 | `limit` | `int`, optional | Configured limit. |
 | `remaining` | `int`, optional | Remaining allowance. |
-| `overage` | `bool`, optional | Whether usage is in overage. |
+| `overage` | `bool`, optional | `True` when usage has reached a soft limit; the usage is billed as overage. Never a denial by itself. |
 | `economics` | `dict`, optional | Point-in-time Cost Sheet estimate with exact decimal strings, Cost Rule version identifiers, and explicit exclusions. |
 
 ## FastAPI pattern
@@ -47,7 +47,7 @@ check = nozle.can(customer_id, "analytics")
 
 if not check["allowed"]:
     raise HTTPException(
-        status_code=429 if check.get("overage") else 403,
+        status_code=403,
         detail={
             "reason": check.get("reason", "upgrade_required"),
             "used": check["used"],
@@ -55,6 +55,12 @@ if not check["allowed"]:
             "remaining": check.get("remaining"),
         },
     )
+
+if check.get("overage"):
+    # Allowed: a soft limit is reached, so this usage is billed as overage.
+    warn_about_overage(customer_id, check)
 ```
+
+Deny only when `allowed` is `False`. `overage` set to `True` never denies by itself: a soft limit is reached and the usage is billed as overage.
 
 Perform this check immediately before protected server work. React gates are not an authorization boundary. `can()` also does not reserve product credits; use `usage.track()` for atomic consumption.

@@ -11,9 +11,13 @@ Deprecated. Use [Track and Consume Credits](/api/usage-track) (`POST /usage/trac
 Responses carry `Deprecation: true` and `Link: </api/v1/usage/track>; rel="successor-version"`. The endpoint still works.
 </Warning>
 
-Atomically check whether a customer's wallet has enough credits and deduct them in a single database transaction. The customer's newest active wallet is locked while it is read, so concurrent requests cannot overspend it. A successful deduction moves the wallet's money balance with the credits and records a wallet transaction.
+Check whether a customer's wallet has enough credits and deduct them. The Engine locks the customer's newest active wallet for the check-and-deduct calls, so concurrent calls cannot overspend it, then spends the credits through Core's wallet transaction API (`POST /wallet_transactions` with `voided_credits`). Core records a voided outbound wallet transaction, updates the wallet's balances, sends `wallet.updated` and `wallet_transaction.created` and runs wallet alerts.
 
-**Auth:** `sk_` only. Publishable keys are rejected with `403`. With [API key permissions](/api/authentication#key-permissions), the key needs `credit_system:write`; without it the call returns `403` with `code: permission_denied`.
+<Warning>
+Not idempotent. Every call that returns `allowed: true` deducts, and a retry after a timeout or a `5xx` can deduct again. An `Idempotency-Key` header is ignored. For usage you may retry, use [Track and Consume Credits](/api/usage-track), which requires an `Idempotency-Key`.
+</Warning>
+
+**Auth:** `sk_` only. Publishable keys are rejected with `403`. With [API key permissions](/api/authentication#key-permissions), the key needs `credit_system:write` and `wallet_transaction:write`; without either the call returns `403` with `code: permission_denied` before any deduction.
 
 <ParamField body="customer_id" type="string" required>
   External customer ID
@@ -60,8 +64,9 @@ curl -X POST https://api.nozle.app/engine/api/v1/check-and-deduct \
 | `400` | `{ "error": "customer_id and positive credits are required" }` | `customer_id` is empty or missing, or `credits` is zero, negative or missing. |
 | `400` | `{ "error": "invalid request body" }` | The body is not valid JSON, or a field has the wrong type, for example `credits` sent as a string. |
 | `404` | `{ "code": "wallet_not_found", "error": "No active wallet found for this customer." }` | The customer does not exist, or has no active wallet. |
-| `500` | `{ "error": "could not deduct wallet credits" }` | The deduction failed. Nothing was deducted. |
+| `403` | `{ "code": "permission_denied", ... }` | API key permissions are on and the key lacks `credit_system:write` or `wallet_transaction:write`. Nothing was deducted. |
+| `500` | `{ "error": "could not deduct wallet credits" }` | The deduction failed, for example Core refused the wallet transaction. Nothing was deducted. |
 
 <Note>
-The deducted amount is `credits` × the wallet's rate, rounded to the wallet currency. The deduction lowers `credits_balance` and the ongoing credit balance by `credits`, lowers `balance_cents` and the ongoing balance by that amount, and adds both to the consumed credits and consumed amount. The wallet transaction records the money amount and the credits. See [Credit balance](/api/credit-balance).
+The deducted amount is `credits` × the wallet's rate, rounded to the wallet currency. The deduction lowers `credits_balance` and the ongoing credit balance by `credits`, lowers `balance_cents` and the ongoing balance by that amount, and adds both to the consumed credits and consumed amount. Core records a voided outbound wallet transaction with the money amount and the credits. See [Credit balance](/api/credit-balance).
 </Note>

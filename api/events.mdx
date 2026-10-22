@@ -43,7 +43,7 @@ An event needs `external_subscription_id` or `external_customer_id`. With only t
 For direct HTTP ingestion, send this envelope to `POST https://api.nozle.app/engine/api/v1/events` with a secret key. Send batches of 1–100 events to `POST https://api.nozle.app/engine/api/v1/events/batch` using an `events` array. Event reads and fee estimates use the Core API. Prefer the SDKs so subscription lookup, UUID generation, timeout handling, and errors remain consistent.
 
 <Note>
-For retry safety, preserve the complete event payload and reuse the same `transaction_id`. Within an organization, the first accepted event owns that identifier even if a later request changes the subscription or timestamp.
+For retry safety, preserve the complete event payload, including `timestamp`, and reuse the same `transaction_id`. Never reuse a `transaction_id` for a different event: on the standard event store the first accepted event owns that identifier, the same event returns the stored one, and a different one (another code, subscription, properties or sent `timestamp`) gets `409 transaction_id_conflict`. On the high-volume event store the repeat is accepted with `200`, which does not tell you how it is counted; a repeat is deduplicated only when `transaction_id` and `timestamp` both match. Without a `timestamp`, each attempt is stamped when it arrives, so send one and reuse it. See [deduplication](/guides/billing/event-pipeline#2-ingest-and-deduplicate).
 </Note>
 
 ## Responses and limits
@@ -53,7 +53,9 @@ For retry safety, preserve the complete event payload and reuse the same `transa
 | Accepted | `200` with the event under `event`. A batch returns the events under `events`. |
 | Batch size | 1 to 100 events. An empty array returns `422` with `events: ["no_events"]`, and more than 100 returns `422` with `events: ["too_many_events"]`. |
 | An invalid event in a batch | The whole batch is rejected with `422 validation_errors` and nothing is stored. `error_details` is keyed by the position of the event in the array, for example `{"0": {"external_customer_id": ["active_subscription_ambiguous"]}}`. |
-| The same `transaction_id` twice in one batch | The repeat is reported as `transaction_id: ["value_already_exist"]`. |
+| A `transaction_id` already used, same payload | Standard event store: `200` with the stored event, and nothing new is stored. High-volume event store: `200`, and billing removes the repeat. |
+| A `transaction_id` already used, different payload | Standard event store: `409 transaction_id_conflict` with `error_details` `{"transaction_id": ["value_already_exist"]}`, and nothing is stored. High-volume event store: `200`, and billing counts one copy. See [deduplication](/guides/billing/event-pipeline#2-ingest-and-deduplicate). |
+| The same `transaction_id` twice in one batch, or a reused one with a different payload | Standard event store: the batch is rejected with `422 validation_errors` and `transaction_id: ["value_already_exist"]` for that event. High-volume event store: `200`. |
 | A `timestamp` that is not a number | `422` with `timestamp: ["invalid_format"]`. |
 | Neither `external_subscription_id` nor `external_customer_id` | `422 validation_errors` with `external_subscription_id: ["value_is_mandatory"]`. |
 | Only `external_customer_id`, and the customer is unknown or has no active subscription | `422 active_subscription_not_found` with `error_details` `{"external_customer_id": ["active_subscription_not_found"]}`. |

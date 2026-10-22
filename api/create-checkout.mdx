@@ -78,7 +78,7 @@ Plan checkout:
 ## Response
 
 <ResponseField name="type" type="string" required>
-  `stripe`, `razorpay`, `processing`, `completed`, or `scheduled`. This endpoint never returns `hosted`. The SDK types still declare it, and only the deprecated `POST /credits/purchase` of the Engine API returns it.
+  `stripe`, `razorpay`, `processing`, `completed`, or `scheduled`. This endpoint never returns `hosted`. The SDK types still declare it, and only the deprecated `POST /credits/purchase` of the Engine API returns it. That endpoint requires an `Idempotency-Key` header and a `currency` field (the ISO 4217 code of the top-up package, for example `USD`), and answers `400` with the code `idempotency_key_required` or `currency_required` without them; a retry with the same key returns the first purchase. Use [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase) (`POST /credit-top-up-purchases`) instead.
 </ResponseField>
 
 <ResponseField name="client_secret" type="string">

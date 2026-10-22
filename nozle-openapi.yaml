@@ -3195,6 +3195,74 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /customers/{customer_id}/payment-method/manage:
+    post:
+      servers:
+        - url: https://api.nozle.app/engine/api/v1
+          description: Engine payment method management
+      tags:
+        - Customers
+      summary: Manage a customer payment method
+      description: Returns the Stripe Billing Portal `url` where a customer adds or changes their payment method. Stripe only. Razorpay customers pay each invoice by payment link and get 422 razorpay_pays_by_link. Nozle stores no card data. Secret key only, publishable keys are refused with 403.
+      operationId: manageCustomerPaymentMethod
+      parameters:
+        - name: customer_id
+          in: path
+          description: The customer external unique identifier (provided by your own application).
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                return_url:
+                  type: string
+                  format: uri
+                  description: HTTPS URL on an allowlisted origin that Stripe returns to. Defaults to the organization return URL.
+      responses:
+        '200':
+          description: Stripe Billing Portal page
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - manage_payment_method
+                properties:
+                  manage_payment_method:
+                    type: object
+                    required:
+                      - url
+                      - provider
+                    properties:
+                      url:
+                        type: string
+                        description: Stripe Billing Portal URL.
+                      provider:
+                        type: string
+                        enum:
+                          - stripe
+                      expires_at:
+                        type: [string, 'null']
+                        format: date-time
+        '400':
+          description: invalid_return_url, or the body is not valid JSON.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A publishable key was used, or the caller lacks payment:write.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: One of no_linked_payment_provider, razorpay_pays_by_link (Razorpay customers pay each invoice by payment link), provider_not_supported, missing_payment_provider_customer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
   /events:
     post:
       servers:
@@ -3225,6 +3293,19 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          description: 'Standard (PostgreSQL) event store only. The `transaction_id` is already used in the organization by an event with a different payload (feature code, subscription, `properties`, `precise_total_amount_cents`, or `timestamp` when sent). Nothing is stored; the first event keeps the ID. The same payload returns `200` with the stored event. Organizations on the high-volume (ClickHouse) event store get `200` for any repeat: billing removes repeats when usage is read.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+              example:
+                status: 409
+                error: Conflict
+                code: transaction_id_conflict
+                error_details:
+                  transaction_id:
+                    - value_already_exist
         '422':
           description: 'The event was not stored. `validation_errors` for an invalid field, including `external_subscription_id: [value_is_mandatory]` when neither `external_subscription_id` nor `external_customer_id` is sent. `active_subscription_not_found` or `active_subscription_ambiguous` when only `external_customer_id` is sent and the customer has no active subscription (or is unknown) or several.'
           content:
@@ -3363,7 +3444,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '422':
-          description: 'The batch was not stored. `code` is `validation_errors` and `error_details` is keyed by the position of each failing event, with the same field errors as a single event, for example `{"0": {"external_customer_id": ["active_subscription_not_found"]}}`. An empty batch returns `events: [no_events]`, more than 100 events `events: [too_many_events]`.'
+          description: 'The batch was not stored. `code` is `validation_errors` and `error_details` is keyed by the position of each failing event, with the same field errors as a single event, for example `{"0": {"external_customer_id": ["active_subscription_not_found"]}}`. An empty batch returns `events: [no_events]`, more than 100 events `events: [too_many_events]`. On the standard (PostgreSQL) event store, the same `transaction_id` twice in the batch, or one already used by an event with a different payload, fails that event with `transaction_id: [value_already_exist]`; the high-volume (ClickHouse) event store accepts repeats.'
           content:
             application/json:
               schema:
@@ -9699,7 +9780,7 @@ paths:
       tags:
         - Invoices
       summary: List invoices
-      description: Lists the customer's invoices from Engine's billing database, newest first, at most 50, excluding drafts. Requires `invoice:read`. There is no pagination.
+      description: 'Lists the customer''s invoices from Engine''s billing database, newest first, at most 50: the statuses Core''s API shows other than draft (`finalized`, `voided`, `failed`, `pending`), for the live customer with this external ID only. Requires `invoice:read`. There is no pagination.'
       operationId: engineListInvoices
       security:
         - bearerAuth: []
@@ -11639,7 +11720,7 @@ paths:
   /check-and-deduct:
     post:
       summary: Check and deduct legacy wallet credits
-      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet, and when its `credits_balance` covers `credits`, deducts them and records an outbound wallet transaction, in one database transaction. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; With API key permissions, the secret key needs `credit_system:write`, as on `POST /usage/track`.'
+      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet against concurrent check-and-deduct calls, and when its `credits_balance` covers `credits`, spends them through Core''s `POST /wallet_transactions` (`voided_credits`), which records a voided outbound wallet transaction, sends `wallet.updated` and `wallet_transaction.created` and runs wallet alerts. Not idempotent: an `Idempotency-Key` header is ignored and a retry deducts again; use `POST /usage/track` for retries. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; With API key permissions, the secret key needs `credit_system:write`, as on `POST /usage/track`, and `wallet_transaction:write`; without either the answer is `403` with `code: permission_denied` before any deduction.'
       operationId: engineCheckAndDeductCredits
       tags:
         - Credits
@@ -11699,7 +11780,7 @@ paths:
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
-          description: 'A publishable key (body `{"error": "this endpoint requires a secret key (sk_)"}`), or `code: permission_denied` when API key permissions are enabled and the secret key lacks `credit_system:write`.'
+          description: 'A publishable key (body `{"error": "this endpoint requires a secret key (sk_)"}`), or `code: permission_denied` when API key permissions are enabled and the secret key lacks `credit_system:write` or `wallet_transaction:write`.'
         '404':
           description: The customer does not exist or has no active wallet.
           content:
@@ -11711,7 +11792,7 @@ paths:
                     code: wallet_not_found
                     error: No active wallet found for this customer.
         '500':
-          description: The deduction failed.
+          description: The deduction failed, for example Core refused the wallet transaction. Nothing was deducted.
           content:
             application/json:
               schema: *id001
@@ -12326,7 +12407,7 @@ paths:
   /margin/forecast:
     get:
       summary: Get margin forecast
-      description: 'Projects daily revenue, cost and margin for the 30 days after the range. It uses the daily margin trend of the range (by default the last month up to now) and fits a least-squares line to revenue and to cost, using the position of each returned day bucket as x (days without events are skipped, not counted as zero). Each point is dated 1 to 30 days after the end of the range (UTC, `YYYY-MM-DD`). Projected revenue and cost are clamped at 0 and truncated to integer cents; `projected_margin` is their difference and can be negative. `confidence` is `low` with fewer than 7 day buckets, `medium` with 7 to 19 and `high` with 20 or more. With fewer than 2 day buckets the response is `{"points": [], "confidence": "low"}`; `points` is never `null`. The range is read by the Engine''s shared range parser, with the same `from`, `to`, `from_date` and `to_date` rules as the other margin operations; a value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. Other query parameters are ignored. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. With API key permissions, the secret key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable, or, with `code: analytics_unavailable`, that the analytics store could not be reached or a query failed.'
+      description: 'Projects daily revenue, cost and margin for the 30 days after the range. It uses the daily margin trend of the range (by default the last month up to now) and fits a least-squares line to revenue and to cost, using the position of each returned day bucket as x (days without events are skipped, not counted as zero). Points are 30 consecutive UTC days (`YYYY-MM-DD`) starting on the first day the range does not reach: the end''s own day when the end is a UTC midnight (a plain-date `to` such as `2026-10-15` ends at `2026-10-16T00:00:00Z`, so the first point is `2026-10-16`), otherwise the day after the end (the default range ends now, so it starts tomorrow). Projected revenue and cost are clamped at 0 and truncated to integer cents; `projected_margin` is their difference and can be negative. `confidence` is `low` with fewer than 7 day buckets, `medium` with 7 to 19 and `high` with 20 or more. With fewer than 2 day buckets the response is `{"points": [], "confidence": "low"}`; `points` is never `null`. The range is read by the Engine''s shared range parser, with the same `from`, `to`, `from_date` and `to_date` rules as the other margin operations; a value that cannot be parsed, or an end that is not after the start, returns `400` with code `invalid_date_range`. Other query parameters are ignored. Requires an organization secret key (`sk_`) or the trusted internal credential; a publishable key gets `403`. With API key permissions, the secret key needs `analytic:read`; without it the answer is `403` with `code: permission_denied`. `401` covers a missing header, a non-Bearer header or an unknown key; `503` means API key verification is unavailable, or, with `code: analytics_unavailable`, that the analytics store could not be reached or a query failed.'
       operationId: engineGetMarginForecast
       tags:
         - Margin
@@ -12558,7 +12639,7 @@ paths:
         - name: metadata
           in: query
           required: false
-          description: URL-encoded JSON object of event properties. The cost estimate uses it to evaluate Cost Sheet conditions and quantities. For a sum Feature, the revenue estimate reads the call's units from the Feature's `field_name` in it. A value that is not a JSON object returns `400`.
+          description: URL-encoded JSON object of event properties. The cost estimate uses it to evaluate Cost Sheet conditions and quantities. For a sum Feature, the revenue estimate reads the call's units from the Feature's `field_name` in it. It does not filter usage, so `used`, `limit` and `remaining` cover all of the feature's usage. A value that is not a JSON object returns `400`.
           schema:
             type: string
           example: '{"model":"gpt-4o","input_tokens":1200}'
@@ -12814,7 +12895,7 @@ paths:
           description: Nozle secret key (`sk_`). A `pk_` key returns `403`.
           schema:
             type: string
-          example: sk_live_your_nozle_key
+          example: sk_nozle_your_secret_key
         - name: X-Nozle-Customer-Id
           in: header
           required: true
@@ -12914,7 +12995,7 @@ paths:
           description: Nozle secret key (`sk_`). A `pk_` key returns `403`.
           schema:
             type: string
-          example: sk_live_your_nozle_key
+          example: sk_nozle_your_secret_key
         - name: X-Nozle-Customer-Id
           in: header
           required: true
@@ -13010,7 +13091,7 @@ paths:
           description: Nozle secret key (`sk_`). A `pk_` key returns `403`.
           schema:
             type: string
-          example: sk_live_your_nozle_key
+          example: sk_nozle_your_secret_key
         - name: X-Nozle-Customer-Id
           in: header
           required: true
@@ -13118,7 +13199,7 @@ paths:
           description: Nozle secret key (`sk_`). A `pk_` key returns `403`.
           schema:
             type: string
-          example: sk_live_your_nozle_key
+          example: sk_nozle_your_secret_key
         - name: X-Nozle-Customer-Id
           in: header
           required: true
@@ -14023,7 +14104,7 @@ webhooks:
     post:
       operationId: creditNoteProviderRefundFailure
       summary: The refund of a credit note has failed on a payment provider
-      description: The refund of a credit note has failed on a payment provider
+      description: The refund of a credit note has failed on a payment provider. Sent as `credit_note.refund_failure`, the name to use in an endpoint's `event_types` filter. The former name `credit_note.provider_refund_failure` is still accepted in `event_types` and saved as `credit_note.refund_failure`.
       parameters:
         - $ref: '#/components/parameters/webhook_signature'
         - $ref: '#/components/parameters/webhook_signature_algorithm'
@@ -30093,10 +30174,9 @@ components:
           enum:
             - finalized
             - voided
-            - pending
             - failed
-            - unknown
-          description: Draft invoices are never returned.
+            - pending
+          description: Only the statuses Core's API shows, other than draft. Drafts and invoices still being generated are never returned. Whether the invoice is paid is in `payment_status`.
         payment_status:
           type: string
           enum:
@@ -30104,6 +30184,7 @@ components:
             - succeeded
             - failed
             - unknown
+          description: '`succeeded` means the invoice is paid.'
         invoice_type:
           type: string
           enum:
@@ -30111,7 +30192,10 @@ components:
             - add_on
             - credit
             - one_off
+            - advance_charges
+            - progressive_billing
             - other
+          description: '`other` is a type Engine does not know.'
         amount_cents:
           type: integer
           format: int64

@@ -178,7 +178,7 @@ if (!result.allowed) {
 
 ## Legacy wallet adapter
 
-`nozle.checkAndDeduct({ customerId, credits })` is deprecated and remains available for the legacy wallet path. The `feature` field is deprecated: it is still accepted but is not sent and has no effect. Use `usage.check()` and `usage.track()` with a credit system instead.
+`nozle.checkAndDeduct({ customerId, credits })` is deprecated and remains available for the legacy wallet path. It is not idempotent: a retry after a timeout can deduct again, so the SDK never retries it. The `feature` field is deprecated: it is still accepted but is not sent and has no effect. Use `usage.check()` and `usage.track()` with a credit system instead.
 
 ## Security
 

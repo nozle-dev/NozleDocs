@@ -1,0 +1,88 @@
+---
+title: "Manage Payment Method"
+api: "POST https://api.nozle.app/engine/api/v1/customers/{customer_id}/payment-method/manage"
+---
+
+Base URL: `https://api.nozle.app/engine/api/v1`.
+
+Return the Stripe Billing Portal page where a customer adds or changes their payment method. Only Stripe customers have this page.
+
+**Auth:** secret key (`sk_`) with `payment:write`, or trusted internal auth. Publishable keys are always refused with `403`. A customer-scoped credential reaches only its own customer.
+
+<Info>
+Nozle stores no card data and never shows card details. The payment method lives at the payment provider, so this endpoint sends the customer there. Call it from your backend for the logged-in user or team, then redirect the browser to the returned `url`.
+</Info>
+
+## Request
+
+<ParamField path="customer_id" type="string" required>
+  External customer ID. The customer must already exist and be linked to a payment provider.
+</ParamField>
+
+<ParamField body="return_url" type="string">
+  Where Stripe sends the customer when they leave the Billing Portal. It must be an absolute HTTPS URL on an allowlisted origin, the same list as [checkout](/api/create-checkout#return-url). If omitted, Nozle uses the organization's default return URL. The body can be empty.
+</ParamField>
+
+```json
+{ "return_url": "https://app.example.com/settings/billing" }
+```
+
+## Response
+
+Core's body is returned unchanged:
+
+<ResponseField name="manage_payment_method.provider" type="string" required>
+  Always `stripe`.
+</ResponseField>
+
+<ResponseField name="manage_payment_method.url" type="string" required>
+  A Stripe Billing Portal URL. Redirect the customer to it.
+</ResponseField>
+
+<ResponseField name="manage_payment_method.expires_at" type="string | null">
+  When the page stops working, as an RFC 3339 UTC timestamp. `null` for Stripe Billing Portal sessions.
+</ResponseField>
+
+```json
+{
+  "manage_payment_method": {
+    "url": "https://billing.stripe.com/p/session/test_...",
+    "expires_at": null,
+    "provider": "stripe"
+  }
+}
+```
+
+## Razorpay customers
+
+Razorpay customers have no payment method to manage here. They pay each invoice through a Razorpay payment link: when an invoice is finalized and no mandate charges it, Nozle emails the customer a payment request for that invoice with a **Pay invoice** button (the billing entity and the customer need an email address). The button always opens a current Razorpay payment link, also after an earlier link expired, and paying it marks the invoice paid. Dunning campaigns do not send a second request for such an invoice. For a Razorpay customer this endpoint answers `422 razorpay_pays_by_link` and creates nothing at Razorpay.
+
+## Errors
+
+The request is checked in this order: valid JSON body, `return_url`, then Core.
+
+| Status | Code | Cause |
+| --- | --- | --- |
+| `400` | `invalid_return_url` | `return_url` is not an absolute HTTPS URL, or its origin is not allowlisted. |
+| `403` | — | A publishable key was used. The Engine answers with an `error` message, not a code. |
+| `404` | `customer_not_found` | Unknown customer. |
+| `422` | `no_linked_payment_provider` | The customer has no payment provider. |
+| `422` | `razorpay_pays_by_link` | The customer pays through Razorpay. Razorpay customers pay each invoice by payment link, so there is no payment method to manage. |
+| `422` | `provider_not_supported` | The customer's provider is not Stripe (Adyen, Cashfree, Flutterwave, GoCardless and Moneyhash are not supported). |
+| `422` | `missing_payment_provider_customer` | The customer could not be created at Stripe. |
+
+For `422` errors the code is in `error_details`, for example `{"code": "validation_errors", "error_details": {"base": ["razorpay_pays_by_link"]}}`. Match on the code, never on the message text.
+
+## SDKs
+
+The SDK methods return the inner `manage_payment_method` object.
+
+| SDK | Method |
+| --- | --- |
+| Node | `client.managePaymentMethod(customerId, returnUrl?, { idempotencyKey? })` |
+| Python | `manage_payment_method(customer_id, return_url=None, *, idempotency_key=None)` |
+| Go | `ManagePaymentMethod(ctx, customerID, returnURL, key)` |
+
+The idempotency option (`idempotencyKey`, `idempotency_key`, or `key` in Go) is optional. Send the same value when retrying the same request.
+
+See the Billing pages: [Node](/sdks/node/billing#manage-a-payment-method), [Python](/sdks/python/billing#manage-a-payment-method) and [Go](/sdks/go/billing#manage-a-payment-method).

@@ -15,7 +15,7 @@ if (!check.allowed) {
 }
 ```
 
-`can()` calls `GET /api/v1/can` with the customer, feature, and optional metadata.
+`can()` calls `GET /api/v1/can` with the customer, feature, and optional metadata. Metadata is input to the cost and margin estimate only (Cost Sheet conditions and quantities). It does not filter usage: `used`, `limit` and `remaining` always cover all of the feature's usage, whatever `model` or other properties you send.
 
 ## Signature
 
@@ -46,7 +46,7 @@ const check = await nozle.can('workspace_123', 'model_access', {
 | `used` | `number` | Current measured usage. |
 | `limit` | `number \| null` | Configured usage limit. `null` when the feature has no limit. |
 | `remaining` | `number \| null` | Remaining allowance. `null` when the feature has no limit. |
-| `overage` | `boolean?` | Whether usage is in overage. Present only when it applies. |
+| `overage` | `boolean?` | `true` when usage has reached a soft limit; the usage is billed as overage. Never a denial by itself. Present only when it applies. |
 | `policy` | `object?` | Configured policy. Present only when configured. |
 | `configuration` | `Record<string, string>?` | Feature configuration. Present only when configured. |
 | `economics` | `object?` | Point-in-time Cost Sheet estimate with exact decimal strings, Cost Rule version identifiers, and explicit exclusions. |
@@ -75,12 +75,19 @@ if (!check.allowed) {
       limit: check.limit,
       remaining: check.remaining,
     },
-    { status: check.overage ? 429 : 403 },
+    { status: 403 },
   )
+}
+
+if (check.overage) {
+  // Allowed: a soft limit is reached, so this usage is billed as overage.
+  warnAboutOverage(customerId, check)
 }
 
 return runAnalyticsQuery()
 ```
+
+Deny only when `allowed` is `false`. `overage: true` never denies by itself: a soft limit is reached and the usage is billed as overage.
 
 ## Authorization guidance
 
