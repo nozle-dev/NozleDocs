@@ -3182,7 +3182,7 @@ paths:
       tags:
         - Payment Methods
       summary: Delete a payment method
-      description: This endpoint deletes a specific payment method for a customer.
+      description: "This endpoint deletes a Razorpay payment method, which cancels the mandate. For a Stripe or other card provider it answers 410 `payment_method_managed_by_provider`: removing a card here only hid it in Nozle while it stayed attached at the provider, so the customer manages it at the provider's page (see Manage a customer payment method). Nozle stores no card display data."
       operationId: destroyPaymentMethod
       responses:
         '200':
@@ -3195,6 +3195,30 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '410':
+          description: The payment method is managed by the payment provider
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - error
+                  - code
+                properties:
+                  status:
+                    type: integer
+                    example: 410
+                  error:
+                    type: string
+                    example: Gone
+                  code:
+                    type: string
+                    example: payment_method_managed_by_provider
+                  hint:
+                    type: string
+                    description: Where the customer manages the payment method.
+                    example: Use POST /api/v1/customers/{external_id}/manage_payment_method_url (GraphQL generateCustomerManagePaymentMethodUrl) to send the customer to the provider's page
   /customers/{customer_id}/payment-method/manage:
     post:
       servers:
@@ -5029,9 +5053,6 @@ paths:
                           description: AI credits included per person with the plan
                           usage_limit: null
                           hard_limit: null
-                          min_margin_percent: null
-                          margin_enforcement_mode: null
-                          enforce_plan_margin: null
                           privileges:
                             - code: included
                               name: Included Credits
@@ -5045,9 +5066,6 @@ paths:
                           description: No Acme team-member cap
                           usage_limit: null
                           hard_limit: null
-                          min_margin_percent: null
-                          margin_enforcement_mode: null
-                          enforce_plan_margin: null
                           privileges: []
                         - feature_id: 00000000-0000-4000-8000-000000000006
                           feature_type: boolean
@@ -5056,9 +5074,6 @@ paths:
                           description: Access to all supported communication channels
                           usage_limit: null
                           hard_limit: null
-                          min_margin_percent: null
-                          margin_enforcement_mode: null
-                          enforce_plan_margin: null
                           privileges: []
                         - feature_id: 00000000-0000-4000-8000-000000000007
                           feature_type: boolean
@@ -5067,9 +5082,6 @@ paths:
                           description: Access to the complete CRM workspace
                           usage_limit: null
                           hard_limit: null
-                          min_margin_percent: null
-                          margin_enforcement_mode: null
-                          enforce_plan_margin: null
                           privileges: []
                         - feature_id: 00000000-0000-4000-8000-000000000008
                           feature_type: boolean
@@ -5078,9 +5090,6 @@ paths:
                           description: AI meeting notes and follow-ups
                           usage_limit: null
                           hard_limit: null
-                          min_margin_percent: null
-                          margin_enforcement_mode: null
-                          enforce_plan_margin: null
                           privileges: []
                         - feature_id: 00000000-0000-4000-8000-000000000009
                           feature_type: boolean
@@ -5089,9 +5098,6 @@ paths:
                           description: Automated Acme workflows
                           usage_limit: null
                           hard_limit: null
-                          min_margin_percent: null
-                          margin_enforcement_mode: null
-                          enforce_plan_margin: null
                           privileges: []
                         - feature_id: 00000000-0000-4000-8000-000000000010
                           feature_type: boolean
@@ -5100,9 +5106,6 @@ paths:
                           description: AI-assisted lead discovery
                           usage_limit: null
                           hard_limit: null
-                          min_margin_percent: null
-                          margin_enforcement_mode: null
-                          enforce_plan_margin: null
                           privileges: []
                         - feature_id: 00000000-0000-4000-8000-000000000011
                           feature_type: boolean
@@ -5111,9 +5114,6 @@ paths:
                           description: AI voice calling and campaigns
                           usage_limit: null
                           hard_limit: null
-                          min_margin_percent: null
-                          margin_enforcement_mode: null
-                          enforce_plan_margin: null
                           privileges: []
                         - feature_id: 00000000-0000-4000-8000-000000000012
                           feature_type: boolean
@@ -5122,9 +5122,6 @@ paths:
                           description: Access to Acme's workflow integration catalog
                           usage_limit: null
                           hard_limit: null
-                          min_margin_percent: null
-                          margin_enforcement_mode: null
-                          enforce_plan_margin: null
                           privileges: []
                         - feature_id: 00000000-0000-4000-8000-000000000013
                           feature_type: config
@@ -5133,9 +5130,6 @@ paths:
                           description: Customer support level
                           usage_limit: null
                           hard_limit: null
-                          min_margin_percent: null
-                          margin_enforcement_mode: null
-                          enforce_plan_margin: null
                           privileges:
                             - code: tier
                               name: Tier
@@ -5261,7 +5255,7 @@ paths:
       tags:
         - Entitlements
       summary: Partial update of an entitlement
-      description: This accepts a list of entitlements to update. If the feature isn't part of the plan yet, it's added with all the privileges from the payload. If the feature is already part of the plan, the privilege and values are updated or added. All privileges must be valid for the feature. All features  and privileges not part of the payload are left untouched. For a feature that is already part of the plan, the metered settings the payload leaves out (`usage_limit`, `hard_limit`, `min_margin_percent`, `margin_enforcement_mode`, `enforce_plan_margin`) keep their current values, so sending only `hard_limit` set to false keeps the usage limit, and sending only `usage_limit` keeps a soft limit soft. POST replaces the whole entitlement and applies the defaults. To remove privileges or features, use the DELETE endpoints. In a plan family, features and privileges are written to every plan of the family, but `usage_limit` and `hard_limit` are set on the plan in the path only, so each billing interval keeps its own limits, because usage is counted per billing period. A plan of the family that gets a metered feature for the first time this way has no limit until one is set on it.
+      description: This accepts a list of entitlements to update. If the feature isn't part of the plan yet, it's added with all the privileges from the payload. If the feature is already part of the plan, the privilege and values are updated or added. All privileges must be valid for the feature. All features  and privileges not part of the payload are left untouched. For a feature that is already part of the plan, the metered settings the payload leaves out (`usage_limit`, `hard_limit`) keep their current values, so sending only `hard_limit` set to false keeps the usage limit, and sending only `usage_limit` keeps a soft limit soft. POST replaces the whole entitlement and applies the defaults. To remove privileges or features, use the DELETE endpoints. In a plan family, features and privileges are written to every plan of the family, but `usage_limit` and `hard_limit` are set on the plan in the path only, so each billing interval keeps its own limits, because usage is counted per billing period. A plan of the family that gets a metered feature for the first time this way has no limit until one is set on it.
       operationId: updateEntitlement
       requestBody:
         description: Entitlement payload
@@ -25225,6 +25219,16 @@ components:
           type:
             - string
             - 'null'
+        payment_collection_warning:
+          type:
+            - string
+            - 'null'
+          enum:
+            - billing_entity_email_missing
+            - customer_email_missing
+            - null
+          description: 'Set for a customer who pays each invoice by link (Razorpay, or Stripe without a saved payment method) when no email can carry the link: the billing entity has no email, or the customer has none. `null` otherwise. While it is set, the automatic payment request of an invoice is skipped and Nozle sends `invoice.payment_failure` for that invoice with the same value as `provider_error.error_code`.'
+          example: null
     MetadataObject:
       type:
         - object
@@ -31261,9 +31265,6 @@ components:
         - description
         - usage_limit
         - hard_limit
-        - min_margin_percent
-        - margin_enforcement_mode
-        - enforce_plan_margin
         - privileges
       properties:
         feature_id:
@@ -31290,29 +31291,6 @@ components:
             - boolean
             - 'null'
           description: For a metered feature, `true` blocks usage over `usage_limit`. `null` for boolean and config features.
-          example: null
-        min_margin_percent:
-          type:
-            - number
-            - 'null'
-          description: Minimum margin, as a percentage, the plan must keep on this feature. `null` when no minimum is set.
-          example: null
-        margin_enforcement_mode:
-          type:
-            - string
-            - 'null'
-          enum:
-            - enforce
-            - warn
-            - 'off'
-            - null
-          description: What happens when the margin falls below `min_margin_percent`. `null` for boolean and config features.
-          example: null
-        enforce_plan_margin:
-          type:
-            - boolean
-            - 'null'
-          description: Whether the plan-level margin is enforced for this metered feature. `null` for boolean and config features.
           example: null
         code:
           type: string
