@@ -9,7 +9,7 @@ description: Product and developer-platform updates from Nozle
 
 _Unreleased_
 
-- Changing what a plan bills or grants while customers pay for it saves the plan's next version under the same code. Existing subscribers keep their version and price; new subscriptions get the current version. Plans have `version` and `is_current`, and `GET /plans` returns current versions only. See [Plan versioning](/guides/billing/plan-versions).
+- **Changed for every organization:** changing what a plan bills or grants while customers pay for it saves the plan's next version under the same code. Existing subscribers keep their version and price; new subscriptions get the current version. Before, the change applied to existing subscribers from their next invoice; to keep doing that, send `disable_version: true` with the edit. Plans have `version` and `is_current`, and `GET /plans` returns current versions only. See [Plan versioning](/guides/billing/plan-versions).
 - `PUT /plans/{code}` takes `disable_version` (change the current version for everyone) and `force_version`. An edit of an older version is refused with `409 plan_version_not_current`.
 - Sell an older version with `plan_version` on `POST /subscriptions` and on the Engine's `POST /subscribe`. The same plan code sent again for an existing subscription never moves it.
 - `GET /plans/{code}/versions` lists the versions; version migrations (`/plans/{code}/version-migrations`: preview, start, list, read, cancel) move one version's subscribers to another at the end of their billing periods, charging nothing when they run. See [Plan Versions and Migrations](/api/plan-versions).
