@@ -9823,7 +9823,7 @@ paths:
       tags:
         - Subscription Changes
       summary: Cancel a subscription
-      description: Cancels a subscription now or at its next renewal boundary. Engine checks that the subscription belongs to the customer, then forwards to Core `DELETE /subscriptions/{id}?cancellation_policy=...`. Requires `subscription:write`. For `end_of_period` the subscription stays `active` and `ending_at` is set; for `immediate` the terminated subscription is returned. Engine forwards Core's status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine's own `{error, code?}` errors.
+      description: Cancels a subscription now or at its next renewal boundary. Engine checks that the subscription belongs to the customer, then forwards to Core `DELETE /subscriptions/{id}` only the timing and settlement parameters that were sent (`credit_action` becomes Core `on_termination_credit_note`, with `none` as `skip`; `final_invoice_action` becomes `on_termination_invoice`). Each parameter left out follows the subscription, then the organization's cancellation settings. Requires `subscription:write`. For `end_of_period` the subscription stays `active` and `ending_at` is set; for `immediate` the terminated subscription is returned. Engine forwards Core's status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine's own `{error, code?}` errors.
       operationId: engineCancelSubscription
       security:
         - bearerAuth: []
@@ -9850,13 +9850,41 @@ paths:
         - name: cancellation_policy
           in: query
           required: false
-          description: '`immediate` terminates now; `end_of_period` schedules the ending at the next renewal boundary. Any other value returns `400`.'
+          description: '`immediate` terminates now; `end_of_period` schedules the ending at the next renewal boundary. Left out, the organization''s cancellation timing applies (Nozle''s default is `end_of_period`); a subscription that has not started is always canceled immediately. Any other value returns `400`.'
           schema:
             type: string
             enum:
               - immediate
               - end_of_period
-            default: immediate
+        - name: credit_action
+          in: query
+          required: false
+          description: 'Unused paid time of a pay-in-advance plan: `credit`, `refund`, `offset` (needs a final invoice) or `none`. Ignored for pay-in-arrears plans. Left out, the subscription''s, then the organization''s setting applies. Any other value returns `400`.'
+          schema:
+            type: string
+            enum:
+              - credit
+              - refund
+              - offset
+              - none
+        - name: refund_mode
+          in: query
+          required: false
+          description: '`prorated` refunds the unused part, `full` the whole amount. `full` on a pay-in-advance plan needs `credit_action: refund` (sent or inherited), else Core answers `422`. Left out, the organization''s setting applies. Any other value returns `400`.'
+          schema:
+            type: string
+            enum:
+              - prorated
+              - full
+        - name: final_invoice_action
+          in: query
+          required: false
+          description: '`generate` issues a final invoice; `skip` does not. Left out, the subscription''s, then the organization''s setting applies. Any other value returns `400`.'
+          schema:
+            type: string
+            enum:
+              - generate
+              - skip
       responses:
         '200':
           description: The subscription.
@@ -10461,7 +10489,6 @@ paths:
             enum:
               - active
               - suspended
-              - deleted
         - name: limit
           in: query
           required: false
@@ -10629,7 +10656,7 @@ paths:
             entity, err := client.GetEntity(ctx, "cust_123", "user_42")
     put:
       summary: Create or update a customer Entity
-      description: Creates the Entity or replaces its name, status and metadata. The body is a complete snapshot. Entity lifecycle changes never create billing events. When the Entity becomes active (created, activated or reactivated), its credit grants are scheduled. The body is at most 128 KiB. Requires an organization secret key, or trusted internal authentication. A secret key needs `entity:write`. Publishable keys are rejected.
+      description: Creates the Entity or replaces its name, status and metadata. The body is a complete snapshot. Entity lifecycle changes never create billing events. When the Entity becomes active (created or activated), its credit grants are scheduled. The body is at most 128 KiB. Requires an organization secret key, or trusted internal authentication. A secret key needs `entity:write`. Publishable keys are rejected.
       operationId: engineUpsertCustomerEntity
       tags:
         - Entities
@@ -10754,91 +10781,6 @@ paths:
             	Status:   "active",
             	Metadata: map[string]any{"role": "admin"},
             }, "upsert-user_42-v1")
-    delete:
-      summary: Delete a customer Entity
-      description: 'Moves the Entity to `deleted`. Deletion is not a financial cascade: sources, allocations, operations and audit rows are kept. Requires an organization secret key, or trusted internal authentication. A secret key needs `entity:write`. Publishable keys are rejected.'
-      operationId: engineDeleteCustomerEntity
-      tags:
-        - Entities
-      servers: *id002
-      security: *id003
-      parameters:
-        - *id004
-        - *id008
-        - name: Idempotency-Key
-          in: header
-          required: true
-          description: Idempotency key, at most 255 bytes. Required. Leading and trailing whitespace is trimmed before the length check and before use. A missing, blank or longer value returns `400 invalid_request` (`Idempotency-Key is required and must not exceed 255 bytes`). Retry an uncertain request with the same key and an identical body; the same key with a different request returns `409 idempotency_key_reused`.
-          schema:
-            type: string
-            maxLength: 255
-            minLength: 1
-      responses:
-        '200':
-          description: The deletion result.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreditsEntityMutationResult'
-              example:
-                action: deleted
-                entity:
-                  id: 0e7c5a7e-3b8f-4c6a-9f1d-2a4b6c8d0e1f
-                  customer_id: workspace_123
-                  external_id: user_42
-                  name: Asha
-                  status: deleted
-                  metadata: *id016
-                  created_at: '2026-07-22T10:00:00Z'
-                  updated_at: '2026-07-23T10:00:00Z'
-                  deleted_at: '2026-07-23T10:00:00Z'
-                replayed: false
-        '400':
-          $ref: '#/components/responses/EngineBadRequest'
-          description: '`code: invalid_request`: invalid path value, query value or body, or a missing or invalid `Idempotency-Key`.'
-        '401': *id006
-        '403':
-          $ref: '#/components/responses/EngineForbidden'
-          description: The credential is not allowed. A publishable key is rejected; a secret key needs `entity:write`. The body has `error` only (no `code`).
-        '404':
-          $ref: '#/components/responses/EngineNotFound'
-          description: Not found. `code` is one of `customer_not_found`, `entity_not_found`.
-        '409':
-          $ref: '#/components/responses/EngineConflict'
-          description: '`code: idempotency_key_reused`: the key was used with a different request.'
-        '422':
-          $ref: '#/components/responses/EngineUnprocessable'
-          description: '`code: entity_status_transition_invalid`: the status change is not allowed.'
-        '500':
-          description: 'Unexpected server error. The body has `code: internal_error`.'
-          content:
-            application/json:
-              schema: *id001
-              examples:
-                internal_error:
-                  value:
-                    code: internal_error
-                    error: entity request failed
-        '503':
-          description: 'Service unavailable. Retry with the same `Idempotency-Key` and body. API key verification failures return `{"error": "API key verification is unavailable"}` with no `code` and no `Retry-After`.'
-          headers:
-            Retry-After:
-              description: Seconds to wait before retrying. Sent with every coded 503 listed here; values are `1` for `entity_service_temporarily_unavailable`.
-              schema:
-                type: integer
-          content:
-            application/json:
-              schema: *id001
-              examples:
-                entity_service_temporarily_unavailable:
-                  summary: Retry-After 1
-                  value:
-                    code: entity_service_temporarily_unavailable
-                    error: entity service is temporarily unavailable; retry with the same Idempotency-Key
-                api_key_verification_unavailable:
-                  summary: No code, no Retry-After
-                  value:
-                    error: API key verification is unavailable
   /customers/{customer_id}/entities/bulk-upsert:
     post:
       summary: Bulk upsert customer Entities
@@ -35716,7 +35658,7 @@ components:
         register_mandate:
           type: boolean
           default: false
-          description: 'Razorpay only: register a recurring mandate with the payment.'
+          description: 'Razorpay only: register a recurring mandate with the payment of a subscription invoice. A plan change that leaves an amount due answers `422 razorpay_mandate_registration_unavailable` instead.'
         subscription_id:
           type: string
           description: External ID of the active subscription to change. Forwarded to Core as `external_subscription_id`. Required when the customer has several active subscriptions.
@@ -37115,7 +37057,6 @@ components:
           enum:
             - active
             - suspended
-            - deleted
         credit_system:
           type: string
         credit_system_id:
@@ -37174,7 +37115,6 @@ components:
           enum:
             - active
             - suspended
-            - deleted
         as_of:
           type: string
           format: date-time
@@ -37362,7 +37302,7 @@ components:
       properties:
         id:
           type: string
-          description: Durable Entity UUID. Recreating an Entity with the same external ID after deletion gives a new incarnation.
+          description: Durable Entity UUID. An Entity keeps its id for its whole life; Entities cannot be deleted.
         customer_id:
           type: string
           description: External customer ID.
@@ -37378,7 +37318,6 @@ components:
           enum:
             - active
             - suspended
-            - deleted
         metadata:
           type: object
           additionalProperties: true
@@ -37437,8 +37376,7 @@ components:
           enum:
             - active
             - suspended
-            - deleted
-          description: 'Required. Allowed transitions: `active` to `suspended` or `deleted`; `suspended` to `active` or `deleted`; `deleted` to `active` (reactivation). Any other change returns `422 entity_status_transition_invalid`.'
+          description: 'Required: `active` or `suspended`. Any other value, including `deleted`, returns `400 invalid_request`. Entities cannot be deleted. Suspending an Entity does not cancel its subscription: cancel the Entity subscription yourself to stop billing. A legacy Entity already in `deleted` status is never revived: changing its status returns `422 entity_status_transition_invalid`.'
         metadata: &id023
           type: object
           additionalProperties: true
@@ -37482,9 +37420,7 @@ components:
             - updated
             - unchanged
             - activated
-            - reactivated
             - suspended
-            - deleted
         entity:
           $ref: '#/components/schemas/CreditsEntity'
     CreditsEntityMutationResult:
@@ -37501,9 +37437,7 @@ components:
             - updated
             - unchanged
             - activated
-            - reactivated
             - suspended
-            - deleted
         entity:
           $ref: '#/components/schemas/CreditsEntity'
         replayed:
@@ -37534,10 +37468,12 @@ components:
           type: integer
         reactivated:
           type: integer
+          description: Always `0`; Entities are no longer reactivated or deleted.
         suspended:
           type: integer
         deleted:
           type: integer
+          description: Always `0`; Entities cannot be deleted.
     CreditsEntityBulkMutationResult:
       type: object
       required:

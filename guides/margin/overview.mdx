@@ -24,6 +24,13 @@ AI products often bill per request, token, workflow, or model while serving cost
 **Access:**
 All margin endpoints require a secret key (sk_). Margin data is server-side only — it should not be exposed to customers.
 
-The `/margin/*` endpoints aggregate stored margin events only. Each event carries its own revenue, cost and margin, and the endpoints sum those values. The other views listed above are not part of the `/margin/*` responses. See [Dashboard](/guides/margin/dashboard).
+The `/margin/*` endpoints and the dashboard margin, LLM cost and Overview margin views sum margin events. There are two kinds:
+
+- **Usage events** from `/events`, with their estimated revenue and any legacy Cost Model cost.
+- **Rated Cost Events** from `/cost-events`, with the cost from your Cost Sheets and no revenue. Each is attributed to its customer and, when it has a parent Feature Event, to that event's Feature, subscription and plan. `properties.model` sets the model.
+
+A Cost Event counts once in `event_count`, however many ledger entries it posts. A later correction of its cost changes the cost instead of adding to it, and a retried or replayed Cost Event is counted once. A Cost Event in the Uncosted queue adds no cost. Cost is summed exactly and rounded to whole cents only in the totals, so many sub-cent costs, such as token costs, add up. A Cost Event that has only a customer and no parent subscription shows under an explicit "Unattributed" plan in the plan breakdown. Cost Events rated before this change shipped are not in the margin views, and there is no backfill: only Cost Events rated from the Engine release that includes this change count.
+
+Feature Event costs and shared period costs from Cost Sheets are in the [Cost Intelligence report](/api/cost-intelligence-report), not in the `/margin/*` responses. See [Dashboard](/guides/margin/dashboard).
 
 The `can()` endpoint can return a labelled decimal `economics` estimate so your backend can log warnings or apply a versioned merchant policy. Calling `/can` never writes usage or financial ledger entries.

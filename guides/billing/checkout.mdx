@@ -28,10 +28,10 @@ Plan and invoice checkout always create an embedded Stripe Checkout Session and 
 
 When you connect a Stripe account, Nozle registers a Stripe webhook endpoint for that account and stores Stripe's webhook signing secret. Your Stripe account must allow webhook endpoint creation.
 
-The webhook target is derived from your public Nozle API URL:
+The webhook target is:
 
 ```text
-{NOZLE_PUBLIC_API_URL}/webhooks/stripe/{organization_id}?code={stripe_provider_code}
+https://api.nozle.app/core/webhooks/stripe/{organization_id}?code={stripe_provider_code}
 ```
 
 Stripe events Nozle handles:
@@ -56,7 +56,7 @@ Retrying a new-subscription checkout for the same plan while its subscription is
 Connect Razorpay in the dashboard with its key ID, key secret and webhook secret. Optional settings enable recurring mandates (with a maximum mandate amount). Razorpay supports only INR. Nozle does not register the Razorpay webhook for you: copy the webhook URL Nozle shows for the connection into your Razorpay dashboard, with the same webhook secret. See the [Razorpay integration](/integrations/razorpay) for setup, events and limits.
 
 ```text
-{NOZLE_PUBLIC_API_URL}/webhooks/razorpay/{payment_provider_id}
+https://api.nozle.app/core/webhooks/razorpay/{payment_provider_id}
 ```
 
 Nozle checks the `X-Razorpay-Signature` header against the webhook secret and de-duplicates on `X-Razorpay-Event-Id`. On `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid` and `payment_link.paid`, Nozle fetches the payment from Razorpay and settles the checkout once the payment is captured. Refund, mandate and dispute events are also handled.

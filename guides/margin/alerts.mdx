@@ -12,7 +12,7 @@ What Nozle does provide:
 - **The Cost Intelligence report:** ledger-backed costs per Feature and customer, built from your Cost Sheets. See [Cost Intelligence report](/api/cost-intelligence-report).
 
 <Warning>
-Do not build a margin check on `margin.trend` or the other `/margin/*` queries. They sum stored margin events only and do not include Cost Sheet costs, so a script built on them can report a cost of 0 while the Cost Intelligence report shows real costs. See [Margin Intelligence](/guides/margin/overview).
+The `/margin/*` queries, such as `margin.trend`, include the cost of rated Cost Events but not Feature Event costs or shared period costs from Cost Sheets. A margin check built on them can show less cost than the Cost Intelligence report. See [Margin Intelligence](/guides/margin/overview).
 </Warning>
 
 ## Check the margin of one call

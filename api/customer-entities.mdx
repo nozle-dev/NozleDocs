@@ -1,14 +1,14 @@
 ---
 title: Customer Entities
 api: "GET https://api.nozle.app/engine/api/v1/customers/{customer_id}/entities"
-description: Create, list, update, suspend, reactivate, and delete customer Entities
+description: Create, list, update, suspend, and activate customer Entities
 ---
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
 **Auth:** secret key only. Reads require `entity:read` and mutations require `entity:write`. Publishable keys cannot read the Entity directory.
 
-List Entities with an optional `status` (`active`, `suspended`, or `deleted`), `limit`, and opaque `cursor`. `limit` is an integer from 1 to 200. Omitted, empty, or `0` uses the default of 50. Any other value returns `400 invalid_request`.
+List Entities with an optional `status` (`active` or `suspended`), `limit`, and opaque `cursor`. `limit` is an integer from 1 to 200. Omitted, empty, or `0` uses the default of 50. Any other value returns `400 invalid_request`.
 
 ```http
 GET /customers/workspace_123/entities?status=active&limit=50
@@ -61,9 +61,9 @@ Content-Type: application/json
 
 The upsert payload is a complete snapshot. When changing only status, send the current `name` and `metadata` so they are not cleared.
 
-`status` is required. `name` is at most 255 characters. `metadata` is a JSON object of at most 64 KiB. Unknown fields return `400 invalid_request`. These status changes are allowed: `active` to `suspended` or `deleted`, `suspended` to `active` or `deleted`, and `deleted` to `active`. Any other change returns `422 entity_status_transition_invalid`.
+`status` is required. `name` is at most 255 characters. `metadata` is a JSON object of at most 64 KiB. Unknown fields return `400 invalid_request`. An Entity is `active` or `suspended` and can move between the two. Any other status, including `deleted`, returns `400 invalid_request`. Entities cannot be deleted.
 
-A new Entity returns `201`. An update, an unchanged Entity, or a replay returns `200`. The body is `{ "action", "entity", "replayed" }`. `action` is one of `created`, `updated`, `unchanged`, `activated`, `reactivated`, `suspended`, or `deleted`.
+A new Entity returns `201`. An update, an unchanged Entity, or a replay returns `200`. The body is `{ "action", "entity", "replayed" }`. `action` is one of `created`, `updated`, `unchanged`, `activated`, or `suspended`.
 
 Entity lifecycle operations never create billing events. If your product bills
 per seat, your backend must track that seat separately through the Events API.
@@ -84,18 +84,23 @@ Content-Type: application/json
 }
 ```
 
-Bulk upsert returns `200` with `{ "customer_id", "entities": [{ "action", "entity" }], "counts", "replayed" }`. `counts` has one integer per action. An empty list, more than 500 items, or a duplicate `external_id` returns `400 invalid_request`.
+Bulk upsert returns `200` with `{ "customer_id", "entities": [{ "action", "entity" }], "counts", "replayed" }`. `counts` has one integer per action; `reactivated` and `deleted` are kept for compatibility and are always `0`. An empty list, more than 500 items, or a duplicate `external_id` returns `400 invalid_request`.
 
-Delete through the lifecycle endpoint:
+## Delete is not supported
+
+An Entity cannot be deleted. It is `active` or `suspended` only.
 
 ```http
 DELETE /customers/workspace_123/entities/user_42
 Authorization: Bearer sk_...
-Idempotency-Key: delete-user-42
 ```
 
-Delete returns `200` with `{ "action", "entity", "replayed" }`.
+This returns `405` with `Allow: GET, PUT` and `{ "code": "entity_deletion_not_supported", "error": "entities cannot be deleted; set the status to suspended instead (suspending does not cancel the subscription)" }`. A `PUT` with status `deleted` returns `400 invalid_request`.
 
-Deletion is not a financial cascade. It preserves all source, allocation, operation, and audit rows. Retry an uncertain mutation with the same idempotency key and identical payload.
+Suspend the Entity instead. Suspending blocks new usage, expires unused Entity subscription grants, and returns unused allocated top-ups. It does **not** cancel the Entity's subscription. To stop billing, [cancel the Entity subscription](/api/entity-subscriptions#cancel) yourself, before or after suspending.
+
+An Entity that was deleted before this rule stays readable: `GET`, `status=deleted` in the list filter and its history keep working, but it is never revived. Changing its status returns `422 entity_status_transition_invalid`.
+
+Suspension is not a financial cascade. It preserves all source, allocation, operation, and audit rows. Retry an uncertain mutation with the same idempotency key and identical payload.
 
 Every mutation requires an `Idempotency-Key` of at most 255 bytes. A missing or longer key returns `400 invalid_request`. Reusing a key with a different request returns `409 idempotency_key_reused`. A retryable failure returns `503` with `Retry-After` and code `entity_service_temporarily_unavailable`. If the Entity was saved but its credit grants could not be scheduled, `PUT` and bulk upsert return `503 entity_grant_scheduling_unavailable`. Retry both with the same key.

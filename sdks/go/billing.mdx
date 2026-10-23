@@ -66,7 +66,7 @@ _ = cancelled
 _ = err
 ```
 
-The customer must already exist, so call `UpsertCustomer` first; an unknown customer returns `404 customer_not_found` and nothing is created. Calling `Subscribe` again for the same customer and plan returns the same subscription. Use direct subscription only when payment is not required: `Subscribe` accepts a paid plan without collecting payment. Cancellation accepts `end_of_period` or `immediate`.
+The customer must already exist, so call `UpsertCustomer` first; an unknown customer returns `404 customer_not_found` and nothing is created. Calling `Subscribe` again for the same customer and plan returns the same subscription. Use direct subscription only when payment is not required: `Subscribe` accepts a paid plan without collecting payment. Cancellation accepts `end_of_period` or `immediate`; an empty policy uses the organization's cancellation timing (Nozle's default is `end_of_period`). An optional `nozle.CancelSubscriptionOptions{CreditAction, RefundMode, FinalInvoiceAction}` chooses the settlement, and each field left empty follows the subscription, then the organization's cancellation settings. See [Cancel Subscription](/api/cancel-subscription) for the rules.
 
 `Subscribe` to another plan adds a second active subscription. It does not replace the first, and plan credit grants are granted again. To move a customer, call `Checkout` with `SubscriptionID` (needs a [transition policy](/api/plan-transition-policies)), or cancel and then subscribe. Pass the new subscription ID as `SubscriptionID` to `Track`.
 
@@ -113,7 +113,7 @@ A \$0 to \$0 immediate upgrade returns `completed` with `payment_source: "credit
 
 ### Schedule or withdraw a downgrade
 
-`PreviewSubscriptionTransition` and `ApplySubscriptionTransition` support `cancel`, `downgrade`, and `uncancel`. Apply requires a caller-supplied idempotency key. `WithdrawPendingSubscriptionChange` requires the exact pending change ID. `CancelSubscription` provides the simpler immediate or end-of-period cancellation path.
+`PreviewSubscriptionTransition` and `ApplySubscriptionTransition` support `cancel`, `downgrade`, and `uncancel`. Apply requires a caller-supplied idempotency key. `WithdrawPendingSubscriptionChange` requires the exact pending change ID. `CancelSubscription` provides the simpler immediate or end-of-period cancellation path. Pass `immediate` or `end_of_period` as the policy. An empty policy sends no timing, so the organization's cancellation timing applies (Nozle's default is `end_of_period`). Settlement choices go in the optional `nozle.CancelSubscriptionOptions` (`CreditAction`, `RefundMode`), as in the [subscriptions guide](/guides/billing/subscriptions).
 
 ```go
 quote, err := client.PreviewSubscriptionChange(ctx, "workspace_123", "subscription_123", "growth_monthly")

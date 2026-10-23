@@ -63,7 +63,7 @@ The endpoint reads only `from`, `to`, `from_date` and `to_date`. Any other query
 }
 ```
 
-There is one row per customer with margin events in the range. Rows are ordered by `margin_cents` ascending, so the least profitable customer comes first. All amounts are integer cents, and `margin_cents` can be negative.
+There is one row per customer with margin events in the range. `cost_cents` and `event_count` include the customer's rated Cost Events (see [Margin Intelligence](/guides/margin/overview)). Rows are ordered by `margin_cents` ascending, so the least profitable customer comes first. All amounts are integer cents, and `margin_cents` can be negative.
 
 `customer_name` is the customer's name. If the name is empty, it is the external ID. If that is empty too, it is the customer ID. A customer missing from the Engine's customer cache also gets its `customer_id` as `customer_name`.
 

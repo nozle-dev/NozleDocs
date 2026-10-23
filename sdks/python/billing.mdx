@@ -115,7 +115,19 @@ result = nozle.cancel_subscription(
 )
 ```
 
-The policy defaults to `end_of_period` and also accepts `immediate`.
+The policy is `end_of_period` or `immediate`. Leave it out to use the organization's cancellation timing (Nozle's default is `end_of_period`). The keyword-only `credit_action` (`credit`, `refund`, `offset`, `none`), `refund_mode` (`prorated`, `full`) and `final_invoice_action` (`generate`, `skip`) choose the settlement; each one left out follows the subscription, then the organization's cancellation settings:
+
+```python
+nozle.cancel_subscription(
+    "workspace_123",
+    "subscription_123",
+    policy="immediate",
+    credit_action="refund",
+    refund_mode="prorated",
+)
+```
+
+See [Cancel Subscription](/api/cancel-subscription) for the rules.
 
 ## Subscription self-service
 
