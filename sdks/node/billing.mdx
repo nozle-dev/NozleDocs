@@ -93,6 +93,21 @@ console.log(subscription.status)
 `subscribe()` to another plan adds a second active subscription. It does not replace the first, and plan credit grants are granted again. To move a customer, call `checkout()` with `subscriptionId` (needs a [transition policy](/api/plan-transition-policies)), or cancel and then subscribe. Pass the new subscription ID to `track()`: cached clients keep the old ID.
 </Warning>
 
+### Plan versions
+
+Changing a plan's price while customers pay for it saves its next version; existing subscribers keep theirs. `plans()` returns current versions only (`version`, `is_current`). With `@nozle-js/node` 0.16.0:
+
+```ts
+await nozle.subscribe('workspace_123', 'pro', { planVersion: 1 }) // sell an older version
+const versions = await nozle.planVersions.list('pro')
+const preview = await nozle.planVersions.previewMigration('pro', { fromVersion: 1 })
+const migration = await nozle.planVersions.createMigration('pro', { fromVersion: 1 })
+await nozle.planVersions.getMigration('pro', migration.nozle_id) // items with move_status
+await nozle.planVersions.cancelMigration('pro', migration.nozle_id)
+```
+
+`planVersions` needs a secret key. Another `planVersion` for an existing subscription throws `NozleApiError` 422; a second migration while one runs throws 409 `plan_version_migration_running`. See [Plan versioning](/guides/billing/plan-versions).
+
 ## Cancellation
 
 ```ts

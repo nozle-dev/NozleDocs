@@ -1,0 +1,102 @@
+---
+title: Plan versioning
+description: Change a plan's price without changing what existing customers pay, then move them to the new price when you choose.
+---
+
+When you change what a plan bills or grants while customers pay for it, Nozle saves the change as the plan's next version. New customers get the new version. Existing subscribers keep the version they bought, its price, usage rates, fixed charges, credits and entitlements, until you move them with a version migration.
+
+Every version keeps the plan's code. `pro` version 1 and `pro` version 2 are two prices of one plan, not two plans.
+
+This is how every organization works; there is nothing to turn on. To change the price for existing subscribers too, change the current version for everyone (below).
+
+## When a change creates a version
+
+| You change | Customers on the plan | What happens |
+| --- | --- | --- |
+| Price, usage charges, fixed charges, credit grants, entitlements, trial, minimum commitment, taxes, thresholds | Yes | A new version. Subscribers stay on theirs. |
+| The same, with **Change version N for everyone** (`disable_version: true`) | Yes | The current version changes in place. Every subscription on it is billed the new pricing from its next invoice. |
+| Anything | No | The plan changes in place. Nobody pays for it, so there is nothing to keep. |
+| Name, description, invoice display name | Either | Every version changes. These describe the plan; they do not bill anything. |
+
+In the dashboard, saving a priced change of a plan with subscribers asks which of the first two you want, and says how many subscriptions it affects. With the API, `PUT /plans/{code}` saves a version unless you send `disable_version: true`; `force_version: true` saves a version even when nothing billed changes.
+
+Only the current version can be edited. An older version is the pricing its subscribers are billed on: its page in the dashboard is read-only, and an API edit of it is refused with `409 plan_version_not_current`. That also catches a form opened before someone else saved a newer version.
+
+## What sells which version
+
+- **Everything that names a plan code gets the current version.** `GET /plans`, the pricing table, checkout, signup, `POST /subscriptions` and the SDKs' `subscribe` all sell the current version. `GET /plans` and `GET /plans/{code}` return current versions only.
+- **The same code again never moves a subscriber.** Sending `POST /subscriptions` (or a checkout) for an existing subscription with its own plan code changes nothing, even when the current version is cheaper. Moving between versions only happens through a migration.
+- **You can sell an older version on purpose.** Pass `plan_version` to `POST /subscriptions` (or `planVersion` / `plan_version` / `PlanVersion` to the SDKs' subscribe), for example to honour an old quote. Another version for an existing subscription is refused with `422 plan_version_change_not_supported`; an unknown version returns `404 plan_version_not_found`.
+- **Read an older version** with a secret key: `GET /plans/{code}?version=1`. List every version, its price and its active subscriptions with `GET /plans/{code}/versions`.
+
+## Move subscribers to a newer version
+
+A version migration moves the active subscriptions of one version to another (the current version by default).
+
+1. **Preview.** `POST /plans/{code}/version-migrations/preview` with `from_version` lists each subscription: `move`, with the day it moves and its current and new plan amounts, or `skip` with the reason. Nothing is written. In the dashboard, the Versions tab shows the same list before you confirm.
+2. **Start.** `POST /plans/{code}/version-migrations` runs in the background. Each subscription moves **at the end of its current billing period**, the way a scheduled downgrade is applied.
+3. **Follow.** `GET /plans/{code}/version-migrations/{id}` returns one item per subscription. A scheduled move's `move_status` is `pending` until it happens, then `moved`; `effective_at` is the day it does.
+4. **Cancel** with `POST /plans/{code}/version-migrations/{id}/cancel`. Moves that have not happened are unscheduled and those subscribers stay on their version.
+
+**Nothing is charged when a migration runs.** No invoice, credit note or refund is made. On the move day, the subscription's next invoice bills the new version for the new period. Usage of the period that just ended is billed at the old version's rates, on that same invoice. Coupons, wallets, taxes and the payment method carry over as they would for any renewal.
+
+These subscriptions are skipped, with the reason in `skip_reason`:
+
+| `skip_reason` | Why |
+| --- | --- |
+| `custom_pricing` | The subscription is on a price negotiated for that customer (an override plan). |
+| `in_trial` | It is in a trial that the new version would make shorter or longer. |
+| `pending_plan_change` | Another plan change is already scheduled. |
+| `open_checkout` | The customer has a checkout open. It is never voided. |
+| `canceling` | It ends at the end of its period. |
+| `different_billing` | The two versions bill on another interval, currency or billing time. |
+| `external_billing` | Another system bills it. |
+| `not_active` | It has not started. |
+| `already_on_version` | It is already on the target version. |
+
+One migration of a plan code runs at a time; another one returns `409 plan_version_migration_running`. Running a migration again is safe: subscriptions already moved are not moved twice, and failed ones are retried.
+
+## Credits when a subscriber moves
+
+For plans that grant credits, **Settings → Billing → "Credits when customers move to a new plan version"** (`plan_version_credits`) decides what a moved customer keeps of the old version's grant when that grant period is still open at the move:
+
+| Setting | Example: 1,000 credits a year, 700 left, the new version grants 500 |
+| --- | --- |
+| `carry_over` (default) | Keeps the 700 until they expire. The new version grants from its next grant period. |
+| `cap_to_new_grant` | Keeps 500; 200 are removed. |
+| `reset` | The 700 are removed and the new version grants its 500. |
+
+A grant whose period ends with the billing period (the usual monthly case) has already expired at the move, so the new version grants its first period in full under every setting. Top-ups and manual grants are never touched.
+
+## How versions work with the rest of Nozle
+
+- **Plan families.** Each interval plan of a family (monthly, yearly) has its own versions. A family-wide feature change saves a version of each plan that has subscribers. A switch from an older version to another interval of the family is a normal plan change.
+- **Transition policies** follow the current version: a re-price moves them to the new version, and a subscriber on an older version uses them too.
+- **Coupons** that apply to a plan code apply to every version of it.
+- **Deleting a plan** deletes every version and unschedules every pending move.
+- **Webhooks.** `plan.version_created` is sent when a change saves a version. Subscriptions carry `plan_version`, `previous_plan_version`, `next_plan_version` and `plan_version_migration_id`.
+
+## SDKs
+
+```ts
+await nozle.subscribe("cus_123", "pro", { planVersion: 1 });
+const versions = await nozle.planVersions.list("pro");
+const preview = await nozle.planVersions.previewMigration("pro", { fromVersion: 1 });
+const migration = await nozle.planVersions.createMigration("pro", { fromVersion: 1 });
+```
+
+```python
+nozle.subscribe("cus_123", "pro", plan_version=1)
+versions = nozle.plan_versions.list("pro")
+preview = nozle.plan_versions.preview_migration("pro", 1)
+migration = nozle.plan_versions.create_migration("pro", 1)
+```
+
+```go
+client.Subscribe(ctx, nozle.SubscribeParams{CustomerID: "cus_123", PlanCode: "pro", PlanVersion: 1})
+versions, err := client.PlanVersions(ctx, "pro")
+preview, err := client.PreviewPlanVersionMigration(ctx, "pro", nozle.PlanVersionMigrationParams{FromVersion: 1})
+migration, err := client.CreatePlanVersionMigration(ctx, "pro", nozle.PlanVersionMigrationParams{FromVersion: 1})
+```
+
+These need `@nozle-js/node` 0.16.0, `nozle-sdk` 0.16.0 or `nozle-go` 0.15.0. The React `<CurrentPlan />` component (0.15.0) does not show the current version's usage limits to a customer on an older version. See the [API reference](/api/plan-versions) for every field.

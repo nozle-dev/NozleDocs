@@ -103,6 +103,21 @@ The customer must already exist, so call `customers.upsert()` first. An unknown 
 
 <Warning>
 `subscribe()` to another plan adds a second active subscription. It does not replace the first, and plan credit grants are granted again. To move a customer, call `checkout()` with `subscription_id` (needs a [transition policy](/api/plan-transition-policies)), or cancel and then subscribe. Pass the new subscription ID to `track()`: cached clients keep the old ID.
+
+### Plan versions
+
+Changing a plan's price while customers pay for it saves its next version; existing subscribers keep theirs. `plans()` returns current versions only (`version`, `is_current`). With `nozle-sdk` 0.16.0 (also on `AsyncNozle`):
+
+```python
+nozle.subscribe("workspace_123", "pro", plan_version=1)  # sell an older version
+versions = nozle.plan_versions.list("pro")
+preview = nozle.plan_versions.preview_migration("pro", 1)
+migration = nozle.plan_versions.create_migration("pro", 1)
+nozle.plan_versions.get_migration("pro", migration["nozle_id"])  # items with move_status
+nozle.plan_versions.cancel_migration("pro", migration["nozle_id"])
+```
+
+`plan_versions` needs a secret key. Another `plan_version` for an existing subscription raises `NozleAPIError` 422; a second migration while one runs raises 409 `plan_version_migration_running`. See [Plan versioning](/guides/billing/plan-versions).
 </Warning>
 
 ## Cancellation

@@ -5,7 +5,7 @@ info:
     One specification for the Nozle API. Core operations use the default server https://api.nozle.app/core/api/v1. Engine operations name their own server, https://api.nozle.app/engine/api/v1. Both live on the one host https://api.nozle.app.
 
     **Legacy key names, removed after January 19, 2027.** Until January 19, 2027 (inclusive), REST responses and webhook payloads carry the old key beside the new one, with the same value, on every object that had it before. `lago_id` is the old name of `nozle_id`. These old names are the new keys with the former prefix: `lago_add_on_id`, `lago_alert_id`, `lago_charge_filter_id`, `lago_charge_id`, `lago_coupon_id`, `lago_credit_note_id`, `lago_customer_id`, `lago_feature_id`, `lago_fee_id`, `lago_fixed_charge_id`, `lago_integration_id`, `lago_invoice_id`, `lago_invoice_ids`, `lago_item_id`, `lago_order_form_id`, `lago_organization_id`, `lago_original_fee_id`, `lago_parent_id`, `lago_payable_id`, `lago_payment_provider_id`, `lago_payment_request_id`, `lago_plan_id`, `lago_pricing_unit_id`, `lago_quote_id`, `lago_quote_version_id`, `lago_subscription_id`, `lago_tax_id`, `lago_true_up_fee_id`, `lago_true_up_parent_fee_id`, `lago_user_id`, `lago_voided_invoice_id`, `lago_wallet_id`, `lago_wallet_transaction_id`. A key gets its old name only on the objects where it was renamed. Old EU tax codes (`lago_eu_<rest>`) resolve to `nozle_eu_<rest>` in `tax_codes` inputs and in `GET`, `PUT` and `DELETE /taxes/{code}`. CSV exports (invoices, invoice fees, credit notes, credit note items) repeat the id columns at the end under the old names `lago_id`, `customer_lago_id`, `invoice_lago_id`, `fee_lago_id`, `credit_note_lago_id`, `credit_note_item_lago_id` and `credit_note_item_fee_lago_id`. Read the new names before the removal date.
-  version: 1.49.0
+  version: 1.50.0
   license:
     name: AGPLv3
     url: https://github.com/nozle-dev/core/blob/main/LICENSE
@@ -4948,7 +4948,10 @@ paths:
       tags:
         - Plans
       summary: Update a plan
-      description: This endpoint updates a specific plan with subscription and usage-based charges. It supports flexible billing cadence (in-advance or in-arrears) and allows for both recurring and metered charges. Usage thresholds (`usage_thresholds`) need progressive billing, which comes with the Growth, Scale and Enterprise Nozle plans, so without it a non-empty list is refused with `422` with `feature_not_available` in `error_details.usage_thresholds`, and nothing is saved. An empty list is accepted and changes nothing.
+      description: |-
+        This endpoint updates a specific plan with subscription and usage-based charges. It supports flexible billing cadence (in-advance or in-arrears) and allows for both recurring and metered charges. Usage thresholds (`usage_thresholds`) need progressive billing, which comes with the Growth, Scale and Enterprise Nozle plans, so without it a non-empty list is refused with `422` with `feature_not_available` in `error_details.usage_thresholds`, and nothing is saved. An empty list is accepted and changes nothing.
+
+        **Plan versioning.** When the plan has active subscriptions and the change alters what it bills or grants, Nozle saves the change as the plan's next version (same code) and returns that new, current version: the existing subscriptions stay on the version they are on until a version migration moves them, and new subscriptions get the new version. Name, description and invoice name are shared by every version and never create one. `disable_version: true` changes the current version in place instead. Only the current version can be edited: an edit of an older version (for example a form opened before another save) is refused with `409` and `plan_version_not_current`. See [Plan versioning](/guides/billing/plan-versions).
       operationId: updatePlan
       requestBody:
         description: Plan payload
@@ -4989,6 +4992,15 @@ paths:
 
         See [Public plan catalog](/api/list-plans).
       operationId: findPlan
+      parameters:
+        - name: version
+          in: query
+          required: false
+          description: Secret keys only. The version of the code to return (see [Plan versioning](/guides/billing/plan-versions)). Without it, or with a publishable key, the current version is returned. An unknown version returns `404` with `plan_not_found`.
+          schema:
+            type: integer
+            minimum: 1
+            example: 1
       responses:
         '200':
           description: Plan
@@ -8725,6 +8737,208 @@ paths:
           label: Go
           source: |-
             withdrawn, err := client.WithdrawPendingSubscriptionChange(ctx, "cust_123", "sub_123", "sub_pending_123", "withdraw-sub_pending_123-v1")
+  /plans/{code}/versions:
+    get:
+      tags:
+        - Plans
+      summary: List the versions of a plan
+      description: Lists every version of the plan code, oldest first, with its price and the number of active subscriptions billed on it. Secret keys only; a publishable key gets `403` with `secret_key_required`. See [Plan versioning](/guides/billing/plan-versions).
+      operationId: listPlanVersions
+      parameters:
+        - $ref: '#/components/parameters/plan_version_code'
+      responses:
+        '200':
+          description: The versions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanVersionList'
+              example:
+                versions:
+                  - nozle_id: 1a901a90-1a90-1a90-1a90-1a901a901a91
+                    version: 1
+                    is_current: false
+                    created_at: '2026-10-01T09:00:00Z'
+                    amount_cents: 4900
+                    amount_currency: USD
+                    active_subscriptions_count: 42
+                  - nozle_id: 1a901a90-1a90-1a90-1a90-1a901a901a92
+                    version: 2
+                    is_current: true
+                    created_at: '2026-10-15T09:00:00Z'
+                    amount_cents: 5900
+                    amount_currency: USD
+                    active_subscriptions_count: 7
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /plans/{code}/version-migrations:
+    get:
+      tags:
+        - Plans
+      summary: List the version migrations of a plan
+      description: Lists the migrations of the plan code, newest first, without their items. Secret keys only.
+      operationId: listPlanVersionMigrations
+      parameters:
+        - $ref: '#/components/parameters/plan_version_code'
+      responses:
+        '200':
+          description: The migrations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanVersionMigrationList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+        - Plans
+      summary: Start a version migration
+      description: |-
+        Moves the active subscriptions on `from_version` of the plan code to `to_version` (the current version by default). Each subscription moves at the end of its current billing period, the way a scheduled downgrade is applied: nothing is invoiced, credited or refunded when the migration runs, and the subscription is billed the new version from its next period.
+
+        The migration runs in the background in chunks and records one item per subscription, so the response has `status: running`; read it again with `GET /plans/{code}/version-migrations/{id}`. Subscriptions are skipped, with a `skip_reason`, when they are on custom pricing, billed by another system, not started, canceling at the end of their period, in a trial the new version would change, already on the target version, waiting on another plan change, have an open checkout, or when the two versions bill on another interval, currency or billing time. Running it again is safe: moved subscriptions are not moved twice and failed ones are retried.
+
+        One migration of a plan code runs at a time: another one returns `409` with `plan_version_migration_running`. `422` with `to_version: same_version` when both versions are the same, or `to_version: plan_pending_deletion` when the target is being deleted. Secret keys only.
+      operationId: createPlanVersionMigration
+      parameters:
+        - $ref: '#/components/parameters/plan_version_code'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanVersionMigrationInput'
+            example:
+              from_version: 1
+      responses:
+        '200':
+          description: The migration, started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanVersionMigrationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: '`plan_version_migration_running`: another migration of this plan code is running.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+              example:
+                status: 409
+                error: Conflict
+                code: plan_version_migration_running
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /plans/{code}/version-migrations/preview:
+    post:
+      tags:
+        - Plans
+      summary: Preview a version migration
+      description: Says what a migration would do to each active subscription on `from_version`, without writing anything. Each item is `move` with the day the subscription would start on the new version and its current and new plan amounts, or `skip` with the reason. Secret keys only.
+      operationId: previewPlanVersionMigration
+      parameters:
+        - $ref: '#/components/parameters/plan_version_code'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanVersionMigrationInput'
+      responses:
+        '200':
+          description: What the migration would do.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanVersionMigrationPreviewResponse'
+              example:
+                plan_version_migration_preview:
+                  plan_code: pro
+                  from_version: 1
+                  to_version: 2
+                  items:
+                    - external_subscription_id: sub_1
+                      external_customer_id: cus_1
+                      outcome: move
+                      skip_reason: null
+                      effective_on: '2026-11-01'
+                      current_amount_cents: 4900
+                      new_amount_cents: 5900
+                    - external_subscription_id: sub_2
+                      external_customer_id: cus_2
+                      outcome: skip
+                      skip_reason: custom_pricing
+                      effective_on: null
+                      current_amount_cents: 3900
+                      new_amount_cents: 5900
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /plans/{code}/version-migrations/{id}:
+    get:
+      tags:
+        - Plans
+      summary: Retrieve a version migration
+      description: Returns the migration with one item per subscription it handled. Secret keys only.
+      operationId: findPlanVersionMigration
+      parameters:
+        - $ref: '#/components/parameters/plan_version_code'
+        - $ref: '#/components/parameters/plan_version_migration_id'
+      responses:
+        '200':
+          description: The migration and its items.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanVersionMigrationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /plans/{code}/version-migrations/{id}/cancel:
+    post:
+      tags:
+        - Plans
+      summary: Cancel a version migration
+      description: Stops a running migration and unschedules every move that has not started. Those subscriptions stay on their version; subscriptions already on the new version stay there. Secret keys only.
+      operationId: cancelPlanVersionMigration
+      parameters:
+        - $ref: '#/components/parameters/plan_version_code'
+        - $ref: '#/components/parameters/plan_version_migration_id'
+      responses:
+        '200':
+          description: The migration, canceled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanVersionMigrationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /plans/{plan_code}/transition-policies:
     get:
       tags:
@@ -17432,6 +17646,45 @@ webhooks:
       responses:
         '200':
           description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
+  plan_version_created:
+    post:
+      operationId: planVersionCreated
+      summary: A plan version has been created
+      description: A pricing change of a plan that customers pay for saved its next version. `plan` is the new, current version; subscriptions stay on the version they are on until a version migration moves them.
+      parameters:
+        - $ref: '#/components/parameters/webhook_signature'
+        - $ref: '#/components/parameters/webhook_signature_algorithm'
+        - $ref: '#/components/parameters/webhook_unique_key'
+      requestBody:
+        description: The new version
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - plan
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - plan.version_created
+                object_type:
+                  type: string
+                  enum:
+                    - plan
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                plan:
+                  $ref: '#/components/schemas/PlanObject'
+      responses:
+        '200':
+          description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
   plan_deleted:
     post:
       operationId: planDeleted
@@ -20581,6 +20834,22 @@ webhooks:
           description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
 components:
   parameters:
+    plan_version_code:
+      name: code
+      in: path
+      required: true
+      description: The plan code. Every version of a plan keeps its code.
+      schema:
+        type: string
+        example: pro
+    plan_version_migration_id:
+      name: id
+      in: path
+      required: true
+      description: The `nozle_id` of the migration.
+      schema:
+        type: string
+        format: uuid
     page:
       name: page
       in: query
@@ -26872,6 +27141,31 @@ components:
           type: string
           example: premium
           description: The unique code representing the plan to be attached to the customer. This code must correspond to the `code` property of one of the active plans.
+        plan_version:
+          type:
+            - integer
+            - 'null'
+          description: The version of the plan code the subscription is billed on. A subscription stays on its version when the plan's pricing changes, until a version migration moves it.
+          example: 1
+        previous_plan_version:
+          type:
+            - integer
+            - 'null'
+          description: The version of the subscription this one replaced, when it replaced one (for example after a version migration).
+          example: null
+        next_plan_version:
+          type:
+            - integer
+            - 'null'
+          description: The version the subscription moves to at the end of its period, when a change or a version migration is scheduled.
+          example: 2
+        plan_version_migration_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: The version migration that started this subscription, when one did.
+          example: null
         plan_amount_cents:
           type: integer
           description: The base cost of the related plan, excluding any applicable taxes, that is billed on a recurring basis.
@@ -31335,6 +31629,15 @@ components:
           type: string
           description: The code of the plan. It serves as a unique identifier associated with a particular plan. The code is typically used for internal or system-level identification purposes, like assigning a subscription, for instance.
           example: startup
+        version:
+          type: integer
+          minimum: 1
+          description: The version of the plan code this plan is. A plan is version 1 until its pricing is changed while customers pay for it; that change saves version 2, and so on. Every version keeps the code. See [Plan versioning](/guides/billing/plan-versions).
+          example: 2
+        is_current:
+          type: boolean
+          description: Whether new subscriptions to the code get this version. `GET /plans` and `GET /plans/{code}` return the current version unless a secret key asks for another one with `version`.
+          example: true
         interval:
           type: string
           description: 'The interval used for recurring billing. It represents the frequency at which subscription billing occurs. The interval can be one of the following values: `yearly`, `semiannual`, `quarterly`, `monthly` or `weekly`.'
@@ -32673,6 +32976,14 @@ components:
               type: boolean
               description: This field determines whether the changes made to the plan should be cascaded to the children plans. When set to `true`, the changes will be cascaded into children. Conversely, when set to `false`, the changes will only be applied to the plan itself. If not defined in the request, default value is `false`.
               example: true
+            disable_version:
+              type: boolean
+              description: Plan versioning. A change to what a plan bills or grants (prices, charges, fixed charges, credit grants, entitlements, trial and so on) while subscriptions are on it saves the plan's next version, and those subscriptions keep the version they are on. `true` changes this version in place instead, for every subscription on it from its next invoice. Cannot be combined with `force_version`. See [Plan versioning](/guides/billing/plan-versions).
+              example: false
+            force_version:
+              type: boolean
+              description: 'Plan versioning. Saves the change as the plan''s next version even when it changes nothing the plan bills or grants. Cannot be combined with `disable_version` (`422`, `force_version: incompatible_with_disable_version`).'
+              example: false
             metadata:
               $ref: '#/components/schemas/MetadataInput'
     PlanEntitlements:
@@ -33292,6 +33603,14 @@ components:
               type: string
               example: premium
               description: The unique code representing the plan to be attached to the customer. This code must correspond to the `code` property of one of the active plans.
+            plan_version:
+              type: integer
+              minimum: 1
+              example: 1
+              description: |-
+                Optional. The version of `plan_code` to sell, for example to keep selling an older price to a customer. Without it, a new subscription gets the current version.
+
+                Sending the `external_id` of an existing subscription with its own `plan_code` changes nothing and returns it, whatever the current version is. A `plan_version` other than the subscription's own is refused with `422` (`plan_version: plan_version_change_not_supported`): only a version migration moves a subscription between versions. An unknown version returns `404` with `plan_version_not_found`.
             name:
               type: string
               example: Repository A
@@ -34429,6 +34748,7 @@ components:
               - payment_request.payment_status_updated
               - plan.created
               - plan.updated
+              - plan.version_created
               - plan.deleted
               - plan_upgrade_intent.needs_review
               - quote.created
@@ -34549,6 +34869,7 @@ components:
                   - payment_request.payment_status_updated
                   - plan.created
                   - plan.updated
+                  - plan.version_created
                   - plan.deleted
                   - plan_upgrade_intent.needs_review
                   - quote.created
@@ -34667,6 +34988,7 @@ components:
                   - payment_request.payment_status_updated
                   - plan.created
                   - plan.updated
+                  - plan.version_created
                   - plan.deleted
                   - plan_upgrade_intent.needs_review
                   - quote.created
@@ -35608,6 +35930,11 @@ components:
         plan_code:
           type: string
           example: pro
+        plan_version:
+          type: integer
+          minimum: 1
+          example: 1
+          description: Optional. The version of `plan_code` to subscribe to. Without it, the customer gets the current version. Core's rules apply (see `plan_version` on `POST /subscriptions`).
     BillingSubscribeResponse:
       description: Core's subscription response with two fields added by Engine.
       allOf:
@@ -36435,6 +36762,250 @@ components:
       properties:
         plan_transition_policy:
           $ref: '#/components/schemas/BillingPlanTransitionPolicy'
+    PlanVersion:
+      type: object
+      description: One version of a plan code.
+      required:
+        - nozle_id
+        - version
+        - is_current
+        - created_at
+        - amount_cents
+        - amount_currency
+        - active_subscriptions_count
+      properties:
+        nozle_id:
+          type: string
+          format: uuid
+          description: The id of the plan row of this version.
+        version:
+          type: integer
+          minimum: 1
+        is_current:
+          type: boolean
+          description: Whether new subscriptions get this version.
+        created_at:
+          type: string
+          format: date-time
+        amount_cents:
+          type: integer
+          description: The base price of this version.
+        amount_currency:
+          type: string
+          example: USD
+        active_subscriptions_count:
+          type: integer
+          description: Active subscriptions billed on this version.
+    PlanVersionList:
+      type: object
+      required:
+        - versions
+      properties:
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanVersion'
+    PlanVersionMigrationInput:
+      type: object
+      required:
+        - from_version
+      properties:
+        from_version:
+          type: integer
+          minimum: 1
+          description: The version whose active subscriptions move.
+        to_version:
+          type: integer
+          minimum: 1
+          description: The version they move to. Defaults to the current version.
+    PlanVersionMigrationItem:
+      type: object
+      description: The outcome of a migration for one subscription.
+      required:
+        - external_subscription_id
+        - status
+      properties:
+        external_subscription_id:
+          type: string
+        status:
+          type: string
+          enum:
+            - succeeded
+            - skipped
+            - failed
+            - canceled
+          description: '`succeeded`: the move is scheduled for the end of the period (or has happened). `canceled`: the migration was canceled before the move started.'
+        skip_reason:
+          type:
+            - string
+            - 'null'
+          enum:
+            - already_on_version
+            - canceling
+            - custom_pricing
+            - different_billing
+            - external_billing
+            - in_trial
+            - not_active
+            - open_checkout
+            - pending_plan_change
+            - null
+        error:
+          type:
+            - string
+            - 'null'
+          description: Why the move failed. A rerun retries it.
+        effective_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: When the subscription starts on the new version.
+        move_status:
+          type:
+            - string
+            - 'null'
+          enum:
+            - pending
+            - moved
+            - canceled
+            - null
+          description: 'For a scheduled move (`status: succeeded`): `pending` until the subscription starts on the new version, `moved` once it has, `canceled` when the move was undone because the subscription ended first. `null` for other items.'
+    PlanVersionMigration:
+      type: object
+      required:
+        - nozle_id
+        - plan_code
+        - from_version
+        - to_version
+        - status
+        - matched_count
+        - succeeded_count
+        - skipped_count
+        - failed_count
+        - created_at
+      properties:
+        nozle_id:
+          type: string
+          format: uuid
+        plan_code:
+          type: string
+        from_version:
+          type: integer
+        to_version:
+          type: integer
+        status:
+          type: string
+          enum:
+            - running
+            - succeeded
+            - completed_with_errors
+            - failed
+            - canceled
+          description: '`succeeded` once every subscription was handled: each move is then scheduled for the end of its period.'
+        matched_count:
+          type: integer
+          description: Active subscriptions on `from_version` when the migration started.
+        succeeded_count:
+          type: integer
+        skipped_count:
+          type: integer
+        failed_count:
+          type: integer
+        started_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        finished_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        canceled_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        items:
+          type: array
+          description: One per subscription. Only in `GET /plans/{code}/version-migrations/{id}`.
+          items:
+            $ref: '#/components/schemas/PlanVersionMigrationItem'
+    PlanVersionMigrationResponse:
+      type: object
+      required:
+        - plan_version_migration
+      properties:
+        plan_version_migration:
+          $ref: '#/components/schemas/PlanVersionMigration'
+    PlanVersionMigrationList:
+      type: object
+      required:
+        - plan_version_migrations
+      properties:
+        plan_version_migrations:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanVersionMigration'
+    PlanVersionMigrationPreviewItem:
+      type: object
+      required:
+        - external_subscription_id
+        - outcome
+      properties:
+        external_subscription_id:
+          type: string
+        external_customer_id:
+          type: string
+        outcome:
+          type: string
+          enum:
+            - move
+            - skip
+        skip_reason:
+          type:
+            - string
+            - 'null'
+          description: Why the subscription would stay, when `outcome` is `skip` (see `PlanVersionMigrationItem.skip_reason`).
+        effective_on:
+          type:
+            - string
+            - 'null'
+          format: date
+          description: The day the subscription would start on the new version.
+        current_amount_cents:
+          type: integer
+        new_amount_cents:
+          type: integer
+    PlanVersionMigrationPreview:
+      type: object
+      required:
+        - plan_code
+        - from_version
+        - to_version
+        - items
+      properties:
+        plan_code:
+          type: string
+        from_version:
+          type: integer
+        to_version:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanVersionMigrationPreviewItem'
+    PlanVersionMigrationPreviewResponse:
+      type: object
+      required:
+        - plan_version_migration_preview
+      properties:
+        plan_version_migration_preview:
+          $ref: '#/components/schemas/PlanVersionMigrationPreview'
     BillingPlanTransitionPolicyList:
       type: object
       required:

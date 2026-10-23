@@ -14,7 +14,11 @@ Create a subscription directly without going through a checkout flow. Use this f
 </ParamField>
 
 <ParamField body="plan_code" type="string" required>
-  The plan code to subscribe the customer to (e.g. `pro`).
+  The plan code to subscribe the customer to (e.g. `pro`). Without `plan_version`, the customer gets the code's current version.
+</ParamField>
+
+<ParamField body="plan_version" type="integer">
+  The version of `plan_code` to subscribe to, for example to keep selling an older price. See [Plan versioning](/guides/billing/plan-versions). Needs Engine 2.7.0; older Engines ignore it and sell the current version.
 </ParamField>
 
 ### Response
@@ -33,7 +37,9 @@ The response also carries Core's full `subscription` object, with the plan, bill
 
 | Status | Code | Meaning |
 |--------|------|---------|
-| `400` | | `plan_code` or `customer_id` is missing. |
+| `400` | | `plan_code` or `customer_id` is missing, or `plan_version` is below 1. |
+| `404` | `plan_version_not_found` | The code has no such version. |
+| `422` | `validation_errors` (`plan_version: plan_version_change_not_supported`) | The customer's subscription to this code is on another version. Calling again with the same code and no `plan_version` returns it on its own version; a [version migration](/api/plan-versions) moves it. |
 | `404` | `customer_not_found` | No customer has this `customer_id`. Create it with `POST /customers`, then call `subscribe` again. No subscription is created. |
 | `404` | `plan_not_found` | No plan has this `plan_code`. |
 | `502` | | The customer could not be verified; retry. |

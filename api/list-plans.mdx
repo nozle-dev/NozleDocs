@@ -33,6 +33,8 @@ Engine forwards the request, with its query string, to Core and returns Core's s
 
 All top-level plans of the organization, newest first. There is no listed, public or draft flag, so trial plans, pay-in-arrears plans and free plans are all included. Per-customer override plans (plans with a `parent_id`) and deleted plans are not.
 
+Only the current version of each plan code is returned. Older versions, which existing subscribers stay on after a price change, are never listed and never sold by code. A secret key reads one with `GET /plans/{code}?version=1` and lists them with `GET /plans/{code}/versions`. See [Plan versioning](/guides/billing/plan-versions).
+
 - A `pk_` key does not receive plans that are pending deletion, and `families[].plan_codes` leaves their codes out. `GET /plans/{code}` returns `404` with `"code": "plan_not_found"` for one.
 - An `sk_` key receives them, with `pending_deletion: true`.
 - A `pk_` key, or an `sk_` key with `include_hidden=false`, does not receive plans whose plan family is hidden from the pricing table in the list. Hiding a family is a listing setting only: `GET /plans/{code}` still returns a plan of a hidden family, or of a deleted family, to a `pk_` key, so the SDK can describe a subscriber's own plan.
@@ -133,7 +135,9 @@ Identifiers are named `nozle_id`. Amounts named `*_cents` are integers in cents 
 | Field | Type | Description |
 |---|---|---|
 | `nozle_id` | string (UUID) | Plan identifier. |
-| `code` | string | Unique plan code. Use it to start checkout. |
+| `code` | string | Unique plan code. Use it to start checkout. Every version of a plan keeps its code. |
+| `version` | integer | The version of the code this plan is: `1` until its pricing changes while customers pay for it. |
+| `is_current` | boolean | Whether new subscriptions get this version. Always `true` in `GET /plans`. |
 | `name` | string | Plan name. |
 | `description` | string or `null` | Plan description. |
 | `plan_family_code` | string or `null` | Code of the plan family. See [Plan families](#plan-families). |

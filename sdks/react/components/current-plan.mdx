@@ -148,6 +148,8 @@ Leave `subscription` out and, inside a `BillingProvider` with `billingEndpoint`,
 - the plan's metered limits from the public catalog with `usePlans`,
 - this period's units with `useUsage`, joined to the limits by feature code.
 
+The catalog lists the current version of each plan. A customer billed on an older version (see [Plan versioning](/guides/billing/plan-versions)) has that version's limits: from React 0.15.0, with `createBillingHandler` from `@nozle-js/node` 0.16.0, the subscription route returns the customer's `plan_version` and that version's `entitlements`, and the meters use those limits. A backend that sends `plan_version` without `entitlements` gets meters that show usage without another version's limits.
+
 Serve `billingEndpoint` with `createBillingHandler` from `@nozle-js/node`; see [Serve the hooks from your backend](/sdks/react/hooks#serve-the-hooks-from-your-backend).
 
 <Note>
