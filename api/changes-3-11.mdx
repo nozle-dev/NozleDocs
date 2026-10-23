@@ -1,0 +1,42 @@
+---
+title: "Changes in Core 3.11 and Engine 2.3"
+description: "What changed for API and webhook integrations in Core 3.11.0 and Engine 2.3.0: the customer warning field, saved card data removed, margin floor removed, labelled and invoiced revenue"
+---
+
+This page lists the changes in Core 3.11.0 and Engine 2.3.0 that can affect an integration. The release notes are in the [changelog](/changelog).
+
+## Customers who pay by link and have no email
+
+- Customers have a new field, `payment_collection_warning`, in the REST payload, in the `customer.*` webhooks and in GraphQL (`Customer.paymentCollectionWarning`). It is `billing_entity_email_missing` or `customer_email_missing` when the customer pays each invoice by link (Razorpay, or Stripe without a saved payment method) and no email can carry the link. It is `null` otherwise.
+- While it is set, the automatic payment request of an invoice is skipped. Nozle then sends `invoice.payment_failure` for that invoice, once per invoice, with the same value in `provider_error.error_code`, and notifies the team. Add an email to the billing entity or the customer to fix it.
+- `POST /payment_requests` now accepts a finalized unpaid invoice of a Razorpay customer before it is overdue, because the pay link is the only way to collect it. Other providers still answer `422 invoices_not_overdue`, and so does a paid or draft invoice.
+
+## Saved card data is removed
+
+- Nozle no longer stores card display data. Stripe and Moneyhash events keep the provider ids and the method type only, so the brand, last digits, expiry, holder name and issuer are gone from payment methods and payments. The receipt PDF shows no card details, and the Factur-X invoice has no card section.
+- On deploy, a background job clears the values stored before from payment methods and payments, in batches. It keeps provider ids, the method type and the Razorpay mandate fields. Re-syncing from the provider is the only way back.
+- GraphQL `PaymentMethodDetails.brand`, `last4`, `expirationMonth` and `expirationYear` are deprecated and always `null`.
+- `DELETE /customers/{external_customer_id}/payment_methods/{id}` and the `destroyPaymentMethod` mutation answer `410` with `code: payment_method_managed_by_provider` for a Stripe or other card provider, and a `hint` that points to [manage a customer payment method](/api/manage-payment-method). Removing a card only hid it in Nozle while it stayed attached at the provider. Razorpay still cancels the mandate.
+
+```json
+{
+  "status": 410,
+  "error": "Gone",
+  "code": "payment_method_managed_by_provider",
+  "hint": "Use POST /api/v1/customers/{external_id}/manage_payment_method_url (GraphQL generateCustomerManagePaymentMethodUrl) to send the customer to the provider's page"
+}
+```
+
+## Margin floor removed
+
+`min_margin_percent`, `margin_enforcement_mode` and `enforce_plan_margin` are no longer in plan and subscription entitlements, in the public plan catalog or in GraphQL `PlanEntitlement`. A request body or a GraphQL `EntitlementInput` that still sends them is accepted and the values are ignored, so an old client gets no error. The `plan_config` entitlement is gone: the GraphQL `createOrUpdatePlanConfig` and `deletePlanConfig` mutations, `PlanConfigObject` and `Plan.planConfig`.
+
+## Workspace upgrade at the MRR limit
+
+When the tracked MRR of a Nozle workspace passes its plan limit, the workspace moves to the next plan at once, with or without a saved payment method and with unpaid earlier invoices. The change invoice is collected like any invoice, so the workspace can use the higher plan before it is paid. An upgrade you start yourself still waits for its payment. See [MRR limit and automatic upgrade](/guides/getting-started/nozle-plans#mrr-limit-and-automatic-upgrade).
+
+## Revenue labels and invoiced revenue
+
+- **Engine 2.3.0 labels the usage estimate.** `GET /analytics/overview` returns `total_revenue_basis` (`estimated_usage`) and `total_revenue_estimated` (`true`). `top-customers`, `top-plans`, `revenue-by-plan`, `revenue-trend` and `margin-trend` return a top-level `basis` and `estimated`.
+- **`basis=invoiced`** on `top-customers`, `top-plans`, `revenue-by-plan` and `revenue-trend` answers from the fees of finalized invoices, in one `currency`. See [Overview revenue](/guides/margin/dashboard). Another `basis` answers `400 invalid_basis`.
+- **GraphQL.** The revenue queries take optional `basis` and `currency` arguments. Their rows gain `basis`, `estimated`, `currency` and, on plan rows, `planName`. `NozleAnalyticsOverview` gains `totalRevenueBasis`, `totalRevenueEstimated`, `invoicedRevenueCents`, `previousPeriodInvoicedRevenueCents`, `invoicedRevenueMomPercent`, `invoicedRevenueByCurrency` (`currency`, `revenueCents`, `previousPeriodRevenueCents`, `momPercent`), `periodStart`, `periodEnd`, `previousPeriodStart` and `previousPeriodEnd` (`YYYY-MM-DD`). All of them are nullable: they are `null` from an Engine that does not return them, and `costCents`, `marginPercent` and `events` of a top customer are `null` for an invoiced answer.

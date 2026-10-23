@@ -13,18 +13,20 @@ Create an endpoint in the dashboard under **Developers > Webhooks**, or with `PO
 {
   "webhook_endpoint": {
     "webhook_url": "https://app.example.com/nozle/webhooks",
-    "signature_algo": "hmac"
+    "signature_algo": "hmac",
+    "name": "Production",
+    "event_types": ["subscription.started", "invoice.payment_status_updated"]
   }
 }
 ```
 
-`signature_algo` is `jwt` (the default) or `hmac`. The URL must be valid and each URL can be registered once per organization. The dashboard form selects `hmac` by default, while the API uses `jwt` when you send no value. The API reference has a Webhook Endpoints section.
+`name` is a label. `event_types` limits the events the endpoint receives: leave it out, or send `null` or `["*"]`, to receive every type. `signature_algo` is `jwt` (the default) or `hmac`. The URL must be valid and each URL can be registered once per organization. The dashboard form selects `hmac` by default, while the API uses `jwt` when you send no value. The API reference has a Webhook Endpoints section.
 
 Until January 19, 2027, payloads also carry the old, former-prefix key names beside `nozle_id` and the new keys. Read the new keys: see [legacy key names](/api/api-standards#legacy-key-names-removal-january-19-2027).
 
-Each delivery is a JSON body with a `webhook_type` such as `subscription.started` and the object it is about, for example `subscription`. The event types are listed in the API reference under Webhooks.
+Each delivery is a JSON body with a `webhook_type` such as `subscription.started` and the object it is about, for example `subscription`. The [webhook events](/api/webhook-events) page lists every event type, when it fires and what its payload holds.
 
-A failed credit note refund is sent as `credit_note.refund_failure`. To receive only some types, send an `event_types` array when you create or update the endpoint (no array means every type). `credit_note.refund_failure` is accepted there; the former name `credit_note.provider_refund_failure` is still accepted and saved as `credit_note.refund_failure`, and endpoints saved with the former name are moved to it.
+A failed credit note refund is sent as `credit_note.refund_failure`. An unknown type in `event_types` is rejected with a `422` `invalid_types` error. `credit_note.refund_failure` is accepted there; the former name `credit_note.provider_refund_failure` is still accepted and saved as `credit_note.refund_failure`, and endpoints saved with the former name are moved to it.
 
 ## Headers
 
@@ -33,6 +35,8 @@ A failed credit note refund is sent as `credit_note.refund_failure`. To receive 
 | `X-Nozle-Signature` | The signature of the body, in the format set by `signature_algo`. |
 | `X-Nozle-Signature-Algorithm` | `jwt` or `hmac`. |
 | `X-Nozle-Unique-Key` | The delivery ID. It is the same on every attempt of one webhook. |
+
+Each header is also sent under its former-prefix name, with the same value. Read the `X-Nozle-` names.
 
 ## Verify the signature
 
