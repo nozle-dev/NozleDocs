@@ -18,7 +18,7 @@ Without the SMTP variables Core reads, no email is sent: sign-up verification co
 | Variable | Description |
 |----------|-------------|
 | `CORS_ALLOWED_ORIGINS` | Comma-separated list of the browser origins that may call Core, for example `https://app.example.com,https://portal.example.com`. Each entry is an exact origin: scheme, host and optional port, no path. Values are lower-cased and a default port or trailing slash is dropped. |
-| `LAGO_FRONT_URL` | Public URL of the dashboard. When `CORS_ALLOWED_ORIGINS` is unset, Core allows only the origin of this URL (its path is ignored). |
+| Dashboard front URL variable of Core | Public URL of the dashboard. When `CORS_ALLOWED_ORIGINS` is unset, Core allows only the origin of this URL (its path is ignored). |
 
 Core denies by default. A browser call from an origin that is not in the list gets no CORS headers, on the preflight too, so the browser blocks it. Server-to-server calls with an API key are not affected. When neither variable gives a valid origin, Core allows no browser origin outside development and test, and prints a warning at boot that names any value it ignored. Development and test also allow `localhost` and `127.0.0.1` on any port.
 
@@ -36,7 +36,7 @@ These steps are for the operator of a Core deployment. Merchants who use Nozle C
 bin/rails payments:open_checkout_sessions
 ```
 
-The dry run lists open Stripe Checkout Sessions, each labelled `tracked` (Core stored the session id) or `customer` (not stored, but it belongs to a Stripe customer recorded for the connection; this can include sessions your own app opened). Add `APPLY=1` to expire the `tracked` ones. Expire the `customer` ones only after you have checked them, with `APPLY=1 INCLUDE_CUSTOMER_MATCHES=1`, or settle those payment requests by hand. A session paid before it is expired settles as before. The deployment setting `NOZLE_LEGACY_LAGO_KEYS_UNTIL` is ignored and can be deleted.
+The dry run lists open Stripe Checkout Sessions, each labelled `tracked` (Core stored the session id) or `customer` (not stored, but it belongs to a Stripe customer recorded for the connection; this can include sessions your own app opened). Add `APPLY=1` to expire the `tracked` ones. Expire the `customer` ones only after you have checked them, with `APPLY=1 INCLUDE_CUSTOMER_MATCHES=1`, or settle those payment requests by hand. A session paid before it is expired settles as before.
 
 **Core 7.0.0 (API keys looked up by digest).** Core finds an API key by the SHA-256 digest of its token, which it stores with the key's type prefix and last 4 characters. The migration computes them for every existing key, so existing keys keep working, and it removes keys from the recorded change history. Deploy the dashboard that shows a new or rotated key once before Core 7.0.0: older dashboards read the key back to copy it, and that now fails. After every pod runs Core 7.0.0, run the digest backfill once more so keys created by older pods during the rollout get their digest. It changes only rows whose stored key and digest disagree, so it is safe to repeat:
 
