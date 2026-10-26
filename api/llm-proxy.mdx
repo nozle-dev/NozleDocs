@@ -6,7 +6,7 @@ description: Reverse proxy for OpenAI and Anthropic with automatic token trackin
 
 Base URL: `https://api.nozle.app/engine/api/v1`
 
-Reverse proxy routes that forward LLM requests to OpenAI or Anthropic and record their token usage as a usage event in your organization, signed with your own `X-Nozle-Key`. Use it when you cannot change your LLM client. When you can, prefer [usage capture in the SDK](/sdks/node/llm-auto-capture): it works with any provider and keeps LLM traffic out of Nozle.
+Reverse proxy routes that forward LLM requests to OpenAI or Anthropic and record their token usage as a usage event in your organization. The event is stored durably before the proxied response returns and is sent to your organization's usage events with your organization's own secret key, not the `X-Nozle-Key` of the request. If Nozle's billing service is unavailable, delivery is retried with backoff for about five hours. Each event is keyed by its transaction ID, so a retry never records usage twice. Use it when you cannot change your LLM client. When you can, prefer [usage capture in the SDK](/sdks/node/llm-auto-capture): it works with any provider and keeps LLM traffic out of Nozle.
 
 The usage event bills only when your plan has a metered Feature with the same code; see [Set up AI token billing](/guides/ai/token-billing).
 

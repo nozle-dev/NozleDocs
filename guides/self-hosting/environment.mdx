@@ -24,13 +24,11 @@ Regardless of deployment model, you need Nozle API keys to use the SDKs:
 
 Create your keys in the Nozle dashboard at [app.nozle.app](https://app.nozle.app) under **Developers > API keys**. There are no separate live and test keys.
 
-## Engine: browser and checkout settings
+## Engine: browser settings
 
 | Variable | Description |
 |----------|-------------|
 | `CORS_ORIGIN` | Transitional single-origin setting retained for older API replicas during a rolling deployment. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated browser-origin allowlist, for example `https://app.example.com,https://portal.example.com`. |
-| `CHECKOUT_RETURN_URL` | Independent absolute URL used when checkout requests omit a return URL. Do not reuse this as the CORS allowlist. |
-| `CHECKOUT_RETURN_URL_ALLOWED_ORIGINS` | Exact comma-separated HTTPS origins allowed for checkout returns. |
 
-Use separate values for browser CORS and checkout return validation. CORS controls which browser origins may call an endpoint; it does not authenticate callers or make a return URL safe.
+The Engine has no checkout return settings. `CHECKOUT_RETURN_URL` and `CHECKOUT_RETURN_URL_ALLOWED_ORIGINS` are no longer Engine settings and are ignored. Core validates checkout return URLs against each organization's own origins (**Developers > Checkout return** in the dashboard) and its deployment list, `CHECKOUT_RETURN_URL_ALLOWED_ORIGINS`. Move any origin that only the Engine list allowed into the organization's settings before you upgrade. CORS controls which browser origins may call an endpoint; it does not authenticate callers or make a return URL safe.

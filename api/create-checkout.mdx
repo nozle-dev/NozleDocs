@@ -56,7 +56,7 @@ Use an `Idempotency-Key` header for the confirmed action and retain it across un
 ## Return URL
 
 <ParamField body="return_url" type="string">
-  URL Stripe should return to after embedded checkout completes. It must use an exactly allowlisted HTTPS origin. The Engine checks it against the origins configured for the Nozle deployment; the origins you register for your organization (`checkout_return_origins`) are accepted by Core's checkout routes, but this Engine check does not read them yet. If omitted, Nozle uses the configured dashboard return URL. See [return URLs and your organization's origins](/guides/billing/checkout#return-urls-and-your-organizations-origins).
+  URL Stripe should return to after embedded checkout completes. It must be an absolute HTTPS URL on one of your organization's allowed origins (`checkout_return_origins`) or on an origin Nozle allows for every organization. The Engine applies no list of its own: it sends the URL to Core, which decides, and a refused URL answers `400` with `invalid_return_url`. If omitted, Nozle uses your organization's default return URL (`checkout_default_return_url`), else your first allowed origin. Set both in the dashboard under **Developers > Checkout return**, or through the API. See [return URLs and your organization's origins](/guides/billing/checkout#return-urls-and-your-organizations-origins).
 </ParamField>
 
 <ParamField body="success_url" type="string">
@@ -191,12 +191,12 @@ With a grace period of 0 and no pending change, a credited upgrade applies as qu
 
 ## Errors
 
-The Engine checks the request in this order: valid JSON body, customer scope, the `subscription_id` combinations, the required fields, then `return_url`, then the `Idempotency-Key` length. Only then is the request sent to Core, which returns the other errors below.
+The Engine checks the request in this order: valid JSON body, customer scope, the `subscription_id` combinations, the required fields, then the `Idempotency-Key` length. Only then is the request sent to Core, which checks `return_url` and returns the other errors below.
 
 | Status | Code | Cause |
 | --- | --- | --- |
 | `400` | `invalid_request` | `subscription_id` combined with `invoice_id` or `external_entity_id`, or neither `plan_code` with `customer_id` nor `invoice_id` given. |
-| `400` | `invalid_return_url` | `return_url` is not an absolute HTTPS URL, or its origin is not on the Engine's allowlist. |
+| `400` | `invalid_return_url` | Core refused `return_url`: it is not an absolute HTTPS URL, or its origin is not one of your organization's allowed origins. See [return URLs](/guides/billing/checkout#return-urls-and-your-organizations-origins). |
 | `400` | — | The body is not valid JSON, or the `Idempotency-Key` is longer than 255 bytes. |
 | `404` | `plan_not_found`, `customer_not_found` | Unknown plan or customer. |
 | `422` | `plan_transition_policy_required` | The customer has an active subscription and the pair of plans has no [transition policy](/api/plan-transition-policies). |

@@ -5,6 +5,15 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Checkout return, LLM proxy delivery, credits plus money (Engine 2.9.0)
+
+_Unreleased_
+
+- **Checkout return URLs are decided per organization.** The Engine no longer has an allowlist or a default return URL of its own (`CHECKOUT_RETURN_URL` and `CHECKOUT_RETURN_URL_ALLOWED_ORIGINS` are removed from the Engine). `POST /checkout` and `POST /manage-payment-method` send `return_url` to Core, which checks it against your organization's `checkout_return_origins` and uses `checkout_default_return_url` when none is sent. A refused URL answers `400 invalid_return_url`. Before you upgrade, register every origin that only the Engine list allowed. Set both in the dashboard under **Developers > Checkout return**. See [Return URLs](/guides/billing/checkout#return-urls-and-your-organizations-origins).
+- **LLM proxy usage is delivered durably.** Each event is stored before the response returns, retried with backoff for about five hours when Nozle's billing service is down, and recorded once per transaction ID. Events are sent with your organization's secret key, not the request's `X-Nozle-Key`. See [LLM Proxy](/api/llm-proxy).
+- **A Feature paid with credits cannot also carry a priced charge in the same plan.** `POST /usage/check` and `POST /usage/track` answer `409 feature_billed_in_money` instead of taking credits and billing the usage again. A charge priced at 0 still works with credits. See [Credits or money, not both](/api/usage-track#credits-or-money-not-both).
+- Docs: only the **Admin** role can create secret keys. See [Authentication](/api/authentication).
+
 ### Plan versioning (API 4.1.0, Engine 2.7.0, Node 0.16.0, React 0.15.0, Python 0.16.0, Go 0.15.0)
 
 _Unreleased_

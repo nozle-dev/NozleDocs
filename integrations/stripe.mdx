@@ -109,7 +109,7 @@ Without the webhook, Stripe can collect the payment but Nozle is not told. Check
 7. Nozle marks the invoice paid and applies the change: it activates the new subscription, or applies the upgrade.
 8. Your app confirms the result. For a new subscription, reload the subscription. For an upgrade, poll checkout status.
 
-If prepaid credits fully cover the invoice, Nozle returns a completed checkout and Stripe is not called. The `return_url` you send must be an allowlisted HTTPS origin, and Nozle passes it to Stripe as the return URL of the session.
+If prepaid credits fully cover the invoice, Nozle returns a completed checkout and Stripe is not called. The `return_url` you send must be an HTTPS URL on one of your organization's allowed origins, and Nozle passes it to Stripe as the return URL of the session.
 
 For an invoice that already exists, call checkout with the invoice instead of a plan. It returns the same `stripe` result. The invoice must not be paid, void or a draft.
 

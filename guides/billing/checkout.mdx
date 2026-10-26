@@ -95,7 +95,7 @@ Free plans and paid upgrades fully funded by prepaid credits return a completed 
 
 ## Return URLs and your organization's origins
 
-A checkout `return_url` (or `success_url`) must be an absolute HTTPS URL on an allowed origin. Core accepts the origins of the Nozle deployment and the origins you register for your own organization, for `POST /checkout_sessions`, Entity checkouts and Entity subscription checkout batches. Another organization's origin is refused with `422` and `return_url: [invalid_or_untrusted]`.
+A checkout `return_url` (or `success_url`) must be an absolute HTTPS URL on an allowed origin. An origin is the scheme and host, plus the port when it is not 443, with no path: `https://app.acme.com` or `https://app.acme.com:8443`. Core accepts the origins of the Nozle deployment and the origins you register for your own organization, for `POST /checkout_sessions`, Entity checkouts and Entity subscription checkout batches. Another organization's origin is refused with `422` and `return_url: [invalid_or_untrusted]`.
 
 Register your origins with `PUT /organizations` (REST) or `updateOrganization` (GraphQL), which needs the `developers:manage` permission:
 
@@ -115,7 +115,9 @@ Register your origins with `PUT /organizations` (REST) or `updateOrganization` (
 
 When a checkout gives no return URL, the customer returns to your default return URL, else to the first registered origin, else to the payment provider's success URL.
 
-The Engine's `POST /checkout` route still checks `return_url` against the origins configured for the Nozle deployment before it forwards the request, and does not read your registered origins yet; see [create checkout](/api/create-checkout).
+The Engine's `POST /checkout` and `POST /manage-payment-method` routes send `return_url` to Core as it is and apply no list of their own, so these per-organization settings decide. A refused URL answers `400` with `code: invalid_return_url`; see [create checkout](/api/create-checkout).
+
+You can also set both in the dashboard under **Developers > Checkout return**. Only members who can manage developer settings and update the organization can change them. The page validates with Core's messages: `value_is_invalid` for an origin that is not `https://host` or `https://host:port`, `value_is_too_long` for more than 20 origins, and `invalid_or_untrusted` for a default URL off the allowed origins.
 
 ## Response
 

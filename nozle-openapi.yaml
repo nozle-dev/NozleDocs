@@ -3246,7 +3246,7 @@ paths:
                 return_url:
                   type: string
                   format: uri
-                  description: HTTPS URL on an allowlisted origin that Stripe returns to. Defaults to the organization return URL.
+                  description: HTTPS URL on one of the organization's allowed origins that Stripe returns to. Defaults to the organization return URL.
       responses:
         '200':
           description: Stripe Billing Portal page
@@ -7907,7 +7907,7 @@ paths:
       tags:
         - Checkout
       summary: Create a checkout
-      description: 'Creates a payment-gated plan checkout, an invoice checkout (`invoice_id`), or an Entity checkout (`external_entity_id`). Requires `payment:write`. Engine validates the body and the `return_url` origin, then forwards to Core `POST /checkout_sessions` (renaming `subscription_id` to `external_subscription_id`). Core decides the result type from the plan, the current subscription and its transition policy: a provider checkout when money is due, `completed` when nothing external is due, `scheduled` for an end-of-period change. An unpaid plan or single Entity checkout expires after 23 hours (the Stripe Checkout Session and Razorpay order too): the subscription is canceled with `cancelation_reason: timeout` and a `subscription.canceled` webhook, the invoice is closed, and the coupons, credit-note credits and wallet credits it used are returned. They are also returned when the checkout payment fails. Checking out the same plan again reopens an abandoned checkout; another plan replaces it. With Stripe, an invoice has at most one payable Checkout Session: checking out the same invoice again returns the open session (same `client_secret`), and while a payment of the last session is processing or has succeeded the call answers `422` with `base: [payment_already_processing]`. A second successful payment for an invoice that is already paid is refunded in full and reported with the `invoice.payment_failure` webhook (`duplicate_payment_refunded`). A customer without a subscription choosing a plan that needs no up-front payment gets `422 checkout_not_required`. Engine forwards Core''s status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine''s own `{error, code?}` errors.'
+      description: 'Creates a payment-gated plan checkout, an invoice checkout (`invoice_id`), or an Entity checkout (`external_entity_id`). Requires `payment:write`. Engine validates the body, then forwards to Core `POST /checkout_sessions` (renaming `subscription_id` to `external_subscription_id`). Core decides the result type from the plan, the current subscription and its transition policy: a provider checkout when money is due, `completed` when nothing external is due, `scheduled` for an end-of-period change. An unpaid plan or single Entity checkout expires after 23 hours (the Stripe Checkout Session and Razorpay order too): the subscription is canceled with `cancelation_reason: timeout` and a `subscription.canceled` webhook, the invoice is closed, and the coupons, credit-note credits and wallet credits it used are returned. They are also returned when the checkout payment fails. Checking out the same plan again reopens an abandoned checkout; another plan replaces it. With Stripe, an invoice has at most one payable Checkout Session: checking out the same invoice again returns the open session (same `client_secret`), and while a payment of the last session is processing or has succeeded the call answers `422` with `base: [payment_already_processing]`. A second successful payment for an invoice that is already paid is refunded in full and reported with the `invoice.payment_failure` webhook (`duplicate_payment_refunded`). A customer without a subscription choosing a plan that needs no up-front payment gets `422 checkout_not_required`. Engine forwards Core''s status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine''s own `{error, code?}` errors.'
       operationId: engineCreateCheckout
       security:
         - bearerAuth: []
@@ -7971,13 +7971,13 @@ paths:
                     transition_policy: next_period
                     effective_at: '2026-11-01T00:00:00.000000Z'
         '400':
-          description: 'Engine rejected the request: invalid body; `subscription_id` with `invoice_id` or `external_entity_id` (`code: invalid_request`); neither `invoice_id` nor `plan_code` with a customer (`code: invalid_request`); `return_url` not an allowlisted HTTPS origin (`code: invalid_return_url`); or an Idempotency-Key longer than 255 bytes.'
+          description: 'Engine rejected the request: invalid body; `subscription_id` with `invoice_id` or `external_entity_id` (`code: invalid_request`); neither `invoice_id` nor `plan_code` with a customer (`code: invalid_request`); Core refused the `return_url` (`code: invalid_return_url`: not an HTTPS URL on an origin allowed for the organization); or an Idempotency-Key longer than 255 bytes.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EngineError'
               example:
-                error: return_url origin is not allowed
+                error: return_url must be an HTTPS URL on an origin allowed for this organization
                 code: invalid_return_url
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
@@ -11682,7 +11682,7 @@ paths:
           description: '`code` is `customer_not_found`, `active_subscription_not_found` (`subscription_id` is not an active subscription of the customer, or belongs to another Entity), `feature_not_found` or `entity_not_found`.'
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
-          description: '`code` is `active_subscription_ambiguous` (several active subscriptions could pay and neither `subscription_id` nor `entity_id` picks one; the message names both), `feature_not_consumable` (a boolean or config Feature, which has no usage to consume), `entity_inactive`, `credit_pool_policy_not_configured` (Entity usage with no explicit pool policy), or `credit_usage_configuration_invalid` (unsupported aggregation or expression, missing or invalid metric value, amount precision, no effective credit rate at that time, or ambiguous Credit System); `error` then holds the detail.'
+          description: '`code` is `active_subscription_ambiguous` (several active subscriptions could pay and neither `subscription_id` nor `entity_id` picks one; the message names both), `feature_not_consumable` (a boolean or config Feature, which has no usage to consume), `feature_billed_in_money` (HTTP 409: the plan bills the Feature with a priced charge as well as credits, so the usage would be billed twice; set the charge to $0 or remove the credits), `entity_inactive`, `credit_pool_policy_not_configured` (Entity usage with no explicit pool policy), or `credit_usage_configuration_invalid` (unsupported aggregation or expression, missing or invalid metric value, amount precision, no effective credit rate at that time, or ambiguous Credit System); `error` then holds the detail.'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -11794,7 +11794,7 @@ paths:
           description: '`code: idempotency_key_reused`: the key was used with a different body.'
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
-          description: '`code` is `active_subscription_ambiguous` (several active subscriptions could pay and neither `subscription_id` nor `entity_id` picks one; the message names both), `feature_not_consumable` (a boolean or config Feature, which has no usage to consume), `entity_inactive`, `credit_pool_policy_not_configured` (Entity usage with no explicit pool policy), or `credit_usage_configuration_invalid` (unsupported aggregation or expression, missing or invalid metric value, amount precision, no effective credit rate at that time, or ambiguous Credit System); `error` then holds the detail.'
+          description: '`code` is `active_subscription_ambiguous` (several active subscriptions could pay and neither `subscription_id` nor `entity_id` picks one; the message names both), `feature_not_consumable` (a boolean or config Feature, which has no usage to consume), `feature_billed_in_money` (HTTP 409: the plan bills the Feature with a priced charge as well as credits, so the usage would be billed twice; set the charge to $0 or remove the credits), `entity_inactive`, `credit_pool_policy_not_configured` (Entity usage with no explicit pool policy), or `credit_usage_configuration_invalid` (unsupported aggregation or expression, missing or invalid metric value, amount precision, no effective credit rate at that time, or ambiguous Credit System); `error` then holds the detail.'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -35971,7 +35971,7 @@ components:
         return_url:
           type: string
           format: uri
-          description: Absolute HTTPS URL whose origin is on Engine's allowlist. Defaults to `success_url`, then to the configured dashboard return URL.
+          description: Absolute HTTPS URL on one of the organization's allowed origins (`checkout_return_origins`). Defaults to `success_url`, then to the organization's default return URL.
         success_url:
           type: string
           format: uri
