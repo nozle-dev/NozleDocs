@@ -28,6 +28,20 @@ _ = err
 
 Metadata can include quantities required by a Cost Rule. It is input to the cost and margin estimate only. It does not filter usage: `Used`, `Limit` and `Remaining` always cover all of the feature's usage, whatever `model` or other properties you send.
 
+## Choose the subscription
+
+A customer with several active subscriptions needs a selector, as in `nozle-go` v0.16.0 and later. `CanWithOptions` takes `CanOptions` with `Metadata`, `SubscriptionID` and `EntityID` (external IDs); `CanWithMetadata` calls it with only `Metadata`:
+
+```go
+result, err := client.CanWithOptions(ctx, "workspace_123", "seats", nozle.CanOptions{
+  SubscriptionID: "sub_team_a",
+})
+_ = result
+_ = err
+```
+
+Without a selector, `Can` evaluates the customer's only subscription. When the customer has several and not exactly one is its own, the answer is not an error: `Can` returns `Allowed == false` with `Reason` `subscription_required`. Send `SubscriptionID` or `EntityID` to choose. See [The can() endpoint](/guides/entitlements/can-endpoint#which-subscription-is-checked).
+
 ## `CanResult`
 
 | Field | Meaning |

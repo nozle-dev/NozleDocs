@@ -20,12 +20,13 @@ if (!check.allowed) {
 ## Signature
 
 ```ts
-import type { CanResult } from '@nozle-js/node'
+import type { CanOptions, CanResult } from '@nozle-js/node'
 
 can(
   customerId: string,
   feature: string,
   metadata?: Record<string, string>,
+  options?: CanOptions,
 ): Promise<CanResult>
 ```
 
@@ -35,6 +36,17 @@ const check = await nozle.can('workspace_123', 'model_access', {
   region: 'us-east',
 })
 ```
+
+## Choose the subscription
+
+A customer with several active subscriptions needs a selector, as in `@nozle-js/node` 0.17.0 and later. `options` takes `subscriptionId` (the external ID of the subscription) or `entityId` (the external ID of the Entity whose subscription is checked):
+
+```ts
+const check = await nozle.can('workspace_123', 'seats', undefined, { subscriptionId: 'sub_team_a' })
+const entityCheck = await nozle.can('workspace_123', 'seats', undefined, { entityId: 'entity_42' })
+```
+
+Without a selector, `can()` evaluates the customer's only subscription. When the customer has several and not exactly one is its own, the answer is not an error: `can()` returns `allowed: false` with `reason: 'subscription_required'`. Send `subscriptionId` or `entityId` to choose. See [The can() endpoint](/guides/entitlements/can-endpoint#which-subscription-is-checked).
 
 ## `CanResult`
 

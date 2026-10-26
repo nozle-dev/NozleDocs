@@ -154,6 +154,10 @@ nozle = Nozle()  # reads NOZLE_SECRET_KEY
 nozle.can('cust_123', 'api_calls')
 ```
 
+**Go:** `client.Can(ctx, "cust_123", "api_calls")`. Pass `nozle.CanOptions{SubscriptionID: ...}` or `EntityID` to `CanWithOptions` to choose a subscription (`nozle-go` v0.16.0).
+
+The Node (0.17.0), Python (`nozle-sdk` 0.17.0) and React (`useEntitlement`, 0.16.0) wrappers take the same selectors: see [Node](/sdks/node/entitlements#choose-the-subscription), [Python](/sdks/python/entitlements#choose-the-subscription) and [React hooks](/sdks/react/hooks#the-hooks).
+
 **React:** fetch the result through your authenticated backend and pass it to `FeatureGate`, `UsageGate`, or your own UI.
 
 ## Availability and freshness

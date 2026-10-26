@@ -116,7 +116,7 @@ On the authenticated merchant backend, call Core's `GET /api/v1/customers/{exter
 }
 ```
 
-`apiUrl` is the Core base without `/graphql`. The component sends `customer-portal-token` on GraphQL requests and keeps the token in memory. Return session responses with `Cache-Control: no-store`; do not embed a token in static JavaScript or store it in local storage. Self-hosted Core must allow your app origin and the portal header through CORS.
+`apiUrl` is the Core base without `/graphql`. The component sends `customer-portal-token` on GraphQL requests and keeps the token in memory. Return session responses with `Cache-Control: no-store`; do not embed a token in static JavaScript or store it in local storage. The portal needs no entry in Core's `CORS_ALLOWED_ORIGINS`: Core allows `POST /graphql` from any origin when it carries the `customer-portal-token` header. Self-hosted Core 5.0.0 and later answers other browser calls only from the origins you list (see the Core environment variables).
 
 ### Portal props
 

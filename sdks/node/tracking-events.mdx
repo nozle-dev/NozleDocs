@@ -49,8 +49,10 @@ track(
 When `subscriptionId` is omitted, the SDK queries `eventsUrl/api/v1/subscriptions` for active subscriptions belonging to the customer:
 
 - exactly one active subscription: its external ID is cached and used;
-- no active subscriptions: `track()` rejects with `No active subscription for customer '<id>'`;
-- multiple active subscriptions: `track()` rejects with `Customer '<id>' has <n> active subscriptions — pass subscriptionId explicitly`.
+- no active subscriptions: `track()` rejects with a `NozleApiError` with `status` 422 and `code` `active_subscription_not_found` (message `No active subscription for customer '<id>'`);
+- multiple active subscriptions: `track()` rejects with a `NozleApiError` with `status` 422 and `code` `active_subscription_ambiguous` (message `Customer '<id>' has <n> active subscriptions — pass subscriptionId explicitly`).
+
+These are the codes the Engine uses for the same cases. Before `0.17.0` the rejection was a plain `Error`.
 
 Pass `subscriptionId` explicitly for customers with multiple active subscriptions and for latency-sensitive event paths that should avoid the initial lookup.
 
