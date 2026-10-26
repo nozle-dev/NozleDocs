@@ -362,6 +362,7 @@ Nozle checks the status of open Razorpay orders, payment links, debits and refun
 
 ## Refunds and disputes
 
+- **Paid or voided invoice.** When an invoice no longer needs paying (voided, marked as paid, settled), Nozle expires and cancels its unused Razorpay orders and payment links. After a partial payment or a credit note offset it replaces them with ones for the amount due. Razorpay cannot cancel every order, so a payment can still be captured on an old order or link of an invoice that is already paid or voided. Nozle refunds that payment in full through Razorpay and sends the `invoice.payment_failure` webhook with `provider_error.error_code` `duplicate_payment_refunded` (invoice already paid) or `voided_invoice_payment_refunded` (invoice voided). If Razorpay refuses the refund, the code is `duplicate_payment_refund_failed` or `voided_invoice_payment_refund_failed`: refund the payment in the Razorpay dashboard. The invoice is not paid by that payment.
 - **Refunds.** A credit-note refund is sent to Razorpay against the captured payment at normal speed. It stays `pending` until Razorpay reports `processed`. If Razorpay reports `failed`, Nozle sends the `credit_note.refund_failure` webhook.
 - **Disputes.** On `payment.dispute.lost`, Nozle fetches the dispute from Razorpay, validates it against the payment, and marks the invoice's dispute lost. A closed or won dispute is not treated as lost.
 

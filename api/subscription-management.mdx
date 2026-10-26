@@ -30,12 +30,12 @@ These paths are for Engine. Its customer/subscription fields map to Core's exter
 | --- | --- |
 | `subscription` | Internal `id`, `external_id`, `plan_code`, `status`, nullable `ending_at`, and `plan`. |
 | `pending_change` | Pending internal `id`, `plan_code`, `name`, `effective_at` and `plan`, or null. |
-| `eligible_plans` | Plans with `direction` and `timing`, authorized by the configured [transition policies](/api/plan-transition-policies). From a free plan, paid plans also appear through the organization's free-to-paid policy. A downgrade appears only when its policy uses `end_of_period` timing and `keep_anchor`. |
+| `eligible_plans` | Plans with `direction` and `timing`, allowed by the [default policy](/api/plan-transition-policies#the-default-policy) or by a configured [transition policy](/api/plan-transition-policies) for the pair, which wins. Without a pair policy, public plans are listed: upgrades with `timing` `immediate`, downgrades at the end of the period. From a free plan, paid plans also appear through the organization's free-to-paid policy. An immediate downgrade is listed only when a pair policy allows it. |
 | `checkout` | Latest intent summary `{ id, status, plan_code }`, or null. Use checkout status for payment recovery. |
 
 `pending_change.effective_at` and the quote's `effective_at` are RFC 3339 timestamps in the customer's timezone, for example `2026-11-01T00:00:00.000000+05:30`. Parse the offset; do not assume `Z`.
 
-A plan contains `code`, `name`, `amount_cents`, `currency`, and `interval`. Keep monetary minor-unit values exact. An empty eligible list can reflect missing transition policies, scheduled cancellation, a pending change, external billing authority, or unresolved checkout. Price comparisons and public catalog membership do not establish permission to change plans.
+A plan contains `code`, `name`, `amount_cents`, `currency`, and `interval`. Keep monetary minor-unit values exact. An empty eligible list can reflect a trial, hidden or older plans that need a pair policy, scheduled cancellation, a pending change, external billing authority, or unresolved checkout. Price comparisons and public catalog membership do not establish permission to change plans.
 
 ## Preview and confirm a plan change
 
@@ -55,7 +55,7 @@ The response includes `quote_id`, `transition_direction`, `timing`, `currency`, 
 
 It also includes `subscription_id` (Core's internal UUID of the current subscription), `external_subscription_id`, `invoice_issuing_date`, and `next_billing_date` with its camel-case alias `nextBillingDate`. `credit`, `debit`, and `net` repeat the three cent amounts in major units (for example `12.5`); use the `*_cents` fields for exact values.
 
-Previewing a change between two plans with no [transition policy](/api/plan-transition-policies) returns `422 plan_transition_policy_required` (except from a free plan to a paid plan). The response also echoes the policy it applied: `transition_policy`, `billing_anchor`, `proration_behavior`, `credit_action`, `refund_mode`, and `final_invoice_action`.
+Previewing a change that the [default policy](/api/plan-transition-policies#the-default-policy) does not allow and no pair policy covers (an immediate downgrade, a hidden or older plan, a trial) returns `422 plan_transition_policy_required`. The response also echoes the policy it applied: `transition_policy`, `billing_anchor`, `proration_behavior`, `credit_action`, `refund_mode`, and `final_invoice_action`.
 
 A plan that is pending deletion cannot be a target: the preview, the checkout and `POST /subscriptions` return `422` with `plan_code: [plan_pending_deletion]`. Applying an immediate downgrade that leaves an amount due returns `422 payment_required`; the customer pays that change first through [Create checkout](/api/create-checkout).
 

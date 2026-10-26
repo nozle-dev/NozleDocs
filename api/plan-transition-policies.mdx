@@ -10,18 +10,35 @@ Base URL: `https://api.nozle.app/core/api/v1`.
 
 A plan transition policy tells Nozle how to move a subscription from one plan (the source) to another (the target). Policies are stored per pair of plans: `starter` to `growth` and `growth` to `starter` are two separate policies. Nozle does not infer the direction from the prices; you set it.
 
-Changing an existing subscription's plan needs a policy for that exact pair. Without one, these calls return `422 plan_transition_policy_required`:
+## The default policy
+
+You do not need a policy for every pair. Without one, a self-serve plan change uses the default policy, `self_serve_default` (the `transition_source` of the result):
+
+- **Upgrade** (the target plan has the same or a higher yearly price): happens now, prorated on the current billing anchor, with the unused prepaid time credited.
+- **Downgrade:** scheduled for the end of the current billing period. It settles nothing now.
+- The default reaches only plans the customer can see in the public catalog (`GET /plans` with a publishable key). A plan of a hidden family (`show_on_pricing: false`), an older plan version or an override plan still needs a policy for the pair.
+- It does not apply while a trial runs on the current or the target plan, or to a target plan in another currency.
+- `change_at` on checkout still moves the change to `immediate` or `end_of_period`.
+
+A policy for the exact pair always wins over the default, and so do the free-to-paid policy and the default of an interval switch inside a plan family.
+
+**The default never makes a downgrade immediate or settles it now.** A downgrade with no pair policy and `change_at: "immediate"` (or, on the settlement transitions, `timing: "immediate"`, a `credit_action` other than `none`, or `refund_mode: "full"`) returns `422 plan_transition_policy_required`, and the options do not list it. Create a policy for the pair with `direction: "downgrade"` and `timing: "immediate"` to allow it.
+
+These calls use the default or the pair policy, and return `422 plan_transition_policy_required` when neither applies (an immediate downgrade, a plan the default does not reach, a trial):
 
 - [Checkout](/api/create-checkout) for a customer that already has an active subscription, including Entity subscription checkout and change-plan
 - [Subscription change preview](/api/subscription-management) (`POST /subscriptions/preview`)
 - [Settlement transitions](/api/subscription-management) of type `downgrade`, preview and apply
+- The options (`GET /subscriptions/options` on the Engine, `GET /subscription_transitions/options` on Core), which list the plans each of these would accept
 
-Withdrawing a pending change does not need a policy. Subscription options leave out every target plan that has no policy, so an empty `eligible_plans` list usually means no policy is configured.
+Withdrawing a pending change does not need a policy. Subscription options list only the targets the default or a policy allows, so an empty `eligible_plans` list means no plan is allowed for this subscription: a trial, a hidden or older plan, a pending change or a missing pair policy for an immediate downgrade.
+
+Merchant plan changes through `POST /subscriptions` are not affected: they follow the organization's downgrade defaults.
 
 A subscription on an override plan (a plan made from a catalog plan for one customer, for example a negotiated price or a subscription created from a quote) uses the policies of the catalog plan it was made from. Its options list the same eligible plans as a subscription on the catalog plan, and preview, checkout and transitions use the catalog plan's policy. The change replaces the override plan with the target catalog plan, so the negotiated price and other overrides do not carry over. A self-serve change from an override plan to its own catalog plan returns `422 plan_already_active`; a merchant plan change through `POST /subscriptions` can still replace it with the catalog plan.
 
 <Info>
-One fallback exists. When the current plan is free and the target plan is paid, Nozle uses the organization's free-to-paid policy (Settings, General, "Checkout & billing policy" in the dashboard) as an upgrade. Every other pair, including paid to paid, paid to free, and free to free, needs its own policy. The dashboard sets only the free-to-paid default; create pair policies with this API.
+When the current plan is free and the target plan is paid, Nozle uses the organization's free-to-paid policy (Settings, General, "Checkout & billing policy" in the dashboard) as an upgrade. Other pairs use the default policy above unless you create a pair policy with this API. The dashboard sets only the free-to-paid default.
 </Info>
 
 ## Create or update a policy
@@ -120,7 +137,7 @@ Upgrade now, keep the renewal day, credit the unused time:
 { "plan_transition_policy": { "direction": "upgrade", "timing": "immediate", "credit_action": "credit" } }
 ```
 
-Downgrade at the end of the period. Subscription options list a downgrade only when it uses `end_of_period` timing and `keep_anchor`:
+Downgrade at the end of the period. This is what the default does without a policy. Subscription options list a downgrade at the end of the period on the current billing anchor, and an immediate downgrade only when a policy for the pair allows it:
 
 ```json
 {
@@ -161,7 +178,7 @@ Other `422` responses from plan changes:
 
 | Code | Cause |
 | --- | --- |
-| `plan_transition_policy_required` | No policy for the pair, and the free-to-paid fallback does not apply. |
+| `plan_transition_policy_required` | The change needs a pair policy: an immediate downgrade, a plan the [default policy](#the-default-policy) does not reach (hidden, older version or override plan), a trial, or a target plan in another currency. |
 | `plan_already_active` | The target is the current plan. |
 | `subscription_not_active` | A transition call named a subscription that is not active. Checkout with a terminated subscription ID was treated as a new checkout in testing. |
 | `target_plan_is_not_a_downgrade` | A `downgrade` transition was requested on a pair whose policy direction is `upgrade`. |

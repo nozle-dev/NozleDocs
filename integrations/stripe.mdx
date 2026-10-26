@@ -119,6 +119,9 @@ An invoice has at most one payable Checkout Session at a time. This applies to i
 - A session that expires within 10 minutes, or that was opened for another amount, is expired at Stripe before exactly one new session is created.
 - While the customer's payment of the last session is processing or has succeeded, checkout answers `422 validation_errors` with `base: [payment_already_processing]` instead of opening a session that could charge the customer twice.
 - If a second payment still succeeds for an invoice that is already paid, Nozle does not apply it. It refunds the payment in full at Stripe with refund reason `duplicate`, and sends you the `invoice.payment_failure` webhook with `provider_error.error_code` `duplicate_payment_refunded` and the payment intent in `error_details.provider_payment_id`. If Stripe refuses the refund, the code is `duplicate_payment_refund_failed`: refund it in the Stripe dashboard. A payment that was still processing when the invoice was paid another way, for example marked as paid, is not refunded automatically; the code is `duplicate_payment_requires_review`.
+- When an invoice no longer needs paying, Nozle expires its open Checkout Sessions (the embedded one and the hosted one of its payment link) and retires its payment link, so a customer with the checkout page still open cannot pay it. This happens when the invoice is voided, marked as paid, paid by another route, partly paid, or reduced by a credit note offset. After a partial payment or an offset, the next checkout is created for the amount now due.
+- If a payment still lands on a voided invoice (the customer completed the checkout before it expired), Nozle refunds it in full. The invoice stays voided and unpaid, and you get the `invoice.payment_failure` webhook with `provider_error.error_code` `voided_invoice_payment_refunded`. If Stripe refuses the refund, the code is `voided_invoice_payment_refund_failed`: refund the payment in the Stripe dashboard.
+- When the amount left to pay is under Stripe's minimum charge (for example a partly paid invoice with less than $0.50 due), checkout answers `422 validation_errors` with `error_details.base` `amount_below_provider_minimum`. The invoice's earlier session is expired.
 
 ### The checkout result
 
@@ -341,6 +344,10 @@ The customer must already be assigned to the Stripe connection and linked to a S
 - **Disputes.** On `charge.dispute.closed` with status `lost`, Nozle marks the invoice's dispute lost and sends the `invoice.payment_dispute_lost` webhook. A dispute that closes any other way changes nothing.
 - **Top-ups.** A credit note or a lost dispute on a paid credit top-up invoice also takes back the top-up's unspent credits. See [Refunds and lost disputes](/guides/credits/top-ups#refunds-and-lost-disputes).
 
+## Metadata on Stripe objects
+
+Nozle sets `nozle_*` metadata on the Stripe objects it creates, so you can match them in your Stripe dashboard: Checkout Sessions, PaymentIntents, Customers and refunds carry `nozle_customer_id`, `nozle_invoice_id`, `nozle_payable_id`, `nozle_payable_type`, `nozle_payment_id`, `nozle_credit_note_id`, `nozle_organization_id` and `nozle_billing_entity_id` where they apply. From Core 6.0.0 Nozle writes and reads only these keys; the former-prefix keys are gone. Objects created before Core 6.0.0 keep their old keys, and Nozle still settles their payments and refunds by the provider id it recorded. If you report on Stripe metadata, read the `nozle_*` keys for new objects.
+
 ## Import existing Stripe customers and invoices
 
 Use **Sync Stripe customers and invoices** on the connection to bring an existing Stripe account into Nozle. A preview comes first and changes nothing. Nozle then creates missing customers, links matching ones and imports invoices as read-only history. It changes no Stripe data and no subscription.
@@ -358,6 +365,7 @@ Checkout errors that are specific to Stripe. See [Create checkout](/api/create-c
 | Status | Code | Cause |
 |---|---|---|
 | `422` | `payment_provider_required` | The organization has no Stripe connection and the customer is not on Razorpay |
+| `422` | `validation_errors` | `error_details.base` is `amount_below_provider_minimum`: the amount left to pay on the invoice is under Stripe's minimum charge |
 | `422` | `stripe_customer_required` | Nozle could not create the customer in Stripe. A `customer.payment_provider_error` webhook carries the Stripe error |
 | `409` | `subscription_checkout_in_progress` | A new-subscription checkout for this customer on a different plan is still being paid. See [Retry a new-subscription checkout](#retry-a-new-subscription-checkout) |
 | `422` | `validation_errors` | `error_details.base` is `invalid_invoice_status_or_payment_status` when the invoice is paid, voided, a draft, closed, failed or has nothing due (embedded checkout and payment URL), `missing_stripe_customer` or `missing_payment_provider` when the connection or Stripe customer is missing, or `no_linked_payment_provider` and `missing_payment_provider_customer` for a payment link or top-up |

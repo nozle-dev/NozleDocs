@@ -163,7 +163,7 @@ Scheduled transition response:
 
 `effective_at` uses the customer's timezone offset, for example `2026-11-01T00:00:00.000000+05:30`.
 
-Changing an existing subscription needs a [plan transition policy](/api/plan-transition-policies) for that pair of plans. Without one, checkout returns `422 plan_transition_policy_required`. See [Create checkout](/api/create-checkout) for every result type and error.
+Changing an existing subscription uses the [default plan change policy](/api/plan-transition-policies#the-default-policy) (an upgrade now, prorated; a downgrade at the end of the period) or a policy you set for that pair of plans. An immediate downgrade, a hidden or older plan, or a trial needs a pair policy: without one, checkout returns `422 plan_transition_policy_required`. See [Create checkout](/api/create-checkout) for every result type and error.
 
 ## React implementation
 

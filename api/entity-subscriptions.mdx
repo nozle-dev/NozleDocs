@@ -298,7 +298,7 @@ Content-Type: application/json
 }
 ```
 
-The [plan transition policy](/api/plan-transition-policies) for the current and target plans determines whether the change is immediate, payment-gated, or scheduled for the renewal boundary. Without a policy for the pair the request returns `422 plan_transition_policy_required` (a change from a free plan to a paid plan uses the organization's free-to-paid policy instead). Change-plan takes no `billing_time`. Changing one Entity never changes another Entity's subscription.
+The [plan transition policy](/api/plan-transition-policies) for the current and target plans determines whether the change is immediate, payment-gated, or scheduled for the renewal boundary. Without a policy for the pair, the [default policy](/api/plan-transition-policies#the-default-policy) applies to public plans (an upgrade now, a downgrade at the end of the period); an immediate downgrade, a hidden or older plan or a trial returns `422 plan_transition_policy_required` (a change from a free plan to a paid plan uses the organization's free-to-paid policy instead). Change-plan takes no `billing_time`. Changing one Entity never changes another Entity's subscription.
 
 The result is a checkout result with `external_entity_id` and `external_subscription_id` added. A scheduled change:
 

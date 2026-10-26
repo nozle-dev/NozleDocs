@@ -199,7 +199,8 @@ The Engine checks the request in this order: valid JSON body, customer scope, th
 | `400` | `invalid_return_url` | Core refused `return_url`: it is not an absolute HTTPS URL, or its origin is not one of your organization's allowed origins. See [return URLs](/guides/billing/checkout#return-urls-and-your-organizations-origins). |
 | `400` | — | The body is not valid JSON, or the `Idempotency-Key` is longer than 255 bytes. |
 | `404` | `plan_not_found`, `customer_not_found` | Unknown plan or customer. |
-| `422` | `plan_transition_policy_required` | The customer has an active subscription and the pair of plans has no [transition policy](/api/plan-transition-policies). |
+| `422` | `plan_transition_policy_required` | The customer has an active subscription and the change needs a [transition policy](/api/plan-transition-policies): an immediate downgrade, a plan the default does not reach, or a trial. Upgrades and end-of-period downgrades between public plans need none. |
+| `422` | `validation_errors` | `error_details.base` is `amount_below_provider_minimum`: an invoice checkout whose amount left to pay is under the payment provider's minimum charge (for example less than $0.50 on Stripe). |
 | `422` | `plan_upgrade_invoice_missing` | An upgrade to a plan billed in arrears: nothing is due up front. |
 | `422` | `plan_already_active`, `target_plan_is_not_a_downgrade` | See [transition policies](/api/plan-transition-policies). |
 | `422` | `subscription_not_active` | Raised by plan-transition calls on a subscription that is not active. A checkout that names a terminated subscription ID was treated as a new checkout in testing, so do not rely on this code from checkout. |
