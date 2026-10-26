@@ -20,7 +20,7 @@ Nozle stores no card data and never shows card details. The payment method lives
 </ParamField>
 
 <ParamField body="return_url" type="string">
-  Where Stripe sends the customer when they leave the Billing Portal. It must be an absolute HTTPS URL on an allowlisted origin, the same list as [checkout](/api/create-checkout#return-url). If omitted, Nozle uses the organization's default return URL. The body can be empty.
+  Where Stripe sends the customer when they leave the Billing Portal. It must be an absolute HTTPS URL on one of your organization's allowed origins, the same list as [checkout](/api/create-checkout#return-url). If omitted, Nozle uses the organization's default return URL. The body can be empty.
 </ParamField>
 
 ```json
@@ -59,11 +59,11 @@ Razorpay customers have no payment method to manage here. They pay each invoice 
 
 ## Errors
 
-The request is checked in this order: valid JSON body, `return_url`, then Core.
+The Engine checks the JSON body, then sends the request to Core, which checks `return_url`.
 
 | Status | Code | Cause |
 | --- | --- | --- |
-| `400` | `invalid_return_url` | `return_url` is not an absolute HTTPS URL, or its origin is not allowlisted. |
+| `400` | `invalid_return_url` | `return_url` is not an absolute HTTPS URL, or its origin is not one of your organization's allowed origins. |
 | `403` | — | A publishable key was used. The Engine answers with an `error` message, not a code. |
 | `404` | `customer_not_found` | Unknown customer. |
 | `422` | `no_linked_payment_provider` | The customer has no payment provider. |

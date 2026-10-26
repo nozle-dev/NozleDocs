@@ -33,7 +33,7 @@ Every delivery has the same envelope. `webhook_type` is the event type, `object_
 ```
 
 - The object under `object_type` is the same object the REST API returns for that resource, so you can use one parser for both. A few events wrap it, for example `invoice.payment_dispute_lost` holds `{ "invoice": {...}, "provider_error": "..." }` under `payment_dispute_lost`.
-- Until January 19, 2027, payloads also carry the old, former-prefix key names beside the new keys. Read the new keys: see [legacy key names](/api/api-standards#legacy-key-names-removal-january-19-2027). The examples on this page show the new keys only.
+- Payloads carry only the Nozle key names (`nozle_id` and the plain `<key>` names). From Core 6.0.0 the former-prefix keys are gone: see [legacy key names](/api/api-standards#legacy-key-names-removed-in-core-600).
 - Examples are captured from Core with real identifiers replaced by placeholders.
 
 ## Choose the events you receive
@@ -136,7 +136,7 @@ An endpoint with no `event_types` receives every type, and gets every type Nozle
 | `invoice.payment_dispute_lost` | `payment_dispute_lost` | A payment dispute on an invoice is lost. The payload wraps the invoice in `payment_dispute_lost` with the provider reason. |
 | `invoice.payment_status_updated` | `invoice` | The payment status of an invoice changes (pending, succeeded, failed). |
 | `invoice.payment_overdue` | `invoice` | An unpaid invoice passes its due date and is marked overdue. |
-| `invoice.payment_failure` | `payment_provider_invoice_payment_error` | A payment attempt for an invoice fails at the provider, or a duplicate payment is refunded. `provider_error` says why. |
+| `invoice.payment_failure` | `payment_provider_invoice_payment_error` | A payment attempt for an invoice fails at the provider, or a duplicate payment, or a payment on a voided invoice, is refunded. `provider_error.error_code` says why, for example `duplicate_payment_refunded`, `voided_invoice_payment_refunded` or, when the provider refuses the refund and you must refund by hand, `duplicate_payment_refund_failed` or `voided_invoice_payment_refund_failed`. |
 | `invoice.resynced` | `invoice` | An invoice is synced again to a CRM integration (Salesforce). |
 
 ### Integrations

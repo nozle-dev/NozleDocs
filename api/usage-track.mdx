@@ -71,6 +71,18 @@ Insufficient credits return `200` with `allowed=false`, `credits_required`,
 `available`, and `reason`, without allocations or a Core event. `entity_id`
 and `pool_policy` are included when they apply. Empty fields are omitted.
 
+## Credits or money, not both
+
+A Feature is paid for either with credits or with money on the invoice, never both. When a plan has a priced charge on a Feature that credits also pay for, the same usage would be taken from the credit balance and billed again on the invoice. Nozle refuses that: `POST /usage/check` and `POST /usage/track` answer `409` with `code: feature_billed_in_money`, take no credits, and publish no event.
+
+- "Priced" means any price in the charge is above 0: an `amount`, `per_unit_amount`, `flat_amount`, `rate`, `fixed_amount` or `per_transaction_min_amount` (also inside charge filters), or a `min_amount_cents`. A custom or dynamic charge model counts as priced, and so does a price Nozle cannot read.
+- A charge priced at 0 is fine next to credits. Credits pay for the usage, and the charge only shows the usage on the invoice.
+- The check reads the plan of the subscription that would pay, including its version and overrides.
+
+To fix it, choose one: make the charge $0 so credits pay for the Feature, or remove the credits from the Feature so the charge bills it in money.
+
+When credits run out on a Feature without a priced charge, `/usage/track` answers `200` with `allowed: false` and `reason: insufficient_credits`, and records nothing. Nozle does not move that usage to money by itself. To bill usage in money after the credits end, send it as a usage event with [`POST /events`](/api/events) against a plan whose charge on that Feature is priced and has no credits behind it.
+
 ## Amount rounding and Features
 
 A consumed amount that does not end within 12 decimals is rounded up to the 12th decimal, so usage is never under-charged: 1 event at 1 credit per 3 events consumes `0.333333333334`, and 7 seconds at 1 credit per 60 seconds consumes `0.116666666667`. Exact amounts are unchanged. Before, such rates answered `422 credit_usage_configuration_invalid`. A boolean or config Feature code answers `422 feature_not_consumable`, not a server error.

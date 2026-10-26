@@ -61,17 +61,18 @@ See [Errors](/api/errors) for retry guidance and application-safe handling.
 
 ## Compatibility names
 
-Some inherited response properties and webhook headers retain compatibility names from the underlying billing contract. Use the exact names displayed in the generated endpoint schemas. Those names can change, and a change is announced in the [changelog](/changelog) first.
+Some inherited response properties retain compatibility names from the underlying billing contract. Use the exact names displayed in the generated endpoint schemas. Those names can change, and a change is announced in the [changelog](/changelog) first.
 
-### Legacy key names (removal January 19, 2027)
+### Legacy key names (removed in Core 6.0.0)
 
-API 1.0.0 renamed the identifier keys of REST responses, webhook payloads and CSV exports and the EU tax codes, from the former product prefix to `nozle_` (`nozle_id`) or to no prefix (`customer_id`, `plan_id`), without notice. Until **January 19, 2027** (inclusive) the old names work again next to the new ones. After that date they are removed.
+API 1.0.0 renamed the identifier keys of REST responses, webhook payloads and CSV exports and the EU tax codes to `nozle_` (`nozle_id`) or to no prefix (`customer_id`, `plan_id`). Core 3.7.0 brought the former names back next to the new ones for a deprecation window. **Core 6.0.0 ends that window early: the former names are gone everywhere, and the earlier end date no longer applies.** The public API carries only the Nozle names. This is a breaking change.
 
-- **Responses and webhook payloads** carry the old key beside the new one, with the same value, on every object that had it before: the old id key beside `nozle_id`, and the old prefixed key beside each of these keys: `add_on_id`, `alert_id`, `charge_filter_id`, `charge_id`, `coupon_id`, `credit_note_id`, `customer_id`, `feature_id`, `fee_id`, `fixed_charge_id`, `integration_id`, `invoice_id`, `invoice_ids`, `item_id`, `order_form_id`, `organization_id`, `original_fee_id`, `parent_id`, `payable_id`, `payment_provider_id`, `payment_request_id`, `plan_id`, `pricing_unit_id`, `quote_id`, `quote_version_id`, `subscription_id`, `tax_id`, `true_up_fee_id`, `true_up_parent_fee_id`, `user_id`, `voided_invoice_id`, `wallet_id`, `wallet_transaction_id`. A key gets its old name only on the objects where it was renamed.
-- **EU tax codes:** an old EU code resolves to the matching `nozle_eu_` code in every `tax_codes` input and in `GET`, `PUT` and `DELETE /taxes/{code}`: the old `fr_standard` code resolves to `nozle_eu_fr_standard`. A tax you created yourself with an old EU code keeps that code. Responses show the `nozle_eu_` code.
-- **CSV exports** (invoices, invoice fees, credit notes, credit note items) repeat the id columns at the end under their old names (the old `id` column and the old `customer_`, `invoice_`, `fee_`, `credit_note_`, `credit_note_item_` and `credit_note_item_fee_` id columns). The earlier columns are unchanged.
-- The old webhook header names stay as before.
+- **Responses and webhook payloads** carry no key with the former product prefix. Read `nozle_id`, and the plain key names such as `customer_id`, `invoice_id`, `subscription_id`, `plan_id`, `fee_id` and `wallet_id`. This includes the fee estimates of `POST /events/estimate_instant_fees` and `batch_estimate_instant_fees` and `POST /credit_notes/estimate`.
+- **Older SDK versions break.** nozle-js older than 0.10.0 (Node), nozle-python older than 0.10.0 and nozle-go older than 0.9.1 read a credit system's id only from the former key. Against Core 6.0.0 the credit system `id` is empty (Node, Go) or the call raises `NozleAPIError` (Python). Upgrade the SDK before Core 6.0.0.
+- **CSV exports** (invoices, invoice fees, credit notes, credit note items) no longer repeat the id columns at the end under their former names. Read the `*nozle_id` columns, by column name.
+- **EU tax codes:** the former `*_eu_*` codes no longer resolve to `nozle_eu_*`, in `tax_codes` inputs or in `GET`, `PUT` and `DELETE /taxes/{code}`. Send the `nozle_eu_*` code; an old code returns `404` or is refused like any unknown code.
+- **Webhook headers:** deliveries carry only `X-Nozle-Signature`, `X-Nozle-Signature-Algorithm` and `X-Nozle-Unique-Key`. Verify with those.
+- **Request headers and inputs:** send `x-nozle-organization` (the former organization header is no longer read), and `invoice_ids` on `POST /payment_requests` (the former `*_invoice_ids` input is refused). Wallet `recurring_transaction_rules[]` name an existing rule with `nozle_id`. A renewed dashboard session token comes back in the `x-nozle-token` response header only.
+- **Stripe metadata:** Nozle writes `nozle_*` metadata keys on the Stripe objects it creates (`nozle_customer_id`, `nozle_invoice_id`, `nozle_payable_id`, `nozle_payable_type`, `nozle_payment_id`, `nozle_credit_note_id`, `nozle_organization_id`, `nozle_billing_entity_id`). Objects created before Core 6.0.0 keep the old keys, and Nozle still settles their payments by the provider id. See [Stripe](/integrations/stripe#metadata-on-stripe-objects).
 
-The exact old key names are listed in the introduction of the OpenAPI specification (`nozle-openapi.yaml`).
-
-**Migrate before January 19, 2027:** read `nozle_id` and the new key names in your webhook receivers, API clients and CSV imports (by column name), and use the `nozle_eu_` tax codes. The new names are always present. Event properties you send are never changed.
+Event properties you send are never changed.

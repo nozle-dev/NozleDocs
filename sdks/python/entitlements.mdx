@@ -26,6 +26,20 @@ check = nozle.can(
 )
 ```
 
+## Choose the subscription
+
+A customer with several active subscriptions needs a selector, as in `nozle-sdk` 0.17.0 and later. `subscription_id` and `entity_id` (external IDs) are keyword-only arguments, on the sync and the async client:
+
+```python
+check = nozle.can("workspace_123", "seats", subscription_id="sub_team_a")
+check = nozle.can("workspace_123", "seats", entity_id="entity_42")
+
+# async client
+check = await async_nozle.can("workspace_123", "seats", subscription_id="sub_team_a")
+```
+
+Without a selector, `can()` evaluates the customer's only subscription. When the customer has several and not exactly one is its own, the answer is not an exception: `can()` returns `allowed: False` with `reason: "subscription_required"`. Send `subscription_id` or `entity_id` to choose. See [The can() endpoint](/guides/entitlements/can-endpoint#which-subscription-is-checked).
+
 ## `CanResult`
 
 | Field | Type | Description |
