@@ -21,6 +21,10 @@ There are no separate live and test keys: every key belongs to one organization.
 
 Only members with the **Admin** role can create, rotate or delete secret keys in the dashboard. The **Finance** and **Manager** roles cannot.
 
+## Store your key when you create it
+
+The dashboard (and the GraphQL `createApiKey` and `rotateApiKey` mutations) show the full key once, when you create or rotate it (Core 7.0.0 and later). After that every read shows it masked, as `••••••••` and the last 3 characters, in the dashboard and in GraphQL (`apiKeys`, `apiKey(id)`, `updateApiKey`, `destroyApiKey`). Nozle cannot show it again. Copy it into your secret manager straight away. If you lose a key, rotate it and update your backend with the new one. Rotating gives the new key the same permissions as the old one.
+
 Send server credentials as a Bearer token:
 
 ```http
@@ -60,7 +64,9 @@ On organizations with API key permissions, these Engine routes check the key too
 
 ## Browser access (CORS)
 
-The publishable-key plan catalog, `GET /plans` and `GET /plans/{code}` on the Engine, answers CORS from any origin, so the [React components](/sdks/react/components) can load plans on your own site. The catalog and its preflight return `Access-Control-Allow-Origin: *` and `Access-Control-Allow-Methods: GET, OPTIONS`, never `Access-Control-Allow-Credentials`. Every other route answers only the origins Nozle allows, so call them from your backend.
+The publishable-key plan catalog, `GET /plans` and `GET /plans/{code}` on the Engine, answers CORS from any origin, so the [React components](/sdks/react/components) can load plans on your own site. The catalog and its preflight return `Access-Control-Allow-Origin: *` and `Access-Control-Allow-Methods: GET, OPTIONS`, never `Access-Control-Allow-Credentials`. Every other Engine route answers only the origins Nozle allows, so call them from your backend.
+
+Core (`https://api.nozle.app/core`) answers browser calls only from an allowlist of exact origins (Nozle Cloud lists the dashboard). A call from another origin gets no CORS headers, so the browser blocks it. The one exception is the customer portal: `POST /graphql` carrying a `customer-portal-token` header is allowed from any origin, so the [billing portal](/sdks/react/billing-portal) works on your site. Calls from your server with an API key are not affected. Self-hosted Core: see the Core environment variables.
 
 <Warning>
 Never expose a secret or master key in client-side code. CORS and `Origin` headers do not authenticate a caller.

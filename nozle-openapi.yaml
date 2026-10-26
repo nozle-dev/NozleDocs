@@ -4,7 +4,7 @@ info:
   description: |-
     One specification for the Nozle API. Core operations use the default server https://api.nozle.app/core/api/v1. Engine operations name their own server, https://api.nozle.app/engine/api/v1. Both live on the one host https://api.nozle.app.
 
-    **Legacy key names, removed after January 19, 2027.** Until January 19, 2027 (inclusive), REST responses and webhook payloads carry the old key beside the new one, with the same value, on every object that had it before. `lago_id` is the old name of `nozle_id`. These old names are the new keys with the former prefix: `lago_add_on_id`, `lago_alert_id`, `lago_charge_filter_id`, `lago_charge_id`, `lago_coupon_id`, `lago_credit_note_id`, `lago_customer_id`, `lago_feature_id`, `lago_fee_id`, `lago_fixed_charge_id`, `lago_integration_id`, `lago_invoice_id`, `lago_invoice_ids`, `lago_item_id`, `lago_order_form_id`, `lago_organization_id`, `lago_original_fee_id`, `lago_parent_id`, `lago_payable_id`, `lago_payment_provider_id`, `lago_payment_request_id`, `lago_plan_id`, `lago_pricing_unit_id`, `lago_quote_id`, `lago_quote_version_id`, `lago_subscription_id`, `lago_tax_id`, `lago_true_up_fee_id`, `lago_true_up_parent_fee_id`, `lago_user_id`, `lago_voided_invoice_id`, `lago_wallet_id`, `lago_wallet_transaction_id`. A key gets its old name only on the objects where it was renamed. Old EU tax codes (`lago_eu_<rest>`) resolve to `nozle_eu_<rest>` in `tax_codes` inputs and in `GET`, `PUT` and `DELETE /taxes/{code}`. CSV exports (invoices, invoice fees, credit notes, credit note items) repeat the id columns at the end under the old names `lago_id`, `customer_lago_id`, `invoice_lago_id`, `fee_lago_id`, `credit_note_lago_id`, `credit_note_item_lago_id` and `credit_note_item_fee_lago_id`. Read the new names before the removal date.
+    **Legacy key names, removed in Core 6.0.0.** REST responses, webhook payloads and CSV exports carry only the Nozle names: `nozle_id` and the plain `<key>` names such as `customer_id` and `invoice_id`. The former-prefix keys, the former EU tax codes, the former CSV id columns and the former webhook headers are gone. Webhook deliveries carry `X-Nozle-Signature`, `X-Nozle-Signature-Algorithm` and `X-Nozle-Unique-Key`. nozle-js and nozle-python older than 0.10.0 and nozle-go older than 0.9.1 cannot read a credit system id from Core 6.0.0.
   version: 1.50.0
   license:
     name: AGPLv3
@@ -6842,7 +6842,7 @@ paths:
     parameters:
       - name: code
         in: path
-        description: The code of the tax. It serves as a unique identifier associated with a particular tax. The code is typically used for internal or system-level identification purposes. Until January 19, 2027, an old `lago_eu_<rest>` code resolves to the `nozle_eu_<rest>` tax (a tax you created yourself with a `lago_eu_*` code keeps it).
+        description: The code of the tax. It serves as a unique identifier associated with a particular tax. The code is typically used for internal or system-level identification purposes. Send the `nozle_eu_<rest>` code for the EU taxes Nozle creates; an old EU code no longer resolves.
         required: true
         schema:
           type: string
