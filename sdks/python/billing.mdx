@@ -56,7 +56,7 @@ Validate the exact HTTPS return origin before passing a browser-provided URL to 
 
 | Status | `code` | Cause |
 | --- | --- | --- |
-| 400 | `invalid_return_url` | The `return_url` origin is not allowed. Checked before anything else. |
+| 400 | `invalid_return_url` | Core refused the `return_url`: it is not an HTTPS URL on one of your organization's allowed origins. Add the origin under **Developers > Checkout return** in the dashboard. |
 | 404 | `plan_not_found`, `customer_not_found` | Unknown plan or customer. |
 | 409 | `subscription_selection_required` | The customer has several active subscriptions and no `subscription_id` was given. |
 | 422 | `checkout_not_required` | The plan needs no up-front payment (free, trial, or pay-in-arrears) and the customer has no subscription. Use `subscribe()` instead. |
@@ -345,7 +345,7 @@ The result contains `id`, `type` (`stripe`, `razorpay`, `processing`, or `comple
 - `idempotency_key` is required, up to 255 bytes, and sent as the `Idempotency-Key` header. The same key and request returns `replayed: True` and reuses the open session. Replaying a `failed` or `expired` batch returns `checkout_not_available`.
 - The checkout expires after 23 hours.
 - Every plan must require up-front payment: pay in advance with an amount above 0 and no trial, or pay-in-advance fixed charges. Otherwise the whole batch fails with `422 validation_errors` and `error_details["items"] == ["paid_plan_required"]`. Other item errors are `mixed_currencies` and `mixed_intervals`.
-- An untrusted `return_url` returns `422` with `return_url: invalid_or_untrusted`.
+- An untrusted `return_url` on an Entity batch returns `422` with `return_url: invalid_or_untrusted`.
 - With no payment provider connected, the call returns `422 payment_provider_required`, as single checkout does.
 
 See [bulk Entity checkout](/api/entity-subscriptions#purchase-multiple-entity-plans-together).
