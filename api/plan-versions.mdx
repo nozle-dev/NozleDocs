@@ -66,12 +66,22 @@ Content-Type: application/json
     "from_version": 1,
     "to_version": 2,
     "items": [
-      { "external_subscription_id": "sub_1", "external_customer_id": "cus_1", "outcome": "move", "skip_reason": null, "effective_on": "2026-11-01", "current_amount_cents": 4900, "new_amount_cents": 5900 },
-      { "external_subscription_id": "sub_2", "external_customer_id": "cus_2", "outcome": "skip", "skip_reason": "custom_pricing", "effective_on": null, "current_amount_cents": 3900, "new_amount_cents": 5900 }
+      { "external_subscription_id": "sub_1", "external_customer_id": "cus_1", "outcome": "move", "skip_reason": null, "effective_on": "2026-11-01", "current_amount_cents": 4900, "new_amount_cents": 5900, "price_change": "increase", "price_increase": true, "mandate_cap_exceeded": false },
+      { "external_subscription_id": "sub_2", "external_customer_id": "cus_2", "outcome": "skip", "skip_reason": "custom_pricing", "effective_on": null, "current_amount_cents": 3900, "new_amount_cents": 5900, "price_change": null, "price_increase": false, "mandate_cap_exceeded": false }
     ]
   }
 }
 ```
+
+Each item also says what the move does to the price:
+
+| Field | Meaning |
+| --- | --- |
+| `price_change` | `increase` when the plan amount goes up. `decrease` or `same` when it goes down or stays and nothing else in the pricing differs. `undeterminable` when the plan amount does not go up but usage, fixed or commitment pricing differs, so the total depends on future usage. `null` for a skipped subscription, which keeps its price. |
+| `price_increase` | `true` when `price_change` is `increase`. |
+| `mandate_cap_exceeded` | `true` when the new amount is above the customer's auto-pay limit. The plan amount is compared; usage on top is not known in advance. |
+
+An `undeterminable` item is not an increase, so it does not block a migration. Look at those by hand.
 
 ## Start a migration
 
@@ -80,8 +90,10 @@ POST /plans/pro/version-migrations
 ```
 
 ```json
-{ "from_version": 1 }
+{ "from_version": 1, "allow_price_increase": true }
 ```
+
+`allow_price_increase` is optional and defaults to `false` (GraphQL: `allowPriceIncrease`). Without it, a migration that would raise a price, or take it past an auto-pay limit, is refused and nothing starts; see [price increases](#price-increases-need-your-consent).
 
 It returns `200` with `status: "running"`; the migration then works through the subscriptions in the background. Each subscription that can move is scheduled to move at the end of its current billing period, like a scheduled downgrade. **Nothing is invoiced, credited or refunded when it runs**; the subscription's next invoice bills the new version, and usage of the period that ended is billed at the old version's rates.
 
@@ -91,6 +103,31 @@ It returns `200` with `status: "running"`; the migration then works through the 
 | `409` `plan_version_migration_running` | Another migration of this code is running. |
 | `422` `to_version: same_version` | Both versions are the same. |
 | `422` `to_version: plan_pending_deletion` | The target version is being deleted. |
+| `422` `price_increase_not_allowed` | A subscription would pay more, or pass its auto-pay limit, and `allow_price_increase` is not `true`. |
+
+## Price increases need your consent
+
+A migration never raises a price by accident. When any subscription would pay more (`price_increase`) or the new amount is above its auto-pay limit (`mandate_cap_exceeded`), starting is refused with the counts:
+
+```json
+{
+  "status": 422,
+  "error": "Unprocessable Entity",
+  "code": "price_increase_not_allowed",
+  "price_increase_count": 3,
+  "mandate_cap_exceeded_count": 1
+}
+```
+
+Preview, look at the flagged items, then send the same request with `allow_price_increase: true`. A migration where no price goes up needs nothing extra. The same applies to the GraphQL mutation, with `allowPriceIncrease` and the preview's `priceChange`, `priceIncrease` and `mandateCapExceeded`.
+
+## The price change email
+
+When a move changes the subscriber's plan amount, Nozle emails the customer before the new price applies. The event is `subscription.price_change_scheduled`. It is off until you add it to the billing entity's `email_settings`.
+
+- **When:** as the migration schedules the move for a subscription, once per subscription per migration. A rerun does not send it again. It is skipped, and the move still happens, when the setting is off or the customer has no email.
+- **What it says:** the customer's new price and the old one, the day it starts, and how it will be charged.
+- **How it is charged:** a customer with a saved payment method is told the new amount will be charged automatically to it at the start of that billing period. Any other customer is told they will receive an invoice for the new amount.
 
 ## Follow, list and cancel
 

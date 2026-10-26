@@ -8806,7 +8806,9 @@ paths:
 
         The migration runs in the background in chunks and records one item per subscription, so the response has `status: running`; read it again with `GET /plans/{code}/version-migrations/{id}`. Subscriptions are skipped, with a `skip_reason`, when they are on custom pricing, billed by another system, not started, canceling at the end of their period, in a trial the new version would change, already on the target version, waiting on another plan change, have an open checkout, or when the two versions bill on another interval, currency or billing time. Running it again is safe: moved subscriptions are not moved twice and failed ones are retried.
 
-        One migration of a plan code runs at a time: another one returns `409` with `plan_version_migration_running`. `422` with `to_version: same_version` when both versions are the same, or `to_version: plan_pending_deletion` when the target is being deleted. Secret keys only.
+        One migration of a plan code runs at a time: another one returns `409` with `plan_version_migration_running`. `422` with `to_version: same_version` when both versions are the same, or `to_version: plan_pending_deletion` when the target is being deleted.
+
+        **Price increases need your consent.** When any subscription would pay more, or the new amount is above its auto-pay limit, nothing is started: the response is `422` with `code: price_increase_not_allowed`, `price_increase_count` and `mandate_cap_exceeded_count`. Review the preview, then send the same request with `allow_price_increase: true`. When a move changes a subscriber's plan amount, the customer gets the `subscription.price_change_scheduled` email if the billing entity has it on. Secret keys only.
       operationId: createPlanVersionMigration
       parameters:
         - $ref: '#/components/parameters/plan_version_code'
@@ -8818,6 +8820,7 @@ paths:
               $ref: '#/components/schemas/PlanVersionMigrationInput'
             example:
               from_version: 1
+              allow_price_increase: true
       responses:
         '200':
           description: The migration, started.
@@ -8842,13 +8845,23 @@ paths:
                 error: Conflict
                 code: plan_version_migration_running
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: A validation error, or `price_increase_not_allowed` when a subscription would pay more (or pass its auto-pay limit) and `allow_price_increase` is not `true`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+              example:
+                status: 422
+                error: Unprocessable Entity
+                code: price_increase_not_allowed
+                price_increase_count: 3
+                mandate_cap_exceeded_count: 1
   /plans/{code}/version-migrations/preview:
     post:
       tags:
         - Plans
       summary: Preview a version migration
-      description: Says what a migration would do to each active subscription on `from_version`, without writing anything. Each item is `move` with the day the subscription would start on the new version and its current and new plan amounts, or `skip` with the reason. Secret keys only.
+      description: Says what a migration would do to each active subscription on `from_version`, without writing anything. Each item is `move` with the day the subscription would start on the new version and its current and new plan amounts, or `skip` with the reason. It also says what the move does to the price (`price_change`, `price_increase`) and whether the new amount is above the customer's auto-pay limit (`mandate_cap_exceeded`). Secret keys only.
       operationId: previewPlanVersionMigration
       parameters:
         - $ref: '#/components/parameters/plan_version_code'
@@ -8878,6 +8891,9 @@ paths:
                       effective_on: '2026-11-01'
                       current_amount_cents: 4900
                       new_amount_cents: 5900
+                      price_change: increase
+                      price_increase: true
+                      mandate_cap_exceeded: false
                     - external_subscription_id: sub_2
                       external_customer_id: cus_2
                       outcome: skip
@@ -8885,6 +8901,9 @@ paths:
                       effective_on: null
                       current_amount_cents: 3900
                       new_amount_cents: 5900
+                      price_change: null
+                      price_increase: false
+                      mandate_cap_exceeded: false
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -21722,7 +21741,8 @@ components:
               - invoice.finalized
               - credit_note.created
               - payment_receipt.created
-          description: The email notification settings for this billing entity
+              - subscription.price_change_scheduled
+          description: 'The email notification settings for this billing entity. `subscription.price_change_scheduled` is off until you add it; it emails a customer when a plan version migration moves their subscription to a different price.'
         eu_tax_management:
           type: boolean
           example: false
@@ -21923,7 +21943,8 @@ components:
                 enum:
                   - invoice.finalized
                   - credit_note.created
-              description: The email notification settings for this billing entity
+                  - subscription.price_change_scheduled
+              description: The email notification settings for this billing entity. `subscription.price_change_scheduled` is off until you add it.
             eu_tax_management:
               type: boolean
               example: false
@@ -22259,7 +22280,8 @@ components:
             enum:
               - invoice.finalized
               - credit_note.created
-          description: The email notification settings for this billing entity
+              - subscription.price_change_scheduled
+          description: The email notification settings for this billing entity. `subscription.price_change_scheduled` is off until you add it.
         eu_tax_management:
           type: boolean
           example: false
@@ -36818,6 +36840,10 @@ components:
           type: integer
           minimum: 1
           description: The version they move to. Defaults to the current version.
+        allow_price_increase:
+          type: boolean
+          default: false
+          description: Only read when starting a migration. Without it, starting is refused with `422` `price_increase_not_allowed` when any subscription would pay more, or pass its auto-pay limit. Check the preview first.
     PlanVersionMigrationItem:
       type: object
       description: The outcome of a migration for one subscription.
@@ -36981,6 +37007,23 @@ components:
           type: integer
         new_amount_cents:
           type: integer
+        price_change:
+          type:
+            - string
+            - 'null'
+          enum:
+            - increase
+            - decrease
+            - same
+            - undeterminable
+            - null
+          description: 'What the move does to the price. `increase` when the plan amount goes up. `undeterminable` when the plan amount does not go up but usage, fixed or commitment pricing differs, so the total depends on future usage. `null` for a skipped subscription, which keeps its price.'
+        price_increase:
+          type: boolean
+          description: '`true` when `price_change` is `increase`. Starting the migration needs `allow_price_increase` while any item has it.'
+        mandate_cap_exceeded:
+          type: boolean
+          description: '`true` when the new amount is above the customer''s auto-pay limit. Starting the migration needs `allow_price_increase` while any item has it.'
     PlanVersionMigrationPreview:
       type: object
       required:
