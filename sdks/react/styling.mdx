@@ -129,8 +129,8 @@ The page has two tabs:
 | Theme | `light`, `dark`, `nozle`, `nozleDark`, `minimal`, `neobrutal` |
 | Colours | `colorPrimary`, `colorPrimaryForeground`, `colorBackground`, `colorCard`, `colorForeground`, `colorMuted`, `colorMutedForeground`, `colorAccent`, `colorAccentForeground`, `colorBorder`, `colorDanger`, `colorWarning`, `colorSuccess`, `colorSecondary`, `colorInput`, `colorHighlight`, `colorHighlightForeground`, `buttonBorderColor`. Hex only: `#rgb` or `#rrggbb`. |
 | Shape | `borderRadius`, `buttonRadius`, `borderWidth`, `buttonBorderWidth`. Lengths such as `12px` or `1rem`. |
-| Plan cards | `planCardLayout` (`card` or `panel`), set per component |
-| Pricing table | `highlightStyle` (`outline` or `filled`; the dashboard shows Outlined and Contained), `annualDiscountLabel` (up to 40 characters), `showToggle`, set per component |
+| Plan cards | `planCardLayout` (`card` or `panel`), global or per component |
+| Pricing table | `highlightStyle` (`outline` or `filled`; the dashboard shows Outlined and Contained), `highlightLabel` (up to 40 characters), `annualDiscountLabel` (up to 40 characters), `showToggle`, global or per component |
 | Branding | `hideBranding`, only for plans that remove the "Powered by Nozle" line. It hides the line in the SDK components and the customer portal, not on invoice, credit note or receipt PDFs. |
 | Components | `components.<Name>` with its own `theme`, `variables`, `planCardLayout` and `pricingTable`. Names: `PricingTable`, `PlanCard`, `PlanComparison`, `PlanBadge`, `CurrentPlan`, `PlanChangeControl`, `CancellationControl`, `UsageMeter`, `UsageDashboard`, `UsageAlert`, `UsageBreakdown`, `UsageTrend`, `CreditBalance`, `CreditHistory`, `PaymentMethodDisplay`, `CheckoutButton`, `UpgradeButton`, `UpgradeModal`, `UpgradePrompt`, `LockedOverlay` |
 
@@ -284,8 +284,8 @@ The layout can be saved in the dashboard too: see [Saved appearance](#saved-appe
 
 Requires `@nozle-js/react` `0.13.0`. Which button a plan gets depends on the customer's plan:
 
-- **No current plan known:** every paid plan gets the primary button. In the `nozle`, `nozleDark` and `neobrutal` themes it has the hard shadow of the theme's button shadow; `light`, `dark` and `minimal` have none. The highlighted plan keeps its highlight colours.
-- **With `currentPlanCode`:** plans above it get the primary button. The current plan uses the primary colour with no shadow (in the panel layout it also shows the `ACTIVE` label in the header). Plans at or below it get a plain button.
+- **No current plan known:** every plan gets the primary button. In the `nozle`, `nozleDark` and `neobrutal` themes it has the hard shadow of the theme's button shadow; `light`, `dark` and `minimal` have none. The highlighted plan keeps its highlight colours.
+- **With `currentPlanCode`:** plans above it get the primary button. The current plan uses the primary colour with no shadow (in the panel layout it also shows the `ACTIVE` label in the header). Plans at or below it get a plain button. A plan in another currency than the current plan cannot be compared, so it gets the primary button.
 - **Contact-sales plans** stay outlined.
 
 ## Combine themes
