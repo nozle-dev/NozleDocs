@@ -74,6 +74,9 @@ jobs:
           python3 -m pip install --quiet pyyaml
           python3 scripts/check-webhook-events.py
 
+      - name: Check that schemas only require declared keys
+        run: python3 scripts/check-required-properties.py
+
       - name: Check internal links
         run: npx --yes mintlify@4.2.715 broken-links
 

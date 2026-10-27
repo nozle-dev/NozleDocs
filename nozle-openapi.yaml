@@ -70,8 +70,6 @@ tags:
     description: Preview and finalize allocated period costs
   - name: Cost Intelligence
     description: Ledger-backed cost analytics and profitability inputs
-  - name: Cost Intelligence Operations
-    description: Operator replay tools for recoverable cost-processing failures. These routes accept only Nozle's internal service token; organization secret and publishable keys get `403`.
   - name: Organizations
     description: Everything about Organization collection
     externalDocs:
@@ -187,7 +185,7 @@ paths:
               schema:
                 type: object
                 required:
-                  - Billing Entities
+                  - billing_entities
                 properties:
                   billing_entities:
                     type: array
@@ -3645,6 +3643,9 @@ paths:
             	Properties:          map[string]any{"tokens": 900, "model": "example-model", "type": "input"},
             })
   /cost-intelligence/shared-costs/{id}/preview:
+    servers:
+      - url: https://api.nozle.app/engine/api/v1
+        description: Engine API
     parameters:
       - name: id
         in: path
@@ -3687,6 +3688,9 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
   /cost-intelligence/shared-costs/{id}/allocate:
+    servers:
+      - url: https://api.nozle.app/engine/api/v1
+        description: Engine API
     parameters:
       - name: id
         in: path
@@ -3729,6 +3733,9 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
   /cost-intelligence/report:
+    servers:
+      - url: https://api.nozle.app/engine/api/v1
+        description: Engine API
     get:
       tags:
         - Cost Intelligence
@@ -3778,65 +3785,6 @@ paths:
           description: 'A publishable key, or `code: permission_denied` when API key permissions are enabled and the secret key lacks `analytic:read`.'
         '500':
           description: A report data source could not be queried
-  /admin/cost-intelligence/replay-source:
-    post:
-      tags:
-        - Cost Intelligence Operations
-      summary: Replay an uncosted source
-      description: |
-        Retries rating for an uncosted Feature Event or an uncosted or pending Cost Event.
-        A source that already produced ledger entries is rejected so replay cannot duplicate money.
-        Operator only: accepts only Nozle's internal service token. Organization secret (`sk_`) and publishable (`pk_`) keys get `403` with `internal service authentication required`.
-      operationId: replayCostIntelligenceSource
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CostIntelligenceSourceReplayInput'
-      responses:
-        '200':
-          description: Source replay result
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CostIntelligenceReplayResult'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          description: 'Not the internal service token. Organization secret and publishable keys are refused with `{"error": "internal service authentication required"}`.'
-        '409':
-          description: The source is not eligible for replay
-  /admin/cost-intelligence/replay-projection:
-    post:
-      tags:
-        - Cost Intelligence Operations
-      summary: Requeue a cost-ledger projection
-      description: Clears the delivery state for one existing PostgreSQL ledger entry so the outbox relay projects it to ClickHouse again. Operator only; accepts only Nozle's internal service token. Organization secret (`sk_`) and publishable (`pk_`) keys get `403` with `internal service authentication required`.
-      operationId: replayCostIntelligenceProjection
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CostIntelligenceProjectionReplayInput'
-      responses:
-        '200':
-          description: Projection queued
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CostIntelligenceReplayResult'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          description: 'Not the internal service token. Organization secret and publishable keys are refused with `{"error": "internal service authentication required"}`.'
-        '404':
-          $ref: '#/components/responses/NotFound'
   /events/{transaction_id}:
     parameters:
       - name: transaction_id
@@ -22426,7 +22374,7 @@ components:
     ActivityLogsPaginated:
       type: object
       required:
-        - Activity Logs
+        - activity_logs
         - meta
       properties:
         activity_logs:
@@ -22500,7 +22448,7 @@ components:
     AddOnsPaginated:
       type: object
       required:
-        - Add-ons
+        - add_ons
         - meta
       properties:
         add_ons:
@@ -22636,7 +22584,7 @@ components:
     ApiLogsPaginated:
       type: object
       required:
-        - API Logs
+        - api_logs
         - meta
       properties:
         api_logs:
@@ -23233,7 +23181,7 @@ components:
     AppliedCouponsPaginated:
       type: object
       required:
-        - Applied Coupons
+        - applied_coupons
         - meta
       properties:
         applied_coupons:
@@ -23866,7 +23814,7 @@ components:
     CouponsPaginated:
       type: object
       required:
-        - Coupons
+        - coupons
         - meta
       properties:
         coupons:
@@ -25134,11 +25082,16 @@ components:
           example: stripe
           description: |-
             The payment provider utilized to initiate payments for invoices issued by Nozle.
-            Accepted values: `stripe`, `adyen`, `gocardless` or null. This field is required if you intend to assign a `provider_customer_id`.
+            Accepted values: `stripe`, `razorpay`, `adyen`, `gocardless`, `cashfree`, `flutterwave`, `moneyhash` or null. This field is required if you intend to assign a `provider_customer_id`.
           enum:
             - stripe
+            - razorpay
             - adyen
             - gocardless
+            - cashfree
+            - flutterwave
+            - moneyhash
+            - null
         payment_provider_code:
           type:
             - string
@@ -25690,7 +25643,7 @@ components:
     CreditNotesPaginated:
       type: object
       required:
-        - Credit Notes
+        - credit_notes
         - meta
       properties:
         credit_notes:
@@ -26136,7 +26089,7 @@ components:
     CustomersPaginated:
       type: object
       required:
-        - Customers
+        - customers
         - meta
       properties:
         customers:
@@ -26755,7 +26708,7 @@ components:
     InvoicesPaginated:
       type: object
       required:
-        - Invoices
+        - invoices
         - meta
       properties:
         invoices:
@@ -26915,7 +26868,7 @@ components:
     PaymentsPaginated:
       type: object
       required:
-        - Payments
+        - payments
         - meta
       properties:
         payments:
@@ -26985,7 +26938,7 @@ components:
     PaymentRequestsPaginated:
       type: object
       required:
-        - Payment Requests
+        - payment_requests
         - meta
       properties:
         payment_requests:
@@ -27384,7 +27337,7 @@ components:
     SubscriptionsPaginated:
       type: object
       required:
-        - Subscriptions
+        - subscriptions
         - meta
       properties:
         subscriptions:
@@ -27729,7 +27682,7 @@ components:
     WalletsPaginated:
       type: object
       required:
-        - Wallets
+        - wallets
         - meta
       properties:
         wallets:
@@ -28068,10 +28021,10 @@ components:
             recurring_transaction_rules:
               type: array
               description: List of recurring transaction rules. Currently, we only allow one recurring rule per wallet.
-              required:
-                - trigger
               items:
                 type: object
+                required:
+                  - trigger
                 description: Object that represents rule for wallet recurring transactions.
                 properties:
                   nozle_id:
@@ -28333,7 +28286,7 @@ components:
     WalletAlerts:
       type: object
       required:
-        - Alerts
+        - alerts
       properties:
         alerts:
           type: array
@@ -28408,7 +28361,7 @@ components:
     WalletAlertBatchCreateInput:
       type: object
       required:
-        - Alerts
+        - alerts
       properties:
         alerts:
           type: array
@@ -28493,14 +28446,14 @@ components:
     CustomerChargeFiltersUsageObject:
       type: array
       description: Array of filter object, representing multiple dimensions for a charge item.
-      required:
-        - values
-        - units
-        - total_aggregated_units
-        - events_count
-        - amount_cents
       items:
         type: object
+        required:
+          - values
+          - units
+          - total_aggregated_units
+          - events_count
+          - amount_cents
         properties:
           units:
             type: string
@@ -28541,15 +28494,15 @@ components:
     CustomerChargeGroupedUsageObject:
       type: array
       description: Array of aggregated fees, grouped by the event properties defined in a `standard` charge model.
-      required:
-        - amount_cents
-        - events_count
-        - units
-        - total_aggregated_units
-        - grouped_by
-        - groups
       items:
         type: object
+        required:
+          - amount_cents
+          - events_count
+          - units
+          - total_aggregated_units
+          - grouped_by
+          - filters
         properties:
           amount_cents:
             type: integer
@@ -28739,22 +28692,22 @@ components:
     CustomerUsage:
       type: object
       required:
-        - Customer Usage
+        - customer_usage
       properties:
         customer_usage:
           $ref: '#/components/schemas/CustomerUsageObject'
     CustomerProjectedChargeFiltersUsageObject:
       type: array
       description: Array of filter object, representing multiple dimensions for a charge item.
-      required:
-        - values
-        - units
-        - projected_units
-        - events_count
-        - amount_cents
-        - projected_amount_cents
       items:
         type: object
+        required:
+          - values
+          - units
+          - projected_units
+          - events_count
+          - amount_cents
+          - projected_amount_cents
         properties:
           units:
             type: string
@@ -28801,16 +28754,16 @@ components:
     CustomerProjectedChargeGroupedUsageObject:
       type: array
       description: Array of aggregated fees, grouped by the event properties defined in a `standard` charge model.
-      required:
-        - amount_cents
-        - projected_amount_cents
-        - events_count
-        - units
-        - projected_units
-        - grouped_by
-        - groups
       items:
         type: object
+        required:
+          - amount_cents
+          - projected_amount_cents
+          - events_count
+          - units
+          - projected_units
+          - grouped_by
+          - filters
         properties:
           amount_cents:
             type: integer
@@ -28858,7 +28811,7 @@ components:
         - amount_currency
         - charge
         - feature
-        - groups
+        - grouped_usage
       properties:
         units:
           type: string
@@ -29114,7 +29067,7 @@ components:
     PaymentMethodsPaginated:
       type: object
       required:
-        - Payment Methods
+        - payment_methods
         - meta
       properties:
         payment_methods:
@@ -29217,7 +29170,7 @@ components:
     EventsPaginated:
       type: object
       required:
-        - Events
+        - events
         - meta
       properties:
         events:
@@ -29654,36 +29607,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CostIntelligenceProcessingConflict'
-    CostIntelligenceSourceReplayInput:
-      type: object
-      required:
-        - source_type
-        - source_external_id
-      properties:
-        source_type:
-          type: string
-          enum:
-            - feature_event
-            - cost_event
-        source_external_id:
-          type: string
-          description: Feature Event `transaction_id` or Cost Event `cost_event_id`.
-    CostIntelligenceProjectionReplayInput:
-      type: object
-      required:
-        - ledger_entry_id
-      properties:
-        ledger_entry_id:
-          type: string
-          format: uuid
-    CostIntelligenceReplayResult:
-      type: object
-      required:
-        - status
-      properties:
-        status:
-          type: string
-          example: queued
     EventInput:
       type: object
       required:
@@ -29717,7 +29640,7 @@ components:
     EventsCreated:
       type: object
       required:
-        - Events
+        - events
       properties:
         events:
           type: array
@@ -29755,7 +29678,7 @@ components:
     Fees:
       type: object
       required:
-        - Fees
+        - fees
       properties:
         fees:
           type: array
@@ -29991,7 +29914,7 @@ components:
     FeesEstimate:
       type: object
       required:
-        - Fees
+        - fees
       properties:
         fees:
           type: array
@@ -30000,7 +29923,7 @@ components:
     EventBatchEstimateInstantFeesInput:
       type: object
       required:
-        - Events
+        - events
       properties:
         events:
           type: array
@@ -30016,7 +29939,7 @@ components:
     FeesPaginated:
       type: object
       required:
-        - Fees
+        - fees
         - meta
       properties:
         fees:
@@ -30060,7 +29983,7 @@ components:
           type: object
           required:
             - external_customer_id
-            - Fees
+            - fees
           properties:
             external_customer_id:
               type: string
@@ -30726,6 +30649,18 @@ components:
           type: string
           example: ORG-1234
           description: Sets the prefix for invoices and credit notes. Default is the first three letters of your organization name plus the last four digits of your organization ID. Customizable within 1-10 characters, and automatically capitalized by Nozle.
+        email_settings:
+          type: array
+          description: The documents Nozle sends by email for your organization.
+          example:
+            - invoice.finalized
+            - credit_note.created
+          items:
+            type: string
+            enum:
+              - invoice.finalized
+              - credit_note.created
+              - payment_receipt.created
         net_payment_term:
           type: integer
           example: 30
@@ -30804,7 +30739,7 @@ components:
     PaymentReceiptsPaginated:
       type: object
       required:
-        - Payment Receipts
+        - payment_receipts
         - meta
       properties:
         payment_receipts:
@@ -33012,7 +32947,7 @@ components:
     PlanEntitlements:
       type: object
       required:
-        - Entitlements
+        - entitlements
       properties:
         entitlements:
           type: array
@@ -33021,7 +32956,7 @@ components:
     EntitlementUpdateInput:
       type: object
       required:
-        - Entitlements
+        - entitlements
       properties:
         entitlements:
           type: object
@@ -33976,7 +33911,7 @@ components:
     Alerts:
       type: object
       required:
-        - Alerts
+        - alerts
       properties:
         alerts:
           type: array
@@ -34020,7 +33955,7 @@ components:
     AlertBatchCreateInput:
       type: object
       required:
-        - Alerts
+        - alerts
       properties:
         alerts:
           type: array
@@ -34188,7 +34123,7 @@ components:
     SubscriptionEntitlements:
       type: object
       required:
-        - Entitlements
+        - entitlements
       properties:
         entitlements:
           type: array
@@ -34528,7 +34463,7 @@ components:
     WalletTransactions:
       type: object
       required:
-        - Wallet Transactions
+        - wallet_transactions
       properties:
         wallet_transactions:
           type: array
@@ -34537,14 +34472,16 @@ components:
     WalletTransactionPaymentUrl:
       type: object
       required:
-        - wallet_transaction_id
-        - customer_id
-        - external_customer_id
-        - payment_provider
-      description: .
+        - wallet_transaction_payment_details
       properties:
         wallet_transaction_payment_details:
           type: object
+          required:
+            - wallet_transaction_id
+            - customer_id
+            - external_customer_id
+            - payment_provider
+            - payment_url
           properties:
             customer_id:
               type: string
@@ -35192,6 +35129,9 @@ components:
             - cashfree
             - gocardless
             - stripe
+            - razorpay
+            - flutterwave
+            - moneyhash
           description: The type of payment provider
           example: stripe
         payment_provider_code:
@@ -35295,6 +35235,9 @@ components:
             - cashfree
             - gocardless
             - stripe
+            - razorpay
+            - flutterwave
+            - moneyhash
           description: The type of payment provider code
           example: stripe
         payment_provider_code:
@@ -35468,6 +35411,9 @@ components:
             - cashfree
             - gocardless
             - stripe
+            - razorpay
+            - flutterwave
+            - moneyhash
           description: The type of payment provider code
           example: stripe
         payment_provider_code:
@@ -35597,6 +35543,10 @@ components:
             - cashfree
             - gocardless
             - stripe
+            - razorpay
+            - flutterwave
+            - moneyhash
+            - null
           description: The type of payment provider code
           example: stripe
         payment_provider_code:
@@ -35687,6 +35637,9 @@ components:
             - cashfree
             - gocardless
             - stripe
+            - razorpay
+            - flutterwave
+            - moneyhash
           description: The type of payment provider code
           example: stripe
         payment_provider_code:
