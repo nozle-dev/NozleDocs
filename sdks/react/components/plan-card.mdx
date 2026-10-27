@@ -105,26 +105,20 @@ export function ProCard() {
 
 ### Live data
 
-Read the plans with [`usePlans`](/sdks/react/hooks#useplans) inside `BillingProvider`, and start checkout with [`useCheckoutSession`](/sdks/react/hooks#usecheckoutsession), which calls the provider's `createCheckout`:
+Read the plans with [`usePlans`](/sdks/react/hooks#useplans) inside `BillingProvider`, and start checkout with [`useCheckoutSession`](/sdks/react/hooks#usecheckoutsession), which calls the provider's `createCheckout` and redirects to the Stripe-hosted page:
 
 ```tsx
-import { useState } from 'react'
-import { Checkout, useCheckoutSession, usePlans } from '@nozle-js/react'
+import { useCheckoutSession, usePlans } from '@nozle-js/react'
 
 export function PlanCards({ currentPlanCode }: { currentPlanCode: string }) {
   const { plans } = usePlans()
   const { fetchClientSecret } = useCheckoutSession()
-  const [clientSecret, setClientSecret] = useState<string | null>(null)
-
-  if (clientSecret) {
-    return <Checkout clientSecret={clientSecret} publishableKey="pk_live_stripe..." />
-  }
   return plans.map((plan) => (
     <PlanCard
       key={plan.code}
       plan={plan}
       isCurrent={plan.code === currentPlanCode}
-      onSelect={({ planCode, returnUrl }) => void fetchClientSecret(planCode, returnUrl).then(setClientSecret)}
+      onSelect={({ planCode, returnUrl }) => void fetchClientSecret(planCode, returnUrl)}
     />
   ))
 }

@@ -60,14 +60,13 @@ Render it inside a `BillingProvider` with `createCheckout` (see [Configure Billi
 ```tsx components/upgrade-to-scale.tsx
 import { useBillingRefresh } from '@nozle-js/react'
 
-export function UpgradeToScale({ onClientSecret }: { onClientSecret: (secret: string) => void }) {
+export function UpgradeToScale() {
   const refresh = useBillingRefresh()
   return (
     <UpgradeButton
       planCode="scale"
       label="Upgrade to Scale"
       subscriptionId="sub_123"
-      onStripeClientSecret={onClientSecret}
       onUpgraded={() => void refresh()}
       onDowngradeScheduled={() => void refresh()}
       onError={(error) => console.error(error.message)}
@@ -78,9 +77,9 @@ export function UpgradeToScale({ onClientSecret }: { onClientSecret: (secret: st
 
 ### What a confirm does
 
-The button calls `createCheckout` with the plan code, return URL and the `subscriptionId`, `quoteId` and `idempotencyKey` you pass, then handles every checkout result: Stripe client secret, Razorpay, hosted, processing, completed and scheduled. The dialog closes and:
+The button calls `createCheckout` with the plan code, return URL and the `subscriptionId`, `quoteId` and `idempotencyKey` you pass, then handles every checkout result: hosted (Stripe), Razorpay, processing, completed and scheduled. A hosted result redirects the browser to the Stripe-hosted page. The dialog closes and:
 
-- calls `onCheckoutStarted` after a Stripe client secret was handed to `onStripeClientSecret`,
+- calls `onCheckoutStarted` when the browser is sent to the Stripe-hosted page,
 - calls `onUpgraded` when the change completed, or a Razorpay payment was captured,
 - calls `onDowngradeScheduled` for a `scheduled` result.
 
@@ -175,12 +174,8 @@ export function UpgradeToScale() {
   Sent to `createCheckout`. Defaults to the current URL.
 </ResponseField>
 
-<ResponseField name="onStripeClientSecret" type="(clientSecret: string) => void">
-  Fires for an embedded Stripe checkout and receives its client secret; render [`Checkout`](/sdks/react/components/checkout) with it. Without it the dialog closes and the secret is not used.
-</ResponseField>
-
 <ResponseField name="onCheckoutStarted" type="() => void">
-  Fires after a Stripe client secret was handed over. The dialog closes.
+  Fires when the browser is sent to the Stripe-hosted page. The dialog closes.
 </ResponseField>
 
 <ResponseField name="onUpgraded" type="() => void">
@@ -238,6 +233,6 @@ export function UpgradeToScale() {
     Checkout without a confirmation step.
   </Card>
   <Card title="Checkout" icon="credit-card" href="/sdks/react/components/checkout">
-    The Stripe payment step.
+    The pay button for a checkout result.
   </Card>
 </CardGroup>

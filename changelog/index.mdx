@@ -5,6 +5,16 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Breaking: Stripe checkout is hosted only (Core 11.4.0, Engine 2.12.0)
+
+_Unreleased_
+
+- **Breaking: every Stripe checkout is a Stripe-hosted Checkout Session.** A new subscription's first invoice, an invoice checkout, a paid plan change, the Entity subscription batch and the retry of a first invoice (`POST /invoices/{id}/retry_payment`) answer `{"type": "hosted", "url", "payment_url", "checkout_id", "invoice_id" or "plan_upgrade_intent_id", "amount_cents", "currency", "expires_at"}`. Redirect the customer to `url`. Embedded Stripe Checkout, the `stripe` result type and every `client_secret` and `clientSecret` are removed. No Stripe publishable key and no Stripe.js are needed on your page. A saved card is still charged first (`completed`, `processing` and `scheduled` results are unchanged), and Razorpay is unchanged. See [Checkout](/guides/billing/checkout#stripe) and [Create checkout](/api/create-checkout#hosted-stripe-result).
+- **`cancel_url` and `{CHECKOUT_SESSION_ID}`.** Checkout accepts `cancel_url`, validated like `return_url` and defaulting to it. A return URL may contain the literal `{CHECKOUT_SESSION_ID}`, which Stripe replaces with the Checkout Session ID. A refused `cancel_url` answers `400 invalid_return_url`.
+- **Status poll.** `GET /checkout/{id}` returns the hosted result while the session is open, then `completed`, and `expired` when the session is gone. Nozle sends Adaptive Pricing disabled so the customer is charged in the invoice currency.
+- **React SDK:** the components redirect to the hosted page, so `onStripeClientSecret` and the Stripe peer dependencies (`@stripe/stripe-js`, `@stripe/react-stripe-js`) go away. Self-hosters run `payment_providers:refresh_stripe_webhook_events` once for the new refund events.
+- **Receipt link.** GraphQL `Payment.receiptUrl` returns Stripe's receipt page for a payment, fetched from Stripe on demand and never stored. See [Payments](/guides/billing/payments).
+
 ### Workspace billing: card at onboarding, failed payments, suspension on day 7 (Core 11.2.0 to 11.3.0, Engine 2.11.0)
 
 _Unreleased_

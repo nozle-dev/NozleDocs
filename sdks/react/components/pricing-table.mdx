@@ -92,8 +92,7 @@ With `onSelect`, a click calls it with the plan and nothing else. Without it, th
 
 - opens Razorpay for a `razorpay` result (with the provider's `verifyCheckout`),
 - shows "Payment is processing. Confirmation may take a little while." and polls with `getCheckoutStatus` for a `processing` result,
-- redirects to the URL of a `hosted` result or a result with `url`,
-- passes the secret of a `stripe` result to `onStripeClientSecret`,
+- redirects to the URL of a `hosted` result (every Stripe checkout) or a result with `url`,
 - does nothing more for `completed` and `scheduled` results; read them in `onCheckoutResult`.
 
 See [checkout result types](/sdks/react/hooks#checkout-result-types).
@@ -165,7 +164,7 @@ async function createCheckout(input: { planCode: string; returnUrl: string }): P
   return response.json()
 }
 
-export function PricingPage({ onClientSecret }: { onClientSecret: (secret: string) => void }) {
+export function PricingPage() {
   return (
     <BillingProvider publishableKey="pk_nozle_..." createCheckout={createCheckout}>
       <PricingTable
@@ -174,7 +173,6 @@ export function PricingPage({ onClientSecret }: { onClientSecret: (secret: strin
         highlightPlan="pro"
         contactSalesPlans={['enterprise']}
         enterpriseEmail="sales@example.com"
-        onStripeClientSecret={onClientSecret}
         onCheckoutError={(error) => console.error(error.message)}
       />
     </BillingProvider>
@@ -336,10 +334,6 @@ When the catalog request fails, the table shows the reason instead of the cards.
   Fires for every result `createCheckout` returns, before the table handles it, and receives that result.
 </ResponseField>
 
-<ResponseField name="onStripeClientSecret" type="(clientSecret: string) => void">
-  Fires for an embedded Stripe checkout and receives its client secret; render [`Checkout`](/sdks/react/components/checkout) with it. Without it a Stripe result shows "onStripeClientSecret is required for embedded Stripe checkout".
-</ResponseField>
-
 <ResponseField name="onCheckoutError" type="(error: Error) => void">
   Fires when checkout fails and receives the error. The message also shows above the cards. Catalog load errors are not passed to it.
 </ResponseField>
@@ -381,7 +375,7 @@ The table shows [Powered by Nozle](/sdks/react/components/powered-by-nozle) belo
     The plans side by side, feature by feature.
   </Card>
   <Card title="Checkout" icon="credit-card" href="/sdks/react/components/checkout">
-    Collects the payment for a Stripe client secret.
+    The pay button for a checkout result.
   </Card>
   <Card title="Appearance" icon="palette" href="/sdks/react/styling">
     Themes, variables and element overrides.

@@ -1,16 +1,15 @@
 ---
 title: "Checkout"
-description: "The payment step: Stripe Embedded Checkout or Payment Element for a client secret, or a pay button for any other checkout result."
-keywords: ["checkout", "stripe", "payment element", "embedded checkout", "react"]
+description: "The payment step for a checkout result: a pay button that redirects to the Stripe-hosted page or opens Razorpay."
+keywords: ["checkout", "stripe", "hosted checkout", "react"]
 ---
 
-`Checkout` renders the payment step of a checkout your backend created: Stripe's form for a client secret, or a pay button for a checkout result.
+`Checkout` renders the payment step of a checkout your backend created: a pay button that sends the customer to Stripe's hosted page, or opens Razorpay. It has no card form and needs no Stripe packages or publishable key.
 
 **When to use**
 
-- The step after [`CheckoutButton`](/sdks/react/components/checkout-button) or [`PricingTable`](/sdks/react/components/pricing-table) returns a Stripe client secret.
 - A payment page that resumes a checkout your backend already created.
-- A pay button for a Razorpay, hosted or processing checkout, with or without `BillingProvider`.
+- A pay button for a hosted (Stripe), Razorpay or processing checkout, with or without `BillingProvider`.
 
 `Checkout` does not need `BillingProvider`.
 
@@ -47,7 +46,7 @@ keywords: ["checkout", "stripe", "payment element", "embedded checkout", "react"
   </Tab>
 </Tabs>
 
-The screenshots show the pay button of a checkout result. Stripe's own form takes its look from Stripe and is not shown.
+The screenshots show the pay button of a checkout result. Stripe's hosted page takes its look from your Stripe branding.
 
 ## Importing Checkout
 
@@ -61,31 +60,27 @@ import {
 
 ## Rendering Checkout
 
-Pass a Stripe client secret and your Stripe publishable key:
+Pass the `checkout` result your backend returned. For a `hosted` Stripe result the button redirects the browser to its `url`:
 
 ```tsx components/pay-step.tsx
-export function PayStep({ clientSecret }: { clientSecret: string }) {
+export function PayStep({ result }: { result: CheckoutResult }) {
   return (
     <Checkout
-      clientSecret={clientSecret}
-      publishableKey="pk_live_stripe..."
-      returnUrl="https://app.example.com/settings/billing"
-      onSuccess={(paymentIntentId) => console.log('paid', paymentIntentId)}
+      checkout={result}
+      submitLabel="Pay $29.00"
       onError={(error) => console.error(error.message)}
     />
   )
 }
 ```
 
-A `cs_` Checkout Session secret, which Nozle returns for plan and invoice checkout, mounts Stripe Embedded Checkout. Any other Stripe secret mounts Payment Element, themed from your `appearance`, with a loading placeholder and its own submit button.
-
 <Warning>
-Stripe webhooks decide whether the subscription is active. `onSuccess`, `onComplete` and the return page are interface signals; reload billing status before you show success.
+Stripe webhooks decide whether the subscription is active. The return page and `onComplete` are interface signals; reload billing status before you show success.
 </Warning>
 
 ## Data
 
-`Checkout` takes either a Stripe client secret or a `checkout` result in the `CheckoutResult` shape that `createCheckout` returns:
+`Checkout` takes a `checkout` result in the `CheckoutResult` shape that `createCheckout` returns:
 
 ```tsx
 const result: CheckoutResult = {
@@ -106,26 +101,13 @@ See [checkout result types](/sdks/react/hooks#checkout-result-types).
 
 ### Live data
 
-The client secret comes from `onStripeClientSecret` of [`CheckoutButton`](/sdks/react/components/checkout-button), [`PricingTable`](/sdks/react/components/pricing-table) or [`UpgradeButton`](/sdks/react/components/upgrade-button), or from `fetchClientSecret` of [`useCheckoutSession`](/sdks/react/hooks#usecheckoutsession). Your Stripe publishable key is your own; Nozle does not return it.
-
-```tsx
-import { useState } from 'react'
-import { CheckoutButton } from '@nozle-js/react'
-
-export function BuyPro() {
-  const [clientSecret, setClientSecret] = useState<string | null>(null)
-  if (clientSecret) return <Checkout clientSecret={clientSecret} publishableKey="pk_live_stripe..." />
-  return <CheckoutButton planCode="pro" onStripeClientSecret={setClientSecret} />
-}
-```
-
-A `stripe` result passed as `checkout` is mounted with Stripe only when it carries a client secret and `publishable_key`. Nozle does not return `publishable_key`, so pass a Stripe client secret with `clientSecret` and `publishableKey` instead; a `stripe` result without them shows "Payment setup is incomplete. Contact support to continue."
+The result comes from your `createCheckout` backend call. [`CheckoutButton`](/sdks/react/components/checkout-button), [`PricingTable`](/sdks/react/components/pricing-table) and [`UpgradeButton`](/sdks/react/components/upgrade-button) already redirect for a `hosted` result, so you usually do not render `Checkout` yourself.
 
 ## Examples
 
 ### Pay button for a checkout result
 
-With `checkout`, the component renders a pay button that handles Razorpay, hosted, processing, completed and scheduled results. It reads `verifyCheckout` and `getCheckoutStatus` from its props first (React `0.10.0` and later), then from `BillingProvider`.
+With `checkout`, the component renders a pay button that handles hosted (Stripe), Razorpay, processing, completed and scheduled results. It reads `verifyCheckout` and `getCheckoutStatus` from its props first (React `0.10.0` and later), then from `BillingProvider`.
 
 <Frame>
   <img src="/images/react/components/checkout/light.png" alt="Checkout pay button for a checkout result, labelled Pay $29.00, light theme" width="154" />
@@ -156,91 +138,9 @@ export function ResumePayment({ result }: { result: CheckoutResult }) {
 }
 ```
 
-### Your own pay button
-
-To place your own pay button in the Payment Element form, pass it as `children` and call `useCheckout()` in it. `children` replaces the built-in submit button.
-
-```tsx
-function PayButton() {
-  const { confirmPayment, isProcessing, error } = useCheckout()
-  return (
-    <>
-      <button type="button" onClick={() => void confirmPayment()} disabled={isProcessing}>
-        {isProcessing ? 'Paying…' : 'Pay now'}
-      </button>
-      {error && <p role="alert">{error.message}</p>}
-    </>
-  )
-}
-
-export function CustomPay({ clientSecret }: { clientSecret: string }) {
-  return (
-    <Checkout clientSecret={clientSecret} publishableKey="pk_live_stripe...">
-      <PayButton />
-    </Checkout>
-  )
-}
-```
-
 ## API reference
 
-`Checkout` takes one of two sets of props.
-
-### With a Stripe client secret
-
-<ResponseField name="clientSecret" type="string" required>
-  The Stripe client secret. A `cs_` Checkout Session secret mounts Embedded Checkout; any other secret mounts Payment Element.
-</ResponseField>
-
-<ResponseField name="publishableKey" type="string" required>
-  Your Stripe publishable key.
-</ResponseField>
-
-<ResponseField name="stripeAccount" type="string">
-  Stripe Connect account ID passed to Stripe.
-</ResponseField>
-
-<ResponseField name="returnUrl" type="string">
-  Where Stripe returns the customer after a payment that needs a redirect (Payment Element). Defaults to the current URL.
-</ResponseField>
-
-<ResponseField name="submitLabel" type="string" default="Pay now">
-  Text of the Payment Element submit button. It reads "Processing..." while the payment is confirmed.
-</ResponseField>
-
-<ResponseField name="onSuccess" type="(paymentIntentId: string) => void">
-  Payment Element only. Fires when the PaymentIntent succeeds without a redirect and receives its ID.
-</ResponseField>
-
-<ResponseField name="onComplete" type="() => void">
-  Embedded Checkout only. Fires when the session completes without a redirect. It does not fire when the session redirects to its return URL, which is how Nozle creates sessions.
-</ResponseField>
-
-<ResponseField name="onError" type="(error: Error) => void">
-  Fires when the payment fails and receives Stripe's error, or "Payment could not be confirmed. Check its status before retrying." when confirming throws. The message also shows under the form.
-</ResponseField>
-
-<ResponseField name="onReady" type="() => void">
-  Payment Element only. Fires when the form can be used; a loading placeholder shows until then.
-</ResponseField>
-
-<ResponseField name="children" type="ReactNode">
-  Payment Element only. Replaces the submit button. Call `useCheckout()` inside it. Defaults to a submit button.
-</ResponseField>
-
-<ResponseField name="className" type="string">
-  Class name on the root element.
-</ResponseField>
-
-<ResponseField name="style" type="CSSProperties">
-  Inline styles on the root element.
-</ResponseField>
-
-<ResponseField name="appearance" type="Appearance">
-  Theme for the wrapper, also mapped onto Payment Element: primary, background, text and danger colours, corner radius and font. A dark card colour picks Stripe's `night` theme. Embedded Checkout uses the branding of your Stripe account. Defaults to the provider's.
-</ResponseField>
-
-### With a checkout result
+## Props
 
 <ResponseField name="checkout" type="CheckoutResult" required>
   A result from `createCheckout` or from a checkout status call.
@@ -251,7 +151,7 @@ export function CustomPay({ clientSecret }: { clientSecret: string }) {
 </ResponseField>
 
 <ResponseField name="returnUrl" type="string">
-  Passed on to Stripe when the result is mounted with Stripe. Defaults to the current URL.
+  Unused for a `hosted` result: the return URL was set when your backend created the checkout.
 </ResponseField>
 
 <ResponseField name="verifyCheckout" type="(checkoutId, verification) => Promise<CheckoutStatus>">
@@ -290,33 +190,15 @@ export function CustomPay({ clientSecret }: { clientSecret: string }) {
   Theme, variables and element overrides. Defaults to the provider's. See [Appearance](/sdks/react/styling).
 </ResponseField>
 
-### `useCheckout`
-
-Call `useCheckout()` only inside `children` of the Payment Element form; it throws outside `Checkout`. It is not [`useCheckoutSession`](/sdks/react/hooks#usecheckoutsession), which creates a checkout.
-
-<ResponseField name="confirmPayment" type="() => Promise<void>">
-  Confirms the payment.
-</ResponseField>
-
-<ResponseField name="isProcessing" type="boolean">
-  `true` while the payment is confirmed.
-</ResponseField>
-
-<ResponseField name="error" type="Error | null">
-  The last payment error.
-</ResponseField>
-
 ### States
 
 | State | What shows |
 |---|---|
-| Payment Element loading | A loading placeholder until the form can be used. |
-| Confirming the payment | "Processing..." on the submit button, or "Processing…" on the pay button. |
+| Redirecting | "Processing…" on the pay button until the browser leaves for Stripe. |
 | Waiting for payment confirmation | "Payment is processing. Confirmation may take a little while." |
 | Payment failed | The error message under the form or button. |
-| `stripe` result without client secret and `publishable_key` | "Payment setup is incomplete. Contact support to continue." |
 
-`Checkout` shows [Powered by Nozle](/sdks/react/components/powered-by-nozle) below the form, unless it is inside another component that already shows it.
+`Checkout` shows [Powered by Nozle](/sdks/react/components/powered-by-nozle) below the button, unless it is inside another component that already shows it.
 
 ### Appearance
 
@@ -330,13 +212,13 @@ Call `useCheckout()` only inside `children` of the Payment Element form; it thro
 
 <CardGroup cols={2}>
   <Card title="CheckoutButton" icon="cart-shopping" href="/sdks/react/components/checkout-button">
-    Starts checkout and returns the client secret.
+    Starts checkout and redirects to the hosted page.
   </Card>
   <Card title="PlanChangeControl" icon="arrows-rotate" href="/sdks/react/components/plan-change-control">
     Renders Checkout for a paid upgrade.
   </Card>
   <Card title="Stripe" icon="stripe" href="/integrations/stripe">
-    Connect Stripe to Nozle.
+    Stripe-hosted checkout and webhooks.
   </Card>
   <Card title="Razorpay" icon="indian-rupee-sign" href="/integrations/razorpay">
     Connect Razorpay to Nozle.

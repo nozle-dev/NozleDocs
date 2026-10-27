@@ -146,20 +146,17 @@ The publishable key is public, so every field it receives, including charges, ta
 Calls `BillingProvider.createCheckout` with a plan code and return URL.
 
 ```tsx
-import { Checkout, useCheckoutSession } from '@nozle-js/react'
+import { useCheckoutSession } from '@nozle-js/react'
 
 function BuyProButton() {
   const { fetchClientSecret, checkout, isLoading, error } = useCheckoutSession()
 
   async function startCheckout() {
-    const clientSecret = await fetchClientSecret(
+    // A Stripe checkout is a hosted page: the hook redirects the browser to it.
+    await fetchClientSecret(
       'pro',
       'https://app.example.com/settings/billing',
     )
-
-    if (clientSecret) {
-      // Render <Checkout clientSecret={clientSecret} ... />
-    }
   }
 
   return (
@@ -178,13 +175,13 @@ function BuyProButton() {
 
 `fetchClientSecret` passes only `planCode` and `returnUrl` to `createCheckout`. It sends no idempotency key; use `CheckoutButton` when you need one.
 
-The hook returns a string only for a Stripe client secret. For a `hosted` result (or a result with a `url`), it navigates to the URL and returns `null`. For `completed`, `scheduled`, `razorpay`, and `processing` results it returns `null` without opening Razorpay or polling; read the result from `checkout` and handle it yourself, for example with `Checkout`'s `checkout` prop. Any other result throws `Checkout response did not include a supported result type`.
+`fetchClientSecret` keeps its name for compatibility, but there is no client secret any more. For a `hosted` result (every Stripe checkout, or any result with a `url`), it navigates to the URL and returns `null`. For `completed`, `scheduled`, `razorpay`, and `processing` results it returns `null` without opening Razorpay or polling; read the result from `checkout` and handle it yourself, for example with `Checkout`'s `checkout` prop. Any other result throws `Checkout response did not include a supported result type`.
 
 ### Return value
 
 | Field | Type | Description |
 |---|---|---|
-| `fetchClientSecret` | `(planCode, returnUrl?) => Promise<string \| null>` | Starts checkout and returns an embedded Stripe secret when present. |
+| `fetchClientSecret` | `(planCode, returnUrl?) => Promise<string \| null>` | Starts checkout. Redirects for a hosted Stripe result and resolves to `null`. |
 | `checkout` | `CheckoutResult \| null` | Most recent raw checkout result. |
 | `isLoading` | `boolean` | Whether checkout creation is in progress. |
 | `error` | `Error \| null` | Most recent checkout error. |
@@ -244,9 +241,8 @@ Prefer `useBillingContext` or `useOptionalBillingContext` in application compone
 
 | Result | Shape | Component behavior |
 |---|---|---|
-| Stripe | `{ type: 'stripe', client_secret }` (also `clientSecret`) | Plan and invoice checkout return an embedded Checkout Session client secret (`cs_`), never a Stripe URL. `CheckoutButton` passes it to `onStripeClientSecret`. |
 | Razorpay | `{ type: 'razorpay', checkout_id, key_id, order_id, amount_cents, currency }` | Loads `https://checkout.razorpay.com/v1/checkout.js`, calls `verifyCheckout`, then polls `getCheckoutStatus`. |
-| Hosted | `{ type: 'hosted', payment_url }` | Redirects with `location.assign`. The URL must use HTTPS. `POST /checkout` never returns it for Razorpay, so your `createCheckout` only sees it if your backend forwards a payment link. |
+| Hosted (Stripe) | `{ type: 'hosted', url, payment_url, checkout_id, invoice_id, amount_cents, currency, expires_at }` | Redirects with `location.assign` to `url`. The URL must use HTTPS. Every Stripe checkout returns it; a saved card is charged first and then you get `completed` instead. No Stripe key or package is needed. |
 | Processing | `{ type: 'processing', checkout_id, status }` | Polls `getCheckoutStatus`, which is required. Razorpay returns it while an order is not ready or after it expired, and Stripe returns it for a replayed quoted upgrade whose webhook is still pending. |
 | Completed | `{ type: 'completed', ... }` | Calls `onComplete`. |
 | Scheduled | `{ type: 'scheduled', ... }` | Calls `onScheduled`. |
@@ -259,8 +255,5 @@ Polling calls `getCheckoutStatus` up to 30 times, one second apart, until both `
 |---|---|
 | `Checkout URL must use HTTPS` | A `hosted` `payment_url` (or `url`) is not HTTPS. |
 | `Checkout response did not include a supported result type` | `useCheckoutSession` received an unknown result. |
-| `onStripeClientSecret is required for embedded Stripe checkout` | `CheckoutButton` received a Stripe client secret without the callback. |
-
-The components also accept `{ type: 'stripe', url }` and a legacy `{ url }`, and redirect to them. Plan and invoice checkout do not return either; they return a client secret.
 
 Stripe webhooks remain authoritative. A browser redirect or completion callback does not activate a paid plan by itself.

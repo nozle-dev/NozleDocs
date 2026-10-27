@@ -14,7 +14,7 @@ Available in **`@nozle-js/react` `0.10.2`**, **`@nozle-js/node` `0.10.0`**, **`n
 ## Install
 
 ```bash
-npm install @nozle-js/react@0.11.0 @tanstack/react-query react react-dom @stripe/stripe-js @stripe/react-stripe-js
+npm install @nozle-js/react@0.11.0 @tanstack/react-query react react-dom
 ```
 
 On your Node.js merchant backend:
@@ -47,7 +47,7 @@ flowchart LR
   Portal -->|Scoped GraphQL reads| Core[Nozle Core]
 ```
 
-Your backend authenticates the user and chooses the Nozle customer. The browser sends the selected **external subscription ID**, and your backend and Nozle validate its ownership. Provider secret keys stay in Nozle's saved connection. Embedded Stripe can also require its matching public key.
+Your backend authenticates the user and chooses the Nozle customer. The browser sends the selected **external subscription ID**, and your backend and Nozle validate its ownership. Provider secret keys stay in Nozle's saved connection. A Stripe payment opens on a Stripe-hosted page, so no Stripe key is needed in the browser.
 
 Portal reads use a customer-scoped session issued by your backend. Subscription changes use authenticated merchant callbacks. `BillingPortal` requires neither `BillingProvider` nor Tailwind.
 

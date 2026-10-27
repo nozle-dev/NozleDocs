@@ -21,7 +21,7 @@ export async function exerciseNodeSdk() {
     'pro_monthly',
     'https://app.example.com/settings/billing',
   );
-  if (checkout.type === 'stripe') checkout.url;
+  if (checkout.type === 'hosted') checkout.payment_url; // same value as url
 
   await nozle.subscribe('workspace_123', 'free');
   await nozle.cancelSubscription('workspace_123', 'subscription_123');

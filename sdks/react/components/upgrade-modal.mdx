@@ -58,7 +58,7 @@ Keep the open state yourself and close the dialog in its callbacks. Without `onS
 ```tsx components/upgrade-flow.tsx
 import { useState } from 'react'
 
-export function UpgradeFlow({ onClientSecret }: { onClientSecret: (secret: string) => void }) {
+export function UpgradeFlow() {
   const [open, setOpen] = useState(false)
   const close = () => setOpen(false)
   return (
@@ -68,7 +68,6 @@ export function UpgradeFlow({ onClientSecret }: { onClientSecret: (secret: strin
         isOpen={open}
         planCode="scale"
         onCancel={close}
-        onStripeClientSecret={onClientSecret}
         onCheckoutStarted={close}
         onCompleted={close}
         onScheduled={close}
@@ -84,7 +83,7 @@ The dialog moves focus in on open and back on close, traps focus, and closes on 
 
 With `onSubmit`, confirm runs your action. Without it, confirm calls `createCheckout` with the plan code, return URL and the `subscriptionId`, `quoteId` and `idempotencyKey` you pass, then handles the result:
 
-- a Stripe client secret goes to `onStripeClientSecret`, then `onCheckoutStarted` fires,
+- a hosted Stripe result redirects the browser to the Stripe-hosted page, then `onCheckoutStarted` fires,
 - a completed change or a captured Razorpay payment fires `onCompleted`,
 - a `scheduled` result fires `onScheduled`,
 - a `processing` result shows "Payment is processing. Confirmation may take a little while." in the dialog.
@@ -262,12 +261,8 @@ export function ConfirmStep({ open, back, close }: { open: boolean; back: () => 
   Sent to `createCheckout`. Defaults to the current URL.
 </ResponseField>
 
-<ResponseField name="onStripeClientSecret" type="(clientSecret: string) => void">
-  Fires for an embedded Stripe checkout and receives its client secret.
-</ResponseField>
-
 <ResponseField name="onCheckoutStarted" type="() => void">
-  Fires after the Stripe client secret was handed over.
+  Fires when the browser is sent to the Stripe-hosted page.
 </ResponseField>
 
 <ResponseField name="onCompleted" type="() => void">
