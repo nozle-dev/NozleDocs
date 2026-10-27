@@ -5,6 +5,17 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Workspace billing: card at onboarding, failed payments, suspension on day 7 (Core 11.2.0 to 11.3.0, Engine 2.11.0)
+
+_Unreleased_
+
+- **Every workspace adds a card at onboarding.** The card is verified on a Stripe-hosted page and nothing is charged. Until it is saved, dashboard calls answer `402` `card_required`. See [Workspace billing](/guides/getting-started/workspace-billing).
+- **Automatic upgrades run every hour** and charge the prorated invoice to the saved card at once. Members get emails at 50%, 80%, 90% and 100% of the included events or MRR limit.
+- **Failed Nozle invoices are retried on days 1 to 6.** Every member gets an email on day 0, a reminder on day 3 and a last reminder on day 6, with a pay link that needs no login, and the dashboard shows a banner.
+- **Suspension on day 7.** A workspace with unpaid Nozle invoices gets `402` `workspace_suspended` on events, `/can`, the Engine API, the LLM proxy, REST API keys, the account MCP and Copilot, and the dashboard shows only the Nozle invoices page. Webhooks, the customer portal and payment pages keep working. Events sent during the suspension are refused, not queued. See [Errors](/api/errors#workspace-billing-errors) and [The can() endpoint](/guides/entitlements/can-endpoint#unavailable-or-blocked).
+- **Resume when the invoices are paid**, then the time your own customers were not billed is billed with the original periods.
+- **Stripe refund events.** Webhook endpoints created by Nozle subscribe to `refund.updated` and `refund.failed`. The older `charge.refund.updated` is still accepted for one release. See [Stripe](/integrations/stripe#webhook-setup).
+
 ### Plan version migrations ask before raising a price (Core)
 
 _Unreleased_

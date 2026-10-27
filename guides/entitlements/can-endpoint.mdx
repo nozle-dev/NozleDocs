@@ -165,3 +165,12 @@ The Node (0.17.0), Python (`nozle-sdk` 0.17.0) and React (`useEntitlement`, 0.16
 If usage cannot be read reliably, the hosted API returns HTTP `503` with a structured error and request ID, without an access decision. Treat it as unavailable; do not convert the failure into `allowed: true` or zero usage. Use bounded retries within your request budget and retain the request ID for support.
 
 Entitlement configuration refresh is approximately once per minute. A plan or quota edit may take that interval to appear in `can()` results. Usage projections are asynchronous, and a separate `can()` followed by `track()` does not reserve quota atomically. Use [Track and Consume Credits](/api/usage-track) for atomic product-credit consumption.
+
+## Unavailable or blocked
+
+Two statuses are not a decision about the customer, and they ask for different handling:
+
+- `503`: Nozle could not read usage. Retry within your budget, as described above.
+- `402` `workspace_suspended` (_Unreleased_): your own workspace is suspended over unpaid Nozle invoices. Do not retry. Every call fails until the invoices are paid, and the first request after payment works again. See [Workspace billing](/guides/getting-started/workspace-billing).
+
+Whether your app lets users through while `/can` is unavailable or blocked (fail open) or stops them (fail closed) is your decision. Nozle does not make it for you. Decide per feature, and fail closed where letting a user through costs you money.

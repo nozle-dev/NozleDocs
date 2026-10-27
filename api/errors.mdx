@@ -12,6 +12,7 @@ description: HTTP errors, validation failures, and retry guidance
 | `401` | Missing or invalid credential. |
 | `403` | Credential lacks permission or a publishable key attempted a protected operation. |
 | `404` | Resource was not found within the authenticated organization. |
+| `402` | Your workspace is blocked by Nozle over a missing card or unpaid Nozle invoices: `card_required` or `workspace_suspended`. See [Workspace billing errors](#workspace-billing-errors). |
 | `409` | Idempotency key or resource-state conflict, such as another checkout in progress. Reload the state, then retry. |
 | `422` | Request is syntactically valid but violates a product rule, or the resource's current state refuses it (for example a voided invoice). |
 | `429` | Request was rate limited. |
@@ -67,3 +68,29 @@ Match on the status and `code`, not on the message text.
 | `503` `usage_unavailable` from `can()` | The usage lookup failed. The body carries a `request_id`. | Treat it as an unavailable decision, not a denial, and retry after a second. Quote the `request_id` if it persists. |
 
 An event that was accepted but never counted usually means the event name does not equal the feature code, or processing has not finished: events are processed asynchronously, so read usage again after a few seconds.
+
+## Workspace billing errors
+
+_Unreleased._ These errors are about your own workspace's account with Nozle, not about your customers. See [Workspace billing](/guides/getting-started/workspace-billing).
+
+| Status and `code` | What happened | What to do |
+|---|---|---|
+| `402` `card_required` | The workspace has no verified card yet. It answers dashboard GraphQL calls (`extensions.code = "card_required"`) and the dashboard-login routes `POST /api/v1/onboarding/configuration/preview`, `POST /api/v1/onboarding/configuration/apply`, `POST /api/v1/onboarding/token` and `/oauth/authorize` with a JSON error `card_required`. | A member adds a card in the dashboard. Nothing is charged. |
+| `402` `workspace_suspended` | Nozle invoices of your workspace stayed unpaid for 7 days after the first failed charge. | Do not retry blindly: every retry is refused until the invoices are paid. Pay the Nozle invoices (the **Nozle invoices** page or the link in the emails). The next request works again. |
+
+Bodies of `workspace_suspended`:
+
+```json
+{
+  "status": 402,
+  "error": "Payment Required",
+  "code": "workspace_suspended"
+}
+```
+
+- Core REST calls with an API key, and OAuth authorization, answer the body above.
+- The account MCP endpoint and the dashboard-login routes answer `{"error": "workspace_suspended"}`.
+- GraphQL fails the field with `extensions.code = "workspace_suspended"`.
+- The Engine API (events, `/can`, plans, checkout, billing, credits and the LLM proxy) answers `{"code": "workspace_suspended", "error": "..."}` with a message. Event ingestion adds `"status": 402`.
+
+A refused event is not queued and is not billed later: see [what is lost](/guides/getting-started/workspace-billing#suspension-on-day-7).

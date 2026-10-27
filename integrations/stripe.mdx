@@ -85,10 +85,10 @@ Nozle creates the endpoint with the Stripe API version it pins, `2025-04-30.basi
 | `payment_intent.payment_failed`, `payment_intent.canceled` | Failed payments |
 | `setup_intent.succeeded`, `customer.updated` | The customer's saved payment method |
 | `payment_method.detached` | Clears the stored default payment method when it is the detached one |
-| `charge.refund.updated` | Refund status |
+| `refund.updated`, `refund.failed` | Refund status, including a refund Stripe could not complete |
 | `charge.dispute.closed` | Disputes |
 
-Nozle subscribes the endpoint to these eight events only. Events such as `charge.refunded` and `charge.dispute.created` are not subscribed, and a valid event of any other type that reaches the endpoint is accepted and ignored.
+Nozle subscribes the endpoint to these nine events only. The older `charge.refund.updated` is no longer subscribed, but an endpoint created earlier that still sends it keeps working: Nozle accepts it and handles it like `refund.updated` for one more release, then removes it. Endpoints that Nozle creates from now on subscribe to `refund.updated` and `refund.failed` (_Unreleased_); refresh an existing endpoint so it subscribes to them too. Events such as `charge.refunded` and `charge.dispute.created` are not subscribed, and a valid event of any other type that reaches the endpoint is accepted and ignored.
 
 Nozle verifies the `Stripe-Signature` header of every request against the stored signing secret, using Stripe's default time tolerance. A request with a bad signature, an unknown organization or code, or an unreadable body is answered with `400`. A valid request is stored, queued and answered with `200`. Nozle does not de-duplicate Stripe events by event ID, so a replayed delivery is processed again. Replays are safe because each handler acts on the state of the payment, invoice or upgrade: an upgrade or invoice that is already settled stays settled.
 

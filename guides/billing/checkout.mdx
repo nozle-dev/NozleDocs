@@ -42,10 +42,11 @@ Stripe events Nozle handles:
 - `setup_intent.succeeded`
 - `payment_method.detached` (received, but it does not clear the stored payment method today)
 - `customer.updated`
-- `charge.refund.updated`
+- `refund.updated`
+- `refund.failed`
 - `charge.dispute.closed`
 
-Nozle subscribes to these eight events only. Without this webhook, Stripe may collect payment but Nozle is not told. Checkout status of a paid upgrade reads the Checkout Session from Stripe and reports `processing` once it is complete, but it never settles a payment, so only the webhook does. See the [Stripe integration](/integrations/stripe) for setup, flows and limits.
+Nozle subscribes to these nine events only (the older `charge.refund.updated` is still accepted for one release). Without this webhook, Stripe may collect payment but Nozle is not told. Checkout status of a paid upgrade reads the Checkout Session from Stripe and reports `processing` once it is complete, but it never settles a payment, so only the webhook does. See the [Stripe integration](/integrations/stripe) for setup, flows and limits.
 
 A new-subscription Stripe checkout returns no checkout ID to poll. After Embedded Checkout completes, reload the subscription or wait for your `subscription.started` webhook. A paid upgrade returns `plan_upgrade_intent_id`; poll its status with [`GET /checkout/{id}`](/api/subscription-management) and the subscription scope.
 

@@ -10,7 +10,7 @@ Nozle processes payment webhooks for each connected Stripe account and for each 
 1. You connect a Stripe account to a Nozle organization.
 2. Nozle registers a Stripe webhook endpoint for that Stripe account.
 3. Stripe sends payment events to your public Nozle API URL.
-4. Nozle verifies the `Stripe-Signature` header using the webhook secret returned by Stripe. It subscribes to the eight events below only, and it does not de-duplicate Stripe events by event ID: replays are safe because handlers act on the current state.
+4. Nozle verifies the `Stripe-Signature` header using the webhook secret returned by Stripe. It subscribes to the nine events below only, and it does not de-duplicate Stripe events by event ID: replays are safe because handlers act on the current state.
 5. Nozle updates invoice payment status and resolves any payment-gated subscription activation.
 
 **Key events processed:**
@@ -23,7 +23,7 @@ Nozle processes payment webhooks for each connected Stripe account and for each 
 | setup_intent.succeeded | Stores the customer's new default payment method |
 | payment_method.detached | Received, but it does not clear the stored payment method today (known bug) |
 | customer.updated | Syncs the customer's default payment method |
-| charge.refund.updated | Updates the credit-note refund status |
+| refund.updated, refund.failed | Updates the credit-note refund status. The older `charge.refund.updated` is still accepted for one release |
 | charge.dispute.closed | Marks the invoice's dispute lost when the dispute is lost |
 
 **Setup:**
