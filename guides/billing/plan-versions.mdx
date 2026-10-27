@@ -33,8 +33,8 @@ Only the current version can be edited. An older version is the pricing its subs
 
 A version migration moves the active subscriptions of one version to another (the current version by default).
 
-1. **Preview.** `POST /plans/{code}/version-migrations/preview` with `from_version` lists each subscription: `move`, with the day it moves and its current and new plan amounts, or `skip` with the reason. Nothing is written. In the dashboard, the Versions tab shows the same list before you confirm.
-2. **Start.** `POST /plans/{code}/version-migrations` runs in the background. Each subscription moves **at the end of its current billing period**, the way a scheduled downgrade is applied.
+1. **Preview.** `POST /plans/{code}/version-migrations/preview` with `from_version` lists each subscription: `move`, with the day it moves and its current and new plan amounts, or `skip` with the reason, and flags every move that raises the price (`price_increase`) or goes past an auto-pay limit (`mandate_cap_exceeded`). Nothing is written. In the dashboard, the Versions tab shows the same list before you confirm.
+2. **Start.** `POST /plans/{code}/version-migrations` runs in the background. If any price goes up, it is refused until you pass `allow_price_increase: true`. Each subscription moves **at the end of its current billing period**, the way a scheduled downgrade is applied.
 3. **Follow.** `GET /plans/{code}/version-migrations/{id}` returns one item per subscription. A scheduled move's `move_status` is `pending` until it happens, then `moved`; `effective_at` is the day it does.
 4. **Cancel** with `POST /plans/{code}/version-migrations/{id}/cancel`. Moves that have not happened are unscheduled and those subscribers stay on their version.
 
@@ -53,6 +53,17 @@ These subscriptions are skipped, with the reason in `skip_reason`:
 | `external_billing` | Another system bills it. |
 | `not_active` | It has not started. |
 | `already_on_version` | It is already on the target version. |
+
+## Raise prices safely
+
+A migration that makes customers pay more needs your explicit yes, and the customer hears about it.
+
+1. **Preview.** Call the preview and read `price_change` on each item: `increase`, `decrease`, `same` or `undeterminable` (usage pricing differs, so the total depends on future usage).
+2. **Review the increases.** Check every item with `price_increase: true` and every item with `mandate_cap_exceeded: true`, where the new amount is above the customer's auto-pay limit.
+3. **Confirm.** Start the migration with `allow_price_increase: true` (GraphQL: `allowPriceIncrease: true`). Without it you get `422 price_increase_not_allowed` with `price_increase_count` and `mandate_cap_exceeded_count`, and nothing starts.
+4. **Migrate and notify.** Each subscription moves at the end of its period. If the billing entity has `subscription.price_change_scheduled` in its `email_settings`, the customer gets one email per subscription with the new price, the start day and how it will be charged: automatically to the saved payment method, or by invoice.
+
+See [Plan Versions and Migrations](/api/plan-versions#price-increases-need-your-consent) for the fields and the email.
 
 One migration of a plan code runs at a time; another one returns `409 plan_version_migration_running`. Running a migration again is safe: subscriptions already moved are not moved twice, and failed ones are retried.
 

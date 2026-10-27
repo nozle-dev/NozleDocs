@@ -5,6 +5,13 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Plan version migrations ask before raising a price (Core)
+
+_Unreleased_
+
+- **A migration that raises a price needs `allow_price_increase`.** The preview now returns `price_change`, `price_increase` and `mandate_cap_exceeded` for each subscription. Starting a migration where a subscription would pay more, or pass its auto-pay limit, returns `422 price_increase_not_allowed` with `price_increase_count` and `mandate_cap_exceeded_count`, unless the request has `allow_price_increase: true` (GraphQL: `allowPriceIncrease`). Migrations that raise no price are not affected.
+- **New customer email `subscription.price_change_scheduled`.** Opt in through the billing entity's `email_settings`. It tells the customer the new price, the day it starts and how it will be charged, once per subscription per migration. See [Plan Versions and Migrations](/api/plan-versions#price-increases-need-your-consent).
+
 ### Breaking Core releases: CORS, voided invoices, plan change default, no former-prefix names, API key display (Core 5.0.0 to 7.0.0)
 
 _Unreleased_
