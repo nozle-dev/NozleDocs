@@ -27,7 +27,7 @@ Every Stripe checkout is a Stripe-hosted Checkout Session: a new subscription's 
 1. **Saved card first.** If the customer has a saved card that can be charged, Nozle charges it and answers `completed`, `processing` or `scheduled`. No page opens.
 2. **Redirect.** Otherwise redirect the browser to `url`. The page is valid until `expires_at`.
 3. **Return.** After paying, Stripe sends the customer to your `return_url`. If the customer leaves the page, Stripe sends them to `cancel_url`, or to the return URL when you sent none. Both may contain the literal `{CHECKOUT_SESSION_ID}`, which Stripe replaces with the Checkout Session ID (the `checkout_id` of the result).
-4. **Confirm.** The return only means the customer came back: Nozle applies the payment when Stripe's webhook arrives. Poll [`GET /checkout/{checkout_id}`](/api/subscription-management#payment-status-and-recovery) until it reports the payment, or wait for your `subscription.started` or invoice webhook. The poll returns the hosted result while the session is open, then `completed`, and `expired` if the session is gone.
+4. **Confirm.** The return only means the customer came back: Nozle applies the payment when Stripe's webhook arrives. For a new subscription or an invoice, wait for your `subscription.started` or invoice webhook, or reload the subscription or billing status: they have no status call. Only a paid upgrade has a status call: poll [`GET /checkout/{plan_upgrade_intent_id}`](/api/subscription-management#payment-status-and-recovery) with the customer and subscription scope. While the buyer is paying, `status` is `awaiting_payment` and the nested `checkout` is the hosted result again; `processing` means Stripe took the payment and Nozle is applying it; `succeeded` comes with a nested `completed`; `expired` means the Stripe session is no longer open. The `checkout_id` of a hosted result is the Stripe Checkout Session ID and is not a status ID.
 
 ```json
 {
@@ -37,6 +37,8 @@ Every Stripe checkout is a Stripe-hosted Checkout Session: a new subscription's 
   "cancel_url": "https://app.example.com/billing"
 }
 ```
+
+`cancel_url` is accepted by `POST /checkout`. The Entity subscription endpoints take `return_url` only.
 
 Credit top-ups and invoice payment URLs also open a Stripe-hosted page, valid for 24 hours.
 

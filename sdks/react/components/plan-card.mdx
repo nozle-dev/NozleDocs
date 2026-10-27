@@ -112,13 +112,13 @@ import { useCheckoutSession, usePlans } from '@nozle-js/react'
 
 export function PlanCards({ currentPlanCode }: { currentPlanCode: string }) {
   const { plans } = usePlans()
-  const { fetchClientSecret } = useCheckoutSession()
+  const { startCheckout } = useCheckoutSession()
   return plans.map((plan) => (
     <PlanCard
       key={plan.code}
       plan={plan}
       isCurrent={plan.code === currentPlanCode}
-      onSelect={({ planCode, returnUrl }) => void fetchClientSecret(planCode, returnUrl)}
+      onSelect={({ planCode, returnUrl }) => void startCheckout(planCode, returnUrl)}
     />
   ))
 }

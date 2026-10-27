@@ -9827,6 +9827,7 @@ paths:
                   status: open
                   url: https://checkout.stripe.com/c/pay/cs_...
                   payment_url: https://checkout.stripe.com/c/pay/cs_...
+                  checkout_id: cs_...
                   invoice_id: invoice_uuid
                   amount_cents: 4498
                   currency: USD
@@ -35997,7 +35998,7 @@ components:
         cancel_url:
           type: string
           format: uri
-          description: Where Stripe sends a customer who leaves the hosted page without paying. Validated like `return_url`. Defaults to the return URL.
+          description: Where Stripe sends a customer who leaves the hosted page without paying. Validated like `return_url`. Defaults to the return URL. Accepted by `POST /checkout` only; the Entity subscription endpoints take `return_url` alone.
         success_url:
           type: string
           format: uri
@@ -36041,7 +36042,7 @@ components:
           description: '`hosted` only: the Stripe-hosted Checkout page. Redirect the customer to it.'
         checkout_id:
           type: string
-          description: For `hosted`, the Stripe Checkout Session ID (`cs_...`). For Razorpay, the operation ID (UUID). Use with `GET /checkout/{id}`; Razorpay also with `POST /checkout/{id}/verify`.
+          description: For `hosted`, the Stripe Checkout Session ID (`cs_...`); it is not a status ID (poll a paid upgrade with `plan_upgrade_intent_id`). For Razorpay, the operation ID (UUID), used with `GET /checkout/{id}` and `POST /checkout/{id}/verify`.
         key_id:
           type: string
           description: Public Razorpay key ID.
@@ -37211,10 +37212,6 @@ components:
           type: string
           format: uri
           description: May contain the literal `{CHECKOUT_SESSION_ID}`.
-        cancel_url:
-          type: string
-          format: uri
-          description: Where Stripe sends a customer who leaves the hosted page. Defaults to the return URL.
         success_url:
           type: string
           format: uri
@@ -37284,10 +37281,6 @@ components:
               type: string
               format: uri
               description: May contain the literal `{CHECKOUT_SESSION_ID}`.
-            cancel_url:
-              type: string
-              format: uri
-              description: Where Stripe sends a customer who leaves the hosted page. Defaults to the return URL.
             items:
               type: array
               minItems: 1

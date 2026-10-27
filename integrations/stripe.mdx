@@ -138,7 +138,7 @@ An invoice has at most one payable Checkout Session at a time. This applies to i
 }
 ```
 
-- `url` is the Stripe-hosted page. Redirect the customer to it. `payment_url` is the same value. `checkout_id` is the Stripe Checkout Session ID.
+- `url` is the Stripe-hosted page. Redirect the customer to it. `payment_url` is the same value. `checkout_id` is the Stripe Checkout Session ID, not a status ID.
 - There is no `client_secret` and no Stripe publishable key. The old `type: "stripe"` result no longer exists.
 - `amount_cents` is in the smallest unit of the invoice currency.
 - A paid upgrade returns `plan_upgrade_intent_id` instead of `invoice_id`. The session stays open for 35 minutes.
@@ -234,7 +234,7 @@ invoiceCheckout, err := client.CheckoutInvoice(ctx, invoiceID, idempotencyKey)
 
 Checkout and status calls need an `sk_` key, so they run only in your backend. Bind each upgrade ID to the buyer who started it before you call Nozle. Checkout from an invoice sends no `return_url` through the SDKs, so Nozle uses its configured default return URL.
 
-After the customer returns, poll [`GET /checkout/{checkout_id}`](/api/subscription-management#payment-status-and-recovery) with the Checkout Session ID, or reload the subscription. For example, call `GET /billing/status` with the customer until it returns the plan the customer bought. It returns `404` while the subscription is not active. The poll returns the hosted result while the session is open, then `completed`, and `expired` when the session is gone.
+After the customer returns, reload the subscription: a new subscription or invoice checkout has no status call. For example, call `GET /billing/status` with the customer until it returns the plan the customer bought. It returns `404` while the subscription is not active. For a paid upgrade, poll `GET /checkout/{plan_upgrade_intent_id}` (not the `checkout_id`, which is the Stripe session ID): `awaiting_payment` with the hosted result nested while the buyer pays, `processing` once Stripe took the payment, `succeeded` with a nested `completed` when applied, and `expired` when the Stripe session is no longer open.
 
 ### Redirect to the hosted page
 

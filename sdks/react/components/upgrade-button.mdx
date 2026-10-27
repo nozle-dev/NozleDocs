@@ -79,7 +79,7 @@ export function UpgradeToScale() {
 
 The button calls `createCheckout` with the plan code, return URL and the `subscriptionId`, `quoteId` and `idempotencyKey` you pass, then handles every checkout result: hosted (Stripe), Razorpay, processing, completed and scheduled. A hosted result redirects the browser to the Stripe-hosted page. The dialog closes and:
 
-- calls `onCheckoutStarted` when the browser is sent to the Stripe-hosted page,
+- calls `onCheckoutStarted` just before the browser is sent to the Stripe-hosted page,
 - calls `onUpgraded` when the change completed, or a Razorpay payment was captured,
 - calls `onDowngradeScheduled` for a `scheduled` result.
 
@@ -175,7 +175,7 @@ export function UpgradeToScale() {
 </ResponseField>
 
 <ResponseField name="onCheckoutStarted" type="() => void">
-  Fires when the browser is sent to the Stripe-hosted page. The dialog closes.
+  Fires just before the browser is sent to the Stripe-hosted page. The dialog closes.
 </ResponseField>
 
 <ResponseField name="onUpgraded" type="() => void">

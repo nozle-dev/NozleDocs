@@ -86,10 +86,10 @@ The button needs no customer data. It reads `createCheckout`, `verifyCheckout` a
 
 ### What a click does
 
-1. The button calls `createCheckout({ idempotencyKey, planCode, returnUrl, registerMandate? })`. It keeps one idempotency key per plan and reuses it when the customer clicks again, so a retry reopens the same pending checkout. A second click while the first is running does nothing.
+1. The button calls `createCheckout({ idempotencyKey, planCode, returnUrl, cancelUrl?, registerMandate? })`. It keeps one idempotency key per plan and reuses it when the customer clicks again, so a retry reopens the same pending checkout. A second click while the first is running does nothing.
 2. For a `razorpay` result it loads Razorpay and opens it. A captured payment is checked with `verifyCheckout`, then polled with `getCheckoutStatus` up to 30 times, one second apart. A failed payment shows "Payment failed. You can retry checkout."
 3. For a `processing` result it polls the same way and continues with the checkout it returns.
-4. For a `hosted` result (every Stripe checkout), or a result with a `url`, it redirects the page to the Stripe-hosted Checkout. No Stripe packages or publishable key are needed. Stripe sends the customer back to `returnUrl`, so show success from that page after reloading billing data.
+4. For a `hosted` result (every Stripe checkout), or a result with a `url`, it redirects the page (`window.location.assign`, HTTPS only) to the Stripe-hosted Checkout. No Stripe packages or publishable key are needed. Stripe sends the customer back to `returnUrl`, so show success from that page after reloading billing data.
 5. For a `completed` or `scheduled` result it calls `onComplete` or `onScheduled`.
 
 After a completed or scheduled result, reload the customer's billing data, for example with `useBillingRefresh()` from the [hooks](/sdks/react/hooks). See [checkout result types](/sdks/react/hooks#checkout-result-types).
@@ -164,6 +164,10 @@ export function RazorpayBuy() {
 
 <ResponseField name="returnUrl" type="string">
   Sent to `createCheckout`, where the provider returns the customer after payment. Defaults to the current URL.
+</ResponseField>
+
+<ResponseField name="cancelUrl" type="string">
+  Sent to `createCheckout` when set. Forward it to `nozle.checkout()` as `cancelUrl`: where Stripe sends a customer who leaves the hosted page. Defaults to the return URL.
 </ResponseField>
 
 <ResponseField name="registerMandate" type="boolean">
