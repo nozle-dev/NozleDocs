@@ -79,7 +79,7 @@ Each item also says what the move does to the price:
 | --- | --- |
 | `price_change` | `increase` when the plan amount goes up. `decrease` or `same` when it goes down or stays and nothing else in the pricing differs. `undeterminable` when the plan amount does not go up but usage, fixed or commitment pricing differs, so the total depends on future usage. `null` for a skipped subscription, which keeps its price. |
 | `price_increase` | `true` when `price_change` is `increase`. |
-| `mandate_cap_exceeded` | `true` when the new amount is above the customer's auto-pay limit. The plan amount is compared; usage on top is not known in advance. |
+| `mandate_cap_exceeded` | `true` when the new amount is above the customer's auto-pay limit. The plan amount is compared; usage on top is not known in advance. It stays `false` for customers without a Razorpay auto-pay limit, which is every customer until auto-pay limits are enabled. |
 
 An `undeterminable` item is not an increase, so it does not block a migration. Look at those by hand.
 
