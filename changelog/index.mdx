@@ -5,6 +5,15 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Know when top-up credits can be spent (Core 11.1.0, Engine 2.12.0)
+
+_Unreleased_
+
+- **New webhook `credit_top_up_purchase.fulfilled`.** Sent once per paid top-up purchase, after the credits are granted and can be spent. Until now nothing told you when that happened: the invoice is paid a moment before the grant. See [Webhook events](/api/webhook-events#credit_top_up_purchasefulfilled).
+- **`GET /api/v1/credit-top-up-purchases/{id}` on the Engine.** Returns the purchase with `fulfillment_status` (`pending`, then `fulfilled`) and `fulfilled_at`. Poll it after checkout if you do not use the webhook. Purchases in webhooks and in Core's `GET /credit-top-up-purchases/{id}` carry the same fields.
+- **Razorpay checkout status for a top-up** reports `fulfillment_status: succeeded` only once the credits are granted, not when the payment reaches Nozle.
+- Docs: [Paid Credit Top-ups](/guides/credits/top-ups#know-when-the-credits-can-be-spent) now tells you to wait for the webhook or poll the purchase instead of refreshing on a paid invoice.
+
 ### Razorpay payment failures reach your webhook (Core 11.0.3)
 
 _Unreleased_

@@ -3,7 +3,7 @@ title: "Webhook events"
 description: "Every event type Nozle sends to your webhook endpoints: when it fires, what the payload holds, and which events are new"
 ---
 
-Nozle sends one JSON `POST` per event to every endpoint of your organization that subscribes to the event type. There are 72 types. This page lists them all. Registering an endpoint, verifying the signature and the retry rules are in [Receive Nozle webhooks](/api/receive-webhooks).
+Nozle sends one JSON `POST` per event to every endpoint of your organization that subscribes to the event type. There are 74 types. This page lists them all. Registering an endpoint, verifying the signature and the retry rules are in [Receive Nozle webhooks](/api/receive-webhooks).
 
 Each event has its own page in the API reference under **Webhook Events**, with the payload schema and an example captured from Core.
 
@@ -192,6 +192,7 @@ An endpoint with no `event_types` receives every type, and gets every type Nozle
 
 | Event | Object key | When it fires |
 |---|---|---|
+| `credit_top_up_purchase.fulfilled` | `credit_top_up_purchase` | The credits of a paid top-up are granted and can be spent. Sent once per purchase, after the grant. See [below](#credit_top_up_purchasefulfilled). |
 | `wallet.created` | `wallet` | A wallet is created. |
 | `wallet.depleted_ongoing_balance` | `wallet` | The ongoing balance of a wallet reaches zero. |
 | `wallet.terminated` | `wallet` | A wallet is terminated. |
@@ -243,6 +244,47 @@ Sent once when executing an order fails and the order is marked `failed`. The re
     "order_form_id": "00000000-0000-4000-8000-000000000004",
     "created_at": "2026-10-07T23:41:36Z",
     "updated_at": "2026-10-22T07:10:02Z"
+  }
+}
+```
+
+### `credit_top_up_purchase.fulfilled`
+
+Sent once per [paid top-up](/guides/credits/top-ups) purchase, when the credits are in the customer's balance and can be spent. The invoice is paid a little earlier (`payment_status` is `succeeded` before `fulfillment_status` is `fulfilled`), so refresh balances on this event, not on `invoice.payment_status_updated`. The object is the purchase as `GET /credit-top-up-purchases/{id}` returns it; `fulfilled_at` is when the credits were granted. A purchase granted again by a retry or a duplicate signal does not send it twice. Core 11.1.0 and later.
+
+```json
+{
+  "webhook_type": "credit_top_up_purchase.fulfilled",
+  "object_type": "credit_top_up_purchase",
+  "organization_id": "00000000-0000-4000-8000-000000000001",
+  "credit_top_up_purchase": {
+    "nozle_id": "00000000-0000-4000-8000-000000000002",
+    "organization_id": "00000000-0000-4000-8000-000000000001",
+    "customer_id": "00000000-0000-4000-8000-000000000003",
+    "external_customer_id": "customer_123",
+    "credit_system_id": "00000000-0000-4000-8000-000000000004",
+    "credit_system_code": "ai_credits",
+    "top_up_package_id": "00000000-0000-4000-8000-000000000005",
+    "package_code": "starter_pack",
+    "package_name": "Starter pack",
+    "credit_amount": "250.0",
+    "amount_cents": 1000,
+    "currency": "USD",
+    "expires_after_days": null,
+    "invoice_id": "00000000-0000-4000-8000-000000000006",
+    "invoice_number": "FYN-47DD-008-001",
+    "invoice_amount_cents": 1000,
+    "payment_status": "succeeded",
+    "fulfillment_status": "fulfilled",
+    "fulfilled_at": "2026-10-27T14:12:39Z",
+    "payment_id": null,
+    "payment_provider": "stripe",
+    "payment_provider_type": null,
+    "payment_provider_code": null,
+    "provider_payment_id": null,
+    "payment_url": null,
+    "replayed": false,
+    "created_at": "2026-10-27T14:12:01Z"
   }
 }
 ```
