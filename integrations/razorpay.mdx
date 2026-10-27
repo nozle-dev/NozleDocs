@@ -306,6 +306,8 @@ Expiry is judged by when the customer paid, not by when Nozle processed the paym
 
 If the customer closes or fails the modal, a one-time order stays open until it expires, and reopening the modal on the same order works. Checkout status returns the order as the nested `checkout` while the status is `awaiting_payment`, so store the `checkout` you received, or fetch it again from status, and open the modal with it.
 
+When Razorpay declines a payment in the modal or on a payment link (`payment.failed`), Nozle sends the `invoice.payment_failure` webhook, or `payment_request.payment_failure` for the payment link of overdue invoices. `provider_error` carries Razorpay's `error_code` and `error_description` as `error_code` and `message`. Nozle sends it once per Razorpay payment, however often that payment is reported to Nozle. The order or link stays payable and the invoice stays `pending`, so the customer can try again; each new failed attempt is a new Razorpay payment and sends its own webhook. Nothing is sent once the invoice or payment request is paid.
+
 The React SDK reports a modal `payment.failed` event as "Payment failed. You can retry checkout." The retry button calls your `createCheckout` callback again, which reopens the same order; see [Retry a new-subscription checkout](#retry-a-new-subscription-checkout).
 
 ### Retry a new-subscription checkout
@@ -322,6 +324,8 @@ Nozle uses a Razorpay payment link where the customer is not inside your checkou
 - [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase) returns the purchase with `payment_status`, `payment_provider: "razorpay"` and `payment_url`.
 
 Neither result has a checkout ID, so there is nothing to poll. Redirect the customer to `payment_url`. The `payment_link.paid` webhook settles it, Payment links are not verified with the verify call, which is for orders.
+
+After paying the link for overdue invoices, Razorpay returns the customer to the connection's success redirect URL (`successRedirectUrl`, set with `updateRazorpayPaymentProvider`). Without one, the customer stays on Razorpay's confirmation page.
 
 `POST /checkout` never returns `type: "hosted"` for Razorpay: it returns an order. Only the deprecated `POST https://api.nozle.app/engine/api/v1/credits/purchase` returns `type: "hosted"` with a `payment_url`. That endpoint requires an `Idempotency-Key` header and a `currency` field (the ISO 4217 code of the top-up package, for example `USD`), and answers `400` with the code `idempotency_key_required` or `currency_required` without them; a retry with the same key returns the first purchase. Use [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase) (`POST /credit-top-up-purchases`) instead. The SDK result types still declare `hosted`.
 
