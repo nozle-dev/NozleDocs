@@ -11568,6 +11568,102 @@ paths:
                   value:
                     error: failed to reach billing service
         '503': *id018
+  /credit-top-up-purchases/{id}:
+    get:
+      summary: Get a credit top-up purchase
+      description: Returns the purchase from Nozle Core, passed through unchanged, with `payment_status` and `fulfillment_status`. Poll it after checkout until `fulfillment_status` is `fulfilled` (then `fulfilled_at` is set and the credits can be spent), or wait for the `credit_top_up_purchase.fulfilled` webhook. A paid invoice (`payment_status` `succeeded`) can come a few seconds before the credits. Requires an organization secret key, or trusted internal authentication; a secret key needs `credit_system:read`. A customer-scoped internal caller gets `404` for another customer's purchase. Engine 2.12.0 and later.
+      operationId: engineGetCreditTopUpPurchase
+      tags:
+        - Credits
+      servers: *id002
+      security: *id003
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The purchase `nozle_id` (or `purchase_id` from the legacy `POST /credits/purchase`).
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The purchase.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditsTopUpPurchaseResponse'
+              example:
+                credit_top_up_purchase:
+                  nozle_id: 00000000-0000-4000-8000-000000000002
+                  organization_id: 00000000-0000-4000-8000-000000000001
+                  customer_id: 00000000-0000-4000-8000-000000000003
+                  external_customer_id: customer_123
+                  credit_system_id: 00000000-0000-4000-8000-000000000004
+                  credit_system_code: ai_credits
+                  top_up_package_id: 00000000-0000-4000-8000-000000000005
+                  package_code: starter_pack
+                  package_name: Starter pack
+                  credit_amount: '250.0'
+                  amount_cents: 1000
+                  currency: USD
+                  expires_after_days: null
+                  invoice_id: 00000000-0000-4000-8000-000000000006
+                  invoice_number: FYN-47DD-008-001
+                  invoice_amount_cents: 1000
+                  payment_status: succeeded
+                  fulfillment_status: fulfilled
+                  fulfilled_at: '2026-10-27T14:12:39Z'
+                  payment_id: null
+                  payment_provider: stripe
+                  payment_provider_type: null
+                  payment_provider_code: null
+                  provider_payment_id: null
+                  payment_url: null
+                  replayed: false
+                  created_at: '2026-10-27T14:12:01Z'
+        '400':
+          description: The ID is not a UUID; body has `error` only.
+          content:
+            application/json:
+              schema: *id001
+              examples:
+                invalid_id:
+                  value:
+                    error: invalid purchase ID
+        '401':
+          description: Engine authentication failure, or Core rejected the forwarded credential.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - *id001
+                  - $ref: '#/components/schemas/ApiErrorUnauthorized'
+        '403':
+          description: The credential is not allowed, or a Core credential could not be resolved (Engine body has `error` only), or a Core forbidden error.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - *id001
+                  - $ref: '#/components/schemas/ApiErrorForbidden'
+        '404':
+          description: No purchase with this ID in your organization (Core `ApiErrorNotFound`), or another customer's purchase for a customer-scoped caller (Engine body has `error` only).
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - *id001
+                  - $ref: '#/components/schemas/ApiErrorNotFound'
+        '502':
+          description: Core could not be reached.
+          content:
+            application/json:
+              schema: *id001
+              examples:
+                unreachable:
+                  value:
+                    error: failed to reach billing service
+        '503': *id018
   /credits/{customer_id}/balance:
     get:
       summary: Get legacy wallet balance
@@ -20632,6 +20728,77 @@ webhooks:
                   voided_at: null
                   created_at: '2026-09-30T07:24:25Z'
                   updated_at: '2026-10-07T23:31:58Z'
+      responses:
+        '200':
+          description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
+  credit_top_up_purchase_fulfilled:
+    post:
+      operationId: creditTopUpPurchaseFulfilled
+      summary: The credits of a paid top-up can be spent
+      description: The Engine granted the credits of a paid top-up purchase, so they are in the customer's balance and can be spent. Sent once per purchase, after the grant is committed. A paid invoice alone does not mean the credits are spendable; wait for this event or poll `GET /credit-top-up-purchases/{id}` until `fulfillment_status` is `fulfilled`.
+      parameters:
+        - $ref: '#/components/parameters/webhook_signature'
+        - $ref: '#/components/parameters/webhook_signature_algorithm'
+        - $ref: '#/components/parameters/webhook_unique_key'
+      requestBody:
+        description: Details of the event
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - credit_top_up_purchase
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - credit_top_up_purchase.fulfilled
+                object_type:
+                  type: string
+                  enum:
+                    - credit_top_up_purchase
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                credit_top_up_purchase:
+                  $ref: '#/components/schemas/CreditsTopUpPurchase'
+            example:
+              webhook_type: credit_top_up_purchase.fulfilled
+              object_type: credit_top_up_purchase
+              organization_id: 00000000-0000-4000-8000-000000000001
+              credit_top_up_purchase:
+                nozle_id: 00000000-0000-4000-8000-000000000002
+                organization_id: 00000000-0000-4000-8000-000000000001
+                customer_id: 00000000-0000-4000-8000-000000000003
+                external_customer_id: customer_123
+                credit_system_id: 00000000-0000-4000-8000-000000000004
+                credit_system_code: ai_credits
+                top_up_package_id: 00000000-0000-4000-8000-000000000005
+                package_code: starter_pack
+                package_name: Starter pack
+                credit_amount: '250.0'
+                amount_cents: 1000
+                currency: USD
+                expires_after_days: null
+                invoice_id: 00000000-0000-4000-8000-000000000006
+                invoice_number: FYN-47DD-008-001
+                invoice_amount_cents: 1000
+                payment_status: succeeded
+                fulfillment_status: fulfilled
+                fulfilled_at: '2026-10-27T14:12:39Z'
+                payment_id: null
+                payment_provider: stripe
+                payment_provider_type: null
+                payment_provider_code: null
+                provider_payment_id: null
+                payment_url: null
+                replayed: false
+                created_at: '2026-10-27T14:12:01Z'
       responses:
         '200':
           description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
@@ -34784,6 +34951,7 @@ components:
               - subscription.termination_alert
               - subscription.trial_ended
               - subscription.usage_threshold_reached
+              - credit_top_up_purchase.fulfilled
               - wallet.created
               - wallet.depleted_ongoing_balance
               - wallet.terminated
@@ -34905,6 +35073,7 @@ components:
                   - subscription.termination_alert
                   - subscription.trial_ended
                   - subscription.usage_threshold_reached
+                  - credit_top_up_purchase.fulfilled
                   - wallet.created
                   - wallet.depleted_ongoing_balance
                   - wallet.terminated
@@ -35024,6 +35193,7 @@ components:
                   - subscription.termination_alert
                   - subscription.trial_ended
                   - subscription.usage_threshold_reached
+                  - credit_top_up_purchase.fulfilled
                   - wallet.created
                   - wallet.depleted_ongoing_balance
                   - wallet.terminated
@@ -38364,6 +38534,24 @@ components:
           type: integer
         payment_status:
           type: string
+          enum:
+            - pending
+            - succeeded
+            - failed
+            - voided
+          description: Payment of the top-up invoice. `succeeded` does not mean the credits can be spent yet; see `fulfillment_status`.
+        fulfillment_status:
+          type: string
+          enum:
+            - pending
+            - fulfilled
+          description: '`fulfilled` once the credits are granted and can be spent (Core 11.1.0 and later), then the `credit_top_up_purchase.fulfilled` webhook is sent. `pending` before.'
+        fulfilled_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: When the credits were granted, or `null` while `fulfillment_status` is `pending`.
         payment_id:
           type:
             - string
