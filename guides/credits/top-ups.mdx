@@ -11,7 +11,22 @@ Create purchase -> checkout/invoice -> invoice fully paid -> idempotent credit s
 
 Checkout creation never grants credits. Credits are granted when the top-up invoice is fully paid, by any route: a card or provider payment, a manual payment for the full amount, a payment request, or marking the invoice paid. A partial manual payment grants nothing until the invoice is fully paid. Nozle then durably records one payment signal for the purchase and materializes exactly one source and one originating grant operation. A reconciliation sweep repairs missed delivery for every paid top-up invoice without duplicating credits.
 
-Expose available packages through your authenticated backend and start checkout from your own billing UI or a merchant callback. Refresh the product-credit balance only after the invoice is paid.
+Expose available packages through your authenticated backend and start checkout from your own billing UI or a merchant callback.
+
+## Know when the credits can be spent
+
+A paid invoice is not yet spendable credit: the Engine grants the credits a moment after the payment is recorded. Refresh the customer's balance, or unlock what the credits pay for, only once the purchase is fulfilled:
+
+- **Webhook (recommended).** Subscribe to [`credit_top_up_purchase.fulfilled`](/api/webhook-events#credit_top_up_purchasefulfilled). It is sent once per purchase, after the credits are in the balance.
+- **Polling.** Call `GET /api/v1/credit-top-up-purchases/{id}` on the Engine with the `purchase_id` from checkout until `fulfillment_status` is `fulfilled`. `fulfilled_at` is when the credits were granted. `payment_status` can already be `succeeded` while `fulfillment_status` is still `pending`.
+
+```bash
+curl https://api.nozle.app/engine/api/v1/credit-top-up-purchases/$PURCHASE_ID \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY"
+# {"credit_top_up_purchase": {"payment_status": "succeeded", "fulfillment_status": "fulfilled", "fulfilled_at": "2026-10-27T14:12:39Z", ...}}
+```
+
+Do not use `invoice.payment_status_updated` or the checkout's payment status as the signal: they arrive before the grant. Razorpay checkout status reports `fulfillment_status: succeeded` only once the purchase is fulfilled.
 
 ## Customer pool and Entity allocation
 
