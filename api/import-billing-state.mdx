@@ -37,9 +37,8 @@ Content-Type: application/json
 
 The server SDKs send the same body and set the `Idempotency-Key` header for you.
 
-{/* Update at SDK release: replace the pending versions below with the released Python and Go versions. */}
 <Note>
-SDK support: Node `@nozle-js/node` 0.19.0+. Python and Go: next release (pending). Until then, call the endpoint over HTTP.
+SDK support: Node `@nozle-js/node` 0.19.0+, Python `nozle` 0.18.0+, Go `nozle-go` v0.17.0+.
 </Note>
 
 <CodeGroup>
@@ -48,16 +47,14 @@ SDK support: Node `@nozle-js/node` 0.19.0+. Python and Go: next release (pending
 const result = await nozle.customers.importBillingState(
   'workspace_123',
   {
-    billing_state_import: {
-      dry_run: false,
-      subscription: {
-        plan_code: 'pro_monthly',
-        status: 'active',
-        billing_authority: 'external',
-        external_reference: 'merchant_subscription_123',
-        current_period_start: '2026-08-15T00:00:00Z',
-        current_period_end: '2026-09-15T00:00:00Z',
-      },
+    dryRun: false,
+    subscription: {
+      planCode: 'pro_monthly',
+      status: 'active',
+      billingAuthority: 'external',
+      externalReference: 'merchant_subscription_123',
+      currentPeriodStart: '2026-08-15T00:00:00Z',
+      currentPeriodEnd: '2026-09-15T00:00:00Z',
     },
   },
   { idempotencyKey: 'workspace-123-pro-cutover-v1' },
@@ -65,28 +62,35 @@ const result = await nozle.customers.importBillingState(
 ```
 
 ```python Python
+# The SDK wraps the body in "billing_state_import".
 result = nozle.customers.import_billing_state(
     "workspace_123",
     {
-        "billing_state_import": {
-            "dry_run": False,
-            "subscription": {
-                "plan_code": "pro_monthly",
-                "status": "active",
-                "billing_authority": "external",
-                "external_reference": "merchant_subscription_123",
-                "current_period_start": "2026-08-15T00:00:00Z",
-                "current_period_end": "2026-09-15T00:00:00Z",
-            },
-        }
+        "dry_run": False,
+        "subscription": {
+            "plan_code": "pro_monthly",
+            "status": "active",
+            "billing_authority": "external",
+            "external_reference": "merchant_subscription_123",
+            "current_period_start": "2026-08-15T00:00:00Z",
+            "current_period_end": "2026-09-15T00:00:00Z",
+        },
     },
     idempotency_key="workspace-123-pro-cutover-v1",
 )
 ```
 
 ```go Go
-// body holds the request body shown above; opts sets the Idempotency-Key.
-result, err := client.Customers.ImportBillingState(ctx, "workspace_123", body, opts)
+result, err := client.ImportBillingState(ctx, "workspace_123", nozle.BillingStateImportParams{
+	Subscription: nozle.BillingStateImportSubscription{
+		PlanCode:           "pro_monthly",
+		Status:             "active",
+		BillingAuthority:   "external",
+		ExternalReference:  "merchant_subscription_123",
+		CurrentPeriodStart: "2026-08-15T00:00:00Z",
+		CurrentPeriodEnd:   "2026-09-15T00:00:00Z",
+	},
+}, "workspace-123-pro-cutover-v1")
 if err != nil {
 	return err
 }

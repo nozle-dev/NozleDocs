@@ -31,9 +31,8 @@ Content-Type: application/json
 
 The server SDKs send the same body and set the `Idempotency-Key` header for you.
 
-{/* Update at SDK release: replace the pending versions below with the released Python and Go versions. */}
 <Note>
-SDK support: Node `@nozle-js/node` 0.19.0+. Python and Go: next release (pending). Until then, call the endpoint over HTTP.
+SDK support: Node `@nozle-js/node` 0.19.0+, Python `nozle` 0.18.0+, Go `nozle-go` v0.17.0+.
 </Note>
 
 <CodeGroup>
@@ -42,11 +41,11 @@ SDK support: Node `@nozle-js/node` 0.19.0+. Python and Go: next release (pending
 const result = await nozle.customers.importCreditBalance(
   'workspace_123',
   {
-    external_subscription_id: 'merchant_subscription_123',
-    credit_system_code: 'ai_credits',
-    granted_amount: '500',
-    remaining_amount: '320',
-    dry_run: false,
+    externalSubscriptionId: 'merchant_subscription_123',
+    creditSystemCode: 'ai_credits',
+    grantedAmount: '500',
+    remainingAmount: '320',
+    dryRun: false,
   },
   { idempotencyKey: 'workspace-123-ai-credits-cutover-v1' },
 )
@@ -67,8 +66,12 @@ result = nozle.customers.import_credit_balance(
 ```
 
 ```go Go
-// body holds the request body shown above; opts sets the Idempotency-Key.
-result, err := client.Customers.ImportCreditBalance(ctx, "workspace_123", body, opts)
+result, err := client.ImportCreditBalance(ctx, "workspace_123", nozle.CreditBalanceImportParams{
+	ExternalSubscriptionID: "merchant_subscription_123",
+	CreditSystemCode:       "ai_credits",
+	GrantedAmount:          "500",
+	RemainingAmount:        "320",
+}, "workspace-123-ai-credits-cutover-v1")
 if err != nil {
 	return err
 }
