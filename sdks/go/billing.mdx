@@ -92,7 +92,7 @@ Changing an existing subscription's plan needs a [transition policy](/api/plan-t
 
 ### Load options and preview a quote
 
-`CheckoutResult.Type` distinguishes `hosted`, `razorpay`, `processing`, `completed`, and `scheduled`. Payment fulfillment is authoritative on the server. Use `CheckoutStatus` and `VerifyCheckout` with a `CheckoutScope` containing both customer and external subscription IDs when recovering payment.
+`CheckoutResult` is one struct; `Type` distinguishes `hosted`, `razorpay`, `processing`, `completed`, and `scheduled`. A Stripe checkout is `Type == "hosted"` with `URL` and `PaymentURL` (the same address), `CheckoutID`, `InvoiceID` or `PlanUpgradeIntentID`, `AmountCents`, `Currency` and `ExpiresAt`; there is no `ClientSecret`. Payment fulfillment is authoritative on the server. Use `CheckoutStatus` and `VerifyCheckout` with a `CheckoutScope` containing both customer and external subscription IDs when recovering payment.
 
 For a signed plan-change quote, call `SubscriptionOptions`, then `PreviewSubscriptionChange`. Pass its `QuoteID` and the external `SubscriptionID` to `Checkout`. A quote can expire; ask the customer to confirm a fresh one after a 409.
 
