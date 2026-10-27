@@ -29,6 +29,53 @@ Content-Type: application/json
 }
 ```
 
+The server SDKs send the same body and set the `Idempotency-Key` header for you.
+
+{/* Update at SDK release: replace the pending versions below with the released Python and Go versions. */}
+<Note>
+SDK support: Node `@nozle-js/node` 0.19.0+. Python and Go: next release (pending). Until then, call the endpoint over HTTP.
+</Note>
+
+<CodeGroup>
+
+```ts Node.js
+const result = await nozle.customers.importCreditBalance(
+  'workspace_123',
+  {
+    external_subscription_id: 'merchant_subscription_123',
+    credit_system_code: 'ai_credits',
+    granted_amount: '500',
+    remaining_amount: '320',
+    dry_run: false,
+  },
+  { idempotencyKey: 'workspace-123-ai-credits-cutover-v1' },
+)
+```
+
+```python Python
+result = nozle.customers.import_credit_balance(
+    "workspace_123",
+    {
+        "external_subscription_id": "merchant_subscription_123",
+        "credit_system_code": "ai_credits",
+        "granted_amount": "500",
+        "remaining_amount": "320",
+        "dry_run": False,
+    },
+    idempotency_key="workspace-123-ai-credits-cutover-v1",
+)
+```
+
+```go Go
+// body holds the request body shown above; opts sets the Idempotency-Key.
+result, err := client.Customers.ImportCreditBalance(ctx, "workspace_123", body, opts)
+if err != nil {
+	return err
+}
+```
+
+</CodeGroup>
+
 For an Entity-scoped balance, include the exact Entity ID associated with the imported subscription. Copy `external_subscription_id` from the Core billing-state import response; do not substitute the request's `external_reference`.
 
 ```json
