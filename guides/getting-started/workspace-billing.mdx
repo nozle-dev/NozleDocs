@@ -6,18 +6,21 @@ description: The card Nozle asks for at onboarding, automatic upgrades, failed p
 This page is about what your workspace pays Nozle. It never touches how you bill your own customers. For prices, limits and what each plan includes, see [Nozle plans and pricing](/guides/getting-started/nozle-plans).
 
 <Note>
-Day-7 suspension, resume and catch-up billing are _Unreleased_. The card step, automatic upgrade and the failed-payment emails are described as they work in the same release.
+The card requirement, day-7 suspension, resume and catch-up billing are _Unreleased_ until deployed.
 </Note>
 
 ## Card at onboarding
 
-Every workspace adds a card before it can use the dashboard, on every plan including the free Starter plan.
+Every workspace adds a card before it can use Nozle, on every plan including the free Starter plan. There is no switch for this: it is always on.
 
-- The card is verified on a page hosted by Stripe. **Nothing is charged** when you add it.
-- Any member of the workspace can add the card. Once it is saved, the dashboard opens for everyone.
-- Existing workspaces without a card see the same step at their next login.
+- The card is verified on a page hosted by Stripe that offers cards only and shows Stripe's own text about reusing the card for later charges. **Nothing is charged** when you add it.
+- Any member of the workspace can add the card. Once it is saved, Nozle opens for everyone.
+- After the card, the AI onboarding opens. Until you have finished setting up, the dashboard shows one banner (verify your card, or finish setting up) instead of a checklist.
+- If you close the page after paying, or Stripe's notification is delayed or lost, Nozle checks with Stripe on its own when you return, or when you choose **Check again**. You are not asked for the card twice.
+- Existing workspaces without a card are flagged within the hour after the release and see the same step.
 - Nozle keeps only Stripe's identifiers and the status of the card. It never stores the card number, brand, expiry or any other card detail.
-- Until a card is on file, the dashboard's data, the dashboard-login routes (`/api/v1/onboarding/...`, `/oauth/authorize`) answer `402` with `card_required`. See [Errors](/api/errors#workspace-billing-errors).
+
+Without a verified card, the dashboard and every API key call are refused with `402` `card_required`: the dashboard, Core REST, account MCP tokens (also ones issued earlier), the Engine API (events, `/can`, plans, checkout, billing, credits), the LLM proxy and event ingestion. Add the card in the dashboard and the next request works. If the workspace is also suspended, `workspace_suspended` is answered instead. See [Errors](/api/errors#workspace-billing-errors).
 
 ## Plan limits and automatic upgrade
 
@@ -45,7 +48,7 @@ Day 0 is the first failed automatic charge of a Nozle invoice.
 
 ## Suspension on day 7
 
-When the Nozle invoices are still unpaid 7 days after the first failed charge, Nozle suspends the workspace. A suspended workspace answers `402` with the code `workspace_suspended`.
+When the Nozle invoices are still unpaid 7 days after the first failed charge, Nozle suspends the workspace. A suspended workspace answers `402` with the code `workspace_suspended`, also when it has no card.
 
 **What stops:**
 
@@ -64,7 +67,7 @@ When the Nozle invoices are still unpaid 7 days after the first failed charge, N
 
 While suspended, the renewals of your own customers and the finalization of their draft invoices are paused. Dunning, credit top-ups, trials, overdue marking and your outgoing webhooks keep running.
 
-**What is lost:** events sent during the suspension are refused with `402`. They are not queued and cannot be billed afterwards. Keep your own copy if you need to resend them. If you want your app to keep working while Nozle is blocked, decide that in your own code: see [The can() endpoint](/guides/entitlements/can-endpoint#availability-and-freshness).
+**What is lost:** events sent during the suspension are refused with `402`. They are not queued and cannot be billed afterwards. Keep your own copy if you need to resend them. If you want your app to keep working while Nozle is blocked, decide that in your own code. The Nozle SDKs throw their API error with `code` `workspace_suspended` (or `card_required`) and never retry a `402`. See [The can() endpoint](/guides/entitlements/can-endpoint#unavailable-or-blocked).
 
 ## Resume
 
