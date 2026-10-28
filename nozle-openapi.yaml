@@ -17277,7 +17277,7 @@ webhooks:
     post:
       operationId: paymentScheduled
       summary: A payment will be debited automatically
-      description: 'Nozle will debit a payment automatically from the customer''s saved card or mandate at `scheduled_at`. It is sent once per payment and `scheduled_at`; a changed `scheduled_at` sends it again. The payload is the payment object plus `scheduled_at` and `method_type`. Nozle emails the customer with this notice when the connection setting `upcomingDebitEmail` is on (default: on for Razorpay and for INR payments on Stripe); you can send your own message from this webhook instead. Today it is sent for Stripe card payments that the bank debits after its notice, not yet for Razorpay debits.'
+      description: 'Nozle will debit a payment automatically from the customer''s saved card or mandate at `scheduled_at`. It is sent once per payment and `scheduled_at`; a changed `scheduled_at` sends it again. The payload is the payment object plus `scheduled_at` and `method_type`. Nozle emails the customer with this notice when the connection setting `upcomingDebitEmail` is on (default: on for Razorpay and for INR payments on Stripe); you can send your own message from this webhook instead. It is sent for Stripe card payments that the bank debits after its notice, and for Razorpay card and UPI debits when the debit is scheduled (not for a bank eMandate, and not when `pre_debit_notice` is off).'
       parameters:
         - $ref: '#/components/parameters/webhook_signature'
         - $ref: '#/components/parameters/webhook_signature_algorithm'
@@ -27244,7 +27244,7 @@ components:
                 - invoice_voided
                 - notice_failed
                 - other
-              description: Why the debit was cancelled. `mandate_changed`, the card or mandate can no longer be used; `invoice_paid`, the invoice was paid another way; `invoice_voided`, the invoice was voided; `notice_failed`, the bank notice failed; `other`, any other reason.
+              description: Why the debit was cancelled. `mandate_changed`, the card or mandate can no longer be used or changed; `invoice_paid`, the invoice was paid another way while the debit waited; `invoice_voided`, the invoice was voided while the debit waited; `notice_failed`, the bank or provider notice failed; `other`, any other failed check before the debit, for example a changed amount.
               example: invoice_paid
     PaymentObject:
       type: object
