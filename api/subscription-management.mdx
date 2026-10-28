@@ -51,7 +51,9 @@ Send `customer_id`, `subscription_id`, and `plan_code` to `POST /subscriptions/p
 
 This route needs the `invoice:read` API permission, not a `subscription` permission. `subscription_id` is optional, but without it a customer with several active subscriptions gets `409 subscription_selection_required`.
 
-The response includes `quote_id`, `transition_direction`, `timing`, `currency`, `credit_amount_cents`, `debit_amount_cents`, `net_amount_cents`, `amount_due_now_cents`, `amount_due_at_effective_cents`, `effective_at`, and nullable `renewal_at`.
+The response includes `quote_id`, `transition_direction`, `timing`, `currency`, `credit_amount_cents`, `credit_remaining_amount_cents`, `refund_amount_cents`, `debit_amount_cents`, `net_amount_cents`, `amount_due_now_cents`, `amount_due_at_effective_cents`, `effective_at`, and nullable `renewal_at`.
+
+`credit_amount_cents` is the credit applied to this change (`net_amount_cents` is debit minus credit). `credit_remaining_amount_cents` is the balance left on the credit notes the change issues, used on later invoices. `refund_amount_cents` is what those credit notes refund.
 
 It also includes `subscription_id` (Core's internal UUID of the current subscription), `external_subscription_id`, `invoice_issuing_date`, and `next_billing_date` with its camel-case alias `nextBillingDate`. `credit`, `debit`, and `net` repeat the three cent amounts in major units (for example `12.5`); use the `*_cents` fields for exact values.
 
