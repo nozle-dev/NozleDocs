@@ -339,26 +339,35 @@ A credit top-up for a Razorpay customer returns a Razorpay payment link as `paym
 | An INR customer and a USD package | `422 validation_errors` with `customer_currency_mismatch` in `error_details.currency` |
 | A customer with no payment provider | `422 validation_errors` with `no_linked_payment_provider` |
 
-## Recurring payments with UPI AutoPay
+## Recurring payments with auto-pay
 
-Renewals are charged automatically only for a confirmed UPI AutoPay mandate. Otherwise Nozle does not charge, and the customer pays the invoice through a new checkout or payment link.
+Renewals are charged automatically only through a confirmed auto-pay mandate. Otherwise Nozle does not charge, and the customer pays each invoice through a payment link.
 
-To register a mandate:
+Auto-pay works with UPI AutoPay, cards and bank debit (Razorpay eMandate). Your integration gets one Nozle URL, never a Razorpay modal:
 
-1. Turn on **Enable recurring payments** and set the mandate maximum on the connection. Your Razorpay account must have UPI AutoPay enabled.
-2. Create the checkout for a subscription invoice with `registerMandate: true` (`register_mandate` in HTTP and Python). The customer needs a name, email and phone number.
-3. Open the modal with `customer_id` and `recurring: '1'`. Nozle creates the order as a UPI authorization with the connection's maximum amount.
-4. Razorpay sends `token.confirmed`. Only then does the mandate become usable, and only for the subscriptions covered by that registration.
+1. Turn on **Enable recurring payments** and set the mandate maximum on the connection. Your Razorpay account must have recurring payments enabled for the methods you offer. The connection offers UPI and card by default; its `mandate_methods` setting (`mandateMethods` in GraphQL) can add `bank_debit` or narrow the list.
+2. Send the customer to Nozle's auto-pay setup page, from either entry point:
+   - **Checkout:** create the checkout for a subscription invoice with `register_mandate: true` (`registerMandate` in the React SDK). The result is `type: hosted` with `payment_url` (the setup page) and `checkout_id`. UPI and card links charge the invoice. Bank debit authorizes ₹0, and Razorpay collects the invoice as the mandate's first payment after the bank confirms, which can take a few working days. The subscription becomes active once the invoice is paid. A paid plan change cannot register a mandate.
+   - **[Manage payment method](/api/manage-payment-method):** for an existing customer, the endpoint returns the setup page in setup mode. UPI and card authorize ₹1, which is refunded once captured; bank debit authorizes ₹0. The customer's open INR subscription invoices are collected once the mandate is confirmed.
+3. The page lists the enabled methods with what each one charges, and shows the customer's current method in setup mode. With a single method the list is skipped. The customer's choice creates a Razorpay hosted registration link (`subscription_registration/auth_links`) for that method and redirects to it. Choosing another method in the same session cancels the earlier link. An expired or invalid page answers `410`.
+4. Razorpay does not send the customer back. Poll `GET /api/v1/checkout_sessions/:checkout_id` for a checkout, or follow the webhooks. Razorpay confirms the mandate through the `token.*` events, which Nozle also reads back during reconciliation. Only then does the mandate become usable, and only for the subscriptions covered by that registration. A confirmed mandate becomes the customer's default payment method and replaces the mandates it covers, which are cancelled at Razorpay.
 
-For a renewal, Nozle uses a confirmed, unexpired UPI mandate that covers every subscription on the invoice and whose maximum is at least the amount due. If the debit is rejected, the invoice returns to needing an interactive payment and Nozle sends the invoice payment-failure notification, once per failed attempt. **Retry payment** on that invoice (dashboard, API or dunning) debits the confirmed mandate again right away with a new order, instead of doing nothing for 24 hours. A retry that cannot debit sends no further notification.
+For a renewal, Nozle prefers the customer's default mandate when it covers every subscription on the invoice, otherwise another eligible mandate for those subscriptions, and rechecks the live token, maximum and expiry before debiting. Razorpay sends its pre-debit notification and collects. If a debit is refused or fails, Razorpay cannot notify the customer, or the debit does not settle within its method's window (UPI 3 days, card 4, bank debit 7), the debit fails and Nozle emails the invoice's payment request with the **Pay invoice** button. Nothing debits that invoice again automatically, and the mandate stays usable.
 
-Mandate registration errors:
+Payment methods expose `type` (`card`, `upi`, `bank_debit`), `status` (`pending`, `active`, `paused`, `cancelled`, `rejected`, `inactive`), `max_amount_cents` and `expires_at`. Nozle stores only the token ID, the method type, the status and the mandate terms.
+
+Auto-pay errors:
 
 | Code | Cause |
 |---|---|
-| `razorpay_mandate_registration_unavailable` | Recurring is off on the connection, the invoice is not a subscription invoice, a hosted link was requested, or the checkout is a paid plan change (a plan change cannot register a mandate yet) |
-| `razorpay_mandate_amount_exceeds_limit` | The amount due is above the mandate maximum |
-| `razorpay_mandate_requires_name_email_phone` | The customer lacks a name, email or phone number |
+| `auto_pay_not_enabled` | Recurring payments are off on the connection. Manage payment method answers `razorpay_pays_by_link` with this code in `error_details.auto_pay` |
+| `payment_method_not_enabled` | None of the requested methods is enabled on the connection |
+| `customer_details_required` | The customer lacks a name, email or phone number |
+| `amount_exceeds_auto_pay_limit` | The amount due is above the mandate maximum |
+| `no_payable_invoice` | The checkout's invoice is not a payable INR subscription invoice |
+| `auto_pay_setup_unavailable` | On the setup page: Razorpay did not return a usable registration link. The customer's next choice creates a new one |
+
+The older `razorpay_mandate_*` codes remain for earlier integrations.
 
 ## Reconciliation and rate limits
 
@@ -391,8 +400,8 @@ Checkout errors that are specific to Razorpay. See [Create checkout](/api/create
 ## Limits
 
 - INR only. Cross-currency collection is not enabled.
-- Cards and UPI through the interactive checkout, and UPI AutoPay mandates for subscription invoices.
-- Not enabled: standalone zero-value or trial mandates, hosted mandate-registration links, recurring cards and arbitrary grouped automatic debits.
+- Cards and UPI through the interactive checkout. Auto-pay mandates (UPI AutoPay, card, bank debit) through Razorpay hosted registration links, from checkout or manage payment method.
+- Not enabled: trial mandates and arbitrary grouped automatic debits. A paid plan change cannot register a mandate.
 - Overdue invoices can be grouped into one payment link. Credit top-up and prepaid-credit invoices cannot be grouped and are collected individually.
 - The Key ID of a connection cannot change.
 
