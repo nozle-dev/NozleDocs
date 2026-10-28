@@ -75,7 +75,9 @@ https://api.nozle.app/core/webhooks/razorpay/{payment_provider_id}
 |---|---|
 | `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`, `payment_link.paid` | Payments. On each one Nozle fetches the payment from Razorpay and settles it only once it is captured |
 | `refund.processed`, `refund.failed` | Refund status |
-| `payment.dispute.lost`, `payment.dispute.closed` | Disputes |
+| `payment.dispute.lost`, `payment.dispute.closed` | Disputes that end the case. A lost dispute updates the invoice |
+| `payment.dispute.created`, `payment.dispute.under_review`, `payment.dispute.action_required`, `payment.dispute.won` | Dispute updates. Nozle sends you the `invoice.payment_dispute_updated` webhook. See [Refunds and disputes](#refunds-and-disputes) |
+| `order.notification.delivered`, `order.notification.failed` | The pre-debit notice of an automatic debit. See [Mandate limits and automatic debits](#mandate-limits-and-automatic-debits) |
 | `token.confirmed`, `token.rejected`, `token.cancelled`, `token.paused`, `token.resumed` | UPI AutoPay mandates |
 
 Nozle computes an HMAC-SHA256 of the raw request body with the webhook secret and compares it with the `X-Razorpay-Signature` header. A request is answered with `400` when:
@@ -87,6 +89,8 @@ Nozle computes an HMAC-SHA256 of the raw request body with the webhook secret an
 - an event ID that Nozle already received arrives with a different body (`webhook_event_payload_conflict`).
 
 A valid request is queued and answered with `200`. Nozle de-duplicates on the event ID, so a repeated event never settles twice.
+
+Selecting every event in Razorpay is safe. Nozle ignores `payment_link.expired`, `payment_link.cancelled`, `payment_link.partially_paid`, `invoice.partially_paid` and `refund.speed_changed` and writes a log line. A Razorpay event whose handling fails is queued again every 15 minutes for its first two hours, then by the reconciliation clock, up to 96 attempts. After that Nozle marks it `failed` and logs an error.
 
 If the webhook is missing or blocked, Razorpay can capture the payment but Nozle is not told. A captured order then settles only when your backend calls verify or status, or when the reconciliation job that runs every five minutes reaches it. Dispute and mandate events are never received.
 
@@ -360,6 +364,23 @@ Mandate registration errors:
 | `razorpay_mandate_amount_exceeds_limit` | The amount due is above the mandate maximum |
 | `razorpay_mandate_requires_name_email_phone` | The customer lacks a name, email or phone number |
 
+## Mandate limits and automatic debits
+
+RBI caps the amount of a mandate per method. Nozle sends Razorpay the **Mandate maximum** of the connection, lowered to the limit of the method the customer chooses:
+
+| Method | Limit per debit |
+|---|---|
+| UPI | INR 25,000 |
+| Card | INR 15,000 |
+| Bank mandate (eMandate) | INR 10 lakh |
+
+These are the limits for a merchant in Razorpay's default category. Nozle does not read your Razorpay category.
+
+- **A checkout above the limit.** When the customer registers a mandate while paying an invoice that is above the limit of the chosen method, the request is refused with the code `amount_exceeds_method_limit`. The customer can choose another method. The code `amount_exceeds_auto_pay_limit` still means the invoice is above your own mandate maximum.
+- **A debit above INR 15,000.** Nozle does not debit a card or UPI mandate silently above INR 15,000. The debit is not sent. The customer gets the Pay link by email, the mandate stays, and the failed attempt sends you the `invoice.payment_failure` webhook with `provider_error.error_code` `amount_above_auto_debit_ceiling`. A bank mandate has no such ceiling, and Nozle prefers it when the customer has one. The connection setting `auto_debit_ceiling_cents` changes the ceiling. It is not in the dashboard or GraphQL yet.
+- **Pre-debit notice.** Nozle asks Razorpay to notify the customer before an automatic debit and schedules the debit itself: 25 hours after the order for UPI, 36 hours 5 minutes for a card. A bank mandate keeps Razorpay's own schedule. If Razorpay refuses the order with the notice, Nozle sends it once more without it. `order.notification.delivered` and `order.notification.failed` store only the status and time. A `failed` notice fails the debit and the customer gets the Pay link.
+- **Minimum amount.** An order, payment link, payment request, payment intent or setup session below INR 1 (100 paise) is refused before any request to Razorpay, with the code `amount_below_minimum`.
+
 ## Reconciliation and rate limits
 
 Nozle checks the status of open Razorpay orders, payment links, debits and refunds with your connection's key. It checks operations from the last hour every few minutes and older ones once an hour. A checkout that nobody paid stops being checked once its expiry plus one hour has passed, or once its invoice or upgrade can no longer be paid through it. When Razorpay rate-limits your key (HTTP `429`), Nozle sends the order, link, debit, refund or customer sync again after the `Retry-After` delay (60 seconds when Razorpay sends none), instead of failing the refund or the collection or falling back to interactive payment.
@@ -368,7 +389,7 @@ Nozle checks the status of open Razorpay orders, payment links, debits and refun
 
 - **Paid or voided invoice.** When an invoice no longer needs paying (voided, marked as paid, settled), Nozle expires and cancels its unused Razorpay orders and payment links. After a partial payment or a credit note offset it replaces them with ones for the amount due. Razorpay cannot cancel every order, so a payment can still be captured on an old order or link of an invoice that is already paid or voided. Nozle refunds that payment in full through Razorpay and sends the `invoice.payment_failure` webhook with `provider_error.error_code` `duplicate_payment_refunded` (invoice already paid) or `voided_invoice_payment_refunded` (invoice voided). If Razorpay refuses the refund, the code is `duplicate_payment_refund_failed` or `voided_invoice_payment_refund_failed`: refund the payment in the Razorpay dashboard. The invoice is not paid by that payment.
 - **Refunds.** A credit-note refund is sent to Razorpay against the captured payment at normal speed. It stays `pending` until Razorpay reports `processed`. If Razorpay reports `failed`, Nozle sends the `credit_note.refund_failure` webhook.
-- **Disputes.** On `payment.dispute.lost`, Nozle fetches the dispute from Razorpay, validates it against the payment, and marks the invoice's dispute lost. A closed or won dispute is not treated as lost.
+- **Disputes.** On `payment.dispute.lost`, Nozle fetches the dispute from Razorpay, validates it against the payment, and marks the invoice's dispute lost. A closed or won dispute is not treated as lost. On `payment.dispute.created`, `under_review`, `action_required` and `won`, Nozle fetches the dispute the same way, changes nothing on the invoice and sends you the [`invoice.payment_dispute_updated`](/api/webhook-events) webhook. It carries the invoice and `dispute` with `id`, `event`, `status`, `reason_code`, `phase` and `respond_by` (the deadline to answer, while you still can). Nozle sends it once per invoice of the payment.
 
 ## Errors
 
@@ -387,6 +408,8 @@ Checkout errors that are specific to Razorpay. See [Create checkout](/api/create
 | `422` | `invalid_checkout_signature` | The verify call's order ID or signature did not match the checkout |
 | `422` | `third_party_error` | Razorpay rejected the request. `error_details.third_party` is `Razorpay`. A verify call with a correct signature for a payment that does not exist at Razorpay returns it with `error_details.thirdparty_error` set to `Razorpay request failed (HTTP 400)` |
 | `404` | `checkout_session_not_found` | Unknown checkout ID |
+| `422` | `validation_errors` | `error_details.base` is `amount_exceeds_method_limit`: a mandate registration for an invoice above the RBI limit of the chosen method. See [Mandate limits](#mandate-limits-and-automatic-debits) |
+| `422` | `validation_errors` | `error_details.base` is `amount_below_minimum`: the amount is below INR 1 (100 paise) |
 
 ## Limits
 

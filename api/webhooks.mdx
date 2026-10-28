@@ -54,6 +54,8 @@ Nozle verifies the `X-Razorpay-Signature` header, an HMAC-SHA256 of the raw requ
 | payment.failed | Fetches the payment; an interactive order stays open for retry |
 | refund.processed, refund.failed | Updates the credit-note refund status |
 | payment.dispute.lost, payment.dispute.closed | Applies a lost dispute; a closed or won dispute is not treated as lost |
+| payment.dispute.created, payment.dispute.under_review, payment.dispute.action_required, payment.dispute.won | Sends you the `invoice.payment_dispute_updated` webhook; the invoice does not change |
+| order.notification.delivered, order.notification.failed | Records the status of the pre-debit notice of an automatic debit; a failed notice fails the debit and the customer gets the Pay link |
 | token.confirmed, token.rejected, token.cancelled, token.paused, token.resumed | Updates the UPI AutoPay mandate |
 
 See the [Razorpay integration](/integrations/razorpay#webhook-setup) for setup and the checkout flow.

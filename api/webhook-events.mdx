@@ -134,6 +134,7 @@ An endpoint with no `event_types` receives every type, and gets every type Nozle
 | `invoice.drafted` | `invoice` | An invoice is created as a draft, while it is in its grace period or has been refreshed. |
 | `invoice.voided` | `invoice` | An invoice is voided. |
 | `invoice.payment_dispute_lost` | `payment_dispute_lost` | A payment dispute on an invoice is lost. The payload wraps the invoice in `payment_dispute_lost` with the provider reason. |
+| `invoice.payment_dispute_updated` | `payment_dispute_updated` | A payment dispute on an invoice is opened, needs a response, is under review or is won (Razorpay). The payload holds the `invoice` and a `dispute` with `id`, `event`, `status`, `reason_code`, `phase` and `respond_by`. The invoice does not change. |
 | `invoice.payment_status_updated` | `invoice` | The payment status of an invoice changes (pending, succeeded, failed). |
 | `invoice.payment_overdue` | `invoice` | An unpaid invoice passes its due date and is marked overdue. |
 | `invoice.payment_failure` | `payment_provider_invoice_payment_error` | A payment attempt for an invoice fails at the provider, or a duplicate payment, or a payment on a voided invoice, is refunded. `provider_error.error_code` says why, for example `duplicate_payment_refunded`, `voided_invoice_payment_refunded` or, when the provider refuses the refund and you must refund by hand, `duplicate_payment_refund_failed` or `voided_invoice_payment_refund_failed`. |

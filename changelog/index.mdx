@@ -5,6 +5,19 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Razorpay mandate limits, dispute events and payment hardening (Core 11.6.7, 11.7.0 and 11.10.1)
+
+_October 28, 2026_
+
+- **RBI limits on Razorpay mandates.** The mandate maximum sent to Razorpay is your connection's maximum lowered to the limit of the chosen method: UPI INR 25,000, card INR 15,000, bank mandate INR 10 lakh. A mandate registration for an invoice above that limit is refused with `amount_exceeds_method_limit`.
+- **Card and UPI debits above INR 15,000 go to the Pay link.** Nozle does not debit them silently. The mandate stays, and you receive `invoice.payment_failure` with `provider_error.error_code` `amount_above_auto_debit_ceiling`.
+- **Pre-debit notice.** Nozle schedules the notice of an automatic Razorpay debit: 25 hours for UPI, 36 hours 5 minutes for a card. Enable `order.notification.delivered` and `order.notification.failed` in Razorpay.
+- **New webhook `invoice.payment_dispute_updated`** for Razorpay disputes that are created, under review, need an answer or are won. It carries the invoice and a `dispute` with `id`, `event`, `status`, `reason_code`, `phase` and `respond_by`. See [webhook events](/api/webhook-events) and [Razorpay](/integrations/razorpay#mandate-limits-and-automatic-debits).
+- **Minimum Razorpay amount.** An order, link, payment request or setup session below INR 1 is refused with `amount_below_minimum`.
+- **Razorpay events.** `payment_link.expired`, `payment_link.cancelled`, `payment_link.partially_paid`, `invoice.partially_paid` and `refund.speed_changed` are ignored. A Razorpay event whose handling failed is queued again every 15 minutes, up to 96 attempts.
+- **Stripe minimum charge.** An off-session charge below Stripe's minimum fails with `amount_below_provider_minimum` and now sends the payment error webhook. Rate-limited or timed-out payment-request charges are retried. A Stripe event delivered twice is stored once, and a failed one is queued again hourly. See [Stripe](/integrations/stripe#saved-payment-methods-and-automatic-charging).
+- **Invoice pay links for customers from India.** With a publishable key on the Stripe connection, the pay link of an invoice opens the Nozle card page and registers the card mandate in the same authentication. See [Indian cards and automatic payments](/integrations/stripe#indian-cards-and-automatic-payments).
+
 ### Indian cards: e-mandates and a Nozle card page (Core 11.8.0 to 11.10.1)
 
 _October 28, 2026_
