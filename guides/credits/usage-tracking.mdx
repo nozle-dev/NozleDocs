@@ -12,20 +12,23 @@ const check = await nozle.usage.check({
   creditSystemCode: "ai_credits",
 });
 
+// Create the key and the timestamp once per unit of work and store them with it.
+const execution = { id: "execution_0183f", occurredAt: new Date().toISOString() };
+
 const result = await nozle.usage.track(
   {
     customerId: "customer_123",
     featureCode: "agent_execution",
     creditSystemCode: "ai_credits",
-    timestamp: new Date().toISOString(),
+    timestamp: execution.occurredAt,
   },
-  { idempotencyKey: "execution_0183f" },
+  { idempotencyKey: execution.id },
 );
 ```
 
 ## Idempotency
 
-Every track request requires an `Idempotency-Key`. Retrying the same key and payload returns the committed result. Reusing the key with a different payload returns a conflict. A denied request is also idempotent; use a new action key after adding credits.
+Every track request requires an `Idempotency-Key`. Retrying the same key and payload returns the committed result. Reusing the key with a different payload returns `409 idempotency_key_reused`, and the `timestamp` is part of the payload. A retry with a different timestamp returns `409 idempotency_key_reused`. Store the timestamp with the key and send both on every retry. You can also leave `timestamp` out: the SDK fills in the current time and reuses it for the same key, but only on the same client and for its last 1000 keys. See [Timestamp and retries](/api/usage-track#timestamp-and-retries). A denied request is also idempotent; use a new action key after adding credits.
 
 ## Outcomes
 

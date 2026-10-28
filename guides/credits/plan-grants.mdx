@@ -9,7 +9,7 @@ For each entitlement period, Nozle creates a distinct balance source with a dete
 
 ## Grant readiness
 
-Initial grants are asynchronous. The hosted scheduler checks for grants once per minute; an active subscription can temporarily have no spendable credit balance. Poll the expected Credit System balance with bounded backoff before allowing credit-backed work. Subscription activation alone is not confirmation that its credits are available.
+Grants are asynchronous. The hosted scheduler checks for grants once per minute, so an active subscription can briefly have no spendable plan credits. This happens at activation and at every renewal: the old period's source expires at the boundary, and the new one appears within about a minute. Poll the expected Credit System balance with bounded backoff before allowing credit-backed work. Subscription activation alone is not confirmation that its credits are available.
 
 ## Lifecycle policy
 
@@ -29,3 +29,12 @@ Plan changes inside one subscription, resubscribing after the cancelled credits 
 Each Credit System is granted on its own: a grant that fails for one Credit System does not hold back the grants of the others on the same subscription.
 
 Paid top-ups remain separate sources and are not reduced by plan changes.
+
+## Changing a plan's grant amount
+
+A grant amount changed in place (**Change version N for everyone**, `disable_version: true`) applies to the subscribers already on that plan version:
+
+- **Increase:** each current subscriber gets the difference for the current period within about a minute.
+- **Decrease:** nothing is taken back. The lower amount applies from the next period.
+
+Saved as a new plan version, the change applies to new subscribers only. Existing subscribers keep their grant until you move them. See [Plan versioning](/guides/billing/plan-versions).
