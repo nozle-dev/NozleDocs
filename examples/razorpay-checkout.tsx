@@ -43,11 +43,6 @@ export function openRazorpay(
     order_id: checkout.order_id,
     amount: checkout.amount_cents,
     currency: checkout.currency,
-    // A mandate checkout (registerMandate) also passes the Razorpay customer.
-    ...(checkout.recurring && {
-      customer_id: checkout.customer_id,
-      recurring: '1',
-    }),
     handler: onPaid,
   }).open();
 }

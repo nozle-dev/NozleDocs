@@ -3225,7 +3225,7 @@ paths:
       tags:
         - Customers
       summary: Manage a customer payment method
-      description: Returns the Stripe Billing Portal `url` where a customer adds or changes their payment method. Stripe only. Razorpay customers pay each invoice by payment link and get 422 razorpay_pays_by_link. Nozle stores no card data. Secret key only, publishable keys are refused with 403.
+      description: Returns the `url` where a customer adds or changes their payment method. Stripe customers get the Stripe Billing Portal. Razorpay customers whose connection has auto-pay (recurring payments) on get Nozle's auto-pay setup page, valid for 24 hours, where they pick an enabled method (UPI, card or bank debit) and are sent to a Razorpay registration link; the confirmed mandate becomes their default payment method. With auto-pay off, Razorpay customers pay each invoice by payment link and get 422 razorpay_pays_by_link with auto_pay_not_enabled. Nozle stores no card data. Secret key only, publishable keys are refused with 403.
       operationId: manageCustomerPaymentMethod
       parameters:
         - name: customer_id
@@ -3244,10 +3244,10 @@ paths:
                 return_url:
                   type: string
                   format: uri
-                  description: HTTPS URL on one of the organization's allowed origins that Stripe returns to. Defaults to the organization return URL.
+                  description: HTTPS URL on one of the organization's allowed origins that Stripe returns to. Defaults to the organization return URL. Checked but unused for Razorpay, whose pages do not return.
       responses:
         '200':
-          description: Stripe Billing Portal page
+          description: Stripe Billing Portal page, or Nozle's Razorpay auto-pay setup page
           content:
             application/json:
               schema:
@@ -3263,14 +3263,16 @@ paths:
                     properties:
                       url:
                         type: string
-                        description: Stripe Billing Portal URL.
+                        description: Stripe Billing Portal URL, or Nozle's auto-pay setup page URL for a Razorpay customer.
                       provider:
                         type: string
                         enum:
                           - stripe
+                          - razorpay
                       expires_at:
                         type: [string, 'null']
                         format: date-time
+                        description: When the page stops working. null for Stripe Billing Portal sessions; 24 hours after the call for the Razorpay setup page.
         '400':
           description: invalid_return_url, or the body is not valid JSON.
         '401':
@@ -3280,7 +3282,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
-          description: One of no_linked_payment_provider, razorpay_pays_by_link (Razorpay customers pay each invoice by payment link), provider_not_supported, missing_payment_provider_customer.
+          description: One of no_linked_payment_provider, razorpay_pays_by_link (Razorpay connection without auto-pay, error_details.auto_pay is auto_pay_not_enabled; the customer pays each invoice by payment link), payment_method_not_enabled, customer_details_required, provider_not_supported, missing_payment_provider_customer.
           content:
             application/json:
               schema:
@@ -36181,7 +36183,7 @@ components:
         register_mandate:
           type: boolean
           default: false
-          description: 'Razorpay only: register a recurring mandate with the payment of a subscription invoice. A plan change that leaves an amount due answers `422 razorpay_mandate_registration_unavailable` instead.'
+          description: 'Razorpay only: set up auto-pay with the payment of a subscription invoice. The result is `hosted` with `payment_url`, Nozle''s auto-pay setup page, instead of a `razorpay` order. A plan change that leaves an amount due answers `422 razorpay_mandate_registration_unavailable` instead.'
         subscription_id:
           type: string
           description: External ID of the active subscription to change. Forwarded to Core as `external_subscription_id`. Required when the customer has several active subscriptions.
@@ -36192,7 +36194,7 @@ components:
       type: object
       required:
         - type
-      description: 'Result of a checkout. The fields present depend on `type`. `hosted` (Stripe): `url`, `payment_url` (the same value), `checkout_id` (the Stripe Checkout Session ID), `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. `razorpay`: `checkout_id`, `key_id`, `order_id`, `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id` (mandate checkouts add `customer_id`, `recurring`, `mandate_max_amount_cents`). `processing`: `checkout_id` and `status`. `completed`: `status`, `payment_source`, `subscription_id`, `plan_code`, `invoice_id`, `amount_cents`, `currency` (an immediate configured downgrade instead carries the settlement fields of a transition result). `scheduled`: `status`, `subscription_id` (the pending subscription), `plan_code`, `transition_direction`, `transition_policy`, `effective_at`. Entity checkouts add `external_entity_id` and `external_subscription_id`. There is no `stripe` result and no client secret.'
+      description: 'Result of a checkout. The fields present depend on `type`. `hosted` (Stripe): `url`, `payment_url` (the same value), `checkout_id` (the Stripe Checkout Session ID), `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. `hosted` (Razorpay mandate checkout, `register_mandate`): `payment_url` (Nozle''s auto-pay setup page), `checkout_id` (to poll), `amount_cents`, `currency`, `expires_at`, `invoice_id`. `razorpay`: `checkout_id`, `key_id`, `order_id`, `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. `processing`: `checkout_id` and `status`. `completed`: `status`, `payment_source`, `subscription_id`, `plan_code`, `invoice_id`, `amount_cents`, `currency` (an immediate configured downgrade instead carries the settlement fields of a transition result). `scheduled`: `status`, `subscription_id` (the pending subscription), `plan_code`, `transition_direction`, `transition_policy`, `effective_at`. Entity checkouts add `external_entity_id` and `external_subscription_id`. There is no `stripe` result and no client secret.'
       properties:
         type:
           type: string
@@ -36220,7 +36222,7 @@ components:
           description: Razorpay order ID.
         customer_id:
           type: string
-          description: Razorpay customer ID (mandate checkouts).
+          description: Razorpay customer ID. Only on orders of earlier mandate checkouts; a mandate checkout now answers `hosted`.
         recurring:
           type: boolean
         mandate_max_amount_cents:
