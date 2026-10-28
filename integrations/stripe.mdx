@@ -33,7 +33,7 @@ The connect form has no success redirect URL. After you connect, use **Add redir
 
 To edit a connection, change its name, code, **Support 3DSecure** and redirect URL. Changing the code updates the customers assigned to it and updates the webhook endpoint URL in Stripe. Until that update finishes, Stripe events sent to the previous code's URL are still accepted. If the connection had no webhook endpoint, the rename registers one, and if the key may not edit webhook endpoints Nozle sends the `payment_provider.error` webhook.
 
-To disconnect, use **Disconnect**. Customers assigned to the connection lose their assignment. Nozle does not delete the webhook endpoint it created in Stripe, so delete it in Stripe yourself.
+To disconnect, use **Disconnect**. Customers assigned to the connection lose their assignment. Nozle also deletes the webhook endpoint it created for the connection in Stripe.
 
 ### Assign the connection to customers
 
@@ -62,7 +62,7 @@ _Unreleased._ A [sandbox](/guides/getting-started/sandbox) has its own Stripe co
 - The sandbox accepts test keys only: a secret key `sk_test_...` or a restricted key `rk_test_...`. A live key, or a key Stripe reports as live, is refused with `422 validation_errors` and `secret_key: ["sandbox_requires_test_key"]`.
 - The [import of Stripe customers and invoices](#import-existing-stripe-customers-and-invoices) runs in the sandbox only with a test key, and is refused with `sandbox_requires_test_key` otherwise.
 - A Stripe event of the other mode than the connection (a live event reaching a test connection) is acknowledged and ignored.
-- A [sandbox reset](/guides/getting-started/sandbox#reset-the-sandbox) does not carry the connection over: connect the test key again in the new sandbox. Nozle registers a new webhook endpoint in Stripe for it. The endpoint of the old sandbox's connection stays in your Stripe test mode: delete it in Stripe.
+- A [sandbox reset](/guides/getting-started/sandbox#reset-the-sandbox) carries the connection over: the new sandbox gets the same Stripe test connection with a new webhook endpoint, and the old sandbox's endpoint is deleted. If Stripe refuses the key during the reset, connect it again in the new sandbox.
 
 Live organizations are unchanged: they can hold test and live connections side by side.
 

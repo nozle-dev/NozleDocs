@@ -100,7 +100,8 @@ What a reset does:
 - Every customer, plan, subscription, invoice, wallet and event of the sandbox is gone from the dashboard and the API. The old sandbox is retired quietly: its subscriptions and wallets stop without invoices, emails or webhooks.
 - **API keys rotate.** The old sandbox keys are refused with `401` from the next request. The new sandbox has one new secret key: give it to every app that used the old one.
 - **Webhook endpoints are deleted.** Add them again in the new sandbox.
-- **Payment connections are not carried over.** Connect your Stripe or Razorpay test keys again.
+- **Stripe test connections are carried over.** Nozle connects the same Stripe test account in the new sandbox, registers its webhook endpoint and removes the old sandbox's endpoint. If Stripe refuses (for example the key was revoked), the reset still completes and tells you to connect it again.
+- **Razorpay test connections are not carried over.** Connect your Razorpay test key again: its webhook is set in the Razorpay dashboard and points at the connection.
 - Settings are copied from your live organization again, as for [a new sandbox](#what-a-new-sandbox-starts-with).
 - Your live organization is not touched.
 
