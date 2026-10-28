@@ -3,7 +3,7 @@ title: Credit Rollout and Acceptance
 description: Validate, canary, monitor, and roll back product-credit integrations
 ---
 
-Roll out product credits in stages: configure, shadow, test, canary, monitor, and expand. Use separate sandbox customers and deterministic identifiers so every result is reproducible.
+Roll out product credits in stages: configure, shadow, test, canary, monitor, and expand. Use separate test customers and deterministic identifiers so every result is reproducible. Run the configuration and test stages in your [sandbox](/guides/getting-started/sandbox), with sandbox keys, so test balances and events stay out of live; recreate the validated configuration in live before the canary.
 
 ## 1. Validate configuration
 
@@ -23,7 +23,7 @@ Advisory checks do not mutate balances and are safe for shadow evaluation.
 
 ## 3. Test idempotency and concurrency
 
-In a sandbox customer, confirm:
+With a test customer, confirm:
 
 - same-key retries return one logical result;
 - the same key with a different payload is rejected;

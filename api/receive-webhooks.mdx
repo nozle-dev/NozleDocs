@@ -24,7 +24,7 @@ Create an endpoint in the dashboard under **Developers > Webhooks**, or with `PO
 
 Payloads carry only `nozle_id` and the plain key names. From Core 6.0.0 the former-prefix keys and the former `X-*-Signature` headers are gone: see [legacy key names](/api/api-standards#legacy-key-names-removed-in-core-600).
 
-Each delivery is a JSON body with a `webhook_type` such as `subscription.started` and the object it is about, for example `subscription`. The [webhook events](/api/webhook-events) page lists every event type, when it fires and what its payload holds.
+Each delivery is a JSON body with a `webhook_type` such as `subscription.started`, `livemode` (`false` for a [sandbox](/guides/getting-started/sandbox) delivery) and the object it is about, for example `subscription`. The [webhook events](/api/webhook-events) page lists every event type, when it fires and what its payload holds.
 
 A failed credit note refund is sent as `credit_note.refund_failure`. An unknown type in `event_types` is rejected with a `422` `invalid_types` error. `credit_note.refund_failure` is accepted there; the former name `credit_note.provider_refund_failure` is still accepted and saved as `credit_note.refund_failure`, and endpoints saved with the former name are moved to it.
 

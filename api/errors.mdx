@@ -52,7 +52,7 @@ Match on the status and `code`, not on the message text.
 
 | Status and `code` | What happened | What to do |
 |---|---|---|
-| `401` (`missing authorization header`, `invalid authorization format, expected Bearer token`, `invalid api key`) | The Engine got no `Authorization` header, one that is not `Bearer <key>`, or a key it does not know or that was revoked. | Send `Authorization: Bearer sk_...` with a current key. |
+| `401` (`missing authorization header`, `invalid authorization format, expected Bearer token`, `invalid api key`) | The Engine got no `Authorization` header, one that is not `Bearer <key>`, or a key it does not know or that was revoked. A sandbox key (`sk_nozle_test_`) on a live organization, a live key on a sandbox and a key of a reset sandbox are refused the same way, and Core answers `{"status": 401, "error": "Unauthorized"}`. | Send `Authorization: Bearer sk_...` with a current key of the environment you mean. See [Live and sandbox keys](/api/authentication#live-and-sandbox-keys). |
 | `403` (`publishable_key_not_allowed` from Core; a `403` message from the Engine) | A `pk_` key called something other than the plan catalog. | Call from your backend with an `sk_` key. See [public plan catalog](/api/list-plans). |
 | `404` `customer_not_found` | No customer has that ID, for example on `subscribe`. | Create the customer with `POST /customers`, then call again. |
 | `404` `active_subscription_not_found` | `usage.check` or `usage.track` for a customer with no active subscription. | Activate a subscription for the customer. |
@@ -69,9 +69,21 @@ Match on the status and `code`, not on the message text.
 
 An event that was accepted but never counted usually means the event name does not equal the feature code, or processing has not finished: events are processed asynchronously, so read usage again after a few seconds.
 
+## Sandbox errors
+
+_Unreleased._ These come from a [sandbox](/guides/getting-started/sandbox), mostly from the dashboard.
+
+| Status and `code` | What happened | What to do |
+|---|---|---|
+| `422` `sandbox_requires_test_key` | A live Stripe or Razorpay credential was used in a sandbox (connection or Stripe import). The field is `secret_key` (Stripe) or `key_id` (Razorpay). | Use `sk_test_`, `rk_test_` or `rzp_test_`. |
+| `403` `not_available_in_sandbox` | A payment provider other than Stripe and Razorpay, or a tax, accounting or CRM integration, was connected in a sandbox. | Test it in live, or leave it out of sandbox tests. |
+| `422` `not_available_in_sandbox` | A customer email was resent (`POST /invoices/{id}/resend_email`, credit notes, payment receipts) in a sandbox. | Nothing to do: a sandbox sends no customer email. |
+| `403` `live_organization_only` | Members, invitations, roles, sign-in methods and SSO, your Nozle plan and billing, or AI onboarding, from a sandbox. | Switch to live. |
+| `429` `sandbox_reset_rate_limited` | The sandbox was reset more than once in 10 minutes or 5 times in a day. | Wait and reset again. |
+
 ## Workspace billing errors
 
-_Unreleased._ These errors are about your own workspace's account with Nozle, not about your customers. They are always on. See [Workspace billing](/guides/getting-started/workspace-billing).
+_Unreleased._ These errors are about your own workspace's account with Nozle, not about your customers. They are always on. A sandbox key gets the same errors as the live organization it belongs to. See [Workspace billing](/guides/getting-started/workspace-billing).
 
 | Status and `code` | What happened | What to do |
 |---|---|---|

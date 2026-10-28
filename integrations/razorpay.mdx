@@ -46,6 +46,16 @@ Once a customer has started a Razorpay checkout, it stays linked to that connect
 
 To assign the connection from code, send `billing_configuration.payment_provider: "razorpay"` and `payment_provider_code` when you create or update the customer. Nozle keeps the assignment even without `sync_with_provider`.
 
+## Sandbox
+
+_Unreleased._ A [sandbox](/guides/getting-started/sandbox) has its own Razorpay connections: your live connections are not shared with it, so connect Razorpay again while you are in the sandbox.
+
+- The sandbox accepts test Key IDs only (`rzp_test_...`). A `rzp_live_` Key ID is refused with `422 validation_errors` and `key_id: ["sandbox_requires_test_key"]`.
+- Set the webhook in your Razorpay test mode dashboard, with the webhook URL that the sandbox connection shows. The URL names the connection, so a sandbox connection never receives your live webhooks.
+- A [sandbox reset](/guides/getting-started/sandbox#reset-the-sandbox) does not carry the connection over: connect the test key again in the new sandbox and point the Razorpay webhook at the new connection's URL.
+
+Live organizations are unchanged: they can hold test and live connections side by side.
+
 ## What Nozle handles
 
 | Feature | How it works |

@@ -14,16 +14,31 @@ description: Public catalog and trusted-backend credentials
 
 | Key type | Prefix | Location | Access |
 |---|---|---|---|
-| Publishable | `pk_nozle_` | Browser | `GET /api/v1/plans` and `GET /api/v1/plans/{code}` only, which return the trimmed public plan. See the [public plan catalog](/api/list-plans). |
-| Secret | `sk_nozle_` | Trusted backend | Organization-scoped server operations allowed by the key's permissions |
+| Publishable | `pk_nozle_` (live), `pk_nozle_test_` (sandbox) | Browser | `GET /api/v1/plans` and `GET /api/v1/plans/{code}` only, which return the trimmed public plan. See the [public plan catalog](/api/list-plans). |
+| Secret | `sk_nozle_` (live), `sk_nozle_test_` (sandbox) | Trusted backend | Organization-scoped server operations allowed by the key's permissions |
 
-There are no separate live and test keys: every key belongs to one organization.
+Every key belongs to one organization. A [sandbox](/guides/getting-started/sandbox) is its own organization, linked to your live one, and its keys carry `_test_` in the prefix.
+
+## Live and sandbox keys
+
+_Unreleased._ Live and sandbox use the same API URLs. The key's organization decides which data a request reaches; the prefix must agree with it:
+
+- A `sk_nozle_test_` or `pk_nozle_test_` key that belongs to a live organization, or a key without `_test_` that belongs to a sandbox, is refused with `401`.
+- After a [sandbox reset](/guides/getting-started/sandbox#reset-the-sandbox), every key of the old sandbox is refused with `401`.
+- Every response to an accepted key, including a `402` refusal, carries `X-Nozle-Livemode: true` for a live organization or `false` for a sandbox. Core REST, the Engine API, event ingestion and the LLM proxy send it, and browsers can read it. A `401` does not carry it.
+
+| Response | Body |
+|---|---|
+| Core REST `401` | `{"status": 401, "error": "Unauthorized"}` |
+| Engine API `401` | `{"error": "invalid api key"}` |
+
+The `401` does not say which rule refused the key. Check the prefix against the environment you meant to use, and that the key is current.
 
 Only members with the **Admin** role can create, rotate or delete secret keys in the dashboard. The **Finance** and **Manager** roles cannot.
 
 ## Store your key when you create it
 
-The dashboard (and the GraphQL `createApiKey` and `rotateApiKey` mutations) show the full key once, when you create or rotate it (Core 7.0.0 and later). After that every read shows it masked, as `••••••••` and the last 3 characters, in the dashboard and in GraphQL (`apiKeys`, `apiKey(id)`, `updateApiKey`, `destroyApiKey`). Nozle cannot show it again. Copy it into your secret manager straight away. If you lose a key, rotate it and update your backend with the new one. Rotating gives the new key the same permissions as the old one.
+The dashboard (and the GraphQL `createApiKey` and `rotateApiKey` mutations) show the full key once, when you create or rotate it (Core 7.0.0 and later). After that every read shows it masked, as `••••••••` and the last 3 characters, in the dashboard and in GraphQL (`apiKeys`, `apiKey(id)`, `updateApiKey`, `destroyApiKey`). A sandbox key keeps its prefix, for example `sk_nozle_test_••••••••a1b`. Nozle cannot show it again. Copy it into your secret manager straight away. If you lose a key, rotate it and update your backend with the new one. Rotating gives the new key the same permissions as the old one.
 
 Send server credentials as a Bearer token:
 
