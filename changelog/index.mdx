@@ -16,6 +16,15 @@ _Unreleased_
 - **Reset.** Admins type `RESET` to replace the sandbox with an empty one: API keys rotate, webhook endpoints are deleted and Stripe or Razorpay test connections must be connected again. At most once every 10 minutes and 5 times a day (`429 sandbox_reset_rate_limited`).
 - Docs: "there are no separate live and test keys" is removed from [Authentication](/api/authentication), [Core Concepts](/guides/getting-started/concepts) and the self-hosting environment page. The credits guides say "test customer" where they said "sandbox customer".
 
+### Breaking: plan changes without checkout follow transition policies; one checkout error shape (Core 11.6.0, Engine 2.14.0 and 2.15.0)
+
+_October 28, 2026_
+
+- **Breaking: `POST /billing/upgrade` and `POST /subscriptions/change` apply a downgrade as a plan transition.** A target plan cheaper than the current one goes through the merchant's [plan transition policy](/api/plan-transition-policies) for the pair, with its timing and settlement, and returns `{"subscription_transition": {...}}` instead of `{"subscription": {...}}`. A pair with no policy now answers `422 plan_transition_policy_required`, and Core's `409 subscription_change_pending`, `422 payment_required`, `422 outstanding_invoice` and `422 plan_already_active` pass through. Send an `Idempotency-Key`: a retry with the same key returns the stored answer with `replayed: true`. Optional `subscription_id` and `entity_id` select the subscription. A paid target at or above the current price still answers `422 payment_checkout_required`, and free to free is unchanged. For new integrations use [`POST /subscriptions/transitions`](/api/subscription-management#schedule-a-downgrade) and [`POST /checkout`](/api/create-checkout). See [Upgrade plan](/api/upgrade).
+- **Every checkout error has a `code`.** Core's checkout errors carry `status`, `error` and `code`; `subscription_selection_required`, `idempotency_key_reused`, `subscription_change_pending` and `subscription_and_idempotency_key_required` no longer come as a bare `{"code": ...}`. Every Engine checkout `400` carries `code: "invalid_request"`, and a customer scope mismatch is `403 customer_scope_mismatch`. See [Create checkout](/api/create-checkout#errors).
+- **Breaking: bulk Entity checkout answers `409 billing_anchor_checkout_in_progress`** while the customer's first paid Entity checkout is still open, as single Entity checkout does. It was `422 validation_errors` with `error_details.checkout`. See [Entity subscriptions](/api/entity-subscriptions).
+- **Analytics timestamps and timezones.** `GET /analytics/llm-events` returns `timestamp` as RFC 3339 in UTC, for example `2026-10-20T10:00:00Z`, instead of `2026-10-20 10:00:00.000` without an offset. `GET /analytics/usage-heatmap` groups hours and weekdays in your organization's timezone and returns it as `timezone` next to `cells`.
+
 ### Breaking: Stripe checkout is hosted only (Core 11.5.0, Engine 2.13.0)
 
 _Unreleased_
@@ -397,6 +406,13 @@ _October 17, 2026_
 - An unpaid plan or single Entity checkout expires after 23 hours, like an Entity checkout batch: the subscription is canceled with `cancelation_reason: timeout` (`subscription.canceled` webhook), the payment-gated invoice is closed, and the Stripe Checkout Session or Razorpay order expires. The coupons, credit-note credits and wallet credits the invoice used are returned when the checkout expires or its payment fails. See [Unpaid checkout expiry](/api/create-checkout#unpaid-checkout-expiry).
 - Stripe invoice checkout and invoice payment URLs refuse an invoice that is paid, voided, draft, closed, failed or has nothing due with `invalid_invoice_status_or_payment_status`, as Razorpay already did.
 - A paid upgrade checkout returns `409 subscription_change_pending` while the subscription has a scheduled cancellation or plan change. Cancelling at period end, scheduling a plan change or applying an immediate downgrade cancels an open upgrade checkout and expires its Stripe Checkout Session or Razorpay order.
+
+### Cancellation timing and downgrade credits
+
+_October 16, 2026_
+
+- `DELETE /subscriptions/{id}` without `cancellation_policy` uses your organization's cancellation timing, which defaults to `end_of_period`: the subscription stays active until its period ends. Send `cancellation_policy=immediate` to end it now. The credit, refund and final invoice options come from the request, then the subscription, then the organization. Set the defaults in **Settings → Billing → General → Cancellations**. See [Cancel subscription](/api/cancel-subscription).
+- An immediate downgrade takes back the old plan's unused credits beyond what the new plan grants for the rest of the period (`downgrade_plan_credits: revoke_excess`, the default). It never takes a balance below zero. To keep them until the period ends, set **Settings → Billing → General → "Credits after an immediate downgrade"** to keep, or send `billing_configuration.downgrade_plan_credits: "keep"` in `PUT /organizations`. See [Included Plan Credits](/guides/credits/plan-grants#lifecycle-policy).
 
 ### Link existing Stripe customers from the SDKs
 

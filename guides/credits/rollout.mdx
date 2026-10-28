@@ -47,15 +47,15 @@ Enable one application workflow for a small set of non-production or internal cu
 
 ## 5. Audit acceptance
 
-Use Nozle's read-only credit audit tooling when available. At minimum, verify:
+The ledger audit needs direct database access, so Nozle runs it. Ask Nozle support for the report after the canary window and keep it with your release evidence.
 
-- source balances equal initial amounts plus immutable allocations;
-- successful consumes have exact deductions and one durable outbox event;
-- denied consumes have no side effects;
-- paid top-ups and subscription grants materialize once; and
-- customer and organization ownership remain consistent.
+From your side, check through the API:
 
-Retain the audit output with release evidence.
+- balances match what you expect, with [`GET /customers/{customer_id}/credit-systems`](/api/customer-credit-balances);
+- each tracked unit of work has one consume of the right amount, with [`GET /customers/{customer_id}/credit-operations`](/api/customer-credit-operations);
+- a denied consume shows its reason and has no allocations;
+- paid top-ups and plan grants appear once each; and
+- for an Entity, the same checks with [Entity Credit Balances](/api/entity-credit-balances) and [Entity Credit Operations](/api/entity-credit-operations).
 
 ## 6. Expand gradually
 

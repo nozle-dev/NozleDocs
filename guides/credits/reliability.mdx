@@ -23,20 +23,18 @@ A failed delivery to billing is retried for about a day before the event is dead
 
 ## Reconciliation
 
-Continuous jobs detect:
+These jobs run all the time:
 
-- source remaining amount that disagrees with immutable allocations;
-- successful consumes missing allocations or an outbox row;
-- denied consumes with side effects;
-- missing billing events;
-- missing subscription grants;
-- paid top-up invoices without a credit source.
+- the subscription grant, Entity grant and paid top-up sweeps run every minute and create any grant or top-up source that is missing;
+- the plan credit revocation sweep runs every minute and applies the credits taken back on an immediate downgrade;
+- the outbox worker publishes billing events continuously and reconciles published events against committed operations.
+
+PostgreSQL triggers prevent the rest. A source's remaining amount changes only through an allocation, a successful consume's allocations must sum to its amount, a denied operation cannot have allocations, and a successful consume must have exactly one outbox row.
 
 Repairs use idempotent materialization or explicit compensating operations. They never rewrite historical ledger rows.
 
 ## Acceptance audit
 
-Use Nozle's read-only credit audit tooling to check source balances against allocations, operation totals, rate arithmetic, delivery envelopes, tenant ownership, publication, and reconciliation. It exits nonzero on drift and never repairs data.
+Drift auditing is a Nozle operator tool. It reads the credit database directly and checks source balances against allocations, operation totals, rate arithmetic, tenant ownership, publication and reconciliation. It exits nonzero on drift and never repairs data. Nozle runs it and shares the report on request.
 
-Run it after the canary settle window and retain the JSON report. See [Credit
-Rollout and Acceptance](/guides/credits/rollout).
+From your side, check balances with [Customer Credit Balances](/api/customer-credit-balances) and history with [Customer Credit Operations](/api/customer-credit-operations), or [Entity Credit Balances](/api/entity-credit-balances) and [Entity Credit Operations](/api/entity-credit-operations) for an Entity. See [Credit Rollout and Acceptance](/guides/credits/rollout).

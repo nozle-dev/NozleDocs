@@ -200,42 +200,41 @@ A `completed` result has `payment_source` `credits` when the change was funded w
 }
 ```
 
-`subscription_id` is the pending subscription; there is no separate `pending_subscription_id` field. A new scheduled change while a change is pending replaces that change and returns a new pending ID. A paid upgrade checkout is refused with `409 subscription_change_pending` while a change is pending: withdraw it first. See [Paid upgrades: current limits](#paid-upgrades-current-limits).
+`subscription_id` is the pending subscription; there is no separate `pending_subscription_id` field. A new scheduled change while a change is pending replaces that change and returns a new pending ID. A paid upgrade checkout is refused with `409 subscription_change_pending` while a change is pending: withdraw it first. See [Paid upgrades: rules](#paid-upgrades-rules).
 
 `effective_at` is an RFC 3339 timestamp rendered in the customer's timezone. For a customer in `Asia/Kolkata` it reads `2026-11-01T00:00:00.000000+05:30`, which is the same instant as `2026-10-31T18:30:00Z`. Parse it as a timestamp and do not assume a trailing `Z`. A scheduled change takes effect at that instant: the active subscription is terminated and the pending subscription becomes active, keeping its `billing_time`.
 
-### Paid upgrades: current limits
+### Paid upgrades: rules
 
-These limits were observed on a paid upgrade checkout that returns a `stripe` result with `plan_upgrade_intent_id`. Configure around them until Core is fixed.
+These rules apply to a paid upgrade checkout, the result that carries `plan_upgrade_intent_id`. Nozle finalizes the upgrade invoice when the payment arrives, even when the billing entity has an invoice grace period.
 
-- **Invoice grace period.** If the billing entity has an invoice grace period above 0 days, the upgrade invoice stays a draft. The customer's payment is still collected, but Nozle cannot apply the upgrade. With `credit_action: "credit"` the upgrade ends in `needs_review` with `plan_upgrade_amount_changed`, because the quoted amount credited the unused time and the draft invoice did not. Without a credit, the payment handler fails with `payment_status_update_on_draft_invoice` and the upgrade stays pending. Set the grace period to 0 for billing entities that sell paid upgrades, or refund and reconcile an affected payment by hand.
 - **Pending change.** A paid upgrade checkout is refused with `409 subscription_change_pending` while the subscription has a scheduled cancellation or a scheduled plan change. Withdraw the pending downgrade with [`POST /subscriptions/transitions/withdraw`](/api/subscription-management#withdraw-a-pending-downgrade), or keep the subscription, then start the upgrade. Cancelling at period end, scheduling a plan change or applying an immediate downgrade cancels an open upgrade checkout: its Stripe Checkout Session or Razorpay order is expired. A payment the provider is already processing is left to settle.
 - **Status.** Poll the upgrade with `GET /checkout/{plan_upgrade_intent_id}?customer_id=…&subscription_id=…` (Engine names). `status` is `awaiting_payment` until payment, then `succeeded` with `fulfillment_status` `succeeded` and an `invoice_id`. `needs_review` means the payment was taken but the upgrade was not applied. See [Subscription self-service](/api/subscription-management#payment-status-and-recovery).
 
-- **Failed upgrades leave nothing behind.** A quoted upgrade with nothing to pay that fails after the change was prepared (for example because the grace period keeps its invoice a draft) is rolled back: the subscription stays on its plan, no credit note is created, and the same request can be retried once the cause is fixed. An upgrade whose credit for the unused time of the old plan cannot be computed (the credit usage of a plan family interval switch is unavailable) fails with `503 credit_usage_unavailable` and applies nothing, instead of applying without the credit. Retry later.
+- **Failed upgrades leave nothing behind.** A quoted upgrade with nothing to pay that fails after the change was prepared is rolled back: the subscription stays on its plan, no credit note is created, and the same request can be retried once the cause is fixed. An upgrade whose credit for the unused time of the old plan cannot be computed (the credit usage of a plan family interval switch is unavailable) fails with `503 credit_usage_unavailable` and applies nothing, instead of applying without the credit. Retry later.
 
-With a grace period of 0 and no pending change, a credited upgrade applies as quoted: the old subscription is terminated, the new one is active, and `billing_time` is unchanged.
+With no pending change, a credited upgrade applies as quoted: the old subscription is terminated, the new one is active, and `billing_time` is unchanged.
 
 ## Errors
 
 The Engine checks the request in this order: valid JSON body, customer scope, the `subscription_id` combinations, the required fields, then the `Idempotency-Key` length. Only then is the request sent to Core, which checks `return_url` and returns the other errors below.
 
+Every error body carries `error` and `code`. Core's errors also carry `status`, as `{"status": 409, "error": "Conflict", "code": "subscription_change_pending"}`, plus `error_details` or `checkout_id` where noted. Branch on the HTTP status and `code`, not on `error`.
+
 | Status | Code | Cause |
 | --- | --- | --- |
-| `400` | `invalid_request` | `subscription_id` combined with `invoice_id` or `external_entity_id`, or neither `plan_code` with `customer_id` nor `invoice_id` given. |
+| `400` | `invalid_request` | The body is not valid JSON, `subscription_id` is combined with `invoice_id` or `external_entity_id`, neither `plan_code` with `customer_id` nor `invoice_id` is given, or the `Idempotency-Key` is longer than 255 bytes. |
 | `400` | `invalid_return_url` | Core refused `return_url`: it is not an absolute HTTPS URL, or its origin is not one of your organization's allowed origins. See [return URLs](/guides/billing/checkout#return-urls-and-your-organizations-origins). |
-| `400` | — | The body is not valid JSON, or the `Idempotency-Key` is longer than 255 bytes. |
-| `404` | `plan_not_found`, `customer_not_found` | Unknown plan or customer. |
+| `403` | `customer_scope_mismatch` | Trusted internal authentication with an `X-Nozle-Customer-Id` header that differs from `customer_id`. |
+| `404` | `plan_not_found`, `customer_not_found`, `subscription_not_found` | Unknown plan or customer, or `subscription_id` is not an active subscription of the customer (for example a terminated one). |
 | `422` | `plan_transition_policy_required` | The customer has an active subscription and the change needs a [transition policy](/api/plan-transition-policies): an immediate downgrade, a plan the default does not reach, or a trial. Upgrades and end-of-period downgrades between public plans need none. |
 | `422` | `validation_errors` | `error_details.base` is `amount_below_provider_minimum`: an invoice checkout whose amount left to pay is under the payment provider's minimum charge (for example less than $0.50 on Stripe). |
 | `422` | `plan_upgrade_invoice_missing` | An upgrade to a plan billed in arrears: nothing is due up front. |
 | `422` | `plan_already_active`, `target_plan_is_not_a_downgrade` | See [transition policies](/api/plan-transition-policies). |
-| `422` | `subscription_not_active` | Raised by plan-transition calls on a subscription that is not active. A checkout that names a terminated subscription ID was treated as a new checkout in testing, so do not rely on this code from checkout. |
 | `409` | `subscription_selection_required` | The customer has several active subscriptions and no `subscription_id` was given. |
 | `409` | `plan_upgrade_checkout_in_progress` | Another upgrade checkout for the same subscription is open, or its time ran out while the provider reports a payment in progress or cannot be reached. Recover it with checkout status. See [Upgrade checkout that ran out of time](#upgrade-checkout-that-ran-out-of-time). |
 | `409` | `entity_subscription_checkout_in_progress` | A single Entity checkout on a different plan is still being paid: the provider is processing its payment, or it was paid. An abandoned one is replaced instead. |
-| `409` | `billing_anchor_checkout_in_progress` | A single Entity checkout found that the customer's first paid Entity checkout is still open and no billing anchor is set yet. |
-| `422` | `validation_errors` | `error_details.checkout` is `billing_anchor_checkout_in_progress`: a bulk Entity checkout found an Entity with an incomplete subscription, or a first paid checkout for the customer still open. It is a `422`, not a `409`. |
+| `409` | `billing_anchor_checkout_in_progress` | A single or bulk Entity checkout found that the customer's first paid Entity checkout is still open and no billing anchor is set yet. A bulk checkout returned `422 validation_errors` for this before October 28, 2026. |
 | `409` | `idempotency_key_reused` | The key was used with a different request. An invoice checkout on Stripe returns it when Stripe refuses the reused key. |
 | `409` | `plan_change_quote_changed` | The quote no longer matches the subscription. Preview again. |
 | `409` | `subscription_change_pending` | The subscription has a scheduled cancellation or plan change, or an upgrade payment in progress. Withdraw the change, or wait for the payment, then preview again. |
