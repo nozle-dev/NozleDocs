@@ -10,7 +10,7 @@ Nozle processes payment webhooks for each connected Stripe account and for each 
 1. You connect a Stripe account to a Nozle organization.
 2. Nozle registers a Stripe webhook endpoint for that Stripe account.
 3. Stripe sends payment events to your public Nozle API URL.
-4. Nozle verifies the `Stripe-Signature` header using the webhook secret returned by Stripe. It subscribes to the nine events below only, and it does not de-duplicate Stripe events by event ID: replays are safe because handlers act on the current state.
+4. Nozle verifies the `Stripe-Signature` header using the webhook secret returned by Stripe. It subscribes to the ten events below only, and it does not de-duplicate Stripe events by event ID: replays are safe because handlers act on the current state.
 5. Nozle updates invoice payment status and resolves any payment-gated subscription activation.
 
 **Key events processed:**
@@ -21,6 +21,7 @@ Nozle processes payment webhooks for each connected Stripe account and for each 
 | payment_intent.payment_failed | Marks the payment failed. A declined card on a payment-gated checkout keeps the invoice open for a retry; any other failure cancels the incomplete subscription |
 | payment_intent.canceled | Treats the payment attempt as failed |
 | setup_intent.succeeded | Stores the customer's new default payment method |
+| mandate.updated | Records the status of an India card mandate and retries the customer's pending invoices when it becomes active. See [Indian cards](/integrations/stripe#indian-cards-and-automatic-payments) |
 | payment_method.detached | Received, but it does not clear the stored payment method today (known bug) |
 | customer.updated | Syncs the customer's default payment method |
 | refund.updated, refund.failed | Updates the credit-note refund status. The older `charge.refund.updated` is still accepted for one release |

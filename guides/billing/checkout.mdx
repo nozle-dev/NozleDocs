@@ -42,6 +42,8 @@ Every Stripe checkout is a Stripe-hosted Checkout Session: a new subscription's 
 
 Credit top-ups and invoice payment URLs also open a Stripe-hosted page, valid for 24 hours.
 
+A card issued in India needs an e-mandate before Nozle can charge it automatically, and Stripe Checkout cannot register one. A first payment through Stripe Checkout therefore leaves an Indian card without a mandate: the customer pays that first invoice by hand and later invoices use the hosted page until a card is saved on Nozle's card page. When the Stripe connection has a publishable key, card setup links (not checkout) open that Nozle-hosted page and return the customer to the return URL with `nozle_card=succeeded`, `processing` or `failed`. See [Indian cards and automatic payments](/integrations/stripe#indian-cards-and-automatic-payments).
+
 ### Required Stripe webhook setup
 
 When you connect a Stripe account, Nozle registers a Stripe webhook endpoint for that account and stores Stripe's webhook signing secret. Your Stripe account must allow webhook endpoint creation.

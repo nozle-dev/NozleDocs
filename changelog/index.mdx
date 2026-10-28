@@ -5,6 +5,15 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Indian cards: e-mandates and a Nozle card page (Core 11.7.0 to 11.9.0)
+
+_October 28, 2026_
+
+- **Optional Stripe publishable key and mandate maximum on the Stripe connection.** `publishableKey` (`pk_test_` or `pk_live_`, same mode as the secret key, not a secret) and `mandateCapMultiplier`, `mandateCapFloorCents`, `mandateCapCeilingCents` on the GraphQL `addStripePaymentProvider` and `updateStripePaymentProvider` mutations. New Stripe endpoints subscribe to `mandate.updated`; self-hosters run `payment_providers:refresh_stripe_webhook_events` for existing ones.
+- **A Nozle-hosted card page** replaces Stripe Checkout for saving a card when the connection has a publishable key and the customer pays by card (or Link) only. It registers an e-mandate for cards issued in India with one bank OTP and does nothing special for other cards. Card details go to Stripe's fields, never to Nozle. The result shape is unchanged: the card setup link and `customer.checkout_url_generated` carry a `url` on Nozle's domain instead of stripe.com. The customer returns to your return URL with `nozle_card=succeeded|processing|failed`. Saving a card while paying a first invoice still uses Stripe Checkout, and the `payment-method/manage` endpoint still opens the Stripe Billing Portal.
+- **Automatic charges of Indian cards use the mandate.** A charge above about INR 15,000, or above the mandate maximum, needs the customer to approve the bank's notice before the debit. A mandated charge stays processing for up to 26 hours. Without an active mandate the customer pays on the hosted page as before.
+- **Failed-payment retries skip reasons that cannot succeed** (authentication or a mandate needed, hard declines) and the customer gets the pay link at once. A payment that is processing no longer starts the failed-payment clock. See [Indian cards and automatic payments](/integrations/stripe#indian-cards-and-automatic-payments) and [Workspace billing](/guides/getting-started/workspace-billing#india-cards).
+
 ### Breaking: plan changes without checkout follow transition policies; one checkout error shape (Core 11.6.0, Engine 2.14.0 and 2.15.0)
 
 _October 28, 2026_
