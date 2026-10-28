@@ -7696,7 +7696,7 @@ paths:
       tags:
         - Subscription Changes
       summary: Preview a plan change
-      description: Returns a signed quote for changing the customer's subscription to `plan_code`. Engine checks that the plan exists and, when `subscription_id` is sent, that the subscription belongs to the customer, then forwards to Core `POST /checkout_sessions/preview`. Requires `invoice:read` (not `subscription`). Changing between two plans needs a plan transition policy for the pair, except free to paid. Engine forwards Core's status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine's own `{error, code?}` errors.
+      description: Returns a signed quote for changing the customer's subscription to `plan_code`. Engine checks that the plan exists and, when `subscription_id` is sent, that the subscription belongs to the customer, then forwards to Core `POST /checkout_sessions/preview`. Requires `invoice:read` (not `subscription`). Changing between two plans needs a plan transition policy for the pair, except free to paid. Engine forwards Core's status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}`) can appear in addition to Engine's own `{error, code?}` errors.
       operationId: enginePreviewSubscriptionChange
       security:
         - bearerAuth: []
@@ -7734,12 +7734,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingEngineOrCoreError'
         '409':
-          description: 'Core: `subscription_selection_required` (several active subscriptions and no `subscription_id`), `plan_change_quote_changed` or `subscription_change_pending`. Body is `{"code": "..."}`.'
+          description: 'Core: `subscription_selection_required` (several active subscriptions and no `subscription_id`), `plan_change_quote_changed` or `subscription_change_pending`.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
               example:
+                status: 409
+                error: Conflict
                 code: subscription_selection_required
         '422':
           description: 'Core validation failure. Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
@@ -7855,7 +7857,7 @@ paths:
       tags:
         - Checkout
       summary: Create a checkout
-      description: 'Creates a payment-gated plan checkout, an invoice checkout (`invoice_id`), or an Entity checkout (`external_entity_id`). Requires `payment:write`. Engine validates the body, then forwards to Core `POST /checkout_sessions` (renaming `subscription_id` to `external_subscription_id`). Core decides the result type from the plan, the current subscription and its transition policy: a provider checkout when money is due, `completed` when nothing external is due, `scheduled` for an end-of-period change. An unpaid plan or single Entity checkout expires after 23 hours (the Stripe Checkout Session and Razorpay order too): the subscription is canceled with `cancelation_reason: timeout` and a `subscription.canceled` webhook, the invoice is closed, and the coupons, credit-note credits and wallet credits it used are returned. They are also returned when the checkout payment fails. Checking out the same plan again reopens an abandoned checkout; another plan replaces it. With Stripe, every checkout is a Stripe-hosted Checkout Session returned as `type: hosted` with a `url` to redirect the customer to (a saved card is charged first, and then no page opens). An invoice has at most one payable Checkout Session: checking out the same invoice again returns the open session (same `url`), and while a payment of the last session is processing or has succeeded the call answers `422` with `base: [payment_already_processing]`. A second successful payment for an invoice that is already paid is refunded in full and reported with the `invoice.payment_failure` webhook (`duplicate_payment_refunded`). A customer without a subscription choosing a plan that needs no up-front payment gets `422 checkout_not_required`. Engine forwards Core''s status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine''s own `{error, code?}` errors.'
+      description: 'Creates a payment-gated plan checkout, an invoice checkout (`invoice_id`), or an Entity checkout (`external_entity_id`). Requires `payment:write`. Engine validates the body, then forwards to Core `POST /checkout_sessions` (renaming `subscription_id` to `external_subscription_id`). Core decides the result type from the plan, the current subscription and its transition policy: a provider checkout when money is due, `completed` when nothing external is due, `scheduled` for an end-of-period change. An unpaid plan or single Entity checkout expires after 23 hours (the Stripe Checkout Session and Razorpay order too): the subscription is canceled with `cancelation_reason: timeout` and a `subscription.canceled` webhook, the invoice is closed, and the coupons, credit-note credits and wallet credits it used are returned. They are also returned when the checkout payment fails. Checking out the same plan again reopens an abandoned checkout; another plan replaces it. With Stripe, every checkout is a Stripe-hosted Checkout Session returned as `type: hosted` with a `url` to redirect the customer to (a saved card is charged first, and then no page opens). An invoice has at most one payable Checkout Session: checking out the same invoice again returns the open session (same `url`), and while a payment of the last session is processing or has succeeded the call answers `422` with `base: [payment_already_processing]`. A second successful payment for an invoice that is already paid is refunded in full and reported with the `invoice.payment_failure` webhook (`duplicate_payment_refunded`). A customer without a subscription choosing a plan that needs no up-front payment gets `422 checkout_not_required`. Engine forwards Core''s status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}`) can appear in addition to Engine''s own `{error, code?}` errors.'
       operationId: engineCreateCheckout
       security:
         - bearerAuth: []
@@ -7919,7 +7921,7 @@ paths:
                     transition_policy: next_period
                     effective_at: '2026-11-01T00:00:00.000000Z'
         '400':
-          description: 'Engine rejected the request: invalid body; `subscription_id` with `invoice_id` or `external_entity_id` (`code: invalid_request`); neither `invoice_id` nor `plan_code` with a customer (`code: invalid_request`); Core refused the `return_url` (`code: invalid_return_url`: not an HTTPS URL on an origin allowed for the organization); or an Idempotency-Key longer than 255 bytes.'
+          description: 'Engine rejected the request with `code: invalid_request`: invalid JSON body, `subscription_id` with `invoice_id` or `external_entity_id`, neither `invoice_id` nor `plan_code` with a customer, or an Idempotency-Key longer than 255 bytes. Or Core refused the `return_url` (`code: invalid_return_url`: not an HTTPS URL on an origin allowed for the organization).'
           content:
             application/json:
               schema:
@@ -7930,7 +7932,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: 'Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the request''s customer, Engine answers `{"error": "customer scope mismatch", "code": "customer_scope_mismatch"}`.'
           content:
             application/json:
               schema:
@@ -8004,7 +8006,7 @@ paths:
       tags:
         - Checkout
       summary: Get checkout status
-      description: Returns the payment and fulfillment status of a checkout, with a resumable `checkout` when payment can still be completed. With `customer_id` and `subscription_id`, Core first looks for a paid upgrade of that subscription with this ID, then for a Razorpay checkout whose owner matches the scope. Without them, only a Razorpay checkout of the organization is found. Requires `payment:read`. Engine forwards Core's status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine's own `{error, code?}` errors.
+      description: Returns the payment and fulfillment status of a checkout, with a resumable `checkout` when payment can still be completed. With `customer_id` and `subscription_id`, Core first looks for a paid upgrade of that subscription with this ID, then for a Razorpay checkout whose owner matches the scope. Without them, only a Razorpay checkout of the organization is found. Requires `payment:read`. Engine forwards Core's status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}`) can appear in addition to Engine's own `{error, code?}` errors.
       operationId: engineGetCheckoutStatus
       security:
         - bearerAuth: []
@@ -8040,7 +8042,7 @@ paths:
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: 'Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the request''s customer, Engine answers `{"error": "customer scope mismatch", "code": "customer_scope_mismatch"}`.'
           content:
             application/json:
               schema:
@@ -8096,7 +8098,7 @@ paths:
       tags:
         - Checkout
       summary: Verify a Razorpay checkout
-      description: Forwards the Razorpay browser handler fields to Core `POST /checkout_sessions/{id}/verify`, which checks the signature and settles the payment, then returns the checkout status. A successful verification is not proof of fulfillment; check `fulfillment_status`. Requires `payment:write`. Engine forwards Core's status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}` or `{code}`) can appear in addition to Engine's own `{error, code?}` errors.
+      description: Forwards the Razorpay browser handler fields to Core `POST /checkout_sessions/{id}/verify`, which checks the signature and settles the payment, then returns the checkout status. A successful verification is not proof of fulfillment; check `fulfillment_status`. Requires `payment:write`. Engine forwards Core's status code and JSON body unchanged, so Core error bodies (`{status, error, code, error_details?}`) can appear in addition to Engine's own `{error, code?}` errors.
       operationId: engineVerifyCheckout
       security:
         - bearerAuth: []
@@ -8142,17 +8144,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingCheckoutStatus'
         '400':
-          description: Invalid checkout ID, missing Razorpay fields, unpaired scope parameters, or an Idempotency-Key longer than 255 bytes.
+          description: 'Invalid checkout ID, missing Razorpay fields, unpaired scope parameters, or an Idempotency-Key longer than 255 bytes. `code` is `invalid_request`.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EngineError'
               example:
                 error: Razorpay order, payment and signature are required
+                code: invalid_request
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
-          description: Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`).
+          description: 'Engine refused the credential (publishable key, missing API permission, or no Core credential for this organization), or Core refused it (`secret_key_required`, `write_action_not_allowed_for_<resource>`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the request''s customer, Engine answers `{"error": "customer scope mismatch", "code": "customer_scope_mismatch"}`.'
           content:
             application/json:
               schema:
@@ -9825,8 +9828,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorNotFound'
+        '409':
+          description: '`billing_anchor_checkout_in_progress`: a first paid Entity checkout for this customer is still open and no billing anchor is set yet. Before Core 11.6.0 this was a `422 validation_errors` with `error_details.checkout`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingCoreError'
+              example:
+                status: 409
+                error: Conflict
+                code: billing_anchor_checkout_in_progress
         '422':
-          description: '`validation_errors`. `error_details` keys: `items` (`paid_plan_required`, `mixed_currencies`, `mixed_intervals`, `duplicate_external_entity_id`, `entity_subscription_already_exists`, `value_is_mandatory`, `value_is_too_large`, `value_is_invalid`), `currency` (`customer_currency_mismatch`), `checkout` (`billing_anchor_checkout_in_progress`, `checkout_not_available`, `payment_provider_changed`), `billing_time` (`value_is_invalid`), `idempotency_key` (`value_is_mandatory`, `value_is_too_long`, `idempotency_key_reused`), `return_url` (`invalid_or_untrusted`). Refused in the current state: `payment_provider_required` or `stripe_customer_required`.'
+          description: '`validation_errors`. `error_details` keys: `items` (`paid_plan_required`, `mixed_currencies`, `mixed_intervals`, `duplicate_external_entity_id`, `entity_subscription_already_exists`, `value_is_mandatory`, `value_is_too_large`, `value_is_invalid`), `currency` (`customer_currency_mismatch`), `checkout` (`checkout_not_available`, `payment_provider_changed`), `billing_time` (`value_is_invalid`), `idempotency_key` (`value_is_mandatory`, `value_is_too_long`, `idempotency_key_reused`), `return_url` (`invalid_or_untrusted`). Refused in the current state: `payment_provider_required` or `stripe_customer_required`.'
           content:
             application/json:
               schema:
@@ -35885,7 +35898,7 @@ components:
           description: Request id to quote to support, when the Engine includes it.
     BillingCoreError:
       type: object
-      description: Error body produced by Core and forwarded unchanged by Engine. Some conflict responses carry only `code`. Validation failures carry `error_details`, an object whose keys are field names and whose values are arrays of error codes.
+      description: Error body produced by Core and forwarded unchanged by Engine. Checkout errors always carry `status`, `error` and `code`; some conflict responses of other routes carry only `code`. Validation failures carry `error_details`, an object whose keys are field names and whose values are arrays of error codes.
       properties:
         status:
           type: integer

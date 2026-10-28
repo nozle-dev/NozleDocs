@@ -220,22 +220,22 @@ With a grace period of 0 and no pending change, a credited upgrade applies as qu
 
 The Engine checks the request in this order: valid JSON body, customer scope, the `subscription_id` combinations, the required fields, then the `Idempotency-Key` length. Only then is the request sent to Core, which checks `return_url` and returns the other errors below.
 
+Every error body carries `error` and `code`. Core's errors also carry `status`, as `{"status": 409, "error": "Conflict", "code": "subscription_change_pending"}`, plus `error_details` or `checkout_id` where noted. Branch on the HTTP status and `code`, not on `error`.
+
 | Status | Code | Cause |
 | --- | --- | --- |
-| `400` | `invalid_request` | `subscription_id` combined with `invoice_id` or `external_entity_id`, or neither `plan_code` with `customer_id` nor `invoice_id` given. |
+| `400` | `invalid_request` | The body is not valid JSON, `subscription_id` is combined with `invoice_id` or `external_entity_id`, neither `plan_code` with `customer_id` nor `invoice_id` is given, or the `Idempotency-Key` is longer than 255 bytes. |
 | `400` | `invalid_return_url` | Core refused `return_url`: it is not an absolute HTTPS URL, or its origin is not one of your organization's allowed origins. See [return URLs](/guides/billing/checkout#return-urls-and-your-organizations-origins). |
-| `400` | — | The body is not valid JSON, or the `Idempotency-Key` is longer than 255 bytes. |
-| `404` | `plan_not_found`, `customer_not_found` | Unknown plan or customer. |
+| `403` | `customer_scope_mismatch` | Trusted internal authentication with an `X-Nozle-Customer-Id` header that differs from `customer_id`. |
+| `404` | `plan_not_found`, `customer_not_found`, `subscription_not_found` | Unknown plan or customer, or `subscription_id` is not an active subscription of the customer (for example a terminated one). |
 | `422` | `plan_transition_policy_required` | The customer has an active subscription and the change needs a [transition policy](/api/plan-transition-policies): an immediate downgrade, a plan the default does not reach, or a trial. Upgrades and end-of-period downgrades between public plans need none. |
 | `422` | `validation_errors` | `error_details.base` is `amount_below_provider_minimum`: an invoice checkout whose amount left to pay is under the payment provider's minimum charge (for example less than $0.50 on Stripe). |
 | `422` | `plan_upgrade_invoice_missing` | An upgrade to a plan billed in arrears: nothing is due up front. |
 | `422` | `plan_already_active`, `target_plan_is_not_a_downgrade` | See [transition policies](/api/plan-transition-policies). |
-| `422` | `subscription_not_active` | Raised by plan-transition calls on a subscription that is not active. A checkout that names a terminated subscription ID was treated as a new checkout in testing, so do not rely on this code from checkout. |
 | `409` | `subscription_selection_required` | The customer has several active subscriptions and no `subscription_id` was given. |
 | `409` | `plan_upgrade_checkout_in_progress` | Another upgrade checkout for the same subscription is open, or its time ran out while the provider reports a payment in progress or cannot be reached. Recover it with checkout status. See [Upgrade checkout that ran out of time](#upgrade-checkout-that-ran-out-of-time). |
 | `409` | `entity_subscription_checkout_in_progress` | A single Entity checkout on a different plan is still being paid: the provider is processing its payment, or it was paid. An abandoned one is replaced instead. |
-| `409` | `billing_anchor_checkout_in_progress` | A single Entity checkout found that the customer's first paid Entity checkout is still open and no billing anchor is set yet. |
-| `422` | `validation_errors` | `error_details.checkout` is `billing_anchor_checkout_in_progress`: a bulk Entity checkout found an Entity with an incomplete subscription, or a first paid checkout for the customer still open. It is a `422`, not a `409`. |
+| `409` | `billing_anchor_checkout_in_progress` | A single or bulk Entity checkout found that the customer's first paid Entity checkout is still open and no billing anchor is set yet. A bulk checkout returned `422 validation_errors` for this before October 28, 2026. |
 | `409` | `idempotency_key_reused` | The key was used with a different request. An invoice checkout on Stripe returns it when Stripe refuses the reused key. |
 | `409` | `plan_change_quote_changed` | The quote no longer matches the subscription. Preview again. |
 | `409` | `subscription_change_pending` | The subscription has a scheduled cancellation or plan change, or an upgrade payment in progress. Withdraw the change, or wait for the payment, then preview again. |
