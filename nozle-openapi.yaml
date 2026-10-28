@@ -17230,6 +17230,8 @@ webhooks:
                   type: string
                   enum:
                     - payment.requires_action
+                    - payment.scheduled
+                    - payment.schedule_cancelled
                 object_type:
                   type: string
                   enum:
@@ -17268,6 +17270,142 @@ webhooks:
                 provider_customer_id: cus_example
                 next_action: {}
                 created_at: '2026-10-12T22:17:08Z'
+      responses:
+        '200':
+          description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
+  payment_scheduled:
+    post:
+      operationId: paymentScheduled
+      summary: A payment will be debited automatically
+      description: 'Nozle will debit a payment automatically from the customer''s saved card or mandate at `scheduled_at`. It is sent once per payment and `scheduled_at`; a changed `scheduled_at` sends it again. The payload is the payment object plus `scheduled_at` and `method_type`. Nozle emails the customer with this notice when the connection setting `upcomingDebitEmail` is on (default: on for Razorpay and for INR payments on Stripe); you can send your own message from this webhook instead. Today it is sent for Stripe card payments that the bank debits after its notice, not yet for Razorpay debits.'
+      parameters:
+        - $ref: '#/components/parameters/webhook_signature'
+        - $ref: '#/components/parameters/webhook_signature_algorithm'
+        - $ref: '#/components/parameters/webhook_unique_key'
+      requestBody:
+        description: Details of the payment and of the automatic debit
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - payment
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - payment.scheduled
+                object_type:
+                  type: string
+                  enum:
+                    - payment
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                payment:
+                  $ref: '#/components/schemas/PaymentScheduledObject'
+            example:
+              webhook_type: payment.scheduled
+              object_type: payment
+              organization_id: 00000000-0000-4000-8000-000000000001
+              payment:
+                nozle_id: 00000000-0000-4000-8000-000000000002
+                customer_id: 00000000-0000-4000-8000-000000000003
+                external_customer_id: sdkv3u-1791843258
+                invoice_ids:
+                  - 00000000-0000-4000-8000-000000000004
+                invoice_numbers:
+                  - PUL-CDDE-202610-318
+                payable_id: 00000000-0000-4000-8000-000000000004
+                payable_type: Invoice
+                amount_cents: 919
+                amount_currency: USD
+                status: processing
+                payment_status: pending
+                type: provider
+                reference: null
+                payment_provider_code: stripe_sync_canary
+                payment_provider_type: PaymentProviders::StripeProvider
+                external_payment_id: pi_example
+                provider_payment_id: pi_example
+                provider_customer_id: cus_example
+                next_action: {}
+                created_at: '2026-10-12T22:17:08Z'
+                scheduled_at: '2026-10-30T14:30:00Z'
+                method_type: card
+      responses:
+        '200':
+          description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
+  payment_schedule_cancelled:
+    post:
+      operationId: paymentScheduleCancelled
+      summary: An announced automatic debit will not happen
+      description: 'An automatic debit announced by `payment.scheduled` will not happen. It is sent only after `payment.scheduled` was sent for the payment. The payload is the payment object plus `scheduled_at` (the announced time) and `reason`; it has no `method_type`.'
+      parameters:
+        - $ref: '#/components/parameters/webhook_signature'
+        - $ref: '#/components/parameters/webhook_signature_algorithm'
+        - $ref: '#/components/parameters/webhook_unique_key'
+      requestBody:
+        description: Details of the payment and of the automatic debit
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - payment
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - payment.schedule_cancelled
+                object_type:
+                  type: string
+                  enum:
+                    - payment
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                payment:
+                  $ref: '#/components/schemas/PaymentScheduleCancelledObject'
+            example:
+              webhook_type: payment.schedule_cancelled
+              object_type: payment
+              organization_id: 00000000-0000-4000-8000-000000000001
+              payment:
+                nozle_id: 00000000-0000-4000-8000-000000000002
+                customer_id: 00000000-0000-4000-8000-000000000003
+                external_customer_id: sdkv3u-1791843258
+                invoice_ids:
+                  - 00000000-0000-4000-8000-000000000004
+                invoice_numbers:
+                  - PUL-CDDE-202610-318
+                payable_id: 00000000-0000-4000-8000-000000000004
+                payable_type: Invoice
+                amount_cents: 919
+                amount_currency: USD
+                status: succeeded
+                payment_status: succeeded
+                type: provider
+                reference: null
+                payment_provider_code: stripe_sync_canary
+                payment_provider_type: PaymentProviders::StripeProvider
+                external_payment_id: pi_example
+                provider_payment_id: pi_example
+                provider_customer_id: cus_example
+                next_action: {}
+                created_at: '2026-10-12T22:17:08Z'
+                scheduled_at: '2026-10-30T14:30:00Z'
+                reason: invoice_paid
       responses:
         '200':
           description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
@@ -27062,6 +27200,52 @@ components:
             $ref: '#/components/schemas/InvoiceObject'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
+    PaymentScheduledObject:
+      description: The payment plus when Nozle will debit it automatically and with which kind of payment method.
+      allOf:
+        - $ref: '#/components/schemas/PaymentObject'
+        - type: object
+          required:
+            - scheduled_at
+            - method_type
+          properties:
+            scheduled_at:
+              type: string
+              format: date-time
+              description: When the automatic debit is planned, ISO 8601 in UTC.
+              example: '2026-10-30T14:30:00Z'
+            method_type:
+              type: string
+              enum:
+                - card
+                - upi
+                - bank
+              description: The kind of saved payment method that will be debited.
+              example: card
+    PaymentScheduleCancelledObject:
+      description: The payment plus the announced debit time and why the debit will not happen. There is no `method_type`.
+      allOf:
+        - $ref: '#/components/schemas/PaymentObject'
+        - type: object
+          required:
+            - scheduled_at
+            - reason
+          properties:
+            scheduled_at:
+              type: string
+              format: date-time
+              description: The debit time that was announced, ISO 8601 in UTC.
+              example: '2026-10-30T14:30:00Z'
+            reason:
+              type: string
+              enum:
+                - mandate_changed
+                - invoice_paid
+                - invoice_voided
+                - notice_failed
+                - other
+              description: Why the debit was cancelled. `mandate_changed`, the card or mandate can no longer be used; `invoice_paid`, the invoice was paid another way; `invoice_voided`, the invoice was voided; `notice_failed`, the bank notice failed; `other`, any other reason.
+              example: invoice_paid
     PaymentObject:
       type: object
       required:
@@ -35046,6 +35230,8 @@ components:
               - order_form.voided
               - payment.succeeded
               - payment.requires_action
+              - payment.scheduled
+              - payment.schedule_cancelled
               - payment_provider.error
               - payment_receipt.created
               - payment_receipt.generated
@@ -35169,6 +35355,8 @@ components:
                   - order_form.voided
                   - payment.succeeded
                   - payment.requires_action
+                  - payment.scheduled
+                  - payment.schedule_cancelled
                   - payment_provider.error
                   - payment_receipt.created
                   - payment_receipt.generated
@@ -35290,6 +35478,8 @@ components:
                   - order_form.voided
                   - payment.succeeded
                   - payment.requires_action
+                  - payment.scheduled
+                  - payment.schedule_cancelled
                   - payment_provider.error
                   - payment_receipt.created
                   - payment_receipt.generated

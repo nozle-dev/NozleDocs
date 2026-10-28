@@ -45,6 +45,23 @@ Day 0 is the first failed automatic charge of a Nozle invoice.
 - Any member can pay under **Nozle invoices** in the dashboard.
 - Adding or changing the card retries the charge at once. If nothing is owed any more, the cycle ends and the banner disappears.
 - Paying before day 7 means the workspace is never suspended.
+- The **Pay** link opens the Nozle card page in pay mode when the workspace card is handled by Nozle's card page: you pay the invoice there and, for a card issued in India, the bank registers the mandate in the same step. Otherwise it opens Stripe's hosted page.
+
+## Banners and emails about payments
+
+Core tells the dashboard when to show each of these, read live from the payment data and never stored. A banner goes away once the cause is gone.
+
+| Banner | When |
+|---|---|
+| Failed payment | A Nozle invoice failed to be charged. See the steps above. |
+| Approval pending | A payment is waiting for your bank's approval and its deadline is still ahead. It shows the amount and the deadline. |
+| Card needs an update | The saved card was issued in India and has no active mandate, so it cannot be charged automatically. Add the card again. A mandate that is still pending is not flagged: wait. |
+| Upcoming payment | Nozle plans to charge a Nozle invoice to your saved card. It shows the earliest planned date and the amount. A payment that waits for your approval is not announced here. |
+
+Emails to every member:
+
+- **Approval requested.** When a Nozle invoice is charged to an India card and the bank asks for your approval, one email gives the amount, the invoice number, the deadline and the **Pay** link. Approve at the bank, or pay with the link.
+- **Upcoming automatic payment.** "We plan to charge ... on the date", with a **Pay now** button, once per planned debit time. If the plan is cancelled, a second email says the charge will not happen.
 
 ## Suspension on day 7
 

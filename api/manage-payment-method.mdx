@@ -5,7 +5,7 @@ api: "POST https://api.nozle.app/engine/api/v1/customers/{customer_id}/payment-m
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-Return the page where a customer adds or changes their payment method: the Stripe Billing Portal for a Stripe customer, or Nozle's auto-pay setup page for a Razorpay customer whose connection has auto-pay on.
+Return the page where a customer adds or changes their payment method: Nozle's card page or the Stripe Billing Portal for a Stripe customer, or Nozle's auto-pay setup page for a Razorpay customer whose connection has auto-pay on.
 
 **Auth:** secret key (`sk_`) with `payment:write`, or trusted internal auth. Publishable keys are always refused with `403`. A customer-scoped credential reaches only its own customer.
 
@@ -36,11 +36,11 @@ Core's body is returned unchanged:
 </ResponseField>
 
 <ResponseField name="manage_payment_method.url" type="string" required>
-  A Stripe Billing Portal URL, or the URL of Nozle's auto-pay setup page for a Razorpay customer. Redirect the customer to it.
+  For a Stripe customer, the URL of Nozle's card page when the connection has a publishable key and the customer pays by card only (the page registers an e-mandate for a card issued in India), otherwise a Stripe Billing Portal URL. For a Razorpay customer, the URL of Nozle's auto-pay setup page. Redirect the customer to it, or show the card page in a frame (see below).
 </ResponseField>
 
 <ResponseField name="manage_payment_method.expires_at" type="string | null">
-  When the page stops working, as an RFC 3339 UTC timestamp. `null` for Stripe Billing Portal sessions. For the Razorpay setup page, 24 hours after the call.
+  When the page stops working, as an RFC 3339 UTC timestamp. `null` for Stripe Billing Portal sessions. For the Nozle card page and the Razorpay setup page, 24 hours after the call.
 </ResponseField>
 
 ```json
@@ -64,6 +64,12 @@ For a Razorpay customer:
   }
 }
 ```
+
+## Stripe customers
+
+- **Nozle card page.** With a publishable key on the connection and a customer who pays by card only, `url` is Nozle's card page. It needs a return URL, from the request or the organization's default; without either, the Billing Portal is returned. The customer comes back to the return URL with `nozle_card=succeeded`, `processing` or `failed`. If Stripe rejects the publishable key, the page sends the customer to Stripe Checkout instead.
+- **In your app.** Add `embed=1` to the `url` to show the page in a frame. Nozle allows framing only from the origin of the return URL, and the page posts `{ "source": "nozle", "type": "card_setup", "status": "ready" | "succeeded" | "processing" | "failed" | "error", "mode": "setup" }` to your page. In React, use [`NozleCardSetup`](/sdks/react/components/nozle-card-setup) (available from `@nozle-js/react` 0.19.0). See [Show the card page in your app](/integrations/stripe#show-the-card-page-in-your-app).
+- **Billing Portal.** Otherwise the `url` is a Stripe Billing Portal session, as before.
 
 ## Razorpay customers
 

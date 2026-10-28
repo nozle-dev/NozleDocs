@@ -26,6 +26,7 @@ Connect Stripe in the Nozle dashboard under **Settings > Billing settings > Inte
 | **Support 3DSecure** | Optional, off by default. See [Saved payment methods and automatic charging](#saved-payment-methods-and-automatic-charging) |
 | **Publishable key** | Optional. `pk_test_...` or `pk_live_...`, in the same mode as the secret key (a mismatch is refused). Find it in the Stripe dashboard under **Developers > API keys**. It is not a secret. With it, cards are saved on a Nozle-hosted card page that can register an e-mandate for cards issued in India. See [Indian cards and automatic payments](#indian-cards-and-automatic-payments) |
 | **Mandate maximum** | Optional, for Indian cards only: a headroom multiplier over the plan price (3 by default), and a floor and a ceiling in the smallest unit of the mandate currency (defaults per currency). See [How big the mandate is](#how-big-the-mandate-is) |
+| **Upcoming payment email** | Optional (`upcomingDebitEmail` in GraphQL). Whether Nozle emails your customer before an automatic debit. Unset, it is on for payments in INR and off for other currencies. See [Upcoming automatic payments](#upcoming-automatic-payments). The dashboard form has no field for it: set it through GraphQL |
 
 An organization can hold several Stripe connections, but only one per Stripe account and mode. A test key (`sk_test_`) and a live key (`sk_live_`) of the same Stripe account are two connections, so you can go live after testing without disconnecting the test connection. Connecting the same account in the same mode again fails with `500` and the code `stripe_account_already_connected`. The message is only `Internal error`: it does not name the existing connection.
 
@@ -33,7 +34,7 @@ Nozle checks the key with Stripe when you connect. A key Stripe rejects fails wi
 
 The connect form has no success redirect URL. After you connect, use **Add redirect URL** on the connection to set one. Nozle sends the customer there after a payment on a hosted Stripe page, which covers credit top-ups and payment links. Without it the customer lands on `https://stripe.com/`. The URL must be valid and at most 1,024 characters. An embedded checkout uses the `return_url` of the checkout request instead.
 
-To edit a connection, change its name, code, **Support 3DSecure**, redirect URL, publishable key and mandate maximum settings. The same fields are on the GraphQL `addStripePaymentProvider` and `updateStripePaymentProvider` mutations as `publishableKey`, `mandateCapMultiplier`, `mandateCapFloorCents` and `mandateCapCeilingCents`. Changing the code updates the customers assigned to it and updates the webhook endpoint URL in Stripe. Until that update finishes, Stripe events sent to the previous code's URL are still accepted. If the connection had no webhook endpoint, the rename registers one, and if the key may not edit webhook endpoints Nozle sends the `payment_provider.error` webhook.
+To edit a connection, change its name, code, **Support 3DSecure**, redirect URL, publishable key and mandate maximum settings. The same fields are on the GraphQL `addStripePaymentProvider` and `updateStripePaymentProvider` mutations as `publishableKey`, `mandateCapMultiplier`, `mandateCapFloorCents`, `mandateCapCeilingCents` and `upcomingDebitEmail`. Changing the code updates the customers assigned to it and updates the webhook endpoint URL in Stripe. Until that update finishes, Stripe events sent to the previous code's URL are still accepted. If the connection had no webhook endpoint, the rename registers one, and if the key may not edit webhook endpoints Nozle sends the `payment_provider.error` webhook.
 
 To disconnect, use **Disconnect**. Customers assigned to the connection lose their assignment. Nozle does not delete the webhook endpoint it created in Stripe, so delete it in Stripe yourself.
 
@@ -330,7 +331,7 @@ The customer must already be assigned to the Stripe connection and linked to a S
 - **Small amounts.** Nozle checks Stripe's minimum charge (for example USD 0.50) before it calls Stripe, for the currencies it knows the minimum of (_Unreleased_). An off-session charge below it is not sent: the payment fails with `amount_below_provider_minimum`, the invoice stays pending and you receive the payment error webhook. An `amount_too_small` error that Stripe itself returns also leaves the invoice pending instead of failed.
 - **Stripe limits and timeouts.** A charge for a payment request that Stripe rate-limits or that times out is tried again, up to 6 attempts with growing delays, like an invoice charge (_Unreleased_).
 - **Keeping methods current.** `setup_intent.succeeded` makes the new method the customer's default. `customer.updated` follows a default change made in Stripe. `payment_method.detached` clears the stored default when the customer removes that card in Stripe.
-- **Merchant webhooks.** Nozle sends `payment.succeeded` when a payment succeeds, and `payment.requires_action` when a payment needs the customer.
+- **Merchant webhooks.** Nozle sends `payment.succeeded` when a payment succeeds, `payment.requires_action` when a payment needs the customer, and [`payment.scheduled`](#upcoming-automatic-payments) when it announces an automatic debit.
 
 ## Indian cards and automatic payments
 
@@ -340,13 +341,48 @@ Indian rules (RBI) do not let a business debit a card issued in India on its own
 
 **What the customer sees.** When the customer adds a card, the link opens a card page on Nozle's domain, with Stripe's secure card fields. For a card issued in India the bank asks for one OTP, and that registers the mandate with the card. For a card issued anywhere else the page behaves like any card form: no extra step. Nothing is charged when a card is only saved. Card details go from the browser to Stripe's fields and never reach Nozle, which keeps only Stripe's ids and the mandate status. The link is signed and expires after 24 hours.
 
-The card page is used for the card setup links of a customer (the `customer.checkout_url_generated` webhook carries the link), and for Nozle's own workspace card step. It is used only when the customer's payment methods are `card` or `card` with `link`. The pay link of an invoice (the link in the emails, the workspace pay link and the dashboard **Pay** button) opens the same page when the connection has a publishable key and either the customer pays by card (or Link) only and the link would save the card, or the customer is from India (_Unreleased_). The customer pays the invoice there and, for a card issued in India, the bank registers the mandate in the same authentication. The page reads the amount from the invoice when it asks Stripe for the payment, so it is always the amount due at that moment. It answers `410` once the invoice is no longer payable. Other links (payment requests, crypto) and the paid plan upgrade checkout still use Stripe Checkout, which cannot register a mandate, and Checkout does not save the card of a customer from India. The Stripe Billing Portal page of `POST /customers/{customer_id}/payment-method/manage` is unchanged.
+The card page is used for the card setup links of a customer (the `customer.checkout_url_generated` webhook carries the link), and for Nozle's own workspace card step. It is used only when the customer's payment methods are `card` or `card` with `link`. The pay link of an invoice (the link in the emails, the workspace pay link and the dashboard **Pay** button) opens the same page when the connection has a publishable key and either the customer pays by card (or Link) only and the link would save the card, or the customer is from India (_Unreleased_). The customer pays the invoice there and, for a card issued in India, the bank registers the mandate in the same authentication. The page reads the amount from the invoice when it asks Stripe for the payment, so it is always the amount due at that moment. It answers `410` once the invoice is no longer payable. Other links (payment requests, crypto) and the paid plan upgrade checkout still use Stripe Checkout, which cannot register a mandate, and Checkout does not save the card of a customer from India. [`POST /customers/{customer_id}/payment-method/manage`](/api/manage-payment-method) returns the same page when the connection has a publishable key and the customer pays by card only; otherwise it returns the Stripe Billing Portal.
 
 **What the customer is returned to.** After the card page, the customer goes to your return URL with `nozle_card=succeeded`, `processing` or `failed` added. Treat it as a hint for what to show. The saved card and mandate are recorded by Nozle from Stripe, not from the redirect.
+
+### Show the card page in your app
+
+By default the customer leaves your app for the card page. To keep them in your app, show the page in a frame: add `embed=1` to the `url` (the React SDK does this for you, see [NozleCardSetup](/sdks/react/components/nozle-card-setup)).
+
+- **Who may frame it.** Only the origin (scheme, host and port) of the return URL you passed when you created the link. Nozle reads it from the signed link, never from the request. Without `embed=1`, the page cannot be framed at all. Create the link with a `return_url` on your app's origin.
+- **Messages.** The page posts messages to the parent window, with the target origin set to that same origin, never `*`. A message carries no card data, ids or tokens:
+
+```json
+{ "source": "nozle", "type": "card_setup", "status": "ready", "mode": "setup" }
+```
+
+| `status` | Meaning |
+|---|---|
+| `ready` | Stripe's form is shown |
+| `error` | The form cannot load |
+| `succeeded`, `processing`, `failed` | The outcome after the bank step, which runs inside the frame |
+
+`mode` is `setup` for a card setup link and `pay` for an invoice pay link. Check `event.origin` and `event.source` before you read a message, and treat `succeeded` as a hint: confirm through your webhooks or by reloading billing state.
+- **Fallback.** If the frame never reports `ready`, or reports `error`, send the customer to the plain `url` (without `embed=1`). Opened as a top-level page, the return page redirects to your return URL with `nozle_card=` as described above.
+
+### When Stripe rejects the publishable key
+
+If the publishable key is well formed but Stripe rejects it, or Stripe.js does not load, the card page does not end in an error. In a browser tab it shows "Taking you to our payment partner" and redirects to Stripe Checkout for the same setup or payment. A card issued in India then pays through the pay link, as before the card page existed. Inside a frame the page never redirects: it sends the `error` message, and your page opens the plain `url`, which falls back the same way. Fix the key on the connection to get the card page back.
 
 ### How big the mandate is
 
 The maximum of a mandate is the customer's largest recurring price times the connection's headroom multiplier (3 by default), kept between a floor and a ceiling per currency. Set the multiplier, floor and ceiling in the connection settings. The bank must accept the maximum, so a very high one can be refused by some issuers; the card is then not usable for automatic charges and the customer pays on the hosted page.
+
+You can lower the ceiling but not raise it above what Indian banks accept. The ceiling in force is the lower of your setting and this figure, and the floor never exceeds the ceiling:
+
+| Currency | Default floor | Highest ceiling |
+|---|---|---|
+| USD | 50 | 2,800 |
+| EUR | 45 | 2,600 |
+| GBP | 40 | 2,200 |
+| INR | 4,000 | 2.5 lakh (250,000) |
+
+A currency that is not in the table keeps whatever floor and ceiling you set, and has no default. The settings are in the smallest unit of the currency (for example `280000` for USD 2,800). The maximum only matters for cards issued in India: Stripe ignores it for other cards.
 
 ### Automatic charges of an Indian card
 
@@ -356,6 +392,16 @@ The maximum of a mandate is the customer's largest recurring price times the con
 - **Retries.** A failed charge that cannot succeed by retrying (authentication needed, a missing, cancelled or unapproved mandate, or a hard decline such as a lost or expired card) is not retried: the customer gets the pay link at once. Other failures are retried as before.
 
 Other card networks and countries need no mandate. Only Visa and Mastercard get Indian mandates.
+
+## Upcoming automatic payments
+
+When a card payment is debited automatically after the bank's notice (it stays `processing` until then), Nozle tells the customer in advance, once per planned debit time:
+
+- **Webhook `payment.scheduled`.** The payment plus `scheduled_at` (ISO 8601, UTC) and `method_type` (`card`). If the time changes, Nozle sends it again. Use it to send your own message.
+- **Webhook `payment.schedule_cancelled`.** The announced debit will not happen. It carries `scheduled_at` and `reason`, and no `method_type`. For Stripe today the reason is `mandate_changed` when the failure is one only the customer can fix, and `notice_failed` otherwise. The payload also allows `invoice_paid`, `invoice_voided` and `other`.
+- **Email.** Nozle emails the customer in your branding: "We plan to charge ... on the planned date", with a **Pay now** button. It follows the connection setting `upcomingDebitEmail`: unset, it is on for payments in INR and off for other currencies (the card's country is not read: a card issued in India is charged in INR); `true` always sends, `false` never sends. Nothing is sent to a customer without an email address. If you turn it off to send your own message, use the webhooks above.
+
+No notice is sent for a payment that waits for the customer's approval: the approval email covers it. For a Nozle workspace, members get the same notice by email. See [Webhook events](/api/webhook-events#payments).
 
 ## Refunds and disputes
 
