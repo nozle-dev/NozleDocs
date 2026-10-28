@@ -5,6 +5,17 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Sandbox mode (Core 11.7.0, Engine 2.18.0)
+
+_Unreleased_
+
+- **One sandbox per workspace.** A separate organization linked to your live one, with its own customers, plans, subscriptions, invoices, events, API keys, webhook endpoints and payment connections. An admin creates it by switching to **Sandbox** in the workspace switcher; after that every member can open it, with their live role. It starts empty and copies only your live billing settings. See [Sandbox mode](/guides/getting-started/sandbox).
+- **Test keys.** Sandbox keys start with `sk_nozle_test_` and `pk_nozle_test_` and use the same API URLs. The key's organization decides the environment: a test key on a live organization, a live key on a sandbox, or a key of a reset sandbox is refused with `401`. Every response to an accepted key carries `X-Nozle-Livemode: true` or `false`, readable from browsers. See [Live and sandbox keys](/api/authentication#live-and-sandbox-keys).
+- **`livemode` in every webhook payload**, `false` for sandbox deliveries. Additive. See [Webhook events](/api/webhook-events#the-delivery).
+- **What the sandbox does not do.** It sends no customer emails, is never billed by Nozle (it follows your live workspace's `card_required` and `workspace_suspended`), accepts only Stripe (`sk_test_`, `rk_test_`) and Razorpay (`rzp_test_`) test credentials (`422 sandbox_requires_test_key`), and refuses other payment providers and integrations (`403 not_available_in_sandbox`). Members, roles, sign-in methods, SSO and your Nozle plan stay in live (`403 live_organization_only`). Sandbox PDFs are marked `TEST MODE` and numbered `TST-XXXX`.
+- **Reset.** Admins type `RESET` to replace the sandbox with an empty one: API keys rotate, webhook endpoints are deleted, Stripe test connections are connected again automatically and Razorpay test connections must be connected again (the reset response lists them in `reconnectRequired`). At most once every 10 minutes and 5 times a day (`429 sandbox_reset_rate_limited`).
+- Docs: "there are no separate live and test keys" is removed from [Authentication](/api/authentication), [Core Concepts](/guides/getting-started/concepts) and the self-hosting environment page. The credits guides say "test customer" where they said "sandbox customer".
+
 ### Breaking: plan changes without checkout follow transition policies; one checkout error shape (Core 11.6.0, Engine 2.14.0 and 2.15.0)
 
 _October 28, 2026_
