@@ -53,10 +53,22 @@ Core tells the dashboard when to show each of these, read live from the payment 
 
 | Banner | When |
 |---|---|
-| Failed payment | A Nozle invoice failed to be charged. See the steps above. |
+| Failed payment | A Nozle invoice failed to be charged. See the steps above. The wording follows what the failed payment needs, shown just below. |
 | Approval pending | A payment is waiting for your bank's approval and its deadline is still ahead. It shows the amount and the deadline. |
 | Card needs an update | The saved card was issued in India and has no active mandate, so it cannot be charged automatically. Add the card again. A mandate that is still pending is not flagged: wait. |
 | Upcoming payment | Nozle plans to charge a Nozle invoice to your saved card. It shows the earliest planned date and the amount. A payment that waits for your approval is not announced here. |
+
+### What a failed payment asks of you
+
+The first failed-payment email and the reminder on day 3 say what to do, based on why the latest failed charge failed (Stripe's error and decline codes, never the message text). The dashboard reads the same outcome in the GraphQL field `workspaceBilling.failureAction` (`CONFIRM_PAYMENT`, `CHANGE_CARD` or `RETRY_LATER`), which is `null` unless the status is `past_due`. The banner copy follows it.
+
+| `failureAction` | What happened | What the email and banner say |
+|---|---|---|
+| `CONFIRM_PAYMENT` | Your bank asked you to confirm the payment (authentication needed, or the India mandate is missing, cancelled or not approved). | "Your bank asked you to confirm this payment". Use **Pay now** to confirm it with your bank. Nozle does not retry it: nothing happens until a member pays. |
+| `CHANGE_CARD` | The card will not work for this invoice (for example lost, stolen or expired). | "This card could not be charged". Use **Change card** to pay with another card. Nozle does not retry it. |
+| `RETRY_LATER` | The card may work later (for example insufficient funds). | "Declined or needs your approval". Nozle retries the card once a day until day 6, and you can pay at any time. |
+
+The last reminder (day 6) and the suspension email do not promise a retry in any case.
 
 Emails to every member:
 
