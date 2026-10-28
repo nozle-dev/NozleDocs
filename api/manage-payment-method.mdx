@@ -5,7 +5,7 @@ api: "POST https://api.nozle.app/engine/api/v1/customers/{customer_id}/payment-m
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-Return the Stripe Billing Portal page where a customer adds or changes their payment method. Only Stripe customers have this page.
+Return the page where a customer adds or changes their payment method: the Stripe Billing Portal for a Stripe customer, or Nozle's auto-pay setup page for a Razorpay customer whose connection has auto-pay on.
 
 **Auth:** secret key (`sk_`) with `payment:write`, or trusted internal auth. Publishable keys are always refused with `403`. A customer-scoped credential reaches only its own customer.
 
@@ -20,7 +20,7 @@ Nozle stores no card data and never shows card details. The payment method lives
 </ParamField>
 
 <ParamField body="return_url" type="string">
-  Where Stripe sends the customer when they leave the Billing Portal. It must be an absolute HTTPS URL on one of your organization's allowed origins, the same list as [checkout](/api/create-checkout#return-url). If omitted, Nozle uses the organization's default return URL. The body can be empty.
+  Where Stripe sends the customer when they leave the Billing Portal. Razorpay customers are not sent back, so it has no effect for them, but it is still checked. It must be an absolute HTTPS URL on one of your organization's allowed origins, the same list as [checkout](/api/create-checkout#return-url). If omitted, Nozle uses the organization's default return URL. The body can be empty.
 </ParamField>
 
 ```json
@@ -32,15 +32,15 @@ Nozle stores no card data and never shows card details. The payment method lives
 Core's body is returned unchanged:
 
 <ResponseField name="manage_payment_method.provider" type="string" required>
-  Always `stripe`.
+  `stripe` or `razorpay`.
 </ResponseField>
 
 <ResponseField name="manage_payment_method.url" type="string" required>
-  A Stripe Billing Portal URL. Redirect the customer to it.
+  A Stripe Billing Portal URL, or the URL of Nozle's auto-pay setup page for a Razorpay customer. Redirect the customer to it.
 </ResponseField>
 
 <ResponseField name="manage_payment_method.expires_at" type="string | null">
-  When the page stops working, as an RFC 3339 UTC timestamp. `null` for Stripe Billing Portal sessions.
+  When the page stops working, as an RFC 3339 UTC timestamp. `null` for Stripe Billing Portal sessions. For the Razorpay setup page, 24 hours after the call.
 </ResponseField>
 
 ```json
@@ -53,9 +53,26 @@ Core's body is returned unchanged:
 }
 ```
 
+For a Razorpay customer:
+
+```json
+{
+  "manage_payment_method": {
+    "url": "https://api.nozle.app/core/payment_methods/setup?token=...",
+    "expires_at": "2026-10-29T10:15:00Z",
+    "provider": "razorpay"
+  }
+}
+```
+
 ## Razorpay customers
 
-Razorpay customers have no payment method to manage here. They pay each invoice through a Razorpay payment link: when an invoice is finalized and no mandate charges it, Nozle emails the customer a payment request for that invoice with a **Pay invoice** button (the billing entity and the customer need an email address). The button always opens a current Razorpay payment link, also after an earlier link expired, and paying it marks the invoice paid. Dunning campaigns do not send a second request for such an invoice. For a Razorpay customer this endpoint answers `422 razorpay_pays_by_link` and creates nothing at Razorpay.
+Razorpay has no portal and its mandates cannot be edited, so a Razorpay customer sets up a new auto-pay mandate instead. What this endpoint does depends on the customer's Razorpay connection:
+
+- **Auto-pay on** (**Enable recurring payments** on the connection). The `url` opens Nozle's auto-pay setup page. It lists the auto-pay methods enabled on the connection (UPI, card and bank debit through Razorpay eMandate; UPI and card by default) with what each one charges, and shows the customer's current method. With a single enabled method the list is skipped. The customer's choice creates a Razorpay registration link for that method and redirects to it. UPI and card authorize ₹1, which is refunded once captured; bank debit authorizes ₹0. Once Razorpay confirms the mandate it becomes the customer's default payment method, replaces the mandates it covers (they are cancelled at Razorpay), and the customer's open INR subscription invoices are collected with it. Nothing is created at Razorpay until the customer picks a method.
+- **Auto-pay off.** The endpoint answers `422 razorpay_pays_by_link` with `auto_pay_not_enabled` in the error details, and creates nothing at Razorpay. The customer pays each invoice through a Razorpay payment link: when an invoice is finalized and no mandate charges it, Nozle emails the customer a payment request for that invoice with a **Pay invoice** button (the billing entity and the customer need an email address). The button always opens a current Razorpay payment link, also after an earlier link expired, and paying it marks the invoice paid. Dunning campaigns do not send a second request for such an invoice.
+
+The setup page works for 24 hours (`expires_at`); after that, or with an invalid token, it answers `410`. Call this endpoint again for a new page. Razorpay does not send the customer back to your app after registration: follow the `payment_method.created` and `payment_method.updated` webhooks to learn when the mandate is confirmed.
 
 ## Errors
 
@@ -67,11 +84,13 @@ The Engine checks the JSON body, then sends the request to Core, which checks `r
 | `403` | — | A publishable key was used. The Engine answers with an `error` message, not a code. |
 | `404` | `customer_not_found` | Unknown customer. |
 | `422` | `no_linked_payment_provider` | The customer has no payment provider. |
-| `422` | `razorpay_pays_by_link` | The customer pays through Razorpay. Razorpay customers pay each invoice by payment link, so there is no payment method to manage. |
-| `422` | `provider_not_supported` | The customer's provider is not Stripe (Adyen, Cashfree, Flutterwave, GoCardless and Moneyhash are not supported). |
-| `422` | `missing_payment_provider_customer` | The customer could not be created at Stripe. |
+| `422` | `razorpay_pays_by_link` | The customer pays through Razorpay and the connection has auto-pay off (`auto_pay_not_enabled` in `error_details.auto_pay`). The customer pays each invoice by payment link. |
+| `422` | `payment_method_not_enabled` | Razorpay: no auto-pay method is enabled on the connection. |
+| `422` | `customer_details_required` | Razorpay: the customer needs a name, email and phone number before setting up auto-pay. |
+| `422` | `provider_not_supported` | The customer's provider is not Stripe or Razorpay (Adyen, Cashfree, Flutterwave, GoCardless and Moneyhash are not supported). |
+| `422` | `missing_payment_provider_customer` | The customer could not be created at Stripe, or is not linked to its Razorpay connection. |
 
-For `422` errors the code is in `error_details`, for example `{"code": "validation_errors", "error_details": {"base": ["razorpay_pays_by_link"]}}`. Match on the code, never on the message text.
+For `422` errors the code is in `error_details`, for example `{"code": "validation_errors", "error_details": {"base": ["razorpay_pays_by_link"], "auto_pay": ["auto_pay_not_enabled"]}}`. Match on the code, never on the message text.
 
 ## SDKs
 

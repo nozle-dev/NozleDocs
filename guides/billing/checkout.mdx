@@ -72,7 +72,7 @@ Retrying a new-subscription checkout for the same plan while its subscription is
 
 ## Razorpay
 
-Connect Razorpay in the dashboard with its key ID, key secret and webhook secret. Optional settings enable recurring mandates (with a maximum mandate amount). Razorpay supports only INR. Nozle does not register the Razorpay webhook for you: copy the webhook URL Nozle shows for the connection into your Razorpay dashboard, with the same webhook secret. See the [Razorpay integration](/integrations/razorpay) for setup, events and limits.
+Connect Razorpay in the dashboard with its key ID, key secret and webhook secret. Optional settings turn on auto-pay mandates (with a maximum mandate amount). Razorpay supports only INR. Nozle does not register the Razorpay webhook for you: copy the webhook URL Nozle shows for the connection into your Razorpay dashboard, with the same webhook secret. See the [Razorpay integration](/integrations/razorpay) for setup, events and limits.
 
 ```text
 https://api.nozle.app/core/webhooks/razorpay/{payment_provider_id}
@@ -82,7 +82,7 @@ Nozle checks the `X-Razorpay-Signature` header against the webhook secret and de
 
 A Razorpay checkout runs in four steps:
 
-1. **Create.** Checkout returns `{"type": "razorpay", "checkout_id", "key_id", "order_id", "amount_cents", "currency", "expires_at", "invoice_id"}`. A paid upgrade has `plan_upgrade_intent_id` instead of `invoice_id`. A mandate checkout (`register_mandate`) also has `customer_id`, `recurring: true` and `mandate_max_amount_cents`. If the order is not ready yet, or has expired, the result is `{"type": "processing", "checkout_id", "status"}` instead. A bulk Entity checkout first answers `{"entity_subscription_checkout": {"type": "processing", "status": "open", "checkout_id": "..."}}`. A `processing` result carries an internal operation status such as `ready`, not the state of the checkout.
+1. **Create.** Checkout returns `{"type": "razorpay", "checkout_id", "key_id", "order_id", "amount_cents", "currency", "expires_at", "invoice_id"}`. A paid upgrade has `plan_upgrade_intent_id` instead of `invoice_id`. A mandate checkout (`register_mandate`) opens no modal: it answers `type: hosted` with `payment_url`, Nozle's auto-pay setup page, and `checkout_id` to poll (see [Recurring payments with auto-pay](/integrations/razorpay#recurring-payments-with-auto-pay)). If the order is not ready yet, or has expired, the result is `{"type": "processing", "checkout_id", "status"}` instead. A bulk Entity checkout first answers `{"entity_subscription_checkout": {"type": "processing", "status": "open", "checkout_id": "..."}}`. A `processing` result carries an internal operation status such as `ready`, not the state of the checkout.
 2. **Pay.** Load `https://checkout.razorpay.com/v1/checkout.js` and open `new window.Razorpay({ key: key_id, order_id, handler })`.
 3. **Verify.** Send the three fields from the handler to your backend, which calls `POST /checkout/{checkout_id}/verify` with `razorpay_order_id`, `razorpay_payment_id` and `razorpay_signature`. A missing field returns `400`. Nozle checks that the order matches the checkout and that the signature is the HMAC-SHA256 of `order_id|payment_id` with your key secret; a mismatch returns `422 validation_errors` with `invalid_checkout_signature`. Nozle then fetches the payment from Razorpay and settles only a `captured` payment. The response is the checkout status.
 4. **Poll.** Call `GET /checkout/{checkout_id}` until `status` and `fulfillment_status` are both `succeeded`. Each call reconciles with Razorpay.
