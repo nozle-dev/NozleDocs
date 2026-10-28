@@ -96,9 +96,10 @@ The dashboard reads the bars from your workspace's plan status (GraphQL `nozlePl
 | `events_used` | Events reported in the current billing period, across a plan change in that period. |
 | `events_included` | Events included in your plan. |
 | `events_used_percent` | `events_used` / `events_included`, one decimal. |
-| `mrr_tracked_usd_cents` | Tracked MRR of every currency, in USD cents at the latest ECB rates. |
+| `mrr_tracked_usd_cents` | Tracked MRR of every currency that has a rate, in USD cents at the latest ECB rates. |
+| `mrr_unconverted_currencies` | Engine 2.17.0 and later. Currencies with MRR but no exchange rate, left out of `mrr_tracked_usd_cents`, as an array of ISO 4217 codes. Absent when every currency converts. |
 | `mrr_limit_usd_cents` | Your plan's MRR limit, in USD cents. |
 | `mrr_used_percent` | `mrr_tracked_usd_cents` / `mrr_limit_usd_cents`, one decimal. |
 | `plan_limits` | `{events, mrr_cents}`: the plan's included events and MRR limit in USD cents. |
 
-Limits and percentages are `null` when the plan has none, and the MRR values are `null` while a currency has no rate. These fields describe your workspace only. The [billing status](/api/billing-status) of your own customers never includes them.
+Limits and percentages are `null` when the plan has none. When `mrr_unconverted_currencies` is present, `mrr_tracked_usd_cents` and `mrr_used_percent` are a lower bound: the listed currencies are not counted until they have a rate. Before Engine 2.17.0 the MRR values were `null` while any currency had no rate. These fields describe your workspace only. The [billing status](/api/billing-status) of your own customers never includes them.
