@@ -68,7 +68,7 @@ For a Razorpay customer:
 ## Stripe customers
 
 - **Nozle card page.** With a publishable key on the connection and a customer who pays by card only, `url` is Nozle's card page. It needs a return URL, from the request or the organization's default; without either, the Billing Portal is returned. The customer comes back to the return URL with `nozle_card=succeeded`, `processing` or `failed`. If Stripe rejects the publishable key, the page sends the customer to Stripe Checkout instead.
-- **In your app.** Add `embed=1` to the `url` to show the page in a frame. Nozle allows framing only from the origin of the return URL, and the page posts `{ "source": "nozle", "type": "card_setup", "status": "ready" | "succeeded" | "processing" | "failed" | "error", "mode": "setup" }` to your page. In React, use [`NozleCardSetup`](/sdks/react/components/nozle-card-setup) (available from `@nozle-js/react` 0.19.0). See [Show the card page in your app](/integrations/stripe#show-the-card-page-in-your-app).
+- **In your app.** Add `embed=1` to the `url` to show the page in a frame. Nozle allows framing only from the origin of the return URL, and the page posts `{ "source": "nozle", "type": "card_setup", "status": "ready" | "succeeded" | "processing" | "failed" | "error", "mode": "setup" }` to your page. In React, use [`NozleCardSetup`](/sdks/react/components/nozle-card-setup) (available from `@nozle-js/react` 0.20.0). See [Show the card page in your app](/integrations/stripe#show-the-card-page-in-your-app).
 - **Billing Portal.** Otherwise the `url` is a Stripe Billing Portal session, as before.
 
 ## Razorpay customers
