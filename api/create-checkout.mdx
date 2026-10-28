@@ -82,15 +82,15 @@ Plan checkout:
 ## Response
 
 <ResponseField name="type" type="string" required>
-  `hosted` (Stripe), `razorpay`, `processing`, `completed`, or `scheduled`. There is no `stripe` result and no client secret any more. The deprecated `POST /credits/purchase` of the Engine API also returns `hosted`. That endpoint requires an `Idempotency-Key` header and a `currency` field (the ISO 4217 code of the top-up package, for example `USD`), and answers `400` with the code `idempotency_key_required` or `currency_required` without them; a retry with the same key returns the first purchase. Use [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase) (`POST /credit-top-up-purchases`) instead.
+  `hosted` (Stripe, or a Razorpay auto-pay checkout), `razorpay`, `processing`, `completed`, or `scheduled`. There is no `stripe` result and no client secret any more. The deprecated `POST /credits/purchase` of the Engine API also returns `hosted`. That endpoint requires an `Idempotency-Key` header and a `currency` field (the ISO 4217 code of the top-up package, for example `USD`), and answers `400` with the code `idempotency_key_required` or `currency_required` without them; a retry with the same key returns the first purchase. Use [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase) (`POST /credit-top-up-purchases`) instead.
 </ResponseField>
 
 <ResponseField name="url" type="string">
-  `hosted` results: the Stripe-hosted Checkout page. Redirect the customer to it. `payment_url` carries the same value.
+  `hosted` Stripe results: the Stripe-hosted Checkout page. Redirect the customer to it. `payment_url` carries the same value. A Razorpay auto-pay result has only `payment_url`.
 </ResponseField>
 
 <ResponseField name="checkout_id" type="string">
-  `hosted` results: the Stripe Checkout Session ID (`cs_...`). It is not a status ID: poll a paid upgrade with its `plan_upgrade_intent_id`.
+  `hosted` Stripe results: the Stripe Checkout Session ID (`cs_...`). It is not a status ID: poll a paid upgrade with its `plan_upgrade_intent_id`. Razorpay results: the Nozle checkout ID to poll with checkout status.
 </ResponseField>
 
 <ResponseField name="expires_at" type="string">
@@ -134,7 +134,9 @@ A paid upgrade has `plan_upgrade_intent_id` instead of `invoice_id`. Redirect th
 
 ### Razorpay and recovery fields
 
-A `razorpay` result supplies `checkout_id`, `order_id`, public `key_id`, `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. A mandate checkout (`register_mandate: true`) adds `customer_id`, `recurring: true`, and `mandate_max_amount_cents`. Open the Razorpay modal, then verify the handler's signature on your backend. Activation requires captured payment and completed fulfillment. See [the Razorpay flow](/guides/billing/checkout#razorpay).
+A `razorpay` result supplies `checkout_id`, `order_id`, public `key_id`, `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. Open the Razorpay modal, then verify the handler's signature on your backend. Activation requires captured payment and completed fulfillment. See [the Razorpay flow](/guides/billing/checkout#razorpay).
+
+A Razorpay mandate checkout (`register_mandate: true`, a subscription invoice) opens no modal. It answers `type: hosted` with `payment_url` (Nozle's auto-pay setup page, where the customer picks UPI, card or bank debit and is sent to a Razorpay registration link), `checkout_id`, `amount_cents`, `currency`, `expires_at` and `invoice_id`. Redirect the customer to `payment_url`. Razorpay does not send the customer back: poll checkout status with `checkout_id`. A paid plan change cannot register a mandate and answers `422 razorpay_mandate_registration_unavailable`. See [Recurring payments with auto-pay](/integrations/razorpay#recurring-payments-with-auto-pay).
 
 A `processing` result supplies `checkout_id` and `status`. Razorpay returns it while the order is not ready yet or after it expired. Stripe returns it for a replayed quoted upgrade while the payment is complete and its webhook is pending. Recover it rather than starting another checkout. A bulk Entity checkout first answers `{"entity_subscription_checkout": {"type": "processing", "status": "open", "checkout_id": "...", ...}}`. The `status` of a `processing` result is an internal operation status. The nested `checkout` of an expired unpaid Razorpay order in checkout status is `{"type": "processing", "status": "ready"}` while the top-level `status` is `expired`. Both scoped verification and status recovery are described in [Subscription self-service](/api/subscription-management#payment-status-and-recovery).
 

@@ -36183,7 +36183,7 @@ components:
         register_mandate:
           type: boolean
           default: false
-          description: 'Razorpay only: register a recurring mandate with the payment of a subscription invoice. A plan change that leaves an amount due answers `422 razorpay_mandate_registration_unavailable` instead.'
+          description: 'Razorpay only: set up auto-pay with the payment of a subscription invoice. The result is `hosted` with `payment_url`, Nozle''s auto-pay setup page, instead of a `razorpay` order. A plan change that leaves an amount due answers `422 razorpay_mandate_registration_unavailable` instead.'
         subscription_id:
           type: string
           description: External ID of the active subscription to change. Forwarded to Core as `external_subscription_id`. Required when the customer has several active subscriptions.
@@ -36194,7 +36194,7 @@ components:
       type: object
       required:
         - type
-      description: 'Result of a checkout. The fields present depend on `type`. `hosted` (Stripe): `url`, `payment_url` (the same value), `checkout_id` (the Stripe Checkout Session ID), `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. `razorpay`: `checkout_id`, `key_id`, `order_id`, `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id` (mandate checkouts add `customer_id`, `recurring`, `mandate_max_amount_cents`). `processing`: `checkout_id` and `status`. `completed`: `status`, `payment_source`, `subscription_id`, `plan_code`, `invoice_id`, `amount_cents`, `currency` (an immediate configured downgrade instead carries the settlement fields of a transition result). `scheduled`: `status`, `subscription_id` (the pending subscription), `plan_code`, `transition_direction`, `transition_policy`, `effective_at`. Entity checkouts add `external_entity_id` and `external_subscription_id`. There is no `stripe` result and no client secret.'
+      description: 'Result of a checkout. The fields present depend on `type`. `hosted` (Stripe): `url`, `payment_url` (the same value), `checkout_id` (the Stripe Checkout Session ID), `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. `hosted` (Razorpay mandate checkout, `register_mandate`): `payment_url` (Nozle''s auto-pay setup page), `checkout_id` (to poll), `amount_cents`, `currency`, `expires_at`, `invoice_id`. `razorpay`: `checkout_id`, `key_id`, `order_id`, `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. `processing`: `checkout_id` and `status`. `completed`: `status`, `payment_source`, `subscription_id`, `plan_code`, `invoice_id`, `amount_cents`, `currency` (an immediate configured downgrade instead carries the settlement fields of a transition result). `scheduled`: `status`, `subscription_id` (the pending subscription), `plan_code`, `transition_direction`, `transition_policy`, `effective_at`. Entity checkouts add `external_entity_id` and `external_subscription_id`. There is no `stripe` result and no client secret.'
       properties:
         type:
           type: string
@@ -36222,7 +36222,7 @@ components:
           description: Razorpay order ID.
         customer_id:
           type: string
-          description: Razorpay customer ID (mandate checkouts).
+          description: Razorpay customer ID. Only on orders of earlier mandate checkouts; a mandate checkout now answers `hosted`.
         recurring:
           type: boolean
         mandate_max_amount_cents:

@@ -146,7 +146,7 @@ export function RazorpayBuy() {
       verifyCheckout={verifyCheckout}
       getCheckoutStatus={getCheckoutStatus}
     >
-      <CheckoutButton planCode="pro" registerMandate onSuccess={(paymentId) => console.log('paid', paymentId)} />
+      <CheckoutButton planCode="pro" onSuccess={(paymentId) => console.log('paid', paymentId)} />
     </BillingProvider>
   )
 }
@@ -171,7 +171,7 @@ export function RazorpayBuy() {
 </ResponseField>
 
 <ResponseField name="registerMandate" type="boolean">
-  Sent to `createCheckout` when set, to ask for a recurring payment mandate. Not sent when left out.
+  Sent to `createCheckout` when set, to set up auto-pay while paying. With Razorpay the checkout then opens no modal: it answers a `hosted` result with Nozle's auto-pay setup page in `payment_url`. Not sent when left out.
 </ResponseField>
 
 <ResponseField name="onComplete" type="(result: CompletedCheckoutResult) => void">
