@@ -387,6 +387,13 @@ _October 17, 2026_
 - Stripe invoice checkout and invoice payment URLs refuse an invoice that is paid, voided, draft, closed, failed or has nothing due with `invalid_invoice_status_or_payment_status`, as Razorpay already did.
 - A paid upgrade checkout returns `409 subscription_change_pending` while the subscription has a scheduled cancellation or plan change. Cancelling at period end, scheduling a plan change or applying an immediate downgrade cancels an open upgrade checkout and expires its Stripe Checkout Session or Razorpay order.
 
+### Cancellation timing and downgrade credits
+
+_October 16, 2026_
+
+- `DELETE /subscriptions/{id}` without `cancellation_policy` uses your organization's cancellation timing, which defaults to `end_of_period`: the subscription stays active until its period ends. Send `cancellation_policy=immediate` to end it now. The credit, refund and final invoice options come from the request, then the subscription, then the organization. Set the defaults in **Settings → Billing → General → Cancellations**. See [Cancel subscription](/api/cancel-subscription).
+- An immediate downgrade takes back the old plan's unused credits beyond what the new plan grants for the rest of the period (`downgrade_plan_credits: revoke_excess`, the default). It never takes a balance below zero. To keep them until the period ends, set **Settings → Billing → General → "Credits after an immediate downgrade"** to keep, or send `billing_configuration.downgrade_plan_credits: "keep"` in `PUT /organizations`. See [Included Plan Credits](/guides/credits/plan-grants#lifecycle-policy).
+
 ### Link existing Stripe customers from the SDKs
 
 _October 14, 2026_
