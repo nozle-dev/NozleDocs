@@ -229,6 +229,7 @@ Every error body carries `error` and `code`. Core's errors also carry `status`, 
 | `400` | `invalid_return_url` | Core refused `return_url`: it is not an absolute HTTPS URL, or its origin is not one of your organization's allowed origins. See [return URLs](/guides/billing/checkout#return-urls-and-your-organizations-origins). |
 | `403` | `customer_scope_mismatch` | Trusted internal authentication with an `X-Nozle-Customer-Id` header that differs from `customer_id`. |
 | `404` | `plan_not_found`, `customer_not_found`, `subscription_not_found` | Unknown plan or customer, or `subscription_id` is not an active subscription of the customer (for example a terminated one). |
+| `422` | `plan_version_change` | `plan_code` is another version of the plan the subscription is on, for example the customer's own plan code while they are on an older version. That is a [version migration](/api/plan-versions), never a plan change. |
 | `422` | `plan_transition_policy_required` | The customer has an active subscription and the change needs a [transition policy](/api/plan-transition-policies): an immediate downgrade, a plan the default does not reach, or a trial. Upgrades and end-of-period downgrades between public plans need none. |
 | `422` | `validation_errors` | `error_details.base` is `amount_below_provider_minimum`: an invoice checkout whose amount left to pay is under the payment provider's minimum charge (for example less than $0.50 on Stripe). |
 | `422` | `plan_upgrade_invoice_missing` | An upgrade to a plan billed in arrears: nothing is due up front. |
