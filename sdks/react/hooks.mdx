@@ -78,7 +78,7 @@ function AiPanel() {
 
 A customer with several subscriptions needs `useEntitlement('seats', { subscriptionId })` or `{ entityId }` (external IDs), as in `@nozle-js/react` 0.16.0 and later. Your `billingEndpoint` must use `@nozle-js/node` 0.17.0 or later to forward them. Without a selector, the result is `allowed: false` with `reason: 'subscription_required'`, not an error. The Engine checks that the subscription or Entity belongs to the signed-in customer.
 
-A failed request throws `BillingRequestError` with `status`, `code` and `requestId`. A `4xx` is not retried; other failures are retried twice.
+A failed request throws `BillingRequestError` with `status`, `code` and `requestId`. A `4xx` is not retried; other failures are retried twice. A `402` has `code` `card_required` or `workspace_suspended`: your workspace has no verified card, or its Nozle invoices are unpaid. Show your team a billing message instead of retrying. See [Workspace billing errors](/api/errors#workspace-billing-errors).
 
 For subscription changes with confirmation and recovery, use the [billing portal action adapters](/sdks/react/billing-portal).
 

@@ -54,6 +54,19 @@ When `track()` resolves the subscription itself and the customer has no active s
 
 The transport redacts known secret, token, authorization, and key fields and replaces the active API key if it appears in a string response.
 
+## Workspace blocked (`402`)
+
+Your workspace answers HTTP `402` when it has no verified card (`card_required`) or when its Nozle invoices stayed unpaid for 7 days (`workspace_suspended`). See [Workspace billing errors](/api/errors#workspace-billing-errors). Do not retry: the SDK never retries a `402`, and every retry is refused until a member adds a card or pays the Nozle invoices. Calls work again at once afterwards. Events sent while blocked are refused, not queued.
+
+```python
+try:
+    nozle.can("cust_123", "code_completion")
+except NozleAPIError as error:
+    if error.status_code == 402:
+        # error.code is "card_required" or "workspace_suspended".
+        ...  # tell your team to fix billing; neither allowed nor denied
+```
+
 ## Retry behavior
 
 By default the SDK does not retry, so a mutation is never replayed without application context. Set `max_retries` (and optionally `retry_delay`) to retry network errors, timeouts, `429` and `5xx` with backoff, or after `NozleAPIError.retry_after` seconds when the service sent `Retry-After`. Only requests that are safe to repeat are retried: reads, calls that carry an idempotency key (such as `usage.track`), event, cost event and customer writes, and the read-only usage check and transition preview. `subscribe`, `checkout` and other writes without a key are never retried.

@@ -44,6 +44,23 @@ try {
 
 The message keeps the `<operation> failed: <status> <status text>` form, and the class extends `Error`.
 
+## Workspace blocked (`402`)
+
+Your workspace answers HTTP `402` when it has no verified card (`card_required`) or when its Nozle invoices stayed unpaid for 7 days (`workspace_suspended`). See [Workspace billing errors](/api/errors#workspace-billing-errors). Do not retry: the SDK never retries a `402`, and every retry is refused until a member adds a card or pays the Nozle invoices. Calls work again at once afterwards. Events sent while blocked are refused, not queued.
+
+```ts
+try {
+  await nozle.can('workspace_123', 'code_completion')
+} catch (error) {
+  if (error instanceof NozleApiError && error.status === 402) {
+    // error.code is 'card_required' or 'workspace_suspended'.
+    // Tell your team to fix billing; the check is neither allowed nor denied.
+  } else {
+    throw error
+  }
+}
+```
+
 ## Branch on the status
 
 `error.status` works on every call. Use `status` to separate a retryable failure from one that is not:
