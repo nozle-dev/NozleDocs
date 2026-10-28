@@ -200,21 +200,20 @@ A `completed` result has `payment_source` `credits` when the change was funded w
 }
 ```
 
-`subscription_id` is the pending subscription; there is no separate `pending_subscription_id` field. A new scheduled change while a change is pending replaces that change and returns a new pending ID. A paid upgrade checkout is refused with `409 subscription_change_pending` while a change is pending: withdraw it first. See [Paid upgrades: current limits](#paid-upgrades-current-limits).
+`subscription_id` is the pending subscription; there is no separate `pending_subscription_id` field. A new scheduled change while a change is pending replaces that change and returns a new pending ID. A paid upgrade checkout is refused with `409 subscription_change_pending` while a change is pending: withdraw it first. See [Paid upgrades: rules](#paid-upgrades-rules).
 
 `effective_at` is an RFC 3339 timestamp rendered in the customer's timezone. For a customer in `Asia/Kolkata` it reads `2026-11-01T00:00:00.000000+05:30`, which is the same instant as `2026-10-31T18:30:00Z`. Parse it as a timestamp and do not assume a trailing `Z`. A scheduled change takes effect at that instant: the active subscription is terminated and the pending subscription becomes active, keeping its `billing_time`.
 
-### Paid upgrades: current limits
+### Paid upgrades: rules
 
-These limits were observed on a paid upgrade checkout that returns a `stripe` result with `plan_upgrade_intent_id`. Configure around them until Core is fixed.
+These rules apply to a paid upgrade checkout, the result that carries `plan_upgrade_intent_id`. Nozle finalizes the upgrade invoice when the payment arrives, even when the billing entity has an invoice grace period.
 
-- **Invoice grace period.** If the billing entity has an invoice grace period above 0 days, the upgrade invoice stays a draft. The customer's payment is still collected, but Nozle cannot apply the upgrade. With `credit_action: "credit"` the upgrade ends in `needs_review` with `plan_upgrade_amount_changed`, because the quoted amount credited the unused time and the draft invoice did not. Without a credit, the payment handler fails with `payment_status_update_on_draft_invoice` and the upgrade stays pending. Set the grace period to 0 for billing entities that sell paid upgrades, or refund and reconcile an affected payment by hand.
 - **Pending change.** A paid upgrade checkout is refused with `409 subscription_change_pending` while the subscription has a scheduled cancellation or a scheduled plan change. Withdraw the pending downgrade with [`POST /subscriptions/transitions/withdraw`](/api/subscription-management#withdraw-a-pending-downgrade), or keep the subscription, then start the upgrade. Cancelling at period end, scheduling a plan change or applying an immediate downgrade cancels an open upgrade checkout: its Stripe Checkout Session or Razorpay order is expired. A payment the provider is already processing is left to settle.
 - **Status.** Poll the upgrade with `GET /checkout/{plan_upgrade_intent_id}?customer_id=…&subscription_id=…` (Engine names). `status` is `awaiting_payment` until payment, then `succeeded` with `fulfillment_status` `succeeded` and an `invoice_id`. `needs_review` means the payment was taken but the upgrade was not applied. See [Subscription self-service](/api/subscription-management#payment-status-and-recovery).
 
-- **Failed upgrades leave nothing behind.** A quoted upgrade with nothing to pay that fails after the change was prepared (for example because the grace period keeps its invoice a draft) is rolled back: the subscription stays on its plan, no credit note is created, and the same request can be retried once the cause is fixed. An upgrade whose credit for the unused time of the old plan cannot be computed (the credit usage of a plan family interval switch is unavailable) fails with `503 credit_usage_unavailable` and applies nothing, instead of applying without the credit. Retry later.
+- **Failed upgrades leave nothing behind.** A quoted upgrade with nothing to pay that fails after the change was prepared is rolled back: the subscription stays on its plan, no credit note is created, and the same request can be retried once the cause is fixed. An upgrade whose credit for the unused time of the old plan cannot be computed (the credit usage of a plan family interval switch is unavailable) fails with `503 credit_usage_unavailable` and applies nothing, instead of applying without the credit. Retry later.
 
-With a grace period of 0 and no pending change, a credited upgrade applies as quoted: the old subscription is terminated, the new one is active, and `billing_time` is unchanged.
+With no pending change, a credited upgrade applies as quoted: the old subscription is terminated, the new one is active, and `billing_time` is unchanged.
 
 ## Errors
 

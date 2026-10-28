@@ -76,7 +76,7 @@ Content-Type: application/json
 
 Validation rules:
 
-- `end_of_period` timing needs `proration_behavior: "none"` and `credit_action: "none"`. Because `proration_behavior` defaults to `prorate_immediately`, send `"proration_behavior": "none"` with every `end_of_period` policy.
+- `end_of_period` timing needs `proration_behavior: "none"` and `credit_action: "none"`. Because `proration_behavior` defaults to `prorate_immediately`, send `"proration_behavior": "none"` with every `end_of_period` policy (`must_be_none`).
 - `reset_anchor` needs `immediate` timing (`reset_requires_immediate_timing`).
 - `refund_mode: "full"` needs `credit_action: "refund"` (`requires_refund_action`).
 - `credit_action: "offset"` needs `final_invoice_action: "generate"` (`must_generate_for_offset`).
@@ -92,10 +92,6 @@ A violation returns `422` with `code: "validation_errors"` and the failing field
   "error_details": { "billing_anchor": ["reset_requires_immediate_timing"] }
 }
 ```
-
-<Warning>
-The two `end_of_period` rules currently return a long untranslated message in `error_details.proration_behavior` and `error_details.credit_action` instead of a short code. Check which field is present rather than matching the text.
-</Warning>
 
 An unknown target plan returns `404 plan_not_found`. An invalid enum value returns `422` with `value_is_invalid` for that field.
 
@@ -184,4 +180,4 @@ Other `422` responses from plan changes:
 | `target_plan_is_not_a_downgrade` | A `downgrade` transition was requested on a pair whose policy direction is `upgrade`. |
 | `plan_upgrade_invoice_missing` | An upgrade checkout to a plan that bills in arrears; nothing is invoiced up front to pay. |
 
-A new scheduled change while a change is already pending replaces the pending change and returns a new pending subscription ID. Withdrawing the old ID then returns `409 pending_subscription_changed`. A paid upgrade checkout does not replace or withdraw a pending downgrade: it is refused with `409 subscription_change_pending`. Withdraw the pending change first. Scheduling a change cancels an open upgrade checkout. See [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits).
+A new scheduled change while a change is already pending replaces the pending change and returns a new pending subscription ID. Withdrawing the old ID then returns `409 pending_subscription_changed`. A paid upgrade checkout does not replace or withdraw a pending downgrade: it is refused with `409 subscription_change_pending`. Withdraw the pending change first. Scheduling a change cancels an open upgrade checkout. See [Paid upgrades: rules](/api/create-checkout#paid-upgrades-rules).
