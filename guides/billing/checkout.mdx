@@ -108,7 +108,7 @@ Plan checkout:
 }
 ```
 
-Free plans and paid upgrades fully funded by prepaid credits return a completed response instead. Downgrades and other cycle-end transitions return a scheduled response from the same `/checkout` endpoint; browser sessions never call `/billing/upgrade` or `/subscriptions/change`.
+For a customer with no subscription, a free plan, a plan with a trial or a plan billed in arrears returns `422 checkout_not_required`: start it with [`subscribe`](/api/subscribe) instead. For an existing subscriber, an immediate plan change with nothing to pay returns a completed response, including a paid upgrade fully covered by prepaid credits. See [Create checkout](/api/create-checkout). Downgrades and other cycle-end transitions return a scheduled response from the same `/checkout` endpoint; browser sessions never call `/billing/upgrade` or `/subscriptions/change`.
 
 ## Return URLs and your organization's origins
 

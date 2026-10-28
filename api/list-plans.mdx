@@ -31,7 +31,7 @@ Engine forwards the request, with its query string, to Core and returns Core's s
 
 ## Which plans are returned
 
-All top-level plans of the organization, newest first. There is no listed, public or draft flag, so trial plans, pay-in-arrears plans and free plans are all included. Per-customer override plans (plans with a `parent_id`) and deleted plans are not.
+All top-level plans of the organization, newest first. Price, trial and billing timing do not matter, so trial plans, pay-in-arrears plans and free plans are all included. Only the plan family's `show_on_pricing` decides whether a `pk_` list includes a plan; see below. Per-customer override plans (plans with a `parent_id`) and deleted plans are not.
 
 Only the current version of each plan code is returned. Older versions, which existing subscribers stay on after a price change, are never listed and never sold by code. A secret key reads one with `GET /plans/{code}?version=1` and lists them with `GET /plans/{code}/versions`. See [Plan versioning](/guides/billing/plan-versions).
 
