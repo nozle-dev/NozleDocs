@@ -1,0 +1,29 @@
+---
+title: Environments
+description: Split your workspace data into Live and Sandbox environments, and decide which one an integration reaches.
+---
+
+An environment is a data boundary. It decides which customers, events and API keys an integration can reach. It never changes what an invoice says. Invoice identity belongs to a [billing entity](/guides/settings/billing-entities).
+
+Open **Settings** and choose **Environments** to manage them.
+
+## Fields
+
+| Field | What it does |
+| --- | --- |
+| Name | The label people see in the dashboard. |
+| Identifier | Lowercase letters, numbers and hyphens, 3 to 32 characters. API keys reference it, so it cannot be renamed after you create the environment. |
+| Mode | **Live** bills real customers. **Sandbox** holds isolated test data. The mode is fixed once the environment holds data. To change it, create a new environment. |
+| Status | Active, Paused or Archived. |
+| Billing entity | The billing entity whose identity documents issued here carry. Leave it on **Workspace default** to use the default entity. |
+
+## Rules
+
+- Each mode has exactly one default environment. New sessions land in it.
+- You cannot pause or archive the default environment. Promote another one first.
+- You cannot archive the last active live environment. Doing so would stop all billing traffic.
+- Live and sandbox data never mix. A sandbox environment is isolated from live customers, invoices and payments.
+
+## Who can change them
+
+Anyone with settings access can view environments. Adding or editing one needs the `organization.update` permission, which workspace admins have. Without it, the buttons are disabled.

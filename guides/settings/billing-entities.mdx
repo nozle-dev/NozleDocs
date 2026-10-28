@@ -1,0 +1,32 @@
+---
+title: Billing entities
+description: Set up the legal entities that issue your invoices.
+---
+
+A billing entity is a legal entity that issues invoices. It decides what a customer document says: who issued it, how it is numbered, and when it is due. It does not decide which data an API key can reach. That is an [environment](/guides/settings/environments).
+
+Open **Settings** and choose **Billing entities**. You can also manage them with the API: [list](/api-reference/billing-entities/list-all-billing-entities), [create](/api-reference/billing-entities/create-a-billing-entity), [get](/api-reference/billing-entities/retrieve-a-billing-entity) and [update](/api-reference/billing-entities/update-a-billing-entity).
+
+## Fields
+
+| Group | Fields |
+| --- | --- |
+| Identity | Name, code, billing email, logo (PNG or JPEG, up to 800 KB) |
+| Legal | Legal name, legal number, tax identification number |
+| Address | Address lines, city, state or region, postcode, country as a 2-letter code |
+| Currency and time | Currency, timezone |
+| Documents | Document language, document number prefix (up to 10 characters), numbering scheme, invoice footer |
+| Payment | Net payment term (days), invoice grace period (days) |
+| Issuing | Invoice issuing date anchor (Current period end or Next period start), issuing date adjustment (Align with finalization date or Keep anchor) |
+| Switches | Finalize zero-amount invoices, EU tax management, electronic invoicing (shown for countries that require it) |
+| Also | Customer emails, taxes, invoice custom sections |
+
+The numbering scheme is **Per customer** or **Per billing entity**. Customer email switches live on [Customer emails](/guides/settings/customer-emails). To pick custom sections, save the entity first, then reopen it.
+
+## The default entity
+
+Your workspace has a default billing entity. Edits to it apply from the next document it issues. Documents already issued do not change.
+
+## More than one entity
+
+Extra billing entities depend on your plan and organization. You also need billing entity creation permission. If more are not available, the page says so and the **New billing entity** button is disabled.
