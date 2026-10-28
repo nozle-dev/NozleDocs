@@ -105,6 +105,30 @@ The result comes from your `createCheckout` backend call. [`CheckoutButton`](/sd
 
 ## Examples
 
+### Your own pay button
+
+Pass children and call `useCheckout()` inside them. Outside `Checkout` the hook throws.
+
+```tsx
+import { Checkout, useCheckout } from '@nozle-js/react'
+
+function MyPayButton() {
+  const { confirmPayment, isProcessing, error } = useCheckout()
+  return (
+    <>
+      <button onClick={() => void confirmPayment()} disabled={isProcessing}>Pay with Nozle</button>
+      {error && <p role="alert">{error.message}</p>}
+    </>
+  )
+}
+
+export const Pay = ({ checkout }) => (
+  <Checkout checkout={checkout}>
+    <MyPayButton />
+  </Checkout>
+)
+```
+
 ### Pay button for a checkout result
 
 With `checkout`, the component renders a pay button that handles hosted (Stripe), Razorpay, processing, completed and scheduled results. It reads `verifyCheckout` and `getCheckoutStatus` from its props first (React `0.10.0` and later), then from `BillingProvider`.
@@ -184,6 +208,10 @@ export function ResumePayment({ result }: { result: CheckoutResult }) {
 
 <ResponseField name="className" type="string">
   Class name on the root element.
+</ResponseField>
+
+<ResponseField name="children" type="ReactNode">
+  Your own pay UI. It replaces the default pay button (React `0.21.0` and later). Inside it, `useCheckout()` returns `confirmPayment`, `isProcessing` and `error`. The component shows the processing message, but the error is yours to render.
 </ResponseField>
 
 <ResponseField name="appearance" type="Appearance">
