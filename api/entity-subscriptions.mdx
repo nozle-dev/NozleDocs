@@ -191,6 +191,8 @@ Content-Type: application/json
 
 The request accepts 1 to 100 unique Entities and requires an `Idempotency-Key` header of at most 255 bytes. Every plan must require an up-front payment, use the same currency, and use the same interval. A free plan, a plan with a trial, or a plan billed in arrears is refused, even though single Entity checkout accepts it. Each Entity must be active and must not already have an active, pending, or incomplete subscription.
 
+While a first paid Entity checkout for this customer is still open and no billing anchor is set yet, the request returns `409` with `code: "billing_anchor_checkout_in_progress"`, as a single Entity checkout does. Before October 28, 2026 this was a `422 validation_errors` with `error_details.checkout`.
+
 Item problems fail the whole basket with `422` and the reason in `error_details.items`:
 
 ```json
@@ -215,7 +217,6 @@ Item problems fail the whole basket with `422` and the reason in `error_details.
 | `idempotency_key: ["idempotency_key_reused"]` | The key was used for a different basket. |
 | `checkout: ["payment_provider_changed"]` | A replayed Razorpay batch, but the customer is now assigned to another payment connection. |
 | `currency: ["customer_currency_mismatch"]` | The plans' currency differs from the customer's. |
-| `checkout: ["billing_anchor_checkout_in_progress"]` | A first paid checkout for this customer is still open. |
 | `checkout: ["checkout_not_available"]` | A replay of a batch that has failed or expired. Start a new checkout with a new key. |
 
 Create each Entity first with [Customer Entities](/api/customer-entities). An Entity that does not exist returns `404 entity_not_found`.
