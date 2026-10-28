@@ -155,18 +155,11 @@ if err != nil { return err }
 _ = checkout
 ```
 
-On the frontend, pass a Stripe result to the React checkout component:
+On the frontend, redirect to the hosted page of a Stripe result:
 
 ```tsx
-import { Checkout } from '@nozle-js/react'
-
-if (checkout.type === 'stripe' && checkout.client_secret) {
-  return (
-    <Checkout
-      clientSecret={checkout.client_secret}
-      publishableKey={import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY}
-    />
-  )
+if (checkout.type === 'hosted') {
+  window.location.assign(checkout.url)
 }
 ```
 
@@ -233,9 +226,11 @@ An unknown customer or plan returns `404` (`customer_not_found`, `plan_not_found
 {
   "entity_subscription_checkout": {
     "id": "checkout_batch_uuid",
-    "type": "stripe",
+    "type": "hosted",
     "status": "open",
-    "client_secret": "cs_...",
+    "url": "https://checkout.stripe.com/c/pay/cs_...",
+    "payment_url": "https://checkout.stripe.com/c/pay/cs_...",
+    "checkout_id": "cs_...",
     "invoice_id": "invoice_uuid",
     "amount_cents": 4498,
     "currency": "USD",
@@ -255,7 +250,7 @@ An unknown customer or plan returns `404` (`customer_not_found`, `plan_not_found
 
 Nozle supports these result types:
 
-- `stripe`: mount the returned `cs_` client secret with Stripe Embedded Checkout;
+- `hosted`: a Stripe-hosted Checkout page. Redirect the customer to `url`. The page opens only when the saved card cannot be charged; Nozle tries the saved card first;
 - `razorpay`: the result also has `checkout_id`, `key_id`, and `order_id`; open the Razorpay modal and verify as described in [Razorpay](/integrations/razorpay#checkout-flow). Razorpay needs INR plans (`razorpay_requires_inr` otherwise);
 - `processing`: the payment completed, or the Razorpay order is not ready, and the verified payment event is still being processed; and
 - `completed`: the invoice is already settled, so no provider session is required.
@@ -263,10 +258,10 @@ Nozle supports these result types:
 `status` is the batch status: `pending`, `open`, `completed`, `failed`, or `expired`. An unpaid checkout expires after 23 hours (`expires_at`).
 
 <Info>
-A bulk Razorpay checkout answers first with `type: "processing"`, `status: "open"`, `client_secret: null` and a `checkout_id`, because Nozle creates the Razorpay order in the background. Either poll `GET /checkout/{checkout_id}` until its nested `checkout` is `{"type": "razorpay", "key_id", "order_id", ...}`, or replay the same request with the same `Idempotency-Key`: once the order exists the replay returns `type: "razorpay"` with `checkout_id`, `key_id` and `order_id`. Then open the modal. After the payment, status goes `succeeded` with `fulfillment_status` `processing`, then `succeeded`, and every Entity subscription in the basket becomes active.
+A bulk Razorpay checkout answers first with `type: "processing"`, `status: "open"` and a `checkout_id`, because Nozle creates the Razorpay order in the background. Either poll `GET /checkout/{checkout_id}` until its nested `checkout` is `{"type": "razorpay", "key_id", "order_id", ...}`, or replay the same request with the same `Idempotency-Key`: once the order exists the replay returns `type: "razorpay"` with `checkout_id`, `key_id` and `order_id`. Then open the modal. After the payment, status goes `succeeded` with `fulfillment_status` `processing`, then `succeeded`, and every Entity subscription in the basket becomes active.
 </Info>
 
-The idempotency key covers the customer, billing mode, return URL, Entity IDs, and plans. Retry the exact request with the same key: Nozle returns the same batch with `replayed: true` and reuses the open Stripe session. A different basket with the same key returns `422` with `idempotency_key: ["idempotency_key_reused"]`. The result also carries `clientSecret`, a camel-case alias of `client_secret`.
+The idempotency key covers the customer, billing mode, return URL, Entity IDs, and plans. Retry the exact request with the same key: Nozle returns the same batch with `replayed: true` and reuses the open Stripe session (the same `url`). A different basket with the same key returns `422` with `idempotency_key: ["idempotency_key_reused"]`.
 
 ## Shared customer billing anchor
 

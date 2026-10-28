@@ -1,16 +1,16 @@
 ---
 title: Stripe
-description: Stripe integration for embedded checkout, upgrades, credit top-ups and automatic charging
+description: Stripe integration for hosted checkout, upgrades, credit top-ups and automatic charging
 ---
 
-Nozle uses Stripe to collect payments through an embedded Stripe Checkout Session, a hosted Stripe Checkout page, and automatic charges against a saved payment method. Each Nozle organization connects its own Stripe account, so your customers pay into your Stripe account, not Nozle's. Nozle holds no global Stripe credentials.
+Nozle uses Stripe to collect payments through a Stripe-hosted Checkout page and automatic charges against a saved payment method. Each Nozle organization connects its own Stripe account, so your customers pay into your Stripe account, not Nozle's. Nozle holds no global Stripe credentials.
 
 ## What you need
 
 - A Stripe account and a secret key. A test key starts with `sk_test_` and a live key with `sk_live_`.
-- The Stripe publishable key of the same account (`pk_test_...` or `pk_live_...`), in your browser app only. Nozle never returns it. It mounts Stripe Embedded Checkout.
 - A Nozle public API URL that Stripe can reach.
-- For React, the `@stripe/stripe-js` and `@stripe/react-stripe-js` packages. See [React installation](/sdks/react/installation).
+
+Checkout is a Stripe-hosted page, so your page needs no Stripe publishable key, no Stripe.js and no Stripe packages.
 
 Nozle checks the secret key against Stripe when you connect, and rejects a key Stripe does not accept. It calls Stripe with that key to read the account, create and update customers, create Checkout Sessions and payment intents, create refunds, and create and update webhook endpoints. The key needs access to those resources. The optional customer and invoice import also lists Stripe customers and invoices.
 
@@ -59,8 +59,8 @@ Credit top-ups and payment links do not assign a customer. The customer must alr
 
 | Feature | How it works |
 |---|---|
-| **Checkout** | An embedded Stripe Checkout Session for a Nozle invoice, for a new paid subscription or an existing unpaid invoice |
-| **Upgrades** | A paid plan upgrade opens an embedded Checkout Session. The current plan stays active until the payment settles |
+| **Checkout** | A Stripe-hosted Checkout page for a Nozle invoice, for a new paid subscription or an existing unpaid invoice. A saved card is charged first |
+| **Upgrades** | A paid plan upgrade opens a Stripe-hosted Checkout page. The current plan stays active until the payment settles |
 | **Payment links** | A hosted Stripe Checkout page for credit top-ups, invoice payment URLs and overdue invoices |
 | **Subscriptions** | Managed in Nozle. Paid plans activate only after the payment succeeds |
 | **Credit top-ups** | Paid on a hosted Stripe Checkout page. Credits are granted once the top-up invoice is fully paid |
@@ -85,10 +85,10 @@ Nozle creates the endpoint with the Stripe API version it pins, `2025-04-30.basi
 | `payment_intent.payment_failed`, `payment_intent.canceled` | Failed payments |
 | `setup_intent.succeeded`, `customer.updated` | The customer's saved payment method |
 | `payment_method.detached` | Clears the stored default payment method when it is the detached one |
-| `charge.refund.updated` | Refund status |
+| `refund.updated`, `refund.failed` | Refund status, including a refund Stripe could not complete |
 | `charge.dispute.closed` | Disputes |
 
-Nozle subscribes the endpoint to these eight events only. Events such as `charge.refunded` and `charge.dispute.created` are not subscribed, and a valid event of any other type that reaches the endpoint is accepted and ignored.
+Nozle subscribes the endpoint to these nine events only. The older `charge.refund.updated` is no longer subscribed, but an endpoint created earlier that still sends it keeps working: Nozle accepts it and handles it like `refund.updated` for one more release, then removes it. Endpoints that Nozle creates from now on subscribe to `refund.updated` and `refund.failed` (_Unreleased_); refresh an existing endpoint so it subscribes to them too. Self-hosters run the one-time rake task `payment_providers:refresh_stripe_webhook_events` after upgrading, which updates the events of every Stripe endpoint Nozle created. Events such as `charge.refunded` and `charge.dispute.created` are not subscribed, and a valid event of any other type that reaches the endpoint is accepted and ignored.
 
 Nozle verifies the `Stripe-Signature` header of every request against the stored signing secret, using Stripe's default time tolerance. A request with a bad signature, an unknown organization or code, or an unreadable body is answered with `400`. A valid request is stored, queued and answered with `200`. Nozle does not de-duplicate Stripe events by event ID, so a replayed delivery is processed again. Replays are safe because each handler acts on the state of the payment, invoice or upgrade: an upgrade or invoice that is already settled stays settled.
 
@@ -103,23 +103,23 @@ Without the webhook, Stripe can collect the payment but Nozle is not told. Check
 1. Customer selects a plan in your app.
 2. Your backend derives the customer and calls Nozle checkout with an `sk_` key.
 3. Nozle computes the exact invoice or proration, keeping the current plan active.
-4. If money is due, Nozle makes sure the customer exists in Stripe, creates an embedded Checkout Session and returns a `stripe` result.
-5. The browser mounts Stripe Embedded Checkout with the client secret and your Stripe publishable key.
+4. If money is due, Nozle makes sure the customer exists in Stripe, creates a hosted Checkout Session and returns a `hosted` result. A saved card is charged first, and then no page opens.
+5. Your app redirects the browser to the `url` of the result. Stripe sends the customer back to your `return_url` (or to `cancel_url` when they leave).
 6. Stripe sends `payment_intent.succeeded` to Nozle.
 7. Nozle marks the invoice paid and applies the change: it activates the new subscription, or applies the upgrade.
 8. Your app confirms the result. For a new subscription, reload the subscription. For an upgrade, poll checkout status.
 
-If prepaid credits fully cover the invoice, Nozle returns a completed checkout and Stripe is not called. The `return_url` you send must be an HTTPS URL on one of your organization's allowed origins, and Nozle passes it to Stripe as the return URL of the session.
+If prepaid credits fully cover the invoice, Nozle returns a completed checkout and Stripe is not called. The `return_url` you send must be an HTTPS URL on one of your organization's allowed origins, and Nozle passes it to Stripe as the return URL of the session. It may contain the literal `{CHECKOUT_SESSION_ID}`, which Stripe replaces with the Checkout Session ID. The optional `cancel_url` is validated the same way and defaults to the return URL. Nozle sends Adaptive Pricing disabled so the customer is charged in the invoice currency.
 
-For an invoice that already exists, call checkout with the invoice instead of a plan. It returns the same `stripe` result. The invoice must not be paid, void or a draft.
+For an invoice that already exists, call checkout with the invoice instead of a plan. It returns the same `hosted` result. The invoice must not be paid, void or a draft.
 
 An invoice has at most one payable Checkout Session at a time. This applies to invoice checkout and to resumed or Entity subscription checkout:
 
-- Calling checkout again for the same invoice, with or without an `Idempotency-Key`, returns the session that is still open, with the same `client_secret`.
+- Calling checkout again for the same invoice, with or without an `Idempotency-Key`, returns the session that is still open, with the same `url`.
 - A session that expires within 10 minutes, or that was opened for another amount, is expired at Stripe before exactly one new session is created.
 - While the customer's payment of the last session is processing or has succeeded, checkout answers `422 validation_errors` with `base: [payment_already_processing]` instead of opening a session that could charge the customer twice.
 - If a second payment still succeeds for an invoice that is already paid, Nozle does not apply it. It refunds the payment in full at Stripe with refund reason `duplicate`, and sends you the `invoice.payment_failure` webhook with `provider_error.error_code` `duplicate_payment_refunded` and the payment intent in `error_details.provider_payment_id`. If Stripe refuses the refund, the code is `duplicate_payment_refund_failed`: refund it in the Stripe dashboard. A payment that was still processing when the invoice was paid another way, for example marked as paid, is not refunded automatically; the code is `duplicate_payment_requires_review`.
-- When an invoice no longer needs paying, Nozle expires its open Checkout Sessions (the embedded one and the hosted one of its payment link) and retires its payment link, so a customer with the checkout page still open cannot pay it. This happens when the invoice is voided, marked as paid, paid by another route, partly paid, or reduced by a credit note offset. After a partial payment or an offset, the next checkout is created for the amount now due.
+- When an invoice no longer needs paying, Nozle expires its open Checkout Sessions (the checkout page and the hosted one of its payment link) and retires its payment link, so a customer with the checkout page still open cannot pay it. This happens when the invoice is voided, marked as paid, paid by another route, partly paid, or reduced by a credit note offset. After a partial payment or an offset, the next checkout is created for the amount now due.
 - If a payment still lands on a voided invoice (the customer completed the checkout before it expired), Nozle refunds it in full. The invoice stays voided and unpaid, and you get the `invoice.payment_failure` webhook with `provider_error.error_code` `voided_invoice_payment_refunded`. If Stripe refuses the refund, the code is `voided_invoice_payment_refund_failed`: refund the payment in the Stripe dashboard.
 - When the amount left to pay is under Stripe's minimum charge (for example a partly paid invoice with less than $0.50 due), checkout answers `422 validation_errors` with `error_details.base` `amount_below_provider_minimum`. The invoice's earlier session is expired.
 
@@ -127,19 +127,21 @@ An invoice has at most one payable Checkout Session at a time. This applies to i
 
 ```json
 {
-  "type": "stripe",
-  "client_secret": "cs_live_...",
-  "clientSecret": "cs_live_...",
+  "type": "hosted",
+  "url": "https://checkout.stripe.com/c/pay/cs_live_...",
+  "payment_url": "https://checkout.stripe.com/c/pay/cs_live_...",
+  "checkout_id": "cs_live_...",
   "invoice_id": "invoice_uuid",
   "amount_cents": 19900,
-  "currency": "USD"
+  "currency": "USD",
+  "expires_at": "2026-11-01T12:00:00Z"
 }
 ```
 
-- `client_secret` is the `cs_` secret of an embedded Checkout Session. `clientSecret` is the same value.
-- A plan or invoice checkout result has no Stripe-hosted URL, no Stripe publishable key, no `checkout_id` and no `expires_at`. Only credit top-ups return a Stripe-hosted `payment_url`. See [Credit top-ups](#credit-top-ups).
+- `url` is the Stripe-hosted page. Redirect the customer to it. `payment_url` is the same value. `checkout_id` is the Stripe Checkout Session ID, not a status ID.
+- There is no `client_secret` and no Stripe publishable key. The old `type: "stripe"` result no longer exists.
 - `amount_cents` is in the smallest unit of the invoice currency.
-- A paid upgrade returns `plan_upgrade_intent_id` instead of `invoice_id`. It is the ID you poll. The session stays open for 35 minutes.
+- A paid upgrade returns `plan_upgrade_intent_id` instead of `invoice_id`. The session stays open for 35 minutes.
 - The Checkout Session of a new-subscription or single Entity checkout expires after 23 hours, when the unpaid checkout itself expires.
 - An Entity checkout adds `external_entity_id` and `external_subscription_id`.
 - Send an `Idempotency-Key`. A retry of an invoice checkout returns the session that is still open for that invoice.
@@ -232,37 +234,25 @@ invoiceCheckout, err := client.CheckoutInvoice(ctx, invoiceID, idempotencyKey)
 
 Checkout and status calls need an `sk_` key, so they run only in your backend. Bind each upgrade ID to the buyer who started it before you call Nozle. Checkout from an invoice sends no `return_url` through the SDKs, so Nozle uses its configured default return URL.
 
-A new-subscription or invoice checkout has no checkout ID to poll. After Embedded Checkout completes, reload the subscription. For example, call `GET /billing/status` with the customer until it returns the plan the customer bought. It returns `404` while the subscription is not active.
+After the customer returns, reload the subscription: a new subscription or invoice checkout has no status call. For example, call `GET /billing/status` with the customer until it returns the plan the customer bought. It returns `404` while the subscription is not active. For a paid upgrade, poll `GET /checkout/{plan_upgrade_intent_id}` (not the `checkout_id`, which is the Stripe session ID): `awaiting_payment` with the hosted result nested while the buyer pays, `processing` once Stripe took the payment, `succeeded` with a nested `completed` when applied, and `expired` when the Stripe session is no longer open.
 
-### Mount the session in the browser
+### Redirect to the hosted page
 
-Mount the `cs_` secret with Stripe Embedded Checkout and the publishable key of the Stripe account connected in Nozle. A Nozle `pk_nozle_` key cannot do this: it is valid only for the plan catalog.
+Send the browser to `url`. Nothing is mounted: no Stripe.js, no publishable key. A Nozle `pk_nozle_` key cannot start a checkout either: it is valid only for the plan catalog.
 
 ### React
 
-With the React SDK, `CheckoutButton` calls your `createCheckout` callback and hands the Stripe client secret to `onStripeClientSecret`. `Checkout` mounts the secret. It uses Embedded Checkout for a `cs_` secret:
+With the React SDK, `CheckoutButton` calls your `createCheckout` callback and redirects the browser to the `url` of a `hosted` result:
 
 ```tsx
-import { BillingProvider, Checkout, CheckoutButton } from '@nozle-js/react'
-
-const [clientSecret, setClientSecret] = useState<string | null>(null)
+import { BillingProvider, CheckoutButton } from '@nozle-js/react'
 
 <BillingProvider publishableKey={publishableKey} createCheckout={createCheckout}>
-  {clientSecret ? (
-    <Checkout
-      clientSecret={clientSecret}
-      publishableKey={stripePublishableKey}
-      onComplete={() => setClientSecret(null)}
-    />
-  ) : (
-    <CheckoutButton planCode="pro_monthly" onStripeClientSecret={setClientSecret} />
-  )}
+  <CheckoutButton planCode="pro_monthly" returnUrl="https://app.example.com/billing/done" />
 </BillingProvider>
 ```
 
-`CheckoutButton` throws `onStripeClientSecret is required for embedded Stripe checkout` when the callback is missing.
-
-The `onComplete` of the embedded `Checkout` does not fire when the session redirects to the `return_url`, and Nozle creates sessions that redirect. Show success from your return page instead, or by reading billing status for the customer. Neither the return page nor `onComplete` proves activation: reload the subscription or poll status before you show success. See the [React components](/sdks/react/components), the [hooks](/sdks/react/hooks#checkout-result-types) and the [billing portal](/sdks/react/billing-portal), which recovers an open upgrade after a reload.
+Neither the return page nor the redirect proves activation: reload the subscription or poll status before you show success. See the [React components](/sdks/react/components), the [hooks](/sdks/react/hooks#checkout-result-types) and the [billing portal](/sdks/react/billing-portal), which recovers an open upgrade after a reload.
 
 ### HTTP
 
@@ -307,13 +297,13 @@ A browser success callback alone never activates a plan.
 
 While the upgrade awaits payment, each status call retrieves its Checkout Session from Stripe. It reports `processing` when Stripe says the session is complete and `expired` when the session is not open any more. A status call never settles a payment: `succeeded` appears only after the webhook has applied the upgrade.
 
-`fulfillment_status` is `pending` until the upgrade is applied, then `succeeded`. Show success only when both are `succeeded`, then reload the subscription. The response also carries `checkout_id` (the upgrade ID), `provider` (`stripe`), `amount_cents`, `currency` and `invoice_id`. `invoice_id` is empty until the upgrade is applied. While the status is `awaiting_payment`, a nested `checkout` carries the client secret of the still-open session, so a client can resume after a reload.
+`fulfillment_status` is `pending` until the upgrade is applied, then `succeeded`. Show success only when both are `succeeded`, then reload the subscription. The response also carries `checkout_id` (the upgrade ID), `provider` (`stripe`), `amount_cents`, `currency` and `invoice_id`. `invoice_id` is empty until the upgrade is applied. While the status is `awaiting_payment`, a nested `checkout` carries the hosted result of the still-open session, so a client can resume after a reload.
 
 `needs_review` means Stripe took a payment that Nozle could not apply. It also appears when Stripe could not confirm whether it created the session. Two causes are easy to hit today. First, a billing entity with an invoice grace period above 0 days leaves the upgrade invoice as a draft, so the upgrade ends in `needs_review` with `plan_upgrade_amount_changed` when the policy credits the unused time, and otherwise stays pending because the payment handler fails with `payment_status_update_on_draft_invoice`. Second, an upgrade checkout created while a downgrade is pending ends in `needs_review` with `plan_upgrade_subscription_changed`. Set the grace period to 0 and withdraw a pending downgrade before you start the upgrade. See [Paid upgrades: current limits](/api/create-checkout#paid-upgrades-current-limits). Nozle grants no plan and records no successful payment for it. Check the payment in the Stripe dashboard and refund or reconcile it deliberately.
 
 ## Payment links
 
-Nozle uses a hosted Stripe Checkout page where the customer is not inside your embedded checkout: an invoice payment URL, a credit top-up purchase, and the link for overdue invoices. The page offers the payment methods set on the customer. An invoice payment link expires after 24 hours. The result is a `payment_url`, which you navigate the customer to. After payment the customer goes to the connection's success redirect URL. `payment_intent.succeeded` settles it.
+Nozle uses a hosted Stripe Checkout page for the other payment paths: an invoice payment URL, a credit top-up purchase, and the link for overdue invoices. The page offers the payment methods set on the customer. An invoice payment link expires after 24 hours. The result is a `payment_url`, which you navigate the customer to. After payment the customer goes to the connection's success redirect URL. `payment_intent.succeeded` settles it.
 
 ## Credit top-ups
 
@@ -368,7 +358,7 @@ Checkout errors that are specific to Stripe. See [Create checkout](/api/create-c
 | `422` | `validation_errors` | `error_details.base` is `amount_below_provider_minimum`: the amount left to pay on the invoice is under Stripe's minimum charge |
 | `422` | `stripe_customer_required` | Nozle could not create the customer in Stripe. A `customer.payment_provider_error` webhook carries the Stripe error |
 | `409` | `subscription_checkout_in_progress` | A new-subscription checkout for this customer on a different plan is still being paid. See [Retry a new-subscription checkout](#retry-a-new-subscription-checkout) |
-| `422` | `validation_errors` | `error_details.base` is `invalid_invoice_status_or_payment_status` when the invoice is paid, voided, a draft, closed, failed or has nothing due (embedded checkout and payment URL), `missing_stripe_customer` or `missing_payment_provider` when the connection or Stripe customer is missing, or `no_linked_payment_provider` and `missing_payment_provider_customer` for a payment link or top-up |
+| `422` | `validation_errors` | `error_details.base` is `invalid_invoice_status_or_payment_status` when the invoice is paid, voided, a draft, closed, failed or has nothing due (checkout and payment URL), `missing_stripe_customer` or `missing_payment_provider` when the connection or Stripe customer is missing, or `no_linked_payment_provider` and `missing_payment_provider_customer` for a payment link or top-up |
 | `409` | `plan_upgrade_checkout_in_progress` | A payment for the upgrade is already processing, or another upgrade checkout is open. It also stays in force after Stripe expired the session early, until the upgrade's own 35 minutes pass |
 | `422` | `third_party_error` | Stripe rejected the request. `error_details.third_party` is `Stripe` and `thirdparty_error` carries Stripe's message |
 | `404` | `checkout_session_not_found` | Unknown upgrade ID, or a status call without the customer and subscription scope |
@@ -378,13 +368,13 @@ Connecting Stripe can fail with `500 stripe_account_already_connected` (message 
 
 ## Limits
 
-- Plan and invoice checkout use embedded Checkout only. Nozle returns no Stripe-hosted URL for them. A hosted Stripe page (`checkout.stripe.com`, valid for 24 hours) is used for credit top-ups, invoice payment URLs and overdue invoices.
-- A new-subscription or invoice checkout has no checkout ID and no status call. A paid upgrade has both.
+- Every Stripe checkout is a Stripe-hosted page (`checkout.stripe.com`, valid until `expires_at`; 24 hours for credit top-ups, invoice payment URLs and overdue invoices). Nozle returns no card form and no client secret.
+- A saved card is charged first. Only when it cannot be charged does a page open.
 - An upgrade session lasts 35 minutes. A new-subscription, single Entity or bulk Entity checkout lasts 23 hours. See [Entity Subscriptions](/api/entity-subscriptions#purchase-multiple-entity-plans-together).
 - One connection per Stripe account and mode (test or live) in an organization. The secret key of a connection cannot change.
 - Nozle manages the webhook signing secret. You cannot enter it in the dashboard.
 - Bank transfers through `customer_balance` support USD, GBP, JPY, MXN and EUR. For EUR the customer or your billing entity must be in Belgium, Germany, Spain, France, Ireland or the Netherlands.
-- Nozle does not restrict the payment methods of an embedded Checkout Session. Which methods appear depends on your Stripe settings.
+- Nozle does not restrict the payment methods of a Checkout Session. Which methods appear depends on your Stripe settings.
 
 ## Troubleshooting
 

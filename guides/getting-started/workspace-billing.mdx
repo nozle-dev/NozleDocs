@@ -1,0 +1,86 @@
+---
+title: Workspace billing
+description: The card Nozle asks for at onboarding, automatic upgrades, failed payments, suspension on day 7 and how your workspace resumes
+---
+
+This page is about what your workspace pays Nozle. It never touches how you bill your own customers. For prices, limits and what each plan includes, see [Nozle plans and pricing](/guides/getting-started/nozle-plans).
+
+<Note>
+The card requirement, day-7 suspension, resume and catch-up billing are _Unreleased_ until deployed.
+</Note>
+
+## Card at onboarding
+
+Every workspace adds a card before it can use Nozle, on every plan including the free Starter plan. There is no switch for this: it is always on.
+
+- The card is verified on a page hosted by Stripe that offers cards only and shows Stripe's own text about reusing the card for later charges. **Nothing is charged** when you add it.
+- Any member of the workspace can add the card. Once it is saved, Nozle opens for everyone.
+- After the card, the AI onboarding opens. Until you have finished setting up, the dashboard shows one banner (verify your card, or finish setting up) instead of a checklist.
+- If you close the page after paying, or Stripe's notification is delayed or lost, Nozle checks with Stripe on its own when you return, or when you choose **Check again**. You are not asked for the card twice.
+- Existing workspaces without a card are flagged within the hour after the release and see the same step.
+- Nozle keeps only Stripe's identifiers and the status of the card. It never stores the card number, brand, expiry or any other card detail.
+
+Without a verified card, the dashboard and every API key call are refused with `402` `card_required`: the dashboard, Core REST, account MCP tokens (also ones issued earlier), the Engine API (events, `/can`, plans, checkout, billing, credits), the LLM proxy and event ingestion. Add the card in the dashboard and the next request works. If the workspace is also suspended, `workspace_suspended` is answered instead. See [Errors](/api/errors#workspace-billing-errors).
+
+## Plan limits and automatic upgrade
+
+When your tracked MRR passes the limit of your plan, Nozle moves the workspace to the next plan now (Starter to Growth, Growth to Scale). The prorated difference goes on an invoice that is charged to your saved card and emailed to every member. Events over the included amount are never blocked: they are billed as overage at $0.04 per 1,000 events at the end of the month. See [MRR limit and automatic upgrade](/guides/getting-started/nozle-plans#mrr-limit-and-automatic-upgrade).
+
+If the charge for that invoice fails, the plan stays upgraded and the invoice follows the failed-payment steps below.
+
+## When a payment fails
+
+Day 0 is the first failed automatic charge of a Nozle invoice.
+
+| Day | What happens |
+|---|---|
+| 0 | Every member gets an email with the amount due, the invoice numbers, the date access will be blocked and a **Pay** link. The dashboard shows a banner on every page. |
+| 1 to 6 | Nozle retries the charge once a day for each failed invoice. |
+| 3 | Reminder email to every member. |
+| 6 | Last reminder email: access is blocked tomorrow. |
+| 7 | The workspace is suspended if the invoices are still unpaid. Every member gets an email. |
+
+- The **Pay** link in each email needs no login. It opens a Stripe-hosted payment page for the amount due now. Every click opens a new page, so the amount is always current.
+- The banner can be dismissed and comes back after 3 hours.
+- Any member can pay under **Nozle invoices** in the dashboard.
+- Adding or changing the card retries the charge at once. If nothing is owed any more, the cycle ends and the banner disappears.
+- Paying before day 7 means the workspace is never suspended.
+
+## Suspension on day 7
+
+When the Nozle invoices are still unpaid 7 days after the first failed charge, Nozle suspends the workspace. A suspended workspace answers `402` with the code `workspace_suspended`, also when it has no card.
+
+**What stops:**
+
+- Events and cost events sent to Nozle.
+- `GET /can` and every other call to the Engine API with an API key, including plans, checkout, billing and credits routes, and so the billing screens of your embedded SDK components.
+- The LLM proxy.
+- Core REST calls with an API key, and the account MCP.
+- Copilot.
+- The dashboard, except the **Nozle invoices** page. A modal says the bill is unpaid, and the invoices page keeps working so a member can pay.
+
+**What keeps working:**
+
+- Webhooks: payment provider webhooks arriving at Nozle, and the webhooks Nozle sends you.
+- The customer portal and the payment pages of your own customers (`payment_requests/pay`). Your customers can still pay you.
+- The pay link in the emails and the **Nozle invoices** page.
+
+While suspended, the renewals of your own customers and the finalization of their draft invoices are paused. Dunning, credit top-ups, trials, overdue marking and your outgoing webhooks keep running.
+
+**What is lost:** events sent during the suspension are refused with `402`. They are not queued and cannot be billed afterwards. Keep your own copy if you need to resend them. If you want your app to keep working while Nozle is blocked, decide that in your own code. The Nozle SDKs throw their API error with `code` `workspace_suspended` (or `card_required`) and never retry a `402`. See [The can() endpoint](/guides/entitlements/can-endpoint#unavailable-or-blocked).
+
+## Resume
+
+The workspace resumes the moment the owed Nozle invoices are all paid. Paying only one of two invoices keeps it suspended. API keys, events, `/can`, the proxy, MCP and Copilot work again on the next request.
+
+Then Nozle catches up on your own customers: it bills the time that was paused, using the original billing periods, so customers get the invoices they would have had and no period is skipped or billed twice. Expect a burst of invoices to your customers, sent in one go. Then it checks your usage limits again.
+
+No separate email confirms the resume.
+
+## Change the card
+
+Use **Change card** in the dashboard. It opens the Stripe billing portal on the payment method screen only. When you are done, you return to the dashboard. A new card retries any owed invoice at once.
+
+## India cards
+
+Cards issued in India cannot be charged automatically by Nozle. Each Nozle invoice is paid through the hosted **Pay** link or the **Nozle invoices** page every time, so an invoice that is not paid on time follows the failed-payment steps above.

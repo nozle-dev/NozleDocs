@@ -39,14 +39,15 @@ result = nozle.checkout(
 
 | `type` | Fields | Handling |
 | --- | --- | --- |
-| `stripe` | `client_secret`/`clientSecret` (`cs_...`), `invoice_id`, `amount_cents`, `currency` | Mount Stripe embedded Checkout with the client secret. Plan and invoice checkout never return a Stripe `url`; only credit top-ups return a Stripe-hosted `payment_url`. See [the Stripe flow](/guides/billing/checkout#stripe). |
+| `hosted` | `url`, `payment_url`, `checkout_id` (`cs_...`), `invoice_id`, `amount_cents`, `currency`, `expires_at` | Stripe. Redirect the customer to `url`. A saved card is charged first, and then you get `completed` instead. No client secret, Stripe key or Stripe.js is needed. After the customer returns, confirm with your webhook or by reloading billing state; for a paid upgrade, poll `checkout_status(plan_upgrade_intent_id, ...)` with the `plan_upgrade_intent_id` (the `checkout_id` of a hosted result is the Stripe session ID, not a status ID). Pass `cancel_url=` to `checkout()` or `checkout_invoice()` to choose where Stripe sends a customer who leaves the page; it defaults to the return URL. See [the Stripe flow](/guides/billing/checkout#stripe). |
 | `razorpay` | `checkout_id`, `key_id`, `order_id`, `amount_cents`, `currency`, `expires_at`, `invoice_id`; with a mandate also `customer_id`, `recurring: True`, `mandate_max_amount_cents` | Open Razorpay Checkout, then verify the genuine callback through your backend. See [the Razorpay flow](/guides/billing/checkout#razorpay). |
-| `hosted` | `payment_url` | Not returned by `checkout()` or `checkout_invoice()`. The type still exists for a Razorpay payment link: navigate to `payment_url`. Invoice payment URLs and credit top-ups return a `payment_url` without a `type`. |
 | `processing` | `checkout_id`, `status` | Razorpay: the order is not ready or has expired. Stripe: a replayed quoted upgrade whose webhook is still pending. Recover with `checkout_status(checkout_id)`. `status` is an internal operation status. |
 | `completed` | `status: "succeeded"`, `subscription_id`, `plan_code`, `invoice_id` (may be `None`), `amount_cents`, `currency`, `payment_source` (`credits` or `none`) | Refresh authoritative subscription state. |
 | `scheduled` | `status: "pending"`, `subscription_id`, `plan_code`, `transition_direction`, `transition_policy`, `effective_at` | Display the pending change and its effective date. |
 
-A paid upgrade returns `plan_upgrade_intent_id` instead of `invoice_id` on `stripe` and `razorpay` results. On `scheduled`, `subscription_id` is the pending subscription. `pending_subscription_id` was removed from the result type in `0.10.0` because the API never returns it; earlier versions declared it.
+A paid upgrade returns `plan_upgrade_intent_id` instead of `invoice_id` on `hosted` and `razorpay` results. On `scheduled`, `subscription_id` is the pending subscription. `pending_subscription_id` was removed from the result type in `0.10.0` because the API never returns it; earlier versions declared it.
+
+`checkout()` returns one of the `TypedDict`s `RazorpayCheckoutResult`, `ProcessingCheckoutResult`, `HostedCheckoutResult`, `CompletedCheckoutResult` or `ScheduledCheckoutResult`, told apart by `type`. A Stripe checkout is a `HostedCheckoutResult`: `url` and `payment_url` are always present, the other fields (`checkout_id`, `amount_cents`, `currency`, `expires_at`, `invoice_id`, `plan_upgrade_intent_id`) may be missing.
 
 Do not handle all non-Stripe responses as scheduled changes. See [the React checkout components](/sdks/react/components#checkout) for the browser integration.
 
@@ -339,7 +340,7 @@ batch = nozle.entity_subscriptions.checkout_many(
 )
 ```
 
-The result contains `id`, `type` (`stripe`, `razorpay`, `processing`, or `completed`), `status` (`pending`, `open`, `completed`, `failed`, or `expired`), `client_secret`, `invoice_id`, `amount_cents`, `currency`, `replayed`, `expires_at`, and `items` with `external_entity_id`, `external_subscription_id`, `plan_code`, and `subscription_status`. Razorpay results add the Razorpay fields.
+The result contains `id`, `type` (`hosted`, `razorpay`, `processing`, or `completed`), `status` (`pending`, `open`, `completed`, `failed`, or `expired`), `url` (a hosted Stripe page to redirect to), `invoice_id`, `amount_cents`, `currency`, `replayed`, `expires_at`, and `items` with `external_entity_id`, `external_subscription_id`, `plan_code`, and `subscription_status`. Razorpay results add the Razorpay fields.
 
 - Send 1 to 100 unique `external_entity_id` values. The SDK checks this before any request.
 - `idempotency_key` is required, up to 255 bytes, and sent as the `Idempotency-Key` header. The same key and request returns `replayed: True` and reuses the open session. Replaying a `failed` or `expired` batch returns `checkout_not_available`.

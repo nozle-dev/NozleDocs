@@ -5,6 +5,27 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Breaking: Stripe checkout is hosted only (Core 11.5.0, Engine 2.13.0)
+
+_Unreleased_
+
+- **Breaking: every Stripe checkout is a Stripe-hosted Checkout Session.** A new subscription's first invoice, an invoice checkout, a paid plan change, the Entity subscription batch and the retry of a first invoice (`POST /invoices/{id}/retry_payment`) answer `{"type": "hosted", "url", "payment_url", "checkout_id", "invoice_id" or "plan_upgrade_intent_id", "amount_cents", "currency", "expires_at"}`. Redirect the customer to `url`. Embedded Stripe Checkout, the `stripe` result type and every `client_secret` and `clientSecret` are removed. No Stripe publishable key and no Stripe.js are needed on your page. A saved card is still charged first (`completed`, `processing` and `scheduled` results are unchanged), and Razorpay is unchanged. See [Checkout](/guides/billing/checkout#stripe) and [Create checkout](/api/create-checkout#hosted-stripe-result).
+- **`cancel_url` and `{CHECKOUT_SESSION_ID}`.** `POST /checkout` accepts `cancel_url`, validated like `return_url` and defaulting to it. The Entity subscription endpoints take `return_url` only. A return URL may contain the literal `{CHECKOUT_SESSION_ID}`, which Stripe replaces with the Checkout Session ID. A refused `cancel_url` answers `400 invalid_return_url`.
+- **Status poll.** A paid upgrade is polled by `plan_upgrade_intent_id`: the hosted result is nested while the session is open, then `completed`, and `status` is `expired` when the Stripe session is no longer open. The hosted `checkout_id` is the Stripe session ID, not a status ID. Nozle sends Adaptive Pricing disabled so the customer is charged in the invoice currency.
+- **SDKs (Node 0.20.0, React 0.18.0, Python 0.19.0, Go v0.18.0):** Node `cancelUrl` option, Python `cancel_url=`, Go `CancelURL` and `CheckoutInvoiceWithOptions`; the Go `ClientSecret` field is removed. In React, the components redirect to the hosted page, `Checkout` takes only `checkout={result}`, `useCheckoutSession().startCheckout` replaces `fetchClientSecret`, `onStripeClientSecret` and the Stripe peer dependencies (`@stripe/stripe-js`, `@stripe/react-stripe-js`) go away. Self-hosters run `payment_providers:refresh_stripe_webhook_events` once for the new refund events.
+- **Receipt link.** GraphQL `Payment.receiptUrl` returns Stripe's receipt page for a payment, fetched from Stripe on demand and never stored. See [Payments](/guides/billing/payments).
+
+### Workspace billing: card at onboarding, failed payments, suspension on day 7 (Core 11.5.0, Engine 2.13.0)
+
+_Unreleased_
+
+- **Every workspace adds a card at onboarding.** The card is verified on a Stripe-hosted page and nothing is charged. There is no rollout switch: it is always on, and existing workspaces are flagged within the hour. The card page is Stripe-hosted, cards only, with Stripe's reuse agreement text, and a lost webhook is recovered by a server-side check. After the card the AI onboarding opens. Until a card is verified, the dashboard and every API key call (Core REST, account MCP, Engine API, LLM proxy, event ingestion) answer `402` `card_required`. See [Workspace billing](/guides/getting-started/workspace-billing).
+- **Automatic upgrades run every hour** and charge the prorated invoice to the saved card at once. Members get emails at 50%, 80%, 90% and 100% of the included events or MRR limit.
+- **Failed Nozle invoices are retried on days 1 to 6.** Every member gets an email on day 0, a reminder on day 3 and a last reminder on day 6, with a pay link that needs no login, and the dashboard shows a banner.
+- **Suspension on day 7.** A workspace with unpaid Nozle invoices gets `402` `workspace_suspended` (which wins over `card_required`) on events, `/can`, the Engine API, the LLM proxy, REST API keys, the account MCP and Copilot, and the dashboard shows only the Nozle invoices page. Webhooks, the customer portal and payment pages keep working. Events sent during the suspension are refused, not queued. The SDKs throw their API error with `code` and never retry it. See [Errors](/api/errors#workspace-billing-errors) and [The can() endpoint](/guides/entitlements/can-endpoint#unavailable-or-blocked).
+- **Resume when the invoices are paid**, then the time your own customers were not billed is billed with the original periods.
+- **Stripe refund events.** Webhook endpoints created by Nozle subscribe to `refund.updated` and `refund.failed`. The older `charge.refund.updated` is still accepted for one release. See [Stripe](/integrations/stripe#webhook-setup).
+
 ### Know when top-up credits can be spent (Core 11.1.0, Engine 2.12.0)
 
 _Unreleased_
@@ -20,6 +41,15 @@ _Unreleased_
 
 - **A declined Razorpay payment in the modal or on a payment link sends `invoice.payment_failure`** (`payment_request.payment_failure` for the link of overdue invoices), once per Razorpay payment, with Razorpay's error in `provider_error`. The order or link and the invoice stay payable. See [Razorpay](/integrations/razorpay#status).
 - **The payment link for overdue invoices returns the customer to the connection's success redirect URL** when one is set.
+
+### Know when top-up credits can be spent (Core 11.1.0, Engine 2.12.0)
+
+_Unreleased_
+
+- **New webhook `credit_top_up_purchase.fulfilled`.** Sent once per paid top-up purchase, after the credits are granted and can be spent. Until now nothing told you when that happened: the invoice is paid a moment before the grant. See [Webhook events](/api/webhook-events#credit_top_up_purchasefulfilled).
+- **`GET /api/v1/credit-top-up-purchases/{id}` on the Engine.** Returns the purchase with `fulfillment_status` (`pending`, then `fulfilled`) and `fulfilled_at`. Poll it after checkout if you do not use the webhook. Purchases in webhooks and in Core's `GET /credit-top-up-purchases/{id}` carry the same fields.
+- **Razorpay checkout status for a top-up** reports `fulfillment_status: succeeded` only once the credits are granted, not when the payment reaches Nozle.
+- Docs: [Paid Credit Top-ups](/guides/credits/top-ups#know-when-the-credits-can-be-spent) now tells you to wait for the webhook or poll the purchase instead of refreshing on a paid invoice.
 
 ### Plan version migrations ask before raising a price (Core)
 

@@ -11,11 +11,11 @@ Connect a provider in the dashboard under **Settings > Billing settings > Integr
 |---|---|---|
 | **Credential** | Stripe secret key | Razorpay Key ID and key secret, plus a webhook secret |
 | **Currency** | The invoice currency | INR only |
-| **Plan checkout** | Embedded Stripe Checkout Session | Razorpay order in the Razorpay checkout modal |
-| **Payment links** | Hosted Stripe Checkout page | Razorpay payment link |
+| **Plan checkout** | Stripe-hosted Checkout page (a saved card is charged first) | Razorpay order in the Razorpay checkout modal |
+| **Payment links** | Stripe-hosted Checkout page | Razorpay payment link |
 | **Webhook** | Nozle registers it right after you connect | You add it in the Razorpay dashboard |
 | **Payment confirmation** | Signed webhook only | Signed webhook, and your backend's verify call for an order |
-| **Checkout status** | Paid upgrades only, by upgrade ID. It reads the session from Stripe but never settles a payment. A new subscription has no checkout ID | Every checkout, by checkout ID. It reconciles with Razorpay and settles a captured payment |
+| **Checkout status** | Paid upgrades only, by upgrade ID. It reads the session from Stripe but never settles a payment. A new subscription or invoice checkout has no status call | Every checkout, by checkout ID. It reconciles with Razorpay and settles a captured payment |
 | **Renewals** | Automatic charge on the saved card | Automatic only with a UPI AutoPay mandate |
 | **Refunds and disputes** | Credit-note refunds and lost disputes | Credit-note refunds and lost disputes |
 

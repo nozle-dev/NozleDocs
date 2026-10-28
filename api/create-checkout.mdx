@@ -10,7 +10,7 @@ Create a payment-gated plan checkout from a trusted merchant backend.
 **Auth:** secret key only. Publishable keys are always rejected.
 
 <Info>
-The merchant backend derives `customer_id` from its authenticated user or team. Do not trust a browser-provided customer ID. The response can contain a Stripe or Razorpay checkout, a processing state, or a completed or scheduled transition.
+The merchant backend derives `customer_id` from its authenticated user or team. Do not trust a browser-provided customer ID. The response can contain a Stripe-hosted or Razorpay checkout, a processing state, or a completed or scheduled transition.
 </Info>
 
 ## Modes
@@ -56,7 +56,11 @@ Use an `Idempotency-Key` header for the confirmed action and retain it across un
 ## Return URL
 
 <ParamField body="return_url" type="string">
-  URL Stripe should return to after embedded checkout completes. It must be an absolute HTTPS URL on one of your organization's allowed origins (`checkout_return_origins`) or on an origin Nozle allows for every organization. The Engine applies no list of its own: it sends the URL to Core, which decides, and a refused URL answers `400` with `invalid_return_url`. If omitted, Nozle uses your organization's default return URL (`checkout_default_return_url`), else your first allowed origin. Set both in the dashboard under **Developers > Checkout return**, or through the API. See [return URLs and your organization's origins](/guides/billing/checkout#return-urls-and-your-organizations-origins).
+  URL the customer returns to after paying on the Stripe-hosted page. It may contain the literal `{CHECKOUT_SESSION_ID}`, which Stripe replaces with the Checkout Session ID. It must be an absolute HTTPS URL on one of your organization's allowed origins (`checkout_return_origins`) or on an origin Nozle allows for every organization. The Engine applies no list of its own: it sends the URL to Core, which decides, and a refused URL answers `400` with `invalid_return_url`. If omitted, Nozle uses your organization's default return URL (`checkout_default_return_url`), else your first allowed origin. Set both in the dashboard under **Developers > Checkout return**, or through the API. See [return URLs and your organization's origins](/guides/billing/checkout#return-urls-and-your-organizations-origins).
+</ParamField>
+
+<ParamField body="cancel_url" type="string">
+  URL Stripe sends a customer to when they leave the hosted page without paying. Validated like `return_url` (a refused one answers `400` with `invalid_return_url`). Without it, the return URL is used.
 </ParamField>
 
 <ParamField body="success_url" type="string">
@@ -78,15 +82,19 @@ Plan checkout:
 ## Response
 
 <ResponseField name="type" type="string" required>
-  `stripe`, `razorpay`, `processing`, `completed`, or `scheduled`. This endpoint never returns `hosted`. The SDK types still declare it, and only the deprecated `POST /credits/purchase` of the Engine API returns it. That endpoint requires an `Idempotency-Key` header and a `currency` field (the ISO 4217 code of the top-up package, for example `USD`), and answers `400` with the code `idempotency_key_required` or `currency_required` without them; a retry with the same key returns the first purchase. Use [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase) (`POST /credit-top-up-purchases`) instead.
+  `hosted` (Stripe), `razorpay`, `processing`, `completed`, or `scheduled`. There is no `stripe` result and no client secret any more. The deprecated `POST /credits/purchase` of the Engine API also returns `hosted`. That endpoint requires an `Idempotency-Key` header and a `currency` field (the ISO 4217 code of the top-up package, for example `USD`), and answers `400` with the code `idempotency_key_required` or `currency_required` without them; a retry with the same key returns the first purchase. Use [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase) (`POST /credit-top-up-purchases`) instead.
 </ResponseField>
 
-<ResponseField name="client_secret" type="string">
-  Stripe results only: the `cs_` secret of an embedded Stripe Checkout Session. Mount it with Stripe Embedded Checkout (the React `Checkout` component does this). Plan and invoice checkout never return a Stripe-hosted URL. Credit top-ups do: see [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase).
+<ResponseField name="url" type="string">
+  `hosted` results: the Stripe-hosted Checkout page. Redirect the customer to it. `payment_url` carries the same value.
 </ResponseField>
 
-<ResponseField name="clientSecret" type="string">
-  Camel-case alias for `client_secret`.
+<ResponseField name="checkout_id" type="string">
+  `hosted` results: the Stripe Checkout Session ID (`cs_...`). It is not a status ID: poll a paid upgrade with its `plan_upgrade_intent_id`.
+</ResponseField>
+
+<ResponseField name="expires_at" type="string">
+  `hosted` results: when the hosted page expires.
 </ResponseField>
 
 <ResponseField name="invoice_id" type="string">
@@ -104,6 +112,25 @@ Plan checkout:
 <ResponseField name="currency" type="string">
   Invoice currency.
 </ResponseField>
+
+### Hosted Stripe result
+
+Every Stripe checkout (a new subscription's first invoice, an invoice, a paid plan change) is a Stripe-hosted Checkout Session:
+
+```json
+{
+  "type": "hosted",
+  "url": "https://checkout.stripe.com/c/pay/cs_...",
+  "payment_url": "https://checkout.stripe.com/c/pay/cs_...",
+  "checkout_id": "cs_...",
+  "invoice_id": "invoice_uuid",
+  "amount_cents": 19900,
+  "currency": "USD",
+  "expires_at": "2026-11-01T12:00:00Z"
+}
+```
+
+A paid upgrade has `plan_upgrade_intent_id` instead of `invoice_id`. Redirect the customer to `url`. A saved card is charged first: when that works you get `completed`, `processing` or `scheduled` and no page opens. No Stripe publishable key and no Stripe.js are needed on your page. Nozle sends Adaptive Pricing disabled so the customer is charged in the invoice currency. Nothing is paid until Stripe's webhook reaches Nozle: after the customer returns, wait for your webhook, or reload the subscription or [billing status](/api/billing-status). Only a paid upgrade has a status call: poll [`GET /checkout/{plan_upgrade_intent_id}`](/api/subscription-management#payment-status-and-recovery) with the customer and subscription scope. While the buyer is paying, `status` is `awaiting_payment` and the nested `checkout` is the hosted result again; `processing` means Stripe took the payment and Nozle is applying it; `succeeded` comes with a nested `completed`; `expired` means the Stripe session is no longer open. The `checkout_id` of a hosted result is the Stripe Checkout Session ID and is not a status ID.
 
 ### Razorpay and recovery fields
 
@@ -239,6 +266,6 @@ Checkout relies on these Stripe events:
 - `payment_intent.payment_failed`
 - `payment_intent.canceled`
 
-The same endpoint also receives `setup_intent.succeeded`, `payment_method.detached`, `customer.updated`, `charge.refund.updated` and `charge.dispute.closed`. See the [Stripe integration](/integrations/stripe#webhook-setup).
+The same endpoint also receives `setup_intent.succeeded`, `payment_method.detached`, `customer.updated`, `refund.updated`, `refund.failed` and `charge.dispute.closed`. See the [Stripe integration](/integrations/stripe#webhook-setup).
 
 Razorpay webhooks are configured by you in the Razorpay dashboard. See the [Razorpay integration](/integrations/razorpay#webhook-setup) for the URL, headers, and events.

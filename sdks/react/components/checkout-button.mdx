@@ -4,7 +4,7 @@ description: "A button that starts checkout for one plan through your BillingPro
 keywords: ["checkout button", "subscribe", "react", "razorpay", "stripe"]
 ---
 
-`CheckoutButton` starts checkout for one plan through `BillingProvider` and opens Razorpay, redirects, hands you a Stripe client secret, or reports a completed or scheduled change.
+`CheckoutButton` starts checkout for one plan through `BillingProvider` and opens Razorpay, redirects to the Stripe-hosted page, or reports a completed or scheduled change.
 
 **When to use**
 
@@ -63,8 +63,6 @@ import {
 
 ```tsx app/pricing/buy-pro.tsx
 'use client'
-import { Checkout } from '@nozle-js/react'
-
 const createCheckout: CreateCheckout = async (input) => {
   const response = await fetch('/api/billing/checkout', {
     method: 'POST',
@@ -88,35 +86,30 @@ The button needs no customer data. It reads `createCheckout`, `verifyCheckout` a
 
 ### What a click does
 
-1. The button calls `createCheckout({ idempotencyKey, planCode, returnUrl, registerMandate? })`. It keeps one idempotency key per plan and reuses it when the customer clicks again, so a retry reopens the same pending checkout. A second click while the first is running does nothing.
+1. The button calls `createCheckout({ idempotencyKey, planCode, returnUrl, cancelUrl?, registerMandate? })`. It keeps one idempotency key per plan and reuses it when the customer clicks again, so a retry reopens the same pending checkout. A second click while the first is running does nothing.
 2. For a `razorpay` result it loads Razorpay and opens it. A captured payment is checked with `verifyCheckout`, then polled with `getCheckoutStatus` up to 30 times, one second apart. A failed payment shows "Payment failed. You can retry checkout."
 3. For a `processing` result it polls the same way and continues with the checkout it returns.
-4. For a `hosted` result, or a result with a `url`, it redirects the page.
-5. For a `stripe` result it passes the client secret to `onStripeClientSecret`.
-6. For a `completed` or `scheduled` result it calls `onComplete` or `onScheduled`.
+4. For a `hosted` result (every Stripe checkout), or a result with a `url`, it redirects the page (`window.location.assign`, HTTPS only) to the Stripe-hosted Checkout. No Stripe packages or publishable key are needed. Stripe sends the customer back to `returnUrl`, so show success from that page after reloading billing data.
+5. For a `completed` or `scheduled` result it calls `onComplete` or `onScheduled`.
 
 After a completed or scheduled result, reload the customer's billing data, for example with `useBillingRefresh()` from the [hooks](/sdks/react/hooks). See [checkout result types](/sdks/react/hooks#checkout-result-types).
 
 ## Examples
 
-### Embedded Stripe checkout and results
+### Stripe and results
 
-Pass `onStripeClientSecret` and render [`Checkout`](/sdks/react/components/checkout) with the secret. `onComplete` and `onScheduled` report changes that need no payment step.
+Stripe needs no extra props: the button redirects. `onComplete` and `onScheduled` report changes that need no payment step (a saved card was charged, credits covered it, or the change is scheduled).
 
 ```tsx
 import { useState } from 'react'
 
 export function BuyPro() {
-  const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [message, setMessage] = useState('')
-
-  if (clientSecret) return <Checkout clientSecret={clientSecret} publishableKey="pk_live_stripe..." />
   return (
     <>
       <CheckoutButton
         planCode="pro"
         label="Get Pro"
-        onStripeClientSecret={setClientSecret}
         onComplete={(result: CompletedCheckoutResult) => setMessage(`Subscribed: ${result.status}`)}
         onScheduled={(result: ScheduledCheckoutResult) => setMessage(`Change scheduled for ${result.effective_at}`)}
         onError={(error) => setMessage(error.message)}
@@ -173,12 +166,12 @@ export function RazorpayBuy() {
   Sent to `createCheckout`, where the provider returns the customer after payment. Defaults to the current URL.
 </ResponseField>
 
-<ResponseField name="registerMandate" type="boolean">
-  Sent to `createCheckout` when set, to ask for a recurring payment mandate. Not sent when left out.
+<ResponseField name="cancelUrl" type="string">
+  Sent to `createCheckout` when set. Forward it to `nozle.checkout()` as `cancelUrl`: where Stripe sends a customer who leaves the hosted page. Defaults to the return URL.
 </ResponseField>
 
-<ResponseField name="onStripeClientSecret" type="(clientSecret: string) => void">
-  Fires for an embedded Stripe checkout and receives its client secret; render [`Checkout`](/sdks/react/components/checkout) with it. Without it, a Stripe result fails with "onStripeClientSecret is required for embedded Stripe checkout".
+<ResponseField name="registerMandate" type="boolean">
+  Sent to `createCheckout` when set, to ask for a recurring payment mandate. Not sent when left out.
 </ResponseField>
 
 <ResponseField name="onComplete" type="(result: CompletedCheckoutResult) => void">
@@ -243,7 +236,7 @@ export function RazorpayBuy() {
 
 <CardGroup cols={2}>
   <Card title="Checkout" icon="credit-card" href="/sdks/react/components/checkout">
-    Renders the Stripe payment step for the client secret.
+    The pay button for a checkout result.
   </Card>
   <Card title="PricingTable" icon="table-columns" href="/sdks/react/components/pricing-table">
     Plan cards that start checkout the same way.

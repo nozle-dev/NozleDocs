@@ -1,6 +1,6 @@
 ---
 title: Checkout
-description: Payment-aware Stripe and Razorpay checkout through an authenticated merchant backend
+description: Payment-aware Stripe-hosted and Razorpay checkout through an authenticated merchant backend
 ---
 
 Nozle collects plan payments through the payment provider connected to your organization: Stripe or Razorpay. The flow is the same for both:
@@ -9,8 +9,8 @@ Nozle collects plan payments through the payment provider connected to your orga
 2. The React SDK calls your authenticated merchant callback with `{ planCode, returnUrl }`
 3. Your backend derives the customer, validates the plan and return origin, and calls Nozle with `sk_`
 4. Nozle keeps the current plan active and computes the exact invoice or proration
-5. If money remains due, Nozle returns a provider result: an embedded Stripe Checkout Session secret, or a Razorpay order
-6. Customer completes payment in the provider's UI
+5. If money remains due, Nozle returns a provider result: a Stripe-hosted Checkout page URL (`type: "hosted"`), or a Razorpay order
+6. Customer completes payment on the provider's page or modal
 7. The provider confirms the payment to Nozle (a signed webhook, and for Razorpay also your verify call)
 8. Nozle applies the paid plan change only after verified success
 
@@ -22,7 +22,25 @@ A customer whose provider is not connected cannot pay: checkout returns `payment
 
 ## Stripe
 
-Plan and invoice checkout always create an embedded Stripe Checkout Session and return its `cs_` client secret. They never return a Stripe-hosted URL. Credit top-ups are the exception: they return a Stripe-hosted `checkout.stripe.com` `payment_url` that is valid for 24 hours. Mount the secret with Stripe Embedded Checkout (the React [`Checkout`](/sdks/react/components) component does this for a `cs_` secret).
+Every Stripe checkout is a Stripe-hosted Checkout Session: a new subscription's first invoice, an invoice, a paid plan change and the Entity subscription batch. Nozle returns `{"type": "hosted", "url", ...}` and you redirect the customer to `url`. There is no card form on your page, no Stripe publishable key and no Stripe.js to load. Nozle sends Adaptive Pricing disabled so the customer is charged in the invoice currency.
+
+1. **Saved card first.** If the customer has a saved card that can be charged, Nozle charges it and answers `completed`, `processing` or `scheduled`. No page opens.
+2. **Redirect.** Otherwise redirect the browser to `url`. The page is valid until `expires_at`.
+3. **Return.** After paying, Stripe sends the customer to your `return_url`. If the customer leaves the page, Stripe sends them to `cancel_url`, or to the return URL when you sent none. Both may contain the literal `{CHECKOUT_SESSION_ID}`, which Stripe replaces with the Checkout Session ID (the `checkout_id` of the result).
+4. **Confirm.** The return only means the customer came back: Nozle applies the payment when Stripe's webhook arrives. For a new subscription or an invoice, wait for your `subscription.started` or invoice webhook, or reload the subscription or billing status: they have no status call. Only a paid upgrade has a status call: poll [`GET /checkout/{plan_upgrade_intent_id}`](/api/subscription-management#payment-status-and-recovery) with the customer and subscription scope. While the buyer is paying, `status` is `awaiting_payment` and the nested `checkout` is the hosted result again; `processing` means Stripe took the payment and Nozle is applying it; `succeeded` comes with a nested `completed`; `expired` means the Stripe session is no longer open. The `checkout_id` of a hosted result is the Stripe Checkout Session ID and is not a status ID.
+
+```json
+{
+  "customer_id": "customer_123",
+  "plan_code": "growth",
+  "return_url": "https://app.example.com/billing/done?session={CHECKOUT_SESSION_ID}",
+  "cancel_url": "https://app.example.com/billing"
+}
+```
+
+`cancel_url` is accepted by `POST /checkout`. The Entity subscription endpoints take `return_url` only.
+
+Credit top-ups and invoice payment URLs also open a Stripe-hosted page, valid for 24 hours.
 
 ### Required Stripe webhook setup
 
@@ -42,12 +60,11 @@ Stripe events Nozle handles:
 - `setup_intent.succeeded`
 - `payment_method.detached` (received, but it does not clear the stored payment method today)
 - `customer.updated`
-- `charge.refund.updated`
+- `refund.updated`
+- `refund.failed`
 - `charge.dispute.closed`
 
-Nozle subscribes to these eight events only. Without this webhook, Stripe may collect payment but Nozle is not told. Checkout status of a paid upgrade reads the Checkout Session from Stripe and reports `processing` once it is complete, but it never settles a payment, so only the webhook does. See the [Stripe integration](/integrations/stripe) for setup, flows and limits.
-
-A new-subscription Stripe checkout returns no checkout ID to poll. After Embedded Checkout completes, reload the subscription or wait for your `subscription.started` webhook. A paid upgrade returns `plan_upgrade_intent_id`; poll its status with [`GET /checkout/{id}`](/api/subscription-management) and the subscription scope.
+Nozle subscribes to these nine events only (the older `charge.refund.updated` is still accepted for one release). Without this webhook, Stripe may collect payment but Nozle is not told. Checkout status reads the Checkout Session from Stripe and reports `processing` once it is complete, but it never settles a payment, so only the webhook does. Self-hosters upgrading from an earlier release run `payment_providers:refresh_stripe_webhook_events` once so existing endpoints subscribe to the new refund events. See the [Stripe integration](/integrations/stripe) for setup, flows and limits.
 
 Retrying a new-subscription checkout for the same plan while its subscription is still incomplete reopens the first checkout. A different plan replaces the abandoned checkout and returns the new one; `409 subscription_checkout_in_progress` remains only while the provider is still processing a payment for the old checkout. An unpaid plan or single Entity checkout expires after 23 hours: the subscription is canceled with `cancelation_reason: timeout`, the invoice is closed and the credits it used are returned. See [Unpaid checkout expiry](/api/create-checkout#unpaid-checkout-expiry).
 
@@ -123,16 +140,18 @@ You can also set both in the dashboard under **Developers > Checkout return**. O
 
 ```json
 {
-  "type": "stripe",
-  "client_secret": "cs_...",
-  "clientSecret": "cs_...",
+  "type": "hosted",
+  "url": "https://checkout.stripe.com/c/pay/cs_...",
+  "payment_url": "https://checkout.stripe.com/c/pay/cs_...",
+  "checkout_id": "cs_...",
   "invoice_id": "invoice_uuid",
   "amount_cents": 19900,
-  "currency": "USD"
+  "currency": "USD",
+  "expires_at": "2026-11-01T12:00:00Z"
 }
 ```
 
-The browser calls your authenticated merchant backend, which derives the Nozle customer and starts checkout with a restricted `sk_`. A Nozle publishable key is valid only for the plan catalog. If you mount embedded Stripe checkout yourself, your app also needs the Stripe publishable key for the same Stripe account connected in Nozle.
+The browser calls your authenticated merchant backend, which derives the Nozle customer and starts checkout with a restricted `sk_`. A Nozle publishable key is valid only for the plan catalog. Your app needs no Stripe key: it redirects to `url`.
 
 Credit-funded completion response:
 
@@ -176,41 +195,27 @@ import { CheckoutButton } from '@nozle-js/react'
   planCode="growth"
   returnUrl="https://app.example.com/settings/billing"
   label="Subscribe to Growth"
-  onStripeClientSecret={setClientSecret}
 />
 ```
 
-### Option B -- Custom flow with `useCheckoutSession`
+For a `hosted` result the button redirects the browser to `url`. Nothing else to mount.
+
+### Option B -- Custom flow
+
+Call your backend, then redirect to the `url` it returns:
 
 ```tsx
-import { Checkout, useCheckoutSession } from '@nozle-js/react'
-
-const { fetchClientSecret, isLoading } = useCheckoutSession();
-
 const handleCheckout = async () => {
-  const clientSecret = await fetchClientSecret(
-    'growth',
-    'https://app.example.com/settings/billing',
-  );
-  // Pass the cs_... secret to <Checkout>
-};
+  const checkout = await startCheckout('growth')
+  if (checkout.type === 'hosted') window.location.assign(checkout.url)
+}
 ```
 
-### Option C -- Embedded Stripe Checkout
-
-```tsx
-<Checkout
-  clientSecret={secret}
-  publishableKey={import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY}
-  onComplete={() => router.refresh()}
-/>
-```
-
-`onComplete` does not fire when the session redirects to the `return_url`, and Nozle sessions redirect. Show success from your return page, or by reading billing status for the customer.
+Show success from your return page, or by reading billing status for the customer. Do not trust the return alone: Nozle applies the change when Stripe's webhook arrives.
 
 ## Server-side plan changes
 
-For B2B scenarios where payment is already handled outside embedded checkout:
+For B2B scenarios where payment is already handled outside checkout:
 
 ```typescript
 import { Nozle } from '@nozle-js/node'
@@ -222,7 +227,7 @@ const result = await nozle.subscribe('customer_123', 'growth');
 // { subscription_id: 'sub_...', status: 'active' }
 ```
 
-`subscribe()` requires a secret key (`sk_`) and an existing customer: an unknown customer returns `404 customer_not_found`. Embedded checkout should be used when Nozle needs to collect payment before activating a paid plan.
+`subscribe()` requires a secret key (`sk_`) and an existing customer: an unknown customer returns `404 customer_not_found`. Checkout should be used when Nozle needs to collect payment before activating a paid plan.
 
 ## Mixed Entity plan checkout
 

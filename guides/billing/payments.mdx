@@ -7,7 +7,7 @@ Nozle collects payments through the provider connected to your organization: Str
 
 **Payment flow:**
 
-1. Customer pays in the provider's UI: Stripe Embedded Checkout, or the Razorpay checkout modal or payment link
+1. Customer pays in the provider's UI: the Stripe-hosted Checkout page, or the Razorpay checkout modal or payment link
 2. The provider processes the payment
 3. The provider sends a signed webhook to Nozle. Stripe sends `payment_intent.succeeded`, `payment_intent.payment_failed` or `payment_intent.canceled`. Razorpay sends `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid` or `payment_link.paid`. For a Razorpay order, your backend also calls verify with the handler's signature
 4. Nozle updates invoice payment status
@@ -27,6 +27,10 @@ import { PaymentMethodDisplay } from '@nozle-js/react'
   onUpdatePaymentMethod={() => router.push('/update-card')}
 />
 ```
+
+**Receipt link:**
+
+For a Stripe payment, the GraphQL `Payment.receiptUrl` field returns Stripe's receipt page for the payment. Nozle fetches the link from Stripe when you ask for it and never stores it, so it is not available later from Nozle's own records.
 
 **Failed payments and retries:**
 

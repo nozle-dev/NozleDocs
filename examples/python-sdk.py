@@ -31,8 +31,8 @@ def exercise_python_sdk() -> None:
         "pro_monthly",
         return_url="https://app.example.com/settings/billing",
     )
-    if checkout["type"] == "stripe":
-        print(checkout.get("url") or checkout.get("client_secret"))
+    if checkout["type"] == "hosted":
+        print(checkout.get("url"))
 
     nozle.subscribe("workspace_123", "free")
     nozle.cancel_subscription("workspace_123", "subscription_123")

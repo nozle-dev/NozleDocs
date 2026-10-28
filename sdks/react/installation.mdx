@@ -4,12 +4,12 @@ description: "Install the React SDK and configure public catalog reads with merc
 ---
 
 ```bash
-npm install @nozle-js/react@0.11.0 @tanstack/react-query react react-dom @stripe/stripe-js @stripe/react-stripe-js
+npm install @nozle-js/react@0.11.0 @tanstack/react-query react react-dom
 ```
 
 Version `0.11.0` defaults catalog requests to `https://api.nozle.app/engine`.
 
-Peer dependencies are `@tanstack/react-query` 5 or later (required from `0.11.0`), `react` and `react-dom` 18 or later, `@stripe/react-stripe-js` 3 or later, and `@stripe/stripe-js` 5 or later. Install the Stripe packages even if you only use `PricingTable` or `BillingPortal`: without them the import fails with `ERR_MODULE_NOT_FOUND`.
+Peer dependencies are `@tanstack/react-query` 5 or later (required from `0.11.0`), `react` and `react-dom` 18 or later. Stripe checkout is a Stripe-hosted page, so you install no Stripe packages and need no Stripe publishable key. Releases before hosted checkout listed `@stripe/react-stripe-js` and `@stripe/stripe-js` as peer dependencies; remove them when you upgrade to `0.18.0`.
 
 The React SDK has two browser-safe responsibilities:
 

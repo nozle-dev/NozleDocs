@@ -327,7 +327,7 @@ Neither result has a checkout ID, so there is nothing to poll. Redirect the cust
 
 After paying the link for overdue invoices, Razorpay returns the customer to the connection's success redirect URL (`successRedirectUrl`, set with `updateRazorpayPaymentProvider`). Without one, the customer stays on Razorpay's confirmation page.
 
-`POST /checkout` never returns `type: "hosted"` for Razorpay: it returns an order. Only the deprecated `POST https://api.nozle.app/engine/api/v1/credits/purchase` returns `type: "hosted"` with a `payment_url`. That endpoint requires an `Idempotency-Key` header and a `currency` field (the ISO 4217 code of the top-up package, for example `USD`), and answers `400` with the code `idempotency_key_required` or `currency_required` without them; a retry with the same key returns the first purchase. Use [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase) (`POST /credit-top-up-purchases`) instead. The SDK result types still declare `hosted`.
+`POST /checkout` never returns a Razorpay payment link: it returns an order (`type: "razorpay"`). `type: "hosted"` is the Stripe-hosted Checkout result, and the deprecated `POST https://api.nozle.app/engine/api/v1/credits/purchase` also returns it with a `payment_url`. That endpoint requires an `Idempotency-Key` header and a `currency` field (the ISO 4217 code of the top-up package, for example `USD`), and answers `400` with the code `idempotency_key_required` or `currency_required` without them; a retry with the same key returns the first purchase. Use [Create Credit Top-up Purchase](/api/create-credit-top-up-purchase) (`POST /credit-top-up-purchases`) instead. The SDK result types still declare `hosted`.
 
 ## Credit top-ups
 
