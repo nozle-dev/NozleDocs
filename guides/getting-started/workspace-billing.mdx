@@ -8,14 +8,14 @@ This page is about what your workspace pays Nozle. It never touches how you bill
 Your [sandbox](/guides/getting-started/sandbox) is free on every plan and never billed. It follows your live workspace: when the workspace needs a card or is suspended, sandbox keys get the same `402`. Your plan, card and Nozle invoices are managed in live.
 
 <Note>
-The card requirement, day-7 suspension, resume and catch-up billing are _Unreleased_ until deployed.
+The card requirement, day-7 suspension, resume and catch-up billing are _Unreleased_ until deployed. So are the Nozle card page and automatic charges of Indian cards through a mandate (see [India cards](#india-cards)).
 </Note>
 
 ## Card at onboarding
 
 Every workspace adds a card before it can use Nozle, on every plan including the free Starter plan. There is no switch for this: it is always on.
 
-- The card is verified on a page hosted by Stripe that offers cards only and shows Stripe's own text about reusing the card for later charges. **Nothing is charged** when you add it.
+- The card is verified on a page that offers cards only and explains that the card can be reused for later charges. Where Nozle's card page is enabled, that page is hosted by Nozle and uses Stripe's secure card fields; otherwise it is a Stripe-hosted page. **Nothing is charged** when you add it.
 - Any member of the workspace can add the card. Once it is saved, Nozle opens for everyone.
 - After the card, the AI onboarding opens. Until you have finished setting up, the dashboard shows one banner (verify your card, or finish setting up) instead of a checklist.
 - If you close the page after paying, or Stripe's notification is delayed or lost, Nozle checks with Stripe on its own when you return, or when you choose **Check again**. You are not asked for the card twice.
@@ -42,11 +42,40 @@ Day 0 is the first failed automatic charge of a Nozle invoice.
 | 6 | Last reminder email: access is blocked tomorrow. |
 | 7 | The workspace is suspended if the invoices are still unpaid. Every member gets an email. |
 
-- The **Pay** link in each email needs no login. It opens a Stripe-hosted payment page for the amount due now. Every click opens a new page, so the amount is always current.
+- The **Pay** link in each email needs no login. It opens a hosted payment page for the amount due now. Every click opens a new page, so the amount is always current.
 - The banner can be dismissed and comes back after 3 hours.
 - Any member can pay under **Nozle invoices** in the dashboard.
 - Adding or changing the card retries the charge at once. If nothing is owed any more, the cycle ends and the banner disappears.
 - Paying before day 7 means the workspace is never suspended.
+- The **Pay** link opens the Nozle card page in pay mode when the workspace card is handled by Nozle's card page: you pay the invoice there and, for a card issued in India, the bank registers the mandate in the same step. Otherwise it opens Stripe's hosted page.
+
+## Banners and emails about payments
+
+Core tells the dashboard when to show each of these, read live from the payment data and never stored. A banner goes away once the cause is gone.
+
+| Banner | When |
+|---|---|
+| Failed payment | A Nozle invoice failed to be charged. See the steps above. The wording follows what the failed payment needs, shown just below. |
+| Approval pending | A payment is waiting for your bank's approval and its deadline is still ahead. It shows the amount and the deadline. |
+| Card needs an update | The saved card was issued in India and has no active mandate, so it cannot be charged automatically. Add the card again. A mandate that is still pending is not flagged: wait. |
+| Upcoming payment | Nozle plans to charge a Nozle invoice to your saved card. It shows the earliest planned date and the amount. A payment that waits for your approval is not announced here. |
+
+### What a failed payment asks of you
+
+The first failed-payment email and the reminder on day 3 say what to do, based on why the latest failed charge failed (Stripe's error and decline codes, never the message text). The dashboard reads the same outcome in the GraphQL field `workspaceBilling.failureAction` (`CONFIRM_PAYMENT`, `CHANGE_CARD` or `RETRY_LATER`), which is `null` unless the status is `past_due`. The banner copy follows it.
+
+| `failureAction` | What happened | What the email and banner say |
+|---|---|---|
+| `CONFIRM_PAYMENT` | Your bank asked you to confirm the payment (authentication needed, or the India mandate is missing, cancelled or not approved). | "Your bank asked you to confirm this payment". Use **Pay now** to confirm it with your bank. Nozle does not retry it: nothing happens until a member pays. |
+| `CHANGE_CARD` | The card will not work for this invoice (for example lost, stolen or expired). | "This card could not be charged". Use **Change card** to pay with another card. Nozle does not retry it. |
+| `RETRY_LATER` | The card may work later (for example insufficient funds). | "Declined or needs your approval". Nozle retries the card once a day until day 6, and you can pay at any time. |
+
+The last reminder (day 6) and the suspension email do not promise a retry in any case.
+
+Emails to every member:
+
+- **Approval requested.** When a Nozle invoice is charged to an India card and the bank asks for your approval, one email gives the amount, the invoice number, the deadline and the **Pay** link. Approve at the bank, or pay with the link.
+- **Upcoming automatic payment.** "We plan to charge ... on the date", with a **Pay now** button, once per planned debit time. If the plan is cancelled, a second email says the charge will not happen.
 
 ## Suspension on day 7
 
@@ -81,8 +110,13 @@ No separate email confirms the resume.
 
 ## Change the card
 
-Use **Change card** in the dashboard. It opens the Stripe billing portal on the payment method screen only. When you are done, you return to the dashboard. A new card retries any owed invoice at once.
+Use **Change card** in the dashboard. It opens the card page, or the Stripe billing portal on the payment method screen only. When you are done, you return to the dashboard. A new card retries any owed invoice at once.
 
 ## India cards
 
-Cards issued in India cannot be charged automatically by Nozle. Each Nozle invoice is paid through the hosted **Pay** link or the **Nozle invoices** page every time, so an invoice that is not paid on time follows the failed-payment steps above.
+Cards issued in India can be charged automatically after a one-time approval at the bank. When you add the card on the card page, the bank asks for one OTP and registers an e-mandate, the permission for Nozle to debit the card later (Indian rules require it). For cards issued anywhere else the page has no extra step, and nothing is charged when the card is saved.
+
+- **Bills up to about INR 15,000.** Charged automatically. The bank sends a notice 24 hours before the debit, so the payment stays **processing** for up to 26 hours. A processing payment does not start the failed-payment steps above.
+- **Bills above about INR 15,000** (or above the mandate maximum, whichever is lower) need your approval each time: approve the bank's notice before the debit, or the charge is declined. Use the **Pay** link in the email if you prefer to pay on the hosted page.
+- **Cards saved before the card page**, and cards whose mandate the bank refused or cancelled, have no active mandate. Their invoices are paid on the hosted **Pay** link or under **Nozle invoices**, as before. Add the card again to register a mandate. Paying through the **Pay** link registers one too when the card was issued in India (_Unreleased_).
+- **When a charge fails** for a reason that retrying cannot fix (the bank needs you to act, the mandate is missing or cancelled, or the card is lost or expired), Nozle does not retry it daily: every member gets the **Pay** link at once and the failed-payment steps above still apply.

@@ -1,0 +1,90 @@
+---
+title: "NozleCardSetup"
+description: "Show the Nozle card page inside your app in a frame, with callbacks for the outcome, and a plain JavaScript helper."
+keywords: ["card setup", "payment method", "iframe", "embed", "react", "stripe"]
+---
+
+`NozleCardSetup` shows Nozle's card page in a frame in your own page instead of redirecting the customer. It is available from `@nozle-js/react` 0.19.0. The page runs Stripe.js itself: the SDK never sees card data and has no Stripe dependency.
+
+**When to use**
+
+- A billing settings screen where the customer adds or changes the card without leaving your app.
+- Paying an invoice on the card page (pay mode) inside your app.
+
+`CheckoutButton`, `Checkout` and the other hosted-result components still redirect by default.
+
+## Where the URL comes from
+
+Pass the `url` of the Nozle card page. It comes from your backend:
+
+- [Manage payment method](/api/manage-payment-method): the `url` is the card page when the connection has a Stripe publishable key and the customer pays by card only. Otherwise it is the Stripe Billing Portal, which cannot be framed.
+- A card setup link (the `customer.checkout_url_generated` webhook) or an invoice pay link.
+
+Create the link with a `return_url` on **your app's origin**. Nozle allows framing only from that origin. A `POST /checkout` result is a Stripe Checkout Session, not the card page, and cannot be framed.
+
+## Rendering NozleCardSetup
+
+```tsx components/card-step.tsx
+import { NozleCardSetup } from '@nozle-js/react'
+
+export function CardStep({ url }: { url: string }) {
+  return (
+    <NozleCardSetup
+      url={url}
+      onSuccess={() => refreshBilling()}
+      onProcessing={() => showPending()}
+      onFailure={() => showRetry()}
+      onError={({ reason }) => report(reason)}
+    />
+  )
+}
+```
+
+You can pass `result={checkoutResult}` instead of `url` for a hosted result that carries a card page `url`.
+
+## Plain JavaScript
+
+`mountCardSetup` is the helper the component uses. It appends the frame to a container and returns `unmount`.
+
+```ts
+import { mountCardSetup } from '@nozle-js/react'
+
+const { unmount } = mountCardSetup({
+  url,
+  container: document.getElementById('card')!,
+  onReady: () => {},
+  onResult: ({ status }) => {}, // "succeeded" | "processing" | "failed"
+  onError: () => window.location.assign(url), // reason: "timeout" | "load"
+  timeoutSeconds: 15,
+})
+```
+
+## Props
+
+| Prop | Type | Description |
+|---|---|---|
+| `url` | `string` | The Nozle card page URL. HTTPS only (HTTP only on localhost). The component adds `embed=1`. |
+| `result` | `{ url: string }` | A hosted checkout result, used when `url` is not set. |
+| `onSuccess`, `onProcessing`, `onFailure` | `(info: { mode?: 'setup' \| 'pay' }) => void` | The outcome after the bank step. |
+| `onError` | `(error: { reason: 'timeout' \| 'load' \| 'invalid_url' }) => void` | The form cannot load, sent no `ready` in time, or the URL is not allowed. |
+| `fallback` | `'redirect' \| 'none'` | `redirect` (default) sends the customer to the page itself when the frame times out or fails to load. `none` leaves it to `onError`. |
+| `minHeight` | `number` | Frame height in pixels before the page is ready. Default 480. |
+| `timeoutSeconds` | `number` | Seconds to wait for `ready`. Default 15. `0` turns the timeout off. |
+| `className`, `style`, `title` | | Wrapper class and style, and the frame title. |
+
+## Security
+
+- The URL must be HTTPS and must not carry credentials. Only the Nozle page origin is trusted.
+- The SDK reads a message only when its `origin` equals the card page origin and its `source` is the frame's own window, with `source: "nozle"` and `type: "card_setup"`. Everything else, and unknown statuses, is ignored. If you write your own listener, do the same checks.
+- Messages carry a status and a mode, never card data, ids or tokens.
+- The frame has `allow="payment"` and no `sandbox`, because Stripe's 3D Secure step needs scripts and the page's own origin.
+- Treat `succeeded` as a hint for the interface. Confirm through your webhooks or by reloading billing state before you show success.
+- If Stripe rejects the connection's publishable key, the page sends the `error` message and the component redirects to the plain page, which falls back to Stripe Checkout.
+
+The message contract is described in [Show the card page in your app](/integrations/stripe#show-the-card-page-in-your-app).
+
+## Related
+
+- [Manage payment method](/api/manage-payment-method)
+- [Checkout guide](/guides/billing/checkout#card-page-in-your-app)
+- [`Checkout`](/sdks/react/components/checkout)

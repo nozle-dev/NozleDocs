@@ -42,6 +42,12 @@ Every Stripe checkout is a Stripe-hosted Checkout Session: a new subscription's 
 
 Credit top-ups and invoice payment URLs also open a Stripe-hosted page, valid for 24 hours.
 
+A card issued in India needs an e-mandate before Nozle can charge it automatically, and Stripe Checkout cannot register one. A first payment through Stripe Checkout therefore leaves an Indian card without a mandate: the customer pays that first invoice by hand and later invoices use the hosted page until a card is saved on Nozle's card page. With a publishable key, the invoice pay link of a customer from India opens the card page too, so paying through it registers the mandate. When the Stripe connection has a publishable key, card setup links (not checkout) open that Nozle-hosted page and return the customer to the return URL with `nozle_card=succeeded`, `processing` or `failed`. See [Indian cards and automatic payments](/integrations/stripe#indian-cards-and-automatic-payments).
+
+### Card page in your app
+
+The card page can run in a frame in your own app, so the customer does not leave it. It is the page of card setup links, [Manage payment method](/api/manage-payment-method) and invoice pay links, not the result of `POST /checkout`, which stays a Stripe Checkout Session. Add `embed=1` to the page `url`, or use [`NozleCardSetup`](/sdks/react/components/nozle-card-setup) (available from `@nozle-js/react` 0.19.0). Nozle allows framing only from the origin of the `return_url` you passed when you created the link, and the page posts `{ source: "nozle", type: "card_setup", status, mode }` to your page, where `status` is `ready`, `succeeded`, `processing`, `failed` or `error`. See [Show the card page in your app](/integrations/stripe#show-the-card-page-in-your-app). If the connection's publishable key is rejected by Stripe, the page sends the customer to Stripe Checkout instead.
+
 ### Required Stripe webhook setup
 
 When you connect a Stripe account, Nozle registers a Stripe webhook endpoint for that account and stores Stripe's webhook signing secret. Your Stripe account must allow webhook endpoint creation.

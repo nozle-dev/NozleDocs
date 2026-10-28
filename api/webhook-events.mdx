@@ -77,7 +77,7 @@ An endpoint with no `event_types` receives every type, and gets every type Nozle
 | `customer.crm_provider_error` | `crm_provider_customer_error` | Syncing a customer to a CRM integration fails. The error object names the provider in `accounting_provider` and `accounting_provider_code`, the same keys as the accounting error. |
 | `customer.payment_provider_created` | `customer` | A customer is created at a payment provider (Stripe, Razorpay and the other providers). |
 | `customer.payment_provider_error` | `payment_provider_customer_error` | Creating or syncing a customer at a payment provider fails. |
-| `customer.checkout_url_generated` | `payment_provider_customer_checkout_url` | A provider checkout URL is generated for a customer, for example to add a payment method. |
+| `customer.checkout_url_generated` | `payment_provider_customer_checkout_url` | A provider checkout URL is generated for a customer, for example to add a payment method. For a Stripe connection with a publishable key and a card-only customer, the URL is a Nozle-hosted card page, not stripe.com. |
 | `customer.tax_provider_error` | `tax_provider_customer_error` | Fetching taxes for a customer from a tax integration (Anrok or Avalara) fails. |
 | `customer.vies_check` | `customer` | The EU VAT number of a customer is checked against VIES. The `vies_check` field has the VIES answer, or the error when the check fails. |
 
@@ -136,6 +136,7 @@ An endpoint with no `event_types` receives every type, and gets every type Nozle
 | `invoice.drafted` | `invoice` | An invoice is created as a draft, while it is in its grace period or has been refreshed. |
 | `invoice.voided` | `invoice` | An invoice is voided. |
 | `invoice.payment_dispute_lost` | `payment_dispute_lost` | A payment dispute on an invoice is lost. The payload wraps the invoice in `payment_dispute_lost` with the provider reason. |
+| `invoice.payment_dispute_updated` | `payment_dispute_updated` | A payment dispute on an invoice is opened, needs a response, is under review or is won (Razorpay). The payload holds the `invoice` and a `dispute` with `id`, `event`, `status`, `reason_code`, `phase` and `respond_by`. The invoice does not change. |
 | `invoice.payment_status_updated` | `invoice` | The payment status of an invoice changes (pending, succeeded, failed). |
 | `invoice.payment_overdue` | `invoice` | An unpaid invoice passes its due date and is marked overdue. |
 | `invoice.payment_failure` | `payment_provider_invoice_payment_error` | A payment attempt for an invoice fails at the provider, or a duplicate payment, or a payment on a voided invoice, is refunded. `provider_error.error_code` says why, for example `duplicate_payment_refunded`, `voided_invoice_payment_refunded` or, when the provider refuses the refund and you must refund by hand, `duplicate_payment_refund_failed` or `voided_invoice_payment_refund_failed`. |
@@ -168,6 +169,8 @@ An endpoint with no `event_types` receives every type, and gets every type Nozle
 |---|---|---|
 | `payment.succeeded` | `payment` | A payment succeeds at the provider (Stripe, Razorpay and the other providers). |
 | `payment.requires_action` | `payment` | A payment needs the customer to act, for example 3D Secure authentication. `next_action` has the details. |
+| `payment.scheduled` | `payment` | Nozle will debit a payment automatically from the customer's saved card or mandate. The payload is the payment plus `scheduled_at` (ISO 8601, UTC) and `method_type` (`card`, `upi` or `bank`). It is sent once per `scheduled_at`; a changed time sends it again. Nozle sends it for Stripe card payments that the bank debits after its notice, and for Razorpay card and UPI debits when the debit is scheduled (not for a bank eMandate, and not when `pre_debit_notice` is off). |
+| `payment.schedule_cancelled` | `payment` | An automatic debit announced by `payment.scheduled` will not happen. The payload is the payment plus `scheduled_at` (the announced time) and `reason`: `mandate_changed`, `invoice_paid`, `invoice_voided`, `notice_failed` or `other`. It has no `method_type`, and it is sent only after `payment.scheduled` was sent for the payment. |
 | `payment_provider.error` | `payment_provider_error` | A payment provider connection reports an error, for example when Nozle cannot register its webhook at Stripe. |
 | `payment_request.created` | `payment_request` | A payment request is created, by dunning or automatically for an invoice that Core did not charge (`automatic` is `true`). |
 | `payment_request.payment_failure` | `payment_provider_payment_request_payment_error` | A payment attempt for a payment request fails, or its Pay link cannot be built. `provider_error` says why, for example `payment_request_invoices_changed`. |
