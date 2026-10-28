@@ -8223,10 +8223,17 @@ paths:
       tags:
         - Subscription Changes
       summary: Change plan without checkout
-      description: 'Changes the plan of the customer''s active subscription without checkout, from a trusted backend. Requires a secret key with `subscription:write`. Engine loads the target plan, the customer''s current subscription and its plan. With several current subscriptions it uses the customer''s own (not Entity-owned) subscription when there is exactly one, and otherwise answers `409` with `code: subscription_required`. When the target plan''s yearly amount is above zero and at least the current plan''s yearly amount, Engine returns `422` with `code: payment_checkout_required` and changes nothing. Otherwise it calls Core `POST /subscriptions` with the subscription''s external ID and the new plan code, and returns Core''s status and body unchanged.'
+      description: 'Changes the plan of the customer''s current subscription without checkout, from a trusted backend. Requires a secret key with `subscription:write`. Engine loads the target plan and the subscription: the one named by `subscription_id` or `entity_id`, else the customer''s only current subscription, else the customer''s own (not Entity-owned) one when there is exactly one; otherwise `409` with `code: subscription_required`. A target whose yearly amount is below the current plan''s (a downgrade, including paid to free), or the paid plan the subscription is already on, goes to Core `POST /subscription_transitions` with `operation: downgrade` and the Idempotency-Key, so the merchant''s plan transition policy and Core''s guards apply; Core''s status and body are returned unchanged. A paid target at or above the current yearly amount returns `422` with `code: payment_checkout_required` and changes nothing. A free to free change calls Core `POST /subscriptions` and returns Core''s `{"subscription": {...}}`. For new integrations, prefer `POST /subscriptions/transitions` and `POST /checkout`.'
       operationId: engineUpgradeSubscription
       security:
         - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: 'Used for downgrades. A retry with the same key returns Core''s stored answer with `replayed: true`. Without a key Engine generates one per request, so retries are not deduplicated; send one.'
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -8235,14 +8242,16 @@ paths:
               $ref: '#/components/schemas/BillingUpgradeRequest'
             example:
               customer_id: customer_123
-              plan_code: growth
+              plan_code: starter_monthly
       responses:
         '200':
-          description: The updated subscription (Core's response).
+          description: 'A downgrade returns the recorded transition, `{"subscription_transition": {...}}`. A free to free change returns Core''s `{"subscription": {...}}`.'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Subscription'
+                oneOf:
+                  - $ref: '#/components/schemas/BillingTransitionResultResponse'
+                  - $ref: '#/components/schemas/Subscription'
         '400':
           $ref: '#/components/responses/EngineBadRequest'
         '401':
@@ -8254,13 +8263,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingEngineOrCoreError'
         '404':
-          description: 'Engine: `plan not found`, `active subscription not found` or `active subscription plan not found`. Core errors are forwarded.'
+          description: 'Engine: `plan not found` or `active subscription not found`. Core errors are forwarded.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingEngineOrCoreError'
+        '409':
+          description: 'Engine: `subscription_required`. The customer has several current subscriptions, none was selected, and not exactly one of them is the customer''s own. Nothing changes. Core: `subscription_change_pending` (an end-of-period downgrade while a cancellation is scheduled).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingEngineOrCoreError'
+              example:
+                error: the customer has several current subscriptions
+                code: subscription_required
         '422':
-          description: 'Engine: the change needs payment. Core validation errors are also forwarded.'
+          description: 'Engine: `payment_checkout_required`, the change needs payment; use `POST /checkout`. Core, for a downgrade: `plan_transition_policy_required` (the pair has no transition policy), `target_plan_is_not_a_downgrade`, `payment_required` (an immediate downgrade leaves an amount due), `outstanding_invoice`, `plan_already_active` (already on the target plan, with a new Idempotency-Key) and validation errors.'
           content:
             application/json:
               schema:
@@ -8268,15 +8286,6 @@ paths:
               example:
                 error: payment_checkout_required
                 code: payment_checkout_required
-        '409':
-          description: 'Engine: `subscription_required`. The customer has several current subscriptions and not exactly one of them is the customer''s own. Nothing changes.'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BillingEngineOrCoreError'
-              example:
-                error: subscription_required
-                code: subscription_required
         '502':
           description: 'Engine could not reach Core, or Core returned an unusable response. Body: `{"error": "failed to reach billing service"}` or a similar message.'
           content:
@@ -8295,10 +8304,17 @@ paths:
       tags:
         - Subscription Changes
       summary: Change plan without checkout (alias)
-      description: 'Alias of `POST /billing/upgrade`, served by the same handler. Changes the plan of the customer''s active subscription without checkout, from a trusted backend. Requires a secret key with `subscription:write`. Engine loads the target plan, the customer''s most recent active subscription and its plan. When the target plan''s yearly amount is above zero and at least the current plan''s yearly amount, Engine returns `422` with `code: payment_checkout_required` and changes nothing. Otherwise it calls Core `POST /subscriptions` with the subscription''s external ID and the new plan code, and returns Core''s status and body unchanged.'
+      description: 'Alias of `POST /billing/upgrade`, served by the same handler. Changes the plan of the customer''s current subscription without checkout, from a trusted backend. Requires a secret key with `subscription:write`. Engine loads the target plan and the subscription: the one named by `subscription_id` or `entity_id`, else the customer''s only current subscription, else the customer''s own (not Entity-owned) one when there is exactly one; otherwise `409` with `code: subscription_required`. A target whose yearly amount is below the current plan''s (a downgrade, including paid to free), or the paid plan the subscription is already on, goes to Core `POST /subscription_transitions` with `operation: downgrade` and the Idempotency-Key, so the merchant''s plan transition policy and Core''s guards apply; Core''s status and body are returned unchanged. A paid target at or above the current yearly amount returns `422` with `code: payment_checkout_required` and changes nothing. A free to free change calls Core `POST /subscriptions` and returns Core''s `{"subscription": {...}}`. For new integrations, prefer `POST /subscriptions/transitions` and `POST /checkout`.'
       operationId: engineChangeSubscription
       security:
         - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: 'Used for downgrades. A retry with the same key returns Core''s stored answer with `replayed: true`. Without a key Engine generates one per request, so retries are not deduplicated; send one.'
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -8307,14 +8323,16 @@ paths:
               $ref: '#/components/schemas/BillingUpgradeRequest'
             example:
               customer_id: customer_123
-              plan_code: growth
+              plan_code: starter_monthly
       responses:
         '200':
-          description: The updated subscription (Core's response).
+          description: 'A downgrade returns the recorded transition, `{"subscription_transition": {...}}`. A free to free change returns Core''s `{"subscription": {...}}`.'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Subscription'
+                oneOf:
+                  - $ref: '#/components/schemas/BillingTransitionResultResponse'
+                  - $ref: '#/components/schemas/Subscription'
         '400':
           $ref: '#/components/responses/EngineBadRequest'
         '401':
@@ -8326,13 +8344,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingEngineOrCoreError'
         '404':
-          description: 'Engine: `plan not found`, `active subscription not found` or `active subscription plan not found`. Core errors are forwarded.'
+          description: 'Engine: `plan not found` or `active subscription not found`. Core errors are forwarded.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingEngineOrCoreError'
+        '409':
+          description: 'Engine: `subscription_required`. The customer has several current subscriptions, none was selected, and not exactly one of them is the customer''s own. Nothing changes. Core: `subscription_change_pending` (an end-of-period downgrade while a cancellation is scheduled).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingEngineOrCoreError'
+              example:
+                error: the customer has several current subscriptions
+                code: subscription_required
         '422':
-          description: 'Engine: the change needs payment. Core validation errors are also forwarded.'
+          description: 'Engine: `payment_checkout_required`, the change needs payment; use `POST /checkout`. Core, for a downgrade: `plan_transition_policy_required` (the pair has no transition policy), `target_plan_is_not_a_downgrade`, `payment_required` (an immediate downgrade leaves an amount due), `outstanding_invoice`, `plan_already_active` (already on the target plan, with a new Idempotency-Key) and validation errors.'
           content:
             application/json:
               schema:
@@ -36054,7 +36081,7 @@ components:
         plan_code:
           type: string
           description: Target plan code.
-          example: growth
+          example: starter_monthly
         customer_id:
           type: string
           description: External customer ID. Required unless `organization_id` is sent.
@@ -36063,6 +36090,12 @@ components:
           type: string
           deprecated: true
           description: Legacy fallback used as `customer_id` when `customer_id` is empty.
+        subscription_id:
+          type: string
+          description: External ID of the subscription to change. Optional; selects the subscription as for `/can`.
+        entity_id:
+          type: string
+          description: External ID of the Entity whose subscription to change. Optional; selects the subscription as for `/can`.
     BillingSubscribeRequest:
       type: object
       required:

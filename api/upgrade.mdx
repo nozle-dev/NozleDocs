@@ -5,41 +5,104 @@ api: "POST https://api.nozle.app/engine/api/v1/billing/upgrade"
 
 Base URL: `https://api.nozle.app/engine/api/v1`.
 
-Change a customer's current plan without checkout from a trusted backend.
+Change a customer's current plan without checkout from a trusted backend. Despite its name, this route applies downgrades and free to free changes; an upgrade to a paid plan needs [checkout](/api/create-checkout).
 
 **Auth:** secret key only. Publishable keys are rejected.
 
+<Note>
+  For new integrations, use [`POST /subscriptions/transitions`](/api/subscription-management#schedule-a-downgrade) for downgrades and [`POST /checkout`](/api/create-checkout) for upgrades. They take a signed quote, so the customer confirms the amounts and dates before the change.
+</Note>
+
+<ParamField header="Idempotency-Key" type="string">
+  Used for downgrades. A retry with the same key returns the stored answer with `replayed: true` and changes nothing again. Without a key Nozle generates one per request, so a retry is not deduplicated. Send one, and keep it for retries of the same change.
+</ParamField>
+
 <ParamField body="customer_id" type="string" required>
-  External customer ID.
+  External customer ID. `organization_id` is accepted as a legacy alias.
 </ParamField>
 
 <ParamField body="plan_code" type="string" required>
-  The plan code to upgrade the customer to.
+  The plan code to move the customer to.
 </ParamField>
 
-### Response
+<ParamField body="subscription_id" type="string">
+  External ID of the subscription to change.
+</ParamField>
 
-Nozle reads the customer's current subscription and its plan. A customer with one current subscription uses it. With several, Nozle uses the customer's own subscription (not owned by an Entity) when there is exactly one; otherwise the request returns `409` with `subscription_required` and changes nothing. The most recently started subscription is no longer picked for you. If the target plan's yearly amount is above zero and at least the current plan's yearly amount, the request returns `422` and nothing changes. This includes a change between two paid plans with the same price. Otherwise Nozle changes the plan and returns Core's subscription response, `{"subscription": {...}}`, with Core's status code.
+<ParamField body="entity_id" type="string">
+  External ID of the Entity whose subscription to change.
+</ParamField>
 
-The `422` body:
+### Which subscription changes
+
+`subscription_id` or `entity_id` selects the subscription, as for [`/can`](/api/check-entitlement). Without them, a customer with one current subscription uses it. With several, Nozle uses the customer's own subscription (not owned by an Entity) when there is exactly one; otherwise the request returns `409 subscription_required` and changes nothing.
+
+### What happens
+
+Nozle compares the yearly amount of the target plan with that of the subscription's current plan.
+
+| Target plan | Result |
+| --- | --- |
+| Cheaper than the current plan, including paid to free | A plan transition (`operation: downgrade`) under the merchant's [plan transition policy](/api/plan-transition-policies) for the pair: its timing, billing anchor and credit settlement apply. Returns `{"subscription_transition": {...}}`. |
+| Paid, at or above the current plan's price, including the same price | `422 payment_checkout_required`. Nothing changes. Use [checkout](/api/create-checkout). |
+| The paid plan the subscription is already on | Handled as a transition: the retry of an applied downgrade with the same `Idempotency-Key` returns the stored answer with `replayed: true`; a new key returns `422 plan_already_active`. |
+| Free, from a free plan | The plan changes now. Returns `{"subscription": {...}}`. |
+
+A downgrade's response, here an end-of-period policy, so the change is pending until `effective_at`:
 
 ```json
 {
-  "error": "payment_checkout_required",
-  "code": "payment_checkout_required"
+  "subscription_transition": {
+    "id": "6f1c2a9e-3d4b-4c8e-9a7f-2b5d8e1f0a34",
+    "operation": "downgrade",
+    "timing": "end_of_period",
+    "credit_action": "none",
+    "refund_mode": "prorated",
+    "billing_anchor": "keep_anchor",
+    "proration_behavior": "none",
+    "final_invoice_action": "generate",
+    "effective_at": "2026-11-01T00:00:00.000000Z",
+    "subscription_id": "b2e7d4c1-8a3f-4e6b-9c2d-1f0a5e7b3c98",
+    "external_subscription_id": "subscription_123",
+    "plan_code": "starter_monthly",
+    "status": "pending",
+    "credit_amount_cents": 0,
+    "refund_amount_cents": 0,
+    "offset_amount_cents": 0,
+    "amount_due_cents": 0,
+    "currency": "USD",
+    "replayed": false
+  }
 }
 ```
 
-The `409` body:
+The fields are those of [`POST /subscriptions/transitions`](/api/subscription-management#schedule-a-downgrade); null fields are left out. An immediate policy returns `status: "active"` on the new plan, with any credit note and invoice of the settlement.
 
-```json
-{
-  "error": "subscription_required",
-  "code": "subscription_required"
-}
-```
+### Errors
 
-`404` means the plan, the active subscription, or the active subscription's plan was not found. A missing `plan_code` or `customer_id` returns `400`.
+A downgrade passes Core's status and body through unchanged, so its errors are those of plan transitions:
+
+| Status | `code` | Meaning |
+| --- | --- | --- |
+| `422` | `plan_transition_policy_required` | The pair has no transition policy and no self-serve default. Create one with [Plan transition policies](/api/plan-transition-policies). |
+| `422` | `target_plan_is_not_a_downgrade` | Cheaper by price, but the pair's policy direction is `upgrade`. |
+| `422` | `payment_required` | An immediate downgrade leaves an amount due. The customer pays it first through [checkout](/api/create-checkout). |
+| `422` | `outstanding_invoice` | An immediate change while the subscription has an unpaid or dispute-lost invoice. See [Outstanding invoices](/api/subscription-management#outstanding-invoices-and-lost-disputes). |
+| `422` | `plan_already_active` | The subscription is already on the target plan, with a new `Idempotency-Key`. |
+| `409` | `subscription_change_pending` | An end-of-period downgrade while a cancellation is scheduled. Keep the subscription first. |
+
+Nozle's own errors:
+
+| Status | Body |
+| --- | --- |
+| `422` | `{"error": "payment_checkout_required", "code": "payment_checkout_required"}` |
+| `409` | `{"error": "the customer has several current subscriptions", "code": "subscription_required"}` |
+| `404` | The plan or the selected current subscription was not found. |
+| `400` | Invalid JSON, or a missing `plan_code` or `customer_id`. |
+
+<Warning>
+  Breaking change on October 28, 2026: a downgrade used to change the plan at once and return `{"subscription": {...}}`. It now returns `{"subscription_transition": {...}}` and follows the pair's transition policy, so a pair without one returns `422 plan_transition_policy_required` instead of changing.
+</Warning>
 
 For customer self-service, use a signed preview and `POST /checkout` for a selected upgrade, or the end-of-period transition API for a scheduled downgrade. The current paid plan stays active until required payment is fulfilled. See [Subscription self-service](/api/subscription-management) for the complete flow.
 
