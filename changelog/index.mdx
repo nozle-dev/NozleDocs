@@ -5,7 +5,7 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
-### Card page in your app, upcoming payment notices, mandate ceiling (Core 11.7.0, React 0.19.0)
+### Card page in your app, upcoming payment notices, mandate ceiling (Core 11.8.0, React 0.19.0)
 
 _October 28, 2026_
 
@@ -16,7 +16,7 @@ _October 28, 2026_
 - **Mandate maximum ceiling.** A Stripe connection can lower the ceiling but not raise it above what Indian banks accept: USD 2,800, EUR 2,600, GBP 2,200, INR 2.5 lakh. See [How big the mandate is](/integrations/stripe#how-big-the-mandate-is).
 - **Razorpay debit timing.** The card or UPI debit is sent after the notice window (UPI 26 hours 30 minutes, card 37 hours, plus a 5 minute buffer) and shows `processing` meanwhile. A bank mandate is debited at once. See [Razorpay](/integrations/razorpay#mandate-limits-and-automatic-debits).
 
-### Razorpay mandate limits, dispute events and payment hardening (Core 11.7.0)
+### Razorpay mandate limits, dispute events and payment hardening (Core 11.8.0)
 
 _October 28, 2026_
 
@@ -29,7 +29,7 @@ _October 28, 2026_
 - **Stripe minimum charge.** An off-session charge below Stripe's minimum fails with `amount_below_provider_minimum` and now sends the payment error webhook. Rate-limited or timed-out payment-request charges are retried. A Stripe event delivered twice is stored once, and a failed one is queued again hourly. See [Stripe](/integrations/stripe#saved-payment-methods-and-automatic-charging).
 - **Invoice pay links for customers from India.** With a publishable key on the Stripe connection, the pay link of an invoice opens the Nozle card page and registers the card mandate in the same authentication. See [Indian cards and automatic payments](/integrations/stripe#indian-cards-and-automatic-payments).
 
-### Indian cards: e-mandates and a Nozle card page (Core 11.7.0)
+### Indian cards: e-mandates and a Nozle card page (Core 11.8.0)
 
 _October 28, 2026_
 
@@ -37,6 +37,16 @@ _October 28, 2026_
 - **A Nozle-hosted card page** replaces Stripe Checkout for saving a card when the connection has a publishable key and the customer pays by card (or Link) only. It registers an e-mandate for cards issued in India with one bank OTP and does nothing special for other cards. Card details go to Stripe's fields, never to Nozle. The result shape is unchanged: the card setup link and `customer.checkout_url_generated` carry a `url` on Nozle's domain instead of stripe.com. The customer returns to your return URL with `nozle_card=succeeded|processing|failed`. Saving a card while paying a first invoice still uses Stripe Checkout, and the `payment-method/manage` endpoint opens the Nozle page under the conditions in the entry above (it opened the Stripe Billing Portal in earlier builds of this release).
 - **Automatic charges of Indian cards use the mandate.** A charge above about INR 15,000, or above the mandate maximum, needs the customer to approve the bank's notice before the debit. A mandated charge stays processing for up to 26 hours. Without an active mandate the customer pays on the hosted page as before.
 - **Failed-payment retries skip reasons that cannot succeed** (authentication or a mandate needed, hard declines) and the customer gets the pay link at once. A payment that is processing no longer starts the failed-payment clock. See [Indian cards and automatic payments](/integrations/stripe#indian-cards-and-automatic-payments) and [Workspace billing](/guides/getting-started/workspace-billing#india-cards).
+### Sandbox mode (Core 11.7.0, Engine 2.18.0)
+
+_Unreleased_
+
+- **One sandbox per workspace.** A separate organization linked to your live one, with its own customers, plans, subscriptions, invoices, events, API keys, webhook endpoints and payment connections. An admin creates it by switching to **Sandbox** in the workspace switcher; after that every member can open it, with their live role. It starts empty and copies only your live billing settings. See [Sandbox mode](/guides/getting-started/sandbox).
+- **Test keys.** Sandbox keys start with `sk_nozle_test_` and `pk_nozle_test_` and use the same API URLs. The key's organization decides the environment: a test key on a live organization, a live key on a sandbox, or a key of a reset sandbox is refused with `401`. Every response to an accepted key carries `X-Nozle-Livemode: true` or `false`, readable from browsers. See [Live and sandbox keys](/api/authentication#live-and-sandbox-keys).
+- **`livemode` in every webhook payload**, `false` for sandbox deliveries. Additive. See [Webhook events](/api/webhook-events#the-delivery).
+- **What the sandbox does not do.** It sends no customer emails, is never billed by Nozle (it follows your live workspace's `card_required` and `workspace_suspended`), accepts only Stripe (`sk_test_`, `rk_test_`) and Razorpay (`rzp_test_`) test credentials (`422 sandbox_requires_test_key`), and refuses other payment providers and integrations (`403 not_available_in_sandbox`). Members, roles, sign-in methods, SSO and your Nozle plan stay in live (`403 live_organization_only`). Sandbox PDFs are marked `TEST MODE` and numbered `TST-XXXX`.
+- **Reset.** Admins type `RESET` to replace the sandbox with an empty one: API keys rotate, webhook endpoints are deleted, Stripe test connections are connected again automatically and Razorpay test connections must be connected again (the reset response lists them in `reconnectRequired`). At most once every 10 minutes and 5 times a day (`429 sandbox_reset_rate_limited`).
+- Docs: "there are no separate live and test keys" is removed from [Authentication](/api/authentication), [Core Concepts](/guides/getting-started/concepts) and the self-hosting environment page. The credits guides say "test customer" where they said "sandbox customer".
 
 ### Breaking: plan changes without checkout follow transition policies; one checkout error shape (Core 11.6.0, Engine 2.14.0 and 2.15.0)
 

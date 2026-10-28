@@ -52,6 +52,8 @@ Each Feature has an effective-dated cost-composition mode:
 
 Independent cost components are additive. Components in the same variant group are mutually exclusive, and the highest-priority matching rule wins. Publishing fails when same-priority variants overlap ambiguously.
 
+Engine sums every active cost-sheet component for a Feature. That is by design: separate components, such as GPU time and storage, add up to the cost of one action. So the same component must not be active in two Cost Sheets for the same period, or its cost is counted twice. Core refuses to publish a version that overlaps an active sheet's component with the error `component_overlaps_active_sheet`; the error details name the other sheet and component. Archive that sheet, or change its period or components, and publish again.
+
 ## Artificial Intelligence token template
 
 The guided template creates an `ai_tokens` Cost Event Meter using `tokens` as quantity and `provider`, `model`, and `type` as dimensions. It supports input, cached input, cache creation, output, and reasoning categories.

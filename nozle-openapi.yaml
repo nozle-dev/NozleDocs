@@ -5,6 +5,8 @@ info:
     One specification for the Nozle API. Core operations use the default server https://api.nozle.app/core/api/v1. Engine operations name their own server, https://api.nozle.app/engine/api/v1. Both live on the one host https://api.nozle.app.
 
     **Legacy key names, removed in Core 6.0.0.** REST responses, webhook payloads and CSV exports carry only the Nozle names: `nozle_id` and the plain `<key>` names such as `customer_id` and `invoice_id`. The former-prefix keys, the former EU tax codes, the former CSV id columns and the former webhook headers are gone. Webhook deliveries carry `X-Nozle-Signature`, `X-Nozle-Signature-Algorithm` and `X-Nozle-Unique-Key`. nozle-js and nozle-python older than 0.10.0 and nozle-go older than 0.9.1 cannot read a credit system id from Core 6.0.0.
+
+    **Live and sandbox (unreleased).** Live and sandbox use the same servers. The API key decides the environment: live keys start with `sk_nozle_` or `pk_nozle_`, sandbox keys with `sk_nozle_test_` or `pk_nozle_test_`, and each only reaches its own organization's data. A key whose prefix does not match its organization's environment, or a key of a reset sandbox, is refused with `401`. Every response to an accepted key, Core and Engine, carries the header `X-Nozle-Livemode: true` (live) or `false` (sandbox); browsers can read it. Webhook payloads carry `livemode` the same way. See https://docs.nozle.dev/guides/getting-started/sandbox.
   version: 1.50.0
   license:
     name: AGPLv3
@@ -13791,6 +13793,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - triggered_alert
               properties:
                 webhook_type:
@@ -13806,12 +13809,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 triggered_alert:
                   $ref: '#/components/schemas/TriggeredAlertObject'
             example:
               webhook_type: alert.triggered
               object_type: triggered_alert
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               triggered_alert:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 organization_id: 00000000-0000-4000-8000-000000000001
@@ -13855,6 +13863,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - feature
               properties:
                 webhook_type:
@@ -13870,12 +13879,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 feature:
                   $ref: '#/components/schemas/FeatureObject'
             example:
               webhook_type: feature.created
               object_type: feature
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               feature:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 name: Copilot FE workflow flag mtsu96o5
@@ -13906,6 +13920,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - feature
               properties:
                 webhook_type:
@@ -13921,12 +13936,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 feature:
                   $ref: '#/components/schemas/FeatureObject'
             example:
               webhook_type: feature.updated
               object_type: feature
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               feature:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 name: Copilot FE workflow flag mtsu96o5
@@ -13957,6 +13977,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - feature
               properties:
                 webhook_type:
@@ -13972,12 +13993,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 feature:
                   $ref: '#/components/schemas/FeatureObject'
             example:
               webhook_type: feature.deleted
               object_type: feature
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               feature:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 name: Copilot FE workflow flag mtsu96o5
@@ -14008,6 +14034,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - customer
               properties:
                 webhook_type:
@@ -14023,12 +14050,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 customer:
                   $ref: '#/components/schemas/CustomerObject'
             example:
               webhook_type: customer.created
               object_type: customer
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               customer:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -14103,6 +14135,7 @@ webhooks:
               required:
                 - webhook_type
                 - object_type
+                - livemode
                 - customer
               properties:
                 webhook_type:
@@ -14118,12 +14151,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 customer:
                   $ref: '#/components/schemas/CustomerObject'
             example:
               webhook_type: customer.updated
               object_type: customer
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               customer:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -14199,6 +14237,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - customer
               properties:
                 webhook_type:
@@ -14214,12 +14253,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 customer:
                   $ref: '#/components/schemas/CustomerObject'
             example:
               webhook_type: customer.accounting_provider_created
               object_type: customer
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               customer:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -14295,6 +14339,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - accounting_provider_customer_error
               properties:
                 webhook_type:
@@ -14310,12 +14355,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 accounting_provider_customer_error:
                   $ref: '#/components/schemas/CustomerIntegratrionErrorObject'
             example:
               webhook_type: customer.accounting_provider_error
               object_type: accounting_provider_customer_error
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               accounting_provider_customer_error:
                 customer_id: 00000000-0000-4000-8000-000000000002
                 external_customer_id: wrrk-pullse-demo-v2
@@ -14346,6 +14396,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - customer
               properties:
                 webhook_type:
@@ -14361,12 +14412,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 customer:
                   $ref: '#/components/schemas/CustomerObject'
             example:
               webhook_type: customer.payment_provider_created
               object_type: customer
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               customer:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -14441,6 +14497,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment_provider_customer_error
               properties:
                 webhook_type:
@@ -14456,12 +14513,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment_provider_customer_error:
                   $ref: '#/components/schemas/CustomerPaymentProviderErrorObject'
             example:
               webhook_type: customer.payment_provider_error
               object_type: payment_provider_customer_error
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment_provider_customer_error:
                 customer_id: 00000000-0000-4000-8000-000000000002
                 external_customer_id: wrrk-pullse-demo-v2
@@ -14492,6 +14554,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment_provider_customer_checkout_url
               properties:
                 webhook_type:
@@ -14507,12 +14570,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment_provider_customer_checkout_url:
                   $ref: '#/components/schemas/CustomerCheckoutUrl'
             example:
               webhook_type: customer.checkout_url_generated
               object_type: payment_provider_customer_checkout_url
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment_provider_customer_checkout_url:
                 customer_id: 00000000-0000-4000-8000-000000000002
                 external_customer_id: wrrk-pullse-demo-v2
@@ -14541,6 +14609,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - tax_provider_customer_error
               properties:
                 webhook_type:
@@ -14556,12 +14625,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 tax_provider_customer_error:
                   $ref: '#/components/schemas/CustomerTaxProviderErrorObject'
             example:
               webhook_type: customer.tax_provider_error
               object_type: tax_provider_customer_error
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               tax_provider_customer_error:
                 customer_id: 00000000-0000-4000-8000-000000000002
                 external_customer_id: wrrk-pullse-demo-v2
@@ -14592,6 +14666,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - customer
               properties:
                 webhook_type:
@@ -14607,12 +14682,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 customer:
                   $ref: '#/components/schemas/CustomerViesCheckObject'
             example:
               webhook_type: customer.vies_check
               object_type: customer
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               customer:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -14694,6 +14774,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - credit_note
               properties:
                 webhook_type:
@@ -14709,12 +14790,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 credit_note:
                   $ref: '#/components/schemas/CreditNoteExtendedObject'
             example:
               webhook_type: credit_note.created
               object_type: credit_note
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               credit_note:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -14879,6 +14965,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - credit_note
               properties:
                 webhook_type:
@@ -14894,12 +14981,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 credit_note:
                   $ref: '#/components/schemas/CreditNoteExtendedObject'
             example:
               webhook_type: credit_note.generated
               object_type: credit_note
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               credit_note:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -15003,6 +15095,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - credit_note_payment_provider_refund_error
               properties:
                 webhook_type:
@@ -15017,10 +15110,15 @@ webhooks:
                   $ref: '#/components/schemas/CreditNotePaymentProviderRefundError'
                 organization_id:
                   type: string
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
             example:
               webhook_type: credit_note.refund_failure
               object_type: credit_note_payment_provider_refund_error
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               credit_note_payment_provider_refund_error:
                 credit_note_id: 00000000-0000-4000-8000-000000000002
                 customer_id: 00000000-0000-4000-8000-000000000003
@@ -15051,6 +15149,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - dunning_campaign
               properties:
                 webhook_type:
@@ -15066,12 +15165,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 dunning_campaign:
                   $ref: '#/components/schemas/DunningCampaignFinishedObject'
             example:
               webhook_type: dunning_campaign.finished
               object_type: dunning_campaign
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               dunning_campaign:
                 external_customer_id: wrrk-pullse-demo-v2
                 dunning_campaign_code: qa_fm_1011034156_dunning_campaign_conflict_1
@@ -15101,6 +15205,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - event_error
               properties:
                 webhook_type:
@@ -15116,12 +15221,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 event_error:
                   $ref: '#/components/schemas/EventErrorsObject'
             example:
               webhook_type: event.error
               object_type: event_error
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               event_error:
                 status: 422
                 error: Unprocessable entity
@@ -15159,6 +15269,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - events_errors
               properties:
                 webhook_type:
@@ -15174,12 +15285,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 events_errors:
                   $ref: '#/components/schemas/EventsErrorsObject'
             example:
               webhook_type: events.errors
               object_type: events_errors
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               events_errors:
                 invalid_code:
                   - 00000000-0000-4000-8000-000000000002
@@ -15208,6 +15324,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - fee
               properties:
                 webhook_type:
@@ -15223,12 +15340,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 fee:
                   $ref: '#/components/schemas/FeeObject'
             example:
               webhook_type: fee.created
               object_type: fee
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               fee:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 charge_id: 00000000-0000-4000-8000-000000000003
@@ -15305,6 +15427,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - tax_provider_fee_error
               properties:
                 webhook_type:
@@ -15320,12 +15443,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 tax_provider_fee_error:
                   $ref: '#/components/schemas/FeeTaxProviderErrorObject'
             example:
               webhook_type: fee.tax_provider_error
               object_type: tax_provider_fee_error
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               tax_provider_fee_error:
                 tax_provider_code: anrok-prod
                 charge_id: 00000000-0000-4000-8000-000000000002
@@ -15355,6 +15483,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - invoice
               properties:
                 webhook_type:
@@ -15370,12 +15499,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 invoice:
                   $ref: '#/components/schemas/InvoiceObjectExtended'
             example:
               webhook_type: invoice.created
               object_type: invoice
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               invoice:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -15585,6 +15719,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - invoice
               properties:
                 webhook_type:
@@ -15600,12 +15735,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 invoice:
                   $ref: '#/components/schemas/InvoiceObjectExtended'
             example:
               webhook_type: invoice.one_off_created
               object_type: invoice
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               invoice:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -15767,6 +15907,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - invoice
               properties:
                 webhook_type:
@@ -15782,12 +15923,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 invoice:
                   $ref: '#/components/schemas/InvoiceObjectExtended'
             example:
               webhook_type: invoice.paid_credit_added
               object_type: invoice
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               invoice:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -15947,6 +16093,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - invoice
               properties:
                 webhook_type:
@@ -15962,12 +16109,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 invoice:
                   $ref: '#/components/schemas/InvoiceObjectExtended'
             example:
               webhook_type: invoice.generated
               object_type: invoice
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               invoice:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -16075,6 +16227,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - invoice
               properties:
                 webhook_type:
@@ -16090,12 +16243,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 invoice:
                   $ref: '#/components/schemas/InvoiceObjectExtended'
             example:
               webhook_type: invoice.drafted
               object_type: invoice
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               invoice:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -16303,6 +16461,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - invoice
               properties:
                 webhook_type:
@@ -16318,12 +16477,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 invoice:
                   $ref: '#/components/schemas/InvoiceObjectExtended'
             example:
               webhook_type: invoice.voided
               object_type: invoice
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               invoice:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -16487,6 +16651,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment_dispute_lost
               properties:
                 webhook_type:
@@ -16502,12 +16667,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment_dispute_lost:
                   $ref: '#/components/schemas/InvoicePaymentDisputeLostObject'
             example:
               webhook_type: invoice.payment_dispute_lost
               object_type: payment_dispute_lost
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment_dispute_lost:
                 invoice:
                   nozle_id: 00000000-0000-4000-8000-000000000002
@@ -16753,6 +16923,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - invoice
               properties:
                 webhook_type:
@@ -16768,12 +16939,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 invoice:
                   $ref: '#/components/schemas/InvoiceObjectExtended'
             example:
               webhook_type: invoice.payment_status_updated
               object_type: invoice
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               invoice:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -16936,6 +17112,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - invoice
               properties:
                 webhook_type:
@@ -16951,12 +17128,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 invoice:
                   $ref: '#/components/schemas/InvoiceObjectExtended'
             example:
               webhook_type: invoice.payment_overdue
               object_type: invoice
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               invoice:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -17120,6 +17302,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment_provider_invoice_payment_error
               properties:
                 webhook_type:
@@ -17135,12 +17318,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment_provider_invoice_payment_error:
                   $ref: '#/components/schemas/InvoicePaymentFailureObject'
             example:
               webhook_type: invoice.payment_failure
               object_type: payment_provider_invoice_payment_error
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment_provider_invoice_payment_error:
                 invoice_id: 00000000-0000-4000-8000-000000000002
                 customer_id: 00000000-0000-4000-8000-000000000003
@@ -17174,6 +17362,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - provider_error
               properties:
                 webhook_type:
@@ -17189,12 +17378,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 provider_error:
                   $ref: '#/components/schemas/IntegrationProviderErrorObject'
             example:
               webhook_type: integration.provider_error
               object_type: provider_error
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               provider_error:
                 integration_id: 00000000-0000-4000-8000-000000000002
                 provider: anrok
@@ -17224,6 +17418,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment
               properties:
                 webhook_type:
@@ -17241,12 +17436,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment:
                   $ref: '#/components/schemas/PaymentObject'
             example:
               webhook_type: payment.requires_action
               object_type: payment
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 customer_id: 00000000-0000-4000-8000-000000000003
@@ -17428,6 +17628,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment
               properties:
                 webhook_type:
@@ -17443,12 +17644,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment:
                   $ref: '#/components/schemas/PaymentObject'
             example:
               webhook_type: payment.succeeded
               object_type: payment
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 customer_id: 00000000-0000-4000-8000-000000000003
@@ -17494,6 +17700,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment_provider_error
               properties:
                 webhook_type:
@@ -17509,12 +17716,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment_provider_error:
                   $ref: '#/components/schemas/PaymentProviderErrorObject'
             example:
               webhook_type: payment_provider.error
               object_type: payment_provider_error
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment_provider_error:
                 payment_provider_id: 00000000-0000-4000-8000-000000000002
                 payment_provider_code: test
@@ -17546,6 +17758,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment_request
               properties:
                 webhook_type:
@@ -17561,12 +17774,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment_request:
                   $ref: '#/components/schemas/PaymentRequestObject'
             example:
               webhook_type: payment_request.created
               object_type: payment_request
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment_request:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 amount_cents: 330
@@ -17685,6 +17903,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment_provider_payment_request_payment_error
               properties:
                 webhook_type:
@@ -17700,12 +17919,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment_provider_payment_request_payment_error:
                   $ref: '#/components/schemas/PaymentRequestPaymentFailureObject'
             example:
               webhook_type: payment_request.payment_failure
               object_type: payment_provider_payment_request_payment_error
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment_provider_payment_request_payment_error:
                 payment_request_id: 00000000-0000-4000-8000-000000000002
                 invoice_ids:
@@ -17740,6 +17964,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment_request
               properties:
                 webhook_type:
@@ -17755,12 +17980,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment_request:
                   $ref: '#/components/schemas/PaymentRequestObject'
             example:
               webhook_type: payment_request.payment_status_updated
               object_type: payment_request
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment_request:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 amount_cents: 330
@@ -17879,6 +18109,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - plan
               properties:
                 webhook_type:
@@ -17894,12 +18125,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 plan:
                   $ref: '#/components/schemas/PlanObject'
             example:
               webhook_type: plan.created
               object_type: plan
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               plan:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 name: Issue11 LLM plan
@@ -17962,6 +18198,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - plan
               properties:
                 webhook_type:
@@ -17977,12 +18214,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 plan:
                   $ref: '#/components/schemas/PlanObject'
             example:
               webhook_type: plan.updated
               object_type: plan
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               plan:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 name: Issue11 LLM plan
@@ -18045,6 +18287,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - plan
               properties:
                 webhook_type:
@@ -18060,6 +18303,10 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 plan:
                   $ref: '#/components/schemas/PlanObject'
       responses:
@@ -18084,6 +18331,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - plan
               properties:
                 webhook_type:
@@ -18099,12 +18347,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 plan:
                   $ref: '#/components/schemas/PlanObject'
             example:
               webhook_type: plan.deleted
               object_type: plan
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               plan:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 name: Issue11 LLM plan
@@ -18166,6 +18419,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - subscription
               properties:
                 webhook_type:
@@ -18181,12 +18435,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 subscription:
                   $ref: '#/components/schemas/SubscriptionWithCustomerObject'
             example:
               webhook_type: subscription.terminated
               object_type: subscription
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               subscription:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 external_id: issue11_llm_sub
@@ -18330,6 +18589,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - subscription
               properties:
                 webhook_type:
@@ -18345,12 +18605,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 subscription:
                   $ref: '#/components/schemas/SubscriptionWithCustomerObject'
             example:
               webhook_type: subscription.incomplete
               object_type: subscription
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               subscription:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 external_id: issue11_llm_sub
@@ -18494,6 +18759,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - subscription
               properties:
                 webhook_type:
@@ -18509,12 +18775,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 subscription:
                   $ref: '#/components/schemas/SubscriptionWithCustomerObject'
             example:
               webhook_type: subscription.canceled
               object_type: subscription
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               subscription:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 external_id: issue11_llm_sub
@@ -18658,6 +18929,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - subscription
               properties:
                 webhook_type:
@@ -18673,12 +18945,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 subscription:
                   $ref: '#/components/schemas/SubscriptionWithCustomerObject'
             example:
               webhook_type: subscription.started
               object_type: subscription
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               subscription:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 external_id: issue11_llm_sub
@@ -18823,6 +19100,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - subscription
               properties:
                 webhook_type:
@@ -18838,12 +19116,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 subscription:
                   $ref: '#/components/schemas/SubscriptionWithCustomerObject'
             example:
               webhook_type: subscription.updated
               object_type: subscription
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               subscription:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 external_id: issue11_llm_sub
@@ -18988,6 +19271,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - subscription
               properties:
                 webhook_type:
@@ -19003,12 +19287,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 subscription:
                   $ref: '#/components/schemas/SubscriptionWithCustomerObject'
             example:
               webhook_type: subscription.termination_alert
               object_type: subscription
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               subscription:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 external_id: issue11_llm_sub
@@ -19152,6 +19441,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - subscription
               properties:
                 webhook_type:
@@ -19167,12 +19457,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 subscription:
                   $ref: '#/components/schemas/SubscriptionWithCustomerObject'
             example:
               webhook_type: subscription.trial_ended
               object_type: subscription
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               subscription:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 external_id: issue11_llm_sub
@@ -19316,6 +19611,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - subscription
               properties:
                 webhook_type:
@@ -19331,12 +19627,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 subscription:
                   $ref: '#/components/schemas/SubscriptionWithThresholdObject'
             example:
               webhook_type: subscription.usage_threshold_reached
               object_type: subscription
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               subscription:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 external_id: issue11_llm_sub
@@ -19500,6 +19801,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - wallet
               properties:
                 webhook_type:
@@ -19515,12 +19817,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 wallet:
                   $ref: '#/components/schemas/WalletObject'
             example:
               webhook_type: wallet.depleted_ongoing_balance
               object_type: wallet
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               wallet:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 customer_id: 00000000-0000-4000-8000-000000000003
@@ -19571,6 +19878,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - wallet_transaction
               properties:
                 webhook_type:
@@ -19586,12 +19894,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 wallet_transaction:
                   $ref: '#/components/schemas/WalletTransactionObjectExtended'
             example:
               webhook_type: wallet_transaction.created
               object_type: wallet_transaction
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               wallet_transaction:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 wallet_id: 00000000-0000-4000-8000-000000000003
@@ -19666,6 +19979,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - wallet_transaction
               properties:
                 webhook_type:
@@ -19681,12 +19995,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 wallet_transaction:
                   $ref: '#/components/schemas/WalletTransactionObjectExtended'
             example:
               webhook_type: wallet_transaction.updated
               object_type: wallet_transaction
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               wallet_transaction:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 wallet_id: 00000000-0000-4000-8000-000000000003
@@ -19761,6 +20080,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment_provider_wallet_transaction_payment_error
               properties:
                 webhook_type:
@@ -19776,12 +20096,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment_provider_wallet_transaction_payment_error:
                   $ref: '#/components/schemas/WalletTransactionPaymentFailureObject'
             example:
               webhook_type: wallet_transaction.payment_failure
               object_type: payment_provider_wallet_transaction_payment_error
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment_provider_wallet_transaction_payment_error:
                 wallet_transaction_id: 00000000-0000-4000-8000-000000000002
                 customer_id: 00000000-0000-4000-8000-000000000003
@@ -19814,6 +20139,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - customer
               properties:
                 webhook_type:
@@ -19829,12 +20155,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 customer:
                   $ref: '#/components/schemas/CustomerObject'
             example:
               webhook_type: customer.crm_provider_created
               object_type: customer
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               customer:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -19910,6 +20241,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - crm_provider_customer_error
               properties:
                 webhook_type:
@@ -19925,12 +20257,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 crm_provider_customer_error:
                   $ref: '#/components/schemas/CustomerIntegratrionErrorObject'
             example:
               webhook_type: customer.crm_provider_error
               object_type: crm_provider_customer_error
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               crm_provider_customer_error:
                 customer_id: 00000000-0000-4000-8000-000000000002
                 external_customer_id: wrrk-pullse-demo-v2
@@ -19961,6 +20298,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - invoice
               properties:
                 webhook_type:
@@ -19976,12 +20314,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 invoice:
                   $ref: '#/components/schemas/InvoiceObjectExtended'
             example:
               webhook_type: invoice.resynced
               object_type: invoice
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               invoice:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 billing_entity_code: pullse_testing
@@ -20191,6 +20534,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - order
               properties:
                 webhook_type:
@@ -20206,12 +20550,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 order:
                   $ref: '#/components/schemas/OrderWebhookObject'
             example:
               webhook_type: order.created
               object_type: order
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               order:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 number: OR-2026-0002
@@ -20257,6 +20606,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - order
               properties:
                 webhook_type:
@@ -20272,12 +20622,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 order:
                   $ref: '#/components/schemas/OrderWebhookObject'
             example:
               webhook_type: order.executed
               object_type: order
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               order:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 number: OR-2026-0002
@@ -20323,6 +20678,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - order
               properties:
                 webhook_type:
@@ -20338,12 +20694,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 order:
                   $ref: '#/components/schemas/OrderWebhookObject'
             example:
               webhook_type: order.failed
               object_type: order
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               order:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 number: OR-2026-0001
@@ -20389,6 +20750,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - order_form
               properties:
                 webhook_type:
@@ -20404,12 +20766,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 order_form:
                   $ref: '#/components/schemas/OrderFormWebhookObject'
             example:
               webhook_type: order_form.created
               object_type: order_form
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               order_form:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 number: OF-2026-0001
@@ -20447,6 +20814,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - order_form
               properties:
                 webhook_type:
@@ -20462,12 +20830,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 order_form:
                   $ref: '#/components/schemas/OrderFormWebhookObject'
             example:
               webhook_type: order_form.signed
               object_type: order_form
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               order_form:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 number: OF-2026-0001
@@ -20505,6 +20878,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - order_form
               properties:
                 webhook_type:
@@ -20520,12 +20894,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 order_form:
                   $ref: '#/components/schemas/OrderFormWebhookObject'
             example:
               webhook_type: order_form.expired
               object_type: order_form
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               order_form:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 number: OF-2026-0001
@@ -20563,6 +20942,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - order_form
               properties:
                 webhook_type:
@@ -20578,12 +20958,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 order_form:
                   $ref: '#/components/schemas/OrderFormWebhookObject'
             example:
               webhook_type: order_form.voided
               object_type: order_form
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               order_form:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 number: OF-2026-0001
@@ -20621,6 +21006,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment_receipt
               properties:
                 webhook_type:
@@ -20636,12 +21022,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment_receipt:
                   $ref: '#/components/schemas/PaymentReceiptWebhookObject'
             example:
               webhook_type: payment_receipt.created
               object_type: payment_receipt
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment_receipt:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 number: PUL-CDDE-380-RCPT-000001
@@ -20693,6 +21084,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - payment_receipt
               properties:
                 webhook_type:
@@ -20708,12 +21100,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 payment_receipt:
                   $ref: '#/components/schemas/PaymentReceiptWebhookObject'
             example:
               webhook_type: payment_receipt.generated
               object_type: payment_receipt
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               payment_receipt:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 number: PUL-CDDE-380-RCPT-000001
@@ -20765,6 +21162,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - plan_upgrade_intent
               properties:
                 webhook_type:
@@ -20780,12 +21178,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 plan_upgrade_intent:
                   $ref: '#/components/schemas/PlanUpgradeIntentWebhookObject'
             example:
               webhook_type: plan_upgrade_intent.needs_review
               object_type: plan_upgrade_intent
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               plan_upgrade_intent:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 status: needs_review
@@ -20820,6 +21223,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - quote
               properties:
                 webhook_type:
@@ -20835,12 +21239,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 quote:
                   $ref: '#/components/schemas/QuoteWebhookObject'
             example:
               webhook_type: quote.created
               object_type: quote
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               quote:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 number: QT-2026-0002
@@ -20885,6 +21294,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - quote
               properties:
                 webhook_type:
@@ -20900,12 +21310,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 quote:
                   $ref: '#/components/schemas/QuoteWebhookObject'
             example:
               webhook_type: quote.approved
               object_type: quote
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               quote:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 number: QT-2026-0002
@@ -20950,6 +21365,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - quote
               properties:
                 webhook_type:
@@ -20965,12 +21381,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 quote:
                   $ref: '#/components/schemas/QuoteWebhookObject'
             example:
               webhook_type: quote.voided
               object_type: quote
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               quote:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 number: QT-2026-0002
@@ -21015,6 +21436,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - credit_top_up_purchase
               properties:
                 webhook_type:
@@ -21030,12 +21452,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 credit_top_up_purchase:
                   $ref: '#/components/schemas/CreditsTopUpPurchase'
             example:
               webhook_type: credit_top_up_purchase.fulfilled
               object_type: credit_top_up_purchase
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               credit_top_up_purchase:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 organization_id: 00000000-0000-4000-8000-000000000001
@@ -21086,6 +21513,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - wallet
               properties:
                 webhook_type:
@@ -21101,12 +21529,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 wallet:
                   $ref: '#/components/schemas/WalletObject'
             example:
               webhook_type: wallet.created
               object_type: wallet
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               wallet:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 customer_id: 00000000-0000-4000-8000-000000000003
@@ -21158,6 +21591,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - wallet
               properties:
                 webhook_type:
@@ -21173,12 +21607,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 wallet:
                   $ref: '#/components/schemas/WalletObject'
             example:
               webhook_type: wallet.terminated
               object_type: wallet
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               wallet:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 customer_id: 00000000-0000-4000-8000-000000000003
@@ -21230,6 +21669,7 @@ webhooks:
                 - webhook_type
                 - object_type
                 - organization_id
+                - livemode
                 - wallet
               properties:
                 webhook_type:
@@ -21245,12 +21685,17 @@ webhooks:
                   format: uuid
                   description: Unique identifier of the organization, created by Nozle.
                   example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
                 wallet:
                   $ref: '#/components/schemas/WalletObject'
             example:
               webhook_type: wallet.updated
               object_type: wallet
               organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
               wallet:
                 nozle_id: 00000000-0000-4000-8000-000000000002
                 customer_id: 00000000-0000-4000-8000-000000000003
@@ -40513,7 +40958,7 @@ components:
           example: '2026-10-22T07:10:02Z'
   responses:
     Unauthorized:
-      description: Unauthorized error
+      description: 'Missing, unknown or expired API key, or a key refused by its environment: a sandbox key (`sk_nozle_test_`, `pk_nozle_test_`) on a live organization, a live key on a sandbox, or a key of a reset sandbox. The body does not say which. A `401` carries no `X-Nozle-Livemode` header.'
       content:
         application/json:
           schema:
@@ -40555,7 +41000,7 @@ components:
           schema:
             $ref: '#/components/schemas/EngineError'
     EngineUnauthorized:
-      description: Missing, malformed or unknown API key.
+      description: 'Missing, malformed or unknown API key, or a key refused by its environment: a sandbox key (`sk_nozle_test_`, `pk_nozle_test_`) on a live organization, a live key on a sandbox, or a key of a reset sandbox. The body is `{"error": "invalid api key"}` in each case, without `X-Nozle-Livemode`.'
       content:
         application/json:
           schema:
@@ -40594,3 +41039,4 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
+      description: 'A Nozle API key: `sk_nozle_` (secret) or `pk_nozle_` (publishable) for a live organization, `sk_nozle_test_` or `pk_nozle_test_` for its sandbox. Responses to an accepted key carry `X-Nozle-Livemode: true` or `false`.'

@@ -44,7 +44,7 @@ All methods accept `context.Context`. Reuse one client and keep `sk_` credential
 
 ## Authentication and transport
 
-`Plans` accepts `pk_` or `sk_`; all other operations require `sk_`. Wrong key types fail locally. A transport failure returns `TransportError`; a non-success HTTP response returns a structured `APIError`. See [Errors and retries](/sdks/go/errors).
+`Plans` accepts `pk_` or `sk_`; all other operations require `sk_`. Wrong key types fail locally. A [sandbox](/guides/getting-started/sandbox) key (`sk_nozle_test_`, `pk_nozle_test_`) passes the same checks and reaches only the sandbox. A transport failure returns `TransportError`; a non-success HTTP response returns a structured `APIError`. See [Errors and retries](/sdks/go/errors).
 
 By default the SDK makes one HTTP attempt per request. Set `WithMaxRetries(n)` for the SDK's own retries (see [Errors and retries](/sdks/go/errors)), or pass an `*http.Client` whose transport retries. The SDK sets `GetBody` on each request, so the body can be replayed, and the `Idempotency-Key` header is sent again with every attempt:
 

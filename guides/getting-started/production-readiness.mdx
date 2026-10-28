@@ -3,11 +3,12 @@ title: Production integration checklist
 description: What to verify before real customers use your Nozle integration
 ---
 
-Run the integration against a dedicated test customer in your workspace first. Keep test events and payment-provider test mode separate from real customer activity. Tick each item only after you have seen it work.
+Run the integration in your [sandbox](/guides/getting-started/sandbox) first, with sandbox keys (`sk_nozle_test_`) and your payment provider's test credentials. The sandbox is a separate organization, so test customers, events and payments never mix with live activity, and it sends no customer emails. Then repeat the checks that matter in live with live keys. Tick each item only after you have seen it work.
 
 ## Keys and setup
 
 - [ ] Secret keys (`sk_`) are only on your server and read from the environment. The browser only has a publishable key (`pk_`), which can read the plan catalog and nothing else. See [authentication](/api/authentication).
+- [ ] Production runs with live keys (`sk_nozle_`, not `sk_nozle_test_`), and its responses carry `X-Nozle-Livemode: true`. Nothing is copied from the sandbox: the plans, features and webhook endpoints you need exist in live. See [Go live](/guides/getting-started/sandbox#go-live).
 - [ ] You use the latest Node.js, Python, Go and React SDK releases. See each SDK's installation page for the current versions.
 - [ ] The feature, plan, customer and active subscription exist before events are sent. The event name equals the feature code exactly.
 - [ ] Customer identity comes from your authenticated backend, never from the browser.
@@ -36,6 +37,7 @@ Run the integration against a dedicated test customer in your workspace first. K
 
 - [ ] Your receiver verifies the signature on the raw body, deduplicates on `X-Nozle-Unique-Key`, answers `2xx` within 30 seconds and returns `200` for events it does not handle. See [receive webhooks](/api/receive-webhooks).
 - [ ] You do not rely on delivery order, and you read the object from the API when you need its latest state.
+- [ ] If one receiver handles live and sandbox deliveries, it branches on the payload's `livemode` before acting.
 
 ## Cost rating
 

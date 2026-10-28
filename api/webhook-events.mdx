@@ -9,13 +9,14 @@ Each event has its own page in the API reference under **Webhook Events**, with 
 
 ## The delivery
 
-Every delivery has the same envelope. `webhook_type` is the event type, `object_type` names the key that holds the object, and `organization_id` is your organization:
+Every delivery has the same envelope. `webhook_type` is the event type, `object_type` names the key that holds the object, `organization_id` is your organization, and `livemode` is `true` for your live organization and `false` for your [sandbox](/guides/getting-started/sandbox):
 
 ```json
 {
   "webhook_type": "plan_upgrade_intent.needs_review",
   "object_type": "plan_upgrade_intent",
   "organization_id": "00000000-0000-4000-8000-000000000001",
+  "livemode": true,
   "plan_upgrade_intent": {
     "nozle_id": "00000000-0000-4000-8000-000000000002",
     "status": "needs_review",
@@ -34,6 +35,7 @@ Every delivery has the same envelope. `webhook_type` is the event type, `object_
 
 - The object under `object_type` is the same object the REST API returns for that resource, so you can use one parser for both. A few events wrap it, for example `invoice.payment_dispute_lost` holds `{ "invoice": {...}, "provider_error": "..." }` under `payment_dispute_lost`.
 - Payloads carry only the Nozle key names (`nozle_id` and the plain `<key>` names). From Core 6.0.0 the former-prefix keys are gone: see [legacy key names](/api/api-standards#legacy-key-names-removed-in-core-600).
+- `livemode` is _Unreleased_. A sandbox delivery's `organization_id` is the sandbox's own organization ID. If one receiver takes both, check `livemode` before acting on an event.
 - Examples are captured from Core with real identifiers replaced by placeholders.
 
 ## Choose the events you receive
@@ -222,6 +224,7 @@ Sent once when executing an order fails and the order is marked `failed`. The re
   "webhook_type": "order.failed",
   "object_type": "order",
   "organization_id": "00000000-0000-4000-8000-000000000001",
+  "livemode": true,
   "order": {
     "nozle_id": "00000000-0000-4000-8000-000000000002",
     "number": "OR-2026-0001",
@@ -260,6 +263,7 @@ Sent once per [paid top-up](/guides/credits/top-ups) purchase, when the credits 
   "webhook_type": "credit_top_up_purchase.fulfilled",
   "object_type": "credit_top_up_purchase",
   "organization_id": "00000000-0000-4000-8000-000000000001",
+  "livemode": true,
   "credit_top_up_purchase": {
     "nozle_id": "00000000-0000-4000-8000-000000000002",
     "organization_id": "00000000-0000-4000-8000-000000000001",
@@ -305,6 +309,7 @@ Sent when refunding a credit note at the payment provider fails:
   "webhook_type": "credit_note.refund_failure",
   "object_type": "credit_note_payment_provider_refund_error",
   "organization_id": "00000000-0000-4000-8000-000000000001",
+  "livemode": true,
   "credit_note_payment_provider_refund_error": {
     "credit_note_id": "00000000-0000-4000-8000-000000000002",
     "customer_id": "00000000-0000-4000-8000-000000000003",
@@ -326,6 +331,7 @@ Sent when a payment attempt for a payment request fails, or when its Pay link ca
   "webhook_type": "payment_request.payment_failure",
   "object_type": "payment_provider_payment_request_payment_error",
   "organization_id": "00000000-0000-4000-8000-000000000001",
+  "livemode": true,
   "payment_provider_payment_request_payment_error": {
     "payment_request_id": "00000000-0000-4000-8000-000000000002",
     "invoice_ids": [
@@ -353,6 +359,7 @@ The payment request carries `automatic`: `true` for a request Core created itsel
   "webhook_type": "payment_request.payment_status_updated",
   "object_type": "payment_request",
   "organization_id": "00000000-0000-4000-8000-000000000001",
+  "livemode": true,
   "payment_request": {
     "nozle_id": "00000000-0000-4000-8000-000000000002",
     "amount_cents": 330,
@@ -374,6 +381,7 @@ Sent for a change to the subscription itself, for a plan change that is schedule
   "webhook_type": "subscription.updated",
   "object_type": "subscription",
   "organization_id": "00000000-0000-4000-8000-000000000001",
+  "livemode": true,
   "subscription": {
     "nozle_id": "00000000-0000-4000-8000-000000000002",
     "external_id": "issue11_llm_sub",
@@ -421,6 +429,7 @@ Sent for a change to the subscription itself, for a plan change that is schedule
   "webhook_type": "wallet.updated",
   "object_type": "wallet",
   "organization_id": "00000000-0000-4000-8000-000000000001",
+  "livemode": true,
   "wallet": {
     "nozle_id": "00000000-0000-4000-8000-000000000002",
     "customer_id": "00000000-0000-4000-8000-000000000003",

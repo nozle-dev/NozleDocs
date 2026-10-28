@@ -36,7 +36,7 @@ The connect form has no success redirect URL. After you connect, use **Add redir
 
 To edit a connection, change its name, code, **Support 3DSecure**, redirect URL, publishable key and mandate maximum settings. The same fields are on the GraphQL `addStripePaymentProvider` and `updateStripePaymentProvider` mutations as `publishableKey`, `mandateCapMultiplier`, `mandateCapFloorCents`, `mandateCapCeilingCents` and `upcomingDebitEmail`. Changing the code updates the customers assigned to it and updates the webhook endpoint URL in Stripe. Until that update finishes, Stripe events sent to the previous code's URL are still accepted. If the connection had no webhook endpoint, the rename registers one, and if the key may not edit webhook endpoints Nozle sends the `payment_provider.error` webhook.
 
-To disconnect, use **Disconnect**. Customers assigned to the connection lose their assignment. Nozle does not delete the webhook endpoint it created in Stripe, so delete it in Stripe yourself.
+To disconnect, use **Disconnect**. Customers assigned to the connection lose their assignment. Nozle also deletes the webhook endpoint it created for the connection in Stripe.
 
 ### Assign the connection to customers
 
@@ -57,6 +57,17 @@ To link a customer that already exists in Stripe from code, pass the Stripe cust
 On a later upsert or update of a linked customer, Nozle sends Stripe only the name, email, phone and address that the request changed. A changed address line sends the whole address, because Stripe replaces the address as a whole. A repeated upsert, an upsert without `billing_configuration`, and an upsert that only links a `cus_…` leave the Stripe customer's email, phone and address as they are, so edits made in Stripe are kept. Nozle never clears a Stripe customer field: a field sent as `null` or blank is cleared on the Nozle customer only.
 
 Credit top-ups and payment links do not assign a customer. The customer must already be assigned and linked to a Stripe customer. See [Credit top-ups](#credit-top-ups).
+
+## Sandbox
+
+_Unreleased._ A [sandbox](/guides/getting-started/sandbox) has its own Stripe connections: your live connections are not shared with it, so connect Stripe again while you are in the sandbox.
+
+- The sandbox accepts test keys only: a secret key `sk_test_...` or a restricted key `rk_test_...`. A live key, or a key Stripe reports as live, is refused with `422 validation_errors` and `secret_key: ["sandbox_requires_test_key"]`.
+- The [import of Stripe customers and invoices](#import-existing-stripe-customers-and-invoices) runs in the sandbox only with a test key, and is refused with `sandbox_requires_test_key` otherwise.
+- A Stripe event of the other mode than the connection (a live event reaching a test connection) is acknowledged and ignored.
+- A [sandbox reset](/guides/getting-started/sandbox#reset-the-sandbox) carries the connection over: the new sandbox gets the same Stripe test connection with a new webhook endpoint, and the old sandbox's endpoint is deleted. If Stripe refuses the key during the reset, connect it again in the new sandbox.
+
+Live organizations are unchanged: they can hold test and live connections side by side.
 
 ## What Nozle handles
 

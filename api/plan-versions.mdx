@@ -45,6 +45,7 @@ POST /subscriptions
 | `200` | The subscription, with `plan_version`. Sending the same `external_id` and `plan_code` again returns it unchanged, on its own version. |
 | `422` `plan_version: plan_version_change_not_supported` | The subscription exists on another version. Use a migration. |
 | `404` `plan_version_not_found` | The code has no such version. |
+| `422` `plan_version_change` | A checkout, plan-change quote or `/billing/upgrade` named a plan code the subscription is already on, at an older version. A move between versions is a migration, never a plan change. Use a migration. |
 
 ## Preview a migration
 
