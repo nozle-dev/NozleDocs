@@ -5,12 +5,12 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
-### Card page in your app, upcoming payment notices, mandate ceiling (Core 11.8.0, React 0.19.0)
+### Card page in your app, upcoming payment notices, mandate ceiling (Core 11.8.0, React 0.20.0)
 
 _October 28, 2026_
 
 - **Show the card page in a frame.** Add `embed=1` to the card page `url` to keep the customer in your app. Framing is allowed only from the origin of the `return_url` you passed when you created the link. The page posts `{source: "nozle", type: "card_setup", status, mode}` to your page (`status` is `ready`, `succeeded`, `processing`, `failed` or `error`). `POST /customers/{customer_id}/payment-method/manage` now returns the card page when the connection has a publishable key and the customer pays by card only, otherwise the Stripe Billing Portal. If Stripe rejects the publishable key, the page sends the customer to Stripe Checkout. See [Show the card page in your app](/integrations/stripe#show-the-card-page-in-your-app) and [Manage payment method](/api/manage-payment-method).
-- **React `NozleCardSetup` and `mountCardSetup`**, available from `@nozle-js/react` 0.19.0, show the page in a frame with callbacks and a redirect fallback. See [NozleCardSetup](/sdks/react/components/nozle-card-setup).
+- **React `NozleCardSetup` and `mountCardSetup`**, available from `@nozle-js/react` 0.20.0, show the page in a frame with callbacks and a redirect fallback. See [NozleCardSetup](/sdks/react/components/nozle-card-setup).
 - **New webhooks `payment.scheduled` and `payment.schedule_cancelled`.** A payment that Nozle will debit automatically is announced once per debit time, with `scheduled_at` and `method_type` (`card`, `upi`, `bank`). The cancelled event carries `scheduled_at` and `reason` (`mandate_changed`, `invoice_paid`, `invoice_voided`, `notice_failed`, `other`). Nozle sends them for Stripe card payments that the bank debits after its notice and for Razorpay card and UPI debits when the debit is scheduled (not for a bank mandate, and not when `pre_debit_notice` is off). See [webhook events](/api/webhook-events#payments).
 - **Upcoming payment email.** New connection setting `upcomingDebitEmail` on the Stripe and Razorpay connections (GraphQL): on by default for Razorpay and for INR payments on Stripe, off otherwise. Nozle workspace members get the same notice, and a banner for an approval that is pending, a card that needs an update, and an upcoming payment. See [Stripe](/integrations/stripe#upcoming-automatic-payments) and [Workspace billing](/guides/getting-started/workspace-billing#banners-and-emails-about-payments).
 - **Mandate maximum ceiling.** A Stripe connection can lower the ceiling but not raise it above what Indian banks accept: USD 2,800, EUR 2,600, GBP 2,200, INR 2.5 lakh. See [How big the mandate is](/integrations/stripe#how-big-the-mandate-is).
