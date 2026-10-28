@@ -1,0 +1,130 @@
+---
+title: Sandbox mode
+description: A separate test organization linked to your workspace, with its own data, test API keys and test payment connections
+---
+
+<Note>
+Sandbox mode is _Unreleased_ until deployed (Core and Engine 2.14.0).
+</Note>
+
+Every workspace can have one sandbox: a separate organization, linked to your live one, where you build and test your integration without touching live data. It has its own customers, plans, subscriptions, invoices, wallets, events, API keys, webhook endpoints and payment connections. Nothing in the sandbox reaches your live organization, and nothing in live reaches the sandbox.
+
+The sandbox is free on every Nozle plan, never emails your customers and only accepts Stripe and Razorpay test credentials.
+
+## Open the sandbox
+
+Use the workspace switcher in the dashboard: under your organization choose **Sandbox**. You can also open it from **Settings > Organization > Sandbox**.
+
+- The sandbox is created the first time an admin switches to it. It starts empty, with one secret API key.
+- Until then, members who are not admins see **Sandbox · ask an admin** and cannot create it.
+- Once it exists, every member of the workspace can open it. Your role in the live organization applies in the sandbox.
+- While you are in the sandbox, every page shows a banner, **Sandbox — test data only. No real charges, no customer emails.**, with **Switch to Live**.
+
+The sandbox is named after your organization with `(Sandbox)` added, and its invoices and other documents are numbered `TST-XXXX`, so test documents are easy to recognise.
+
+### What a new sandbox starts with
+
+A new sandbox has no customers, plans, features, coupons, subscriptions, invoices, wallets or events. It copies only the settings of your live organization that shape billing behaviour, at the time it is created:
+
+- organization and default billing entity details: legal name and number, address, tax identification number;
+- timezone, default currency, document locale and numbering, invoice footer, grace period, net payment term and VAT rate;
+- plan change, cancellation, downgrade and credit refund policies;
+- premium features and feature flags, event store settings;
+- SDK appearance, checkout return origins and the default return URL.
+
+It never copies API keys, webhook endpoints, payment connections, integrations, members or email settings.
+
+## API keys
+
+Sandbox keys have their own prefixes. Create them in the sandbox under **Developers > API keys**, as you would in live.
+
+| Key | Live organization | Sandbox |
+|---|---|---|
+| Secret | `sk_nozle_…` | `sk_nozle_test_…` |
+| Publishable | `pk_nozle_…` | `pk_nozle_test_…` |
+
+The same rules apply to both: a secret key stays on your server, and a publishable key can only read the plan catalog. A masked sandbox key keeps its `sk_nozle_test_` or `pk_nozle_test_` prefix in the dashboard, so you can tell it from a live key.
+
+### How the API picks the environment
+
+Live and sandbox use the same API URLs, `https://api.nozle.app/core` and `https://api.nozle.app/engine`. There is no separate host and no environment parameter:
+
+- **The key decides.** A request runs in the organization its key belongs to: a sandbox key only ever reads and writes sandbox data.
+- **The prefix must match.** A `_test_` key that belongs to a live organization, or a key without `_test_` that belongs to a sandbox, is refused with `401`. A key of a sandbox that was [reset](#reset-the-sandbox) is refused with `401` too.
+- **Every authenticated response says which one it reached.** Core REST, the Engine API, event ingestion and the LLM proxy add the header `X-Nozle-Livemode: true` for a live organization and `false` for a sandbox, including a `402` refused after authentication. Browsers can read it (it is listed in `Access-Control-Expose-Headers`). A `401` carries no `X-Nozle-Livemode`, because the key was not accepted.
+
+Log `X-Nozle-Livemode` with your requests, or check it once at startup, to catch a deployment that runs with the wrong key.
+
+The SDKs need no change: they check only that a key starts with `sk_` or `pk_`, which sandbox keys do. Give your test environment the `sk_nozle_test_` key in `NOZLE_SECRET_KEY`.
+
+## What is different in the sandbox
+
+| Area | In the sandbox |
+|---|---|
+| Customer emails | Never sent. Invoices, credit notes, payment requests, receipts and the other customer emails are not delivered, and resending one answers `422 not_available_in_sandbox`. Emails Nozle sends to your own team, such as sign-in codes, are not affected. |
+| Nozle billing | Free. Sandbox usage is never billed by Nozle and never reported as usage of your workspace. |
+| Workspace gates | The sandbox follows your live organization: if your workspace needs a card (`402 card_required`) or is suspended (`402 workspace_suspended`), sandbox keys are refused the same way. See [Workspace billing](/guides/getting-started/workspace-billing). |
+| Payment providers | Stripe and Razorpay only, with test credentials: a Stripe secret key `sk_test_…` or restricted key `rk_test_…`, a Razorpay Key ID `rzp_test_…`. A live key is refused with `422` and `sandbox_requires_test_key`. Connect them in the sandbox: live connections are not shared. See [Stripe](/integrations/stripe#sandbox) and [Razorpay](/integrations/razorpay#sandbox). |
+| Other providers and integrations | GoCardless, Adyen, Moneyhash, Cashfree and Flutterwave, and every tax, accounting and CRM integration (for example Avalara, Anrok, NetSuite, Xero, HubSpot, Salesforce), cannot be connected: they answer `403 not_available_in_sandbox`. |
+| Documents | Invoice, credit note and receipt PDFs carry a `TEST MODE - NOT A REAL DOCUMENT` band on every page and are numbered `TST-XXXX`. No Factur-X e-invoice is attached. |
+| Webhooks | Work as in live, to the sandbox's own endpoints. Every payload has `"livemode": false`. See [Webhook events](/api/webhook-events#the-delivery). |
+| Members, roles, sign-in methods and SSO | Managed in live and shared with the sandbox. In the sandbox these pages are hidden, and the matching requests answer `403 live_organization_only`. |
+| Your Nozle plan and invoices | Managed in live. Checkout, card and billing portal requests answer `403 live_organization_only` in the sandbox. |
+| AI onboarding | Live only. |
+
+## Webhooks and `livemode`
+
+Every webhook payload, live or sandbox, has a top-level `livemode` field:
+
+```json
+{
+  "webhook_type": "invoice.created",
+  "object_type": "invoice",
+  "organization_id": "00000000-0000-4000-8000-000000000001",
+  "livemode": false,
+  "invoice": { "...": "..." }
+}
+```
+
+`organization_id` is the sandbox's own organization ID, not your live one. If one receiver handles both environments, branch on `livemode` before you act on an event, and keep the sandbox endpoint's signing secret apart from the live one.
+
+## Reset the sandbox
+
+A reset replaces the sandbox with a new, empty one. Use it to start again from a clean state.
+
+1. In the sandbox banner or under **Settings > Organization > Sandbox**, choose **Reset sandbox**. Only admins see it.
+2. Type `RESET` to confirm.
+
+What a reset does:
+
+- Every customer, plan, subscription, invoice, wallet and event of the sandbox is gone from the dashboard and the API. The old sandbox is retired quietly: its subscriptions and wallets stop without invoices, emails or webhooks.
+- **API keys rotate.** The old sandbox keys are refused with `401` from the next request. The new sandbox has one new secret key: give it to every app that used the old one.
+- **Webhook endpoints are deleted.** Add them again in the new sandbox.
+- **Payment connections are not carried over.** Connect your Stripe or Razorpay test keys again.
+- Settings are copied from your live organization again, as for [a new sandbox](#what-a-new-sandbox-starts-with).
+- Your live organization is not touched.
+
+A workspace can reset its sandbox at most once every 10 minutes and 5 times a day. Past either limit the reset is refused with `sandbox_reset_rate_limited` (HTTP `429`).
+
+## Go live
+
+When your integration works in the sandbox:
+
+1. Switch to **Live** in the workspace switcher.
+2. Create the plans, features, coupons and other configuration you need in live. Nothing is copied from the sandbox automatically.
+3. Connect your payment provider with live credentials.
+4. Create live API keys under **Developers > API keys** and put them in your production environment. Check that responses carry `X-Nozle-Livemode: true`.
+5. Register your production webhook endpoints in live and check that their payloads have `"livemode": true`.
+
+Then work through the [production integration checklist](/guides/getting-started/production-readiness).
+
+## Errors
+
+| Status and `code` | Where | What happened |
+|---|---|---|
+| `401` | Core REST (`{"status": 401, "error": "Unauthorized"}`), Engine (`{"error": "invalid api key"}`) | A test key on a live organization, a live key on a sandbox, or a key of a reset sandbox. |
+| `422` `sandbox_requires_test_key` | Connecting Stripe or Razorpay, or starting a Stripe import, in the sandbox | The credential is a live one. Use a test key. |
+| `403` `not_available_in_sandbox` | Connecting a payment provider other than Stripe or Razorpay, or an integration | Not available in the sandbox. |
+| `422` `not_available_in_sandbox` | Resending an invoice, credit note or payment receipt email | The sandbox sends no customer email. |
+| `403` `live_organization_only` | Members, invitations, roles, sign-in methods and SSO, your Nozle plan and billing, AI onboarding | Manage it in live. |
+| `429` `sandbox_reset_rate_limited` | Resetting the sandbox | More than 1 reset in 10 minutes or 5 in a day. |

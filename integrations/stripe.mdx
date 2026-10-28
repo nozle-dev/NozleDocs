@@ -55,6 +55,17 @@ On a later upsert or update of a linked customer, Nozle sends Stripe only the na
 
 Credit top-ups and payment links do not assign a customer. The customer must already be assigned and linked to a Stripe customer. See [Credit top-ups](#credit-top-ups).
 
+## Sandbox
+
+_Unreleased._ A [sandbox](/guides/getting-started/sandbox) has its own Stripe connections: your live connections are not shared with it, so connect Stripe again while you are in the sandbox.
+
+- The sandbox accepts test keys only: a secret key `sk_test_...` or a restricted key `rk_test_...`. A live key, or a key Stripe reports as live, is refused with `422 validation_errors` and `secret_key: ["sandbox_requires_test_key"]`.
+- The [import of Stripe customers and invoices](#import-existing-stripe-customers-and-invoices) runs in the sandbox only with a test key, and is refused with `sandbox_requires_test_key` otherwise.
+- A Stripe event of the other mode than the connection (a live event reaching a test connection) is acknowledged and ignored.
+- A [sandbox reset](/guides/getting-started/sandbox#reset-the-sandbox) does not carry the connection over: connect the test key again in the new sandbox. Nozle registers a new webhook endpoint in Stripe for it. The endpoint of the old sandbox's connection stays in your Stripe test mode: delete it in Stripe.
+
+Live organizations are unchanged: they can hold test and live connections side by side.
+
 ## What Nozle handles
 
 | Feature | How it works |

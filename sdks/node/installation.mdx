@@ -110,6 +110,7 @@ The package also exports `wrapOpenAI()` and `wrapAnthropic()` for token usage ca
 
 - Billing mutations and settlement transitions require an API key beginning with `sk_`.
 - Entity mutations, credit transfers, and `usage.track()` reject publishable `pk_` keys.
+- A [sandbox](/guides/getting-started/sandbox) key (`sk_nozle_test_`, `pk_nozle_test_`) passes the same checks and reaches only the sandbox. Use it in your test environment's `NOZLE_SECRET_KEY`.
 - Mutation idempotency keys are caller-supplied and limited to 255 bytes.
 - Product-credit amounts are exact decimal strings, not JavaScript numbers.
 - Failed HTTP responses reject with a `NozleApiError` (`status`, `code`, `requestId`, `retryAfter`), which extends `Error`. Its message contains the operation and HTTP status. See [errors and retries](/sdks/node/errors).
