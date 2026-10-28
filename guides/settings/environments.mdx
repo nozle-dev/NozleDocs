@@ -1,29 +1,22 @@
 ---
-title: Environments
-description: Split your workspace data into Live and Sandbox environments, and decide which one an integration reaches.
+title: Sandbox
+description: See whether your workspace has a sandbox, create it, and reset it.
 ---
 
-An environment is a data boundary. It decides which customers, events and API keys an integration can reach. It never changes what an invoice says. Invoice identity belongs to a [billing entity](/guides/settings/billing-entities).
+Every workspace has one live organization and can have one [sandbox](/guides/getting-started/sandbox): a separate, linked organization for test data. It has its own customers, invoices, events, API keys and payment connections, and nothing in it reaches live.
 
-Open **Settings** and choose **Environments** to manage them.
+Open **Settings** and choose **Sandbox** under **Organization**. The page opens from Live; earlier dashboard links to **Environments** land here.
 
-## Fields
+## What the page shows
 
-| Field | What it does |
+| Section | What it says |
 | --- | --- |
-| Name | The label people see in the dashboard. |
-| Identifier | Lowercase letters, numbers and hyphens, 3 to 32 characters. API keys reference it, so it cannot be renamed after you create the environment. |
-| Mode | **Live** bills real customers. **Sandbox** holds isolated test data. The mode is fixed once the environment holds data. To change it, create a new environment. |
-| Status | Active, Paused or Archived. |
-| Billing entity | The billing entity whose identity documents issued here carry. Leave it on **Workspace default** to use the default entity. |
+| Status | **Active** once the sandbox exists, **Not created** before. An admin can create it here, or by switching to **Sandbox** in the workspace switcher. |
+| Reset | Retires the sandbox and creates a fresh, empty one with new API keys. See [Reset the sandbox](/guides/getting-started/sandbox#reset-the-sandbox). |
+| Copied from Live | The billing settings and policies copied once, when the sandbox is created. |
+| What the sandbox has of its own | Customers, plans, invoices, events, API keys, webhook endpoints, payment connections and integrations. |
+| What it shares with Live | Members, roles and sign-in methods, which you manage in Live, and your Nozle plan. The sandbox is free. |
 
-## Rules
+## Who can change it
 
-- Each mode has exactly one default environment. New sessions land in it.
-- You cannot pause or archive the default environment. Promote another one first.
-- You cannot archive the last active live environment. Doing so would stop all billing traffic.
-- Live and sandbox data never mix. A sandbox environment is isolated from live customers, invoices and payments.
-
-## Who can change them
-
-Anyone with settings access can view environments. Adding or editing one needs the `organization.update` permission, which workspace admins have. Without it, the buttons are disabled.
+Every member can open the sandbox once it exists, with the same role they have in Live. Creating and resetting it needs the `developers:keys:manage` permission, which workspace admins have. Without it, the page shows **Ask an admin to create the sandbox**.
