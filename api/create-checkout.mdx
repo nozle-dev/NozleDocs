@@ -23,8 +23,20 @@ Use this when a customer is selecting a plan.
   External customer ID. The customer must already exist.
 </ParamField>
 
-<ParamField body="plan_code" type="string" required>
-  The plan code to subscribe the customer to (e.g. `pro`).
+<ParamField body="plan_code" type="string">
+  The plan code to subscribe the customer to (e.g. `pro`). Required unless you send `plan_family_code` and `interval`.
+</ParamField>
+
+<ParamField body="plan_family_code" type="string">
+  Engine 2.21.0 and Core 11.10.0. Sell a plan family instead of a plan code: Nozle picks the family's current plan for `interval` and `currency`. Cannot be combined with `plan_code`. See [Multi-currency pricing](/guides/billing/multi-currency-pricing#checkout-and-subscribe-by-family).
+</ParamField>
+
+<ParamField body="interval" type="string">
+  With `plan_family_code`, required: `weekly`, `monthly`, `quarterly`, `semiannual` or `yearly`.
+</ParamField>
+
+<ParamField body="currency" type="string">
+  With `plan_family_code`: the ISO 4217 code of the variant to sell, for example `EUR`. Without it, Nozle uses the currency of the subscription being changed (`subscription_id`, else the customer's only active subscription), else the customer's locked currency, else the family's default currency. A plan change never switches currency.
 </ParamField>
 
 Plan checkout is payment-gated. Free-to-paid checkout uses an incomplete subscription. Paid-to-paid upgrades keep the old subscription active in a durable pending intent and apply the billing change only after the payment provider confirms the required payment and Nozle fulfills the change.
@@ -75,6 +87,18 @@ Plan checkout:
 {
   "customer_id": "customer_123",
   "plan_code": "growth",
+  "return_url": "https://app.example.com/settings/billing"
+}
+```
+
+Plan family checkout in EUR (Engine 2.21.0):
+
+```json
+{
+  "customer_id": "customer_123",
+  "plan_family_code": "pro",
+  "interval": "yearly",
+  "currency": "EUR",
   "return_url": "https://app.example.com/settings/billing"
 }
 ```
@@ -229,10 +253,13 @@ Every error body carries `error` and `code`. Core's errors also carry `status`, 
 
 | Status | Code | Cause |
 | --- | --- | --- |
-| `400` | `invalid_request` | The body is not valid JSON, `subscription_id` is combined with `invoice_id` or `external_entity_id`, neither `plan_code` with `customer_id` nor `invoice_id` is given, or the `Idempotency-Key` is longer than 255 bytes. |
+| `400` | `invalid_request` | The body is not valid JSON, `subscription_id` is combined with `invoice_id` or `external_entity_id`, neither `plan_code` (or `plan_family_code`) with `customer_id` nor `invoice_id` is given, or the `Idempotency-Key` is longer than 255 bytes. |
 | `400` | `invalid_return_url` | Core refused `return_url`: it is not an absolute HTTPS URL, or its origin is not one of your organization's allowed origins. See [return URLs](/guides/billing/checkout#return-urls-and-your-organizations-origins). |
 | `403` | `customer_scope_mismatch` | Trusted internal authentication with an `X-Nozle-Customer-Id` header that differs from `customer_id`. |
 | `404` | `plan_not_found`, `customer_not_found`, `subscription_not_found` | Unknown plan or customer, or `subscription_id` is not an active subscription of the customer (for example a terminated one). |
+| `404` | `plan_family_not_found` | No plan family has this `plan_family_code`. |
+| `422` | `validation_errors` | Checkout by family: `plan_family_code: incompatible_with_plan_code` (both `plan_code` and `plan_family_code`), `interval: value_is_mandatory` or `value_is_invalid`, `currency: currency_not_offered` (the family has no plan for that interval and currency). |
+| `422` | `validation_errors` | `currency: customer_currency_mismatch`: the plan's currency is not the customer's. `plan_code: currencies_does_not_match`: a plan change to a plan in another currency. |
 | `422` | `plan_version_change` | `plan_code` is another version of the plan the subscription is on, for example the customer's own plan code while they are on an older version. That is a [version migration](/api/plan-versions), never a plan change. |
 | `422` | `plan_transition_policy_required` | The customer has an active subscription and the change needs a [transition policy](/api/plan-transition-policies): an immediate downgrade, a plan the default does not reach, or a trial. Upgrades and end-of-period downgrades between public plans need none. |
 | `422` | `validation_errors` | `error_details.base` is `amount_below_provider_minimum`: an invoice checkout whose amount left to pay is under the payment provider's minimum charge (for example less than $0.50 on Stripe). |
