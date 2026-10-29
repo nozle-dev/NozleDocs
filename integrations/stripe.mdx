@@ -362,7 +362,13 @@ Indian rules (RBI) do not let a business debit a card issued in India on its own
 | **Pay link of an invoice** | Stripe Checkout | Nozle's page when the customer pays by card, or is from India |
 | **Workspace card step** | Stripe Checkout | Nozle's card page |
 | **Payment requests, crypto, paid plan upgrade checkout** | Stripe Checkout | Stripe Checkout. They cannot register a mandate |
+| **Link and wallets** | Stripe's own page offers Link, Apple Pay and Google Pay | The card page offers Link too. Apple Pay and Google Pay show once the card page's host is registered with your Stripe account (see below) |
 | **Look and feel** | Stripe's | Nozle's brand. In your app you can show it in a frame (see below) |
+
+**Link and wallets on the card page.** The card page shows the same Stripe options as Stripe Checkout: Link, and Apple Pay and Google Pay on devices that have them.
+- **Link.** Nozle gives Stripe the customer's email, so Link can recognise a returning customer and send its code, then fill the saved card. Link can also recognise a customer from a login it already remembers on that device. Safari blocks the cookies that remembered login needs in a form shown on another site, so on Safari Stripe Checkout, which is a Stripe page, can fill in more silently than the card page. Chrome does not have that limit.
+- **Apple Pay and Google Pay.** Stripe shows them only on a domain registered for your Stripe account. Nozle registers the card page's host with your account once, when you save a publishable key, with no step from you. If the key may not manage domains, the wallets stay off and the card form still works. Connections that saved their key before this was added are registered by one run of `rake payment_providers:register_stripe_payment_method_domains`.
+- **Indian cards.** The mandate comes from the card form. A wallet payment can carry no mandate, and then the customer pays the invoice on the pay link, as for any card without a mandate.
 
 **If you do not set it.** Nothing breaks. Everything keeps working through Stripe Checkout, exactly as before. Only cards issued in India lose automatic renewals, because Checkout cannot register their mandate.
 
