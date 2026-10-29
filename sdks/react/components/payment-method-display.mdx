@@ -119,6 +119,15 @@ export function NoCard() {
   Without `onUpdatePaymentMethod`, the button opens this URL in the same window.
 </ResponseField>
 
+<Warning>
+  The default `/billing/update-payment` is a path in your own app. If your app has no page there, the click only reloads your app. Pass `onUpdatePaymentMethod`, or `updateHref`, so the button reaches your card flow. For the Nozle card page, call `managePaymentMethod(returnUrl)` from `useManagePaymentMethod()` in the handler:
+
+  ```tsx
+  const { managePaymentMethod } = useManagePaymentMethod();
+  <PaymentMethodDisplay paymentMethod={card} onUpdatePaymentMethod={() => managePaymentMethod(window.location.href)} />
+  ```
+</Warning>
+
 <ResponseField name="appearance" type="Appearance">
   Theme, variables and element overrides on top of the provider's. See [Appearance](/sdks/react/styling).
 </ResponseField>

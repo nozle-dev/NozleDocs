@@ -26,7 +26,7 @@ Connect Stripe in the Nozle dashboard under **Settings > Billing settings > Inte
 | **Support 3DSecure** | Optional, off by default. See [Saved payment methods and automatic charging](#saved-payment-methods-and-automatic-charging) |
 | **Publishable key** | Optional. `pk_test_...` or `pk_live_...`, in the same mode as the secret key (a mismatch is refused). Find it in the Stripe dashboard under **Developers > API keys**. It is not a secret. With it, cards are saved on a Nozle-hosted card page that can register an e-mandate for cards issued in India. See [Indian cards and automatic payments](#indian-cards-and-automatic-payments) |
 | **Mandate maximum** | Optional, for Indian cards only: a headroom multiplier over the plan price (3 by default), and a floor and a ceiling in the smallest unit of the mandate currency (defaults per currency). See [How big the mandate is](#how-big-the-mandate-is) |
-| **Upcoming payment email** | Optional (`upcomingDebitEmail` in GraphQL). Whether Nozle emails your customer before an automatic debit. Unset, it is on for payments in INR and off for other currencies. See [Upcoming automatic payments](#upcoming-automatic-payments). The dashboard form has no field for it: set it through GraphQL |
+| **Upcoming payment email** | Optional (`upcomingDebitEmail` in GraphQL). Whether Nozle emails your customer before an automatic debit. Unset, it is on for payments in INR and off for other currencies. See [Upcoming automatic payments](#upcoming-automatic-payments). It is on the connection's edit form in the dashboard (**Email customers before an automatic payment**: default, on or off), and in GraphQL |
 
 An organization can hold several Stripe connections, but only one per Stripe account and mode. A test key (`sk_test_`) and a live key (`sk_live_`) of the same Stripe account are two connections, so you can go live after testing without disconnecting the test connection. Connecting the same account in the same mode again fails with `500` and the code `stripe_account_already_connected`. The message is only `Internal error`: it does not name the existing connection.
 
@@ -404,6 +404,16 @@ A currency that is not in the table keeps whatever floor and ceiling you set, an
 - **What the customer reads.** The wording follows the same outcome, from Stripe's codes only. When the bank needs the customer to confirm the payment, the email says "Your bank asked you to confirm this payment" with a **Pay now** button and promises no retry. For a card that will not work it says "This card could not be charged" and offers **Use another card** (**Change card** in a Nozle workspace email). Other failures keep the wording that says the card may work later. This applies to your customers' `invoice.payment_failure` email and to a Nozle workspace's failed-payment and reminder emails. For a workspace, the dashboard field `workspaceBilling.failureAction` (`CONFIRM_PAYMENT`, `CHANGE_CARD`, `RETRY_LATER`; `null` unless the workspace is past due) carries the outcome.
 
 Other card networks and countries need no mandate. Only Visa and Mastercard get Indian mandates.
+
+### Your own card form
+
+Nozle does not support a card form you build yourself with your own Stripe.js. To make an Indian card chargeable automatically, Nozle must create the SetupIntent with the mandate options and record the mandate it returns. A form that skips both saves a card that has no mandate, and the automatic charge is refused with "You must provide a mandate".
+
+You have three options:
+
+- **Nozle's page in your app.** Show the card page in a frame, as above. You control everything around it and read the outcome from the messages. The card form itself stays Nozle's.
+- **Nozle's page as a redirect.** Send the customer to `url` and read `nozle_card=` on your return URL.
+- **Stripe Checkout.** Leave the **Publishable key** empty. Cards from other countries work as before. A card issued in India is then paid through the pay link, one invoice at a time.
 
 ## Upcoming automatic payments
 
