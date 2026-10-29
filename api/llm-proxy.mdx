@@ -127,8 +127,10 @@ These come from Engine. Provider errors are returned unchanged, with the provide
 | `401` | `{"code": "unauthorized", "error": "invalid nozle key"}` | The key is unknown. |
 | `403` | `{"code": "publishable_key_not_allowed", ...}` | A publishable key was used. |
 | `403` | `{"code": "permission_denied", "error": "API key requires event:write permission"}` | The key cannot write events, so the call is refused before it reaches the provider. |
+| `402` | `{"code": "customer_payment_overdue", "error": "This customer's invoices are unpaid past their grace period. Usage resumes once they are paid."}` | _Unreleased (Engine 2.22.0)._ The customer is blocked by your [dunning policy](/guides/billing/dunning). The provider is not called. |
 | `422` | `{"code": "active_subscription_not_found", "error": "customer has no matching active subscription"}` | The customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer. The provider is not called. |
 | `422` | `{"code": "active_subscription_ambiguous", "error": "customer has multiple active subscriptions; set X-Nozle-Subscription"}` | The customer has several active subscriptions. Send `X-Nozle-Subscription`. The provider is not called. |
 | `502` | Empty | Engine could not reach the provider. |
 | `503` | `{"code": "unavailable", "error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |
 | `503` | `{"code": "unavailable", "error": "subscription lookup is unavailable"}` | The subscription could not be looked up. The provider is not called. Retry later. |
+| `503` | `{"code": "unavailable", "error": "customer payment state is unavailable"}` | _Unreleased (Engine 2.22.0)._ Whether the customer is blocked could not be read. The provider is not called. Retry later. |

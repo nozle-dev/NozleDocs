@@ -145,6 +145,8 @@ A denial is an HTTP `200` response with `allowed: false` and one of these `reaso
 | `usage_limit_exceeded` | A hard limit is reached. A soft limit never denies; it sets `overage` to `true` |
 | `economic_policy_denied` | A margin policy in `deny` mode rejected the estimated cost or margin. The `policy` object has the detail |
 
+`customer_payment_overdue` comes with HTTP `402`, not `200`: see [Unavailable or blocked](#unavailable-or-blocked).
+
 For example, an unknown feature code returns:
 
 ```json
@@ -192,6 +194,10 @@ Entitlement configuration refresh is approximately once per minute. A plan or qu
 Two statuses are not a decision about the customer, and they ask for different handling:
 
 - `503`: Nozle could not read usage. Retry within your budget, as described above.
-- `402` `workspace_suspended` or `card_required` (_Unreleased_): your own workspace is suspended over unpaid Nozle invoices, or has no verified card. Do not retry. Every call fails until the invoices are paid or the card is added, and the next request works again. The Nozle SDKs throw their API error with that `code` and never retry it; `can()` throws instead of returning `allowed: false`. See [Workspace billing](/guides/getting-started/workspace-billing).
+- `402` `workspace_suspended` (_Unreleased_): your own workspace is suspended over unpaid Nozle invoices (`card_required` only for a workspace still flagged from before cards became optional). Do not retry. Every call fails until the invoices are paid, and the next request works again. The Nozle SDKs throw their API error with that `code` and never retry it; `can()` throws instead of returning `allowed: false`. See [Workspace billing](/guides/getting-started/workspace-billing).
+
+One `402` is a decision about the customer:
+
+- `402` `customer_payment_overdue` (_Unreleased_, Engine 2.22.0): this customer's unpaid invoices are past the grace of their plan and your [dunning policy](/guides/billing/dunning) blocks them. The body reads like a denial: `{"allowed": false, "reason": "customer_payment_overdue", ...}`. The Node SDK (0.23.0) returns it from `can()` as `{ allowed: false, reason: "customer_payment_overdue", used: 0, limit: null, remaining: null }` instead of throwing, so you can ask the customer to pay. The next call after the invoices are paid is allowed again.
 
 Whether your app lets users through while `/can` is unavailable or blocked (fail open) or stops them (fail closed) is your decision. Nozle does not make it for you. Decide per feature, and fail closed where letting a user through costs you money.

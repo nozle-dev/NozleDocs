@@ -20,6 +20,12 @@ The customer must exist before you subscribe it. An unknown customer returns `40
 
 `subscribe` does not collect payment, even for a paid plan. Use checkout when payment must succeed first.
 
+## Billing alignment
+
+The organization setting **Billing alignment** decides when the billing periods of new subscriptions start: `calendar` (the first of the month, the default) or `anniversary` (the day the subscription starts). Set it in the dashboard under **Settings > Billing settings > General** (Subscription periods), or with `PUT /organizations` as `billing_configuration.billing_alignment`, which the organization object returns.
+
+A subscription can override it with `billing_time` (`calendar` or `anniversary`) on `POST /subscriptions`, checkout and [Entity checkout](/api/entity-subscriptions). Without `billing_time`, Nozle uses the organization's alignment. Changing the setting does not move existing subscriptions.
+
 ## Customer self-service
 
 Use [the native React billing portal](/sdks/react/billing-portal), or add `CancellationControl` and `PlanChangeControl` to your own billing page. Your authenticated Node.js, Python, or Go backend supplies their action adapters.

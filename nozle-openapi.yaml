@@ -3317,6 +3317,16 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '402':
+          description: 'Engine 2.22.0. `customer_payment_overdue`: the event''s customer (by `external_customer_id`, or the customer of `external_subscription_id`) is blocked by its [dunning policy](/guides/billing/dunning). The event is not stored and is not queued.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+              example:
+                status: 402
+                error: "This customer's invoices are unpaid past their grace period. Usage resumes once they are paid."
+                code: customer_payment_overdue
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
@@ -3458,7 +3468,7 @@ paths:
         required: true
       responses:
         '200':
-          description: Event received
+          description: 'Events received. From Engine 2.22.0, events of a customer blocked by its [dunning policy](/guides/billing/dunning) are refused one by one and listed in `error_details` by their position; the other events are stored and returned in `events`.'
           content:
             application/json:
               schema:
@@ -3467,6 +3477,20 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '402':
+          description: 'Engine 2.22.0. Every event of the batch belongs to a customer blocked by its [dunning policy](/guides/billing/dunning). Nothing is stored. `error_details` lists each refused event by its position in the request. When only some events are refused, the others are stored and the answer is `200` with the refused ones in `error_details`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+              example:
+                status: 402
+                error: "This customer's invoices are unpaid past their grace period. Usage resumes once they are paid."
+                code: customer_payment_overdue
+                error_details:
+                  '0':
+                    external_customer_id:
+                      - customer_payment_overdue
         '403':
           $ref: '#/components/responses/Forbidden'
         '422':
@@ -11788,6 +11812,8 @@ paths:
           $ref: '#/components/responses/EngineBadRequest'
           description: '`code: invalid_request`: invalid JSON, an unknown field, more than one JSON value, a body over 1 MiB, a missing `customer_id` or `feature_code`, an invalid or missing time.'
         '401': *id006
+        '402':
+          $ref: '#/components/responses/EngineCustomerPaymentOverdue'
         '403':
           $ref: '#/components/responses/EngineForbidden'
           description: 'A publishable key, `code: permission_denied` when API key permissions are enabled and the secret key lacks `credit_system:{mode}` (`read` for check, `write` for track), or `code: customer_scope_mismatch` when internal authentication is scoped to another customer.'
@@ -11897,6 +11923,8 @@ paths:
           $ref: '#/components/responses/EngineBadRequest'
           description: '`code: invalid_request`: invalid JSON, an unknown field, more than one JSON value, a body over 1 MiB, a missing `customer_id` or `feature_code`, an invalid or missing time, or a missing or invalid `Idempotency-Key`.'
         '401': *id006
+        '402':
+          $ref: '#/components/responses/EngineCustomerPaymentOverdue'
         '403':
           $ref: '#/components/responses/EngineForbidden'
           description: 'A publishable key, `code: permission_denied` when API key permissions are enabled and the secret key lacks `credit_system:{mode}` (`read` for check, `write` for track), or `code: customer_scope_mismatch` when internal authentication is scoped to another customer.'
@@ -12975,6 +13003,37 @@ paths:
           $ref: '#/components/responses/EngineBadRequest'
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
+        '402':
+          description: 'Engine 2.22.0. `customer_payment_overdue`: the customer''s unpaid invoices are past the grace of their plan and their [dunning policy](/guides/billing/dunning) blocks them. The body carries the denial (`allowed`, `reason`) and the error (`code`, `error`). Checked once the customer''s subscription is found. The Node SDK 0.23.0 returns it from `can()` as a denial. A suspended workspace gets `workspace_suspended` (`code` and `error` only), which the SDKs throw.'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - allowed
+                  - reason
+                  - code
+                  - error
+                properties:
+                  allowed:
+                    type: boolean
+                    enum:
+                      - false
+                  reason:
+                    type: string
+                    enum:
+                      - customer_payment_overdue
+                  code:
+                    type: string
+                    enum:
+                      - customer_payment_overdue
+                  error:
+                    type: string
+              example:
+                allowed: false
+                reason: customer_payment_overdue
+                code: customer_payment_overdue
+                error: "This customer's invoices are unpaid past their grace period. Usage resumes once they are paid."
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '503':
@@ -13220,6 +13279,8 @@ paths:
           $ref: '#/components/responses/EngineBadRequest'
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
+        '402':
+          $ref: '#/components/responses/EngineCustomerPaymentOverdue'
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '422':
@@ -13308,6 +13369,8 @@ paths:
           $ref: '#/components/responses/EngineBadRequest'
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
+        '402':
+          $ref: '#/components/responses/EngineCustomerPaymentOverdue'
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '422':
@@ -13424,6 +13487,8 @@ paths:
           $ref: '#/components/responses/EngineBadRequest'
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
+        '402':
+          $ref: '#/components/responses/EngineCustomerPaymentOverdue'
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '422':
@@ -13519,6 +13584,8 @@ paths:
           $ref: '#/components/responses/EngineBadRequest'
         '401':
           $ref: '#/components/responses/EngineUnauthorized'
+        '402':
+          $ref: '#/components/responses/EngineCustomerPaymentOverdue'
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '422':
@@ -15190,6 +15257,71 @@ webhooks:
                 overdue_balance_cents: 19492
                 overdue_balance_currency: USD
                 customer_external_id: wrrk-pullse-demo-v2
+      responses:
+        '200':
+          description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
+  dunning_step:
+    post:
+      operationId: dunningStep
+      summary: A step of the dunning policy ran for an unpaid invoice
+      description: 'Core 11.19.0. A step of the [dunning policy](/guides/billing/dunning) ran for an unpaid invoice of a customer: `payment_failed` (day 0), `reminder`, `final_reminder`, `end_action` (the last day of the grace) or `resolved` (sent once when the invoice no longer needs paying). Only dunning campaigns with an `end_action` send it.'
+      parameters:
+        - $ref: '#/components/parameters/webhook_signature'
+        - $ref: '#/components/parameters/webhook_signature_algorithm'
+        - $ref: '#/components/parameters/webhook_unique_key'
+      requestBody:
+        description: The step, the invoice it ran for and where the timeline stands
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - livemode
+                - dunning_step
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - dunning.step
+                object_type:
+                  type: string
+                  enum:
+                    - dunning_step
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
+                dunning_step:
+                  $ref: '#/components/schemas/DunningStepObject'
+            example:
+              webhook_type: dunning.step
+              object_type: dunning_step
+              organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
+              dunning_step:
+                lago_invoice_id: 00000000-0000-4000-8000-000000000006
+                invoice_number: ACME-47DD-012-001
+                lago_customer_id: 00000000-0000-4000-8000-000000000003
+                external_customer_id: customer_123
+                dunning_campaign_code: block_after_grace
+                step: reminder
+                day: 3
+                grace_days: 7
+                end_action: block
+                started_at: '2026-10-20T09:00:00Z'
+                deadline_at: '2026-10-27T09:00:00Z'
+                next_action: retry
+                next_action_at: '2026-10-25T09:00:00Z'
+                total_due_amount_cents: 4900
+                currency: USD
       responses:
         '200':
           description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
@@ -22643,6 +22775,7 @@ components:
               - credit_note.created
               - payment_receipt.created
               - subscription.price_change_scheduled
+              - dunning.step
           description: 'The email notification settings for this billing entity. `subscription.price_change_scheduled` is off until you add it; it emails a customer when a plan version migration moves their subscription to a different price.'
         eu_tax_management:
           type: boolean
@@ -22845,6 +22978,7 @@ components:
                   - invoice.finalized
                   - credit_note.created
                   - subscription.price_change_scheduled
+                  - dunning.step
               description: The email notification settings for this billing entity. `subscription.price_change_scheduled` is off until you add it.
             eu_tax_management:
               type: boolean
@@ -23182,6 +23316,7 @@ components:
               - invoice.finalized
               - credit_note.created
               - subscription.price_change_scheduled
+              - dunning.step
           description: The email notification settings for this billing entity. `subscription.price_change_scheduled` is off until you add it.
         eu_tax_management:
           type: boolean
@@ -26346,6 +26481,26 @@ components:
           type: boolean
           example: false
           description: Set to true to exclude all invoice custom sections from PDF generation for this customer only.
+        dunning_blocked_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: 'Core 11.19.0. When the [dunning policy](/guides/billing/dunning) blocked the customer: an unpaid invoice is past the grace of its plan and the campaign ends with `block`. The Engine then answers `402` `customer_payment_overdue` for the customer. `null` when not blocked.'
+          example: null
+        dunning_day:
+          type:
+            - integer
+            - 'null'
+          description: Core 11.19.0. Day of the dunning timeline that the customer's furthest unpaid invoice is on. `null` without a dunned invoice.
+          example: null
+        dunning_next_action_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: Core 11.19.0. When the next step of the dunning policy runs, a retry included. `null` when none is planned.
+          example: null
         billing_configuration:
           $ref: '#/components/schemas/CustomerBillingConfiguration'
         shipping_address:
@@ -30651,6 +30806,19 @@ components:
                     type: 'null'
                     description: The value will always be null in this response as the event processing is done asynchronously
                     example: null
+        error_details:
+          type: object
+          description: 'Engine 2.22.0, `POST /events/batch` only. Present when events were refused because their customer is blocked by its [dunning policy](/guides/billing/dunning): keyed by the position of each refused event in the request. The other events were stored.'
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                type: string
+          example:
+            '2':
+              external_customer_id:
+                - customer_payment_overdue
     EventEstimateFeesInput:
       type: object
       required:
@@ -31383,6 +31551,13 @@ components:
       type: object
       description: The custom billing settings for your organization.
       properties:
+        billing_alignment:
+          type: string
+          enum:
+            - calendar
+            - anniversary
+          description: 'When the billing periods of new subscriptions start: `calendar` (the first of the month) or `anniversary` (the day the subscription starts). A subscription, checkout or Entity checkout can set its own `billing_time`; without one it follows this setting. Changing it does not move existing subscriptions.'
+          example: calendar
         invoice_footer:
           type:
             - string
@@ -32640,6 +32815,24 @@ components:
             - 'null'
           description: This field, when set to `true`, enables to invoice fixed charges on monthly basis, even if the cadence of the plan is yearly or semiannual. This allows customers to pay fixed charges on a monthly basis. This can be set to true only if the plan's interval is `yearly` or `semiannual`.
           example: null
+        limit_grace_days:
+          type: integer
+          minimum: 0
+          maximum: 90
+          description: 'Core 11.16.0. Days after the unpaid invoice of an automatic upgrade at the plan''s MRR limit before the end action, 0 to 90 (`0` acts at once). Read for Nozle''s own plans; the dunning policy of your customers reads `unpaid_invoice_grace_days`. Editing it never creates a new plan version. Out of range: `422` `value_is_out_of_range`.'
+          example: 7
+        unpaid_invoice_grace_days:
+          type: integer
+          minimum: 0
+          maximum: 90
+          description: 'Core 11.16.0. Days between day 0 of an unpaid invoice of this plan and the end action of its [dunning policy](/guides/billing/dunning), 0 to 90 (`0` acts at once). Editing it never creates a new plan version; new versions and the other currencies of a plan family copy it. Out of range: `422` `value_is_out_of_range`.'
+          example: 7
+        dunning_campaign_code:
+          type:
+            - string
+            - 'null'
+          description: 'Core 11.19.0. The dunning campaign the plan''s unpaid invoices follow, before the customer''s and the billing entity''s. `null` unlinks it. An unknown code returns `404` `dunning_campaign_not_found`. Editing it never creates a new plan version.'
+          example: block_after_grace
         parent_id:
           type:
             - string
@@ -33363,6 +33556,26 @@ components:
                 - 'null'
               description: This field, when set to `true`, enables to invoice fixed charges on monthly basis, even if the cadence of the plan is `yearly` or `semiannual`. This allows customers to pay fixed charges on a monthly basis. This can be set to true only if the plan's interval is `yearly` or `semiannual`.
               example: null
+            limit_grace_days:
+              type: integer
+              minimum: 0
+              maximum: 90
+              description: 'Core 11.16.0. Days after the unpaid invoice of an automatic upgrade at the plan''s MRR limit before the end action, 0 to 90 (`0` acts at once). Read for Nozle''s own plans; the dunning policy of your customers reads `unpaid_invoice_grace_days`. Editing it never creates a new plan version. Out of range: `422` `value_is_out_of_range`.'
+              default: 7
+              example: 7
+            unpaid_invoice_grace_days:
+              type: integer
+              minimum: 0
+              maximum: 90
+              description: 'Core 11.16.0. Days between day 0 of an unpaid invoice of this plan and the end action of its [dunning policy](/guides/billing/dunning), 0 to 90 (`0` acts at once). Editing it never creates a new plan version; new versions and the other currencies of a plan family copy it. Out of range: `422` `value_is_out_of_range`.'
+              default: 7
+              example: 7
+            dunning_campaign_code:
+              type:
+                - string
+                - 'null'
+              description: 'Core 11.19.0. The dunning campaign the plan''s unpaid invoices follow, before the customer''s and the billing entity''s. `null` unlinks it. An unknown code returns `404` `dunning_campaign_not_found`. Editing it never creates a new plan version.'
+              example: block_after_grace
             tax_codes:
               $ref: '#/components/schemas/TaxCodes'
             minimum_commitment:
@@ -33718,6 +33931,24 @@ components:
                 - 'null'
               description: This field, when set to `true`, enables to invoice fixed charges on monthly basis, even if the cadence of the plan is `yearly` or `semiannual`. This allows customers to pay fixed charges on a monthly basis. This can be set to true only if the plan's interval is `yearly` or `semiannual`.
               example: null
+            limit_grace_days:
+              type: integer
+              minimum: 0
+              maximum: 90
+              description: 'Core 11.16.0. Days after the unpaid invoice of an automatic upgrade at the plan''s MRR limit before the end action, 0 to 90 (`0` acts at once). Read for Nozle''s own plans; the dunning policy of your customers reads `unpaid_invoice_grace_days`. Editing it never creates a new plan version. Out of range: `422` `value_is_out_of_range`.'
+              example: 7
+            unpaid_invoice_grace_days:
+              type: integer
+              minimum: 0
+              maximum: 90
+              description: 'Core 11.16.0. Days between day 0 of an unpaid invoice of this plan and the end action of its [dunning policy](/guides/billing/dunning), 0 to 90 (`0` acts at once). Editing it never creates a new plan version; new versions and the other currencies of a plan family copy it. Out of range: `422` `value_is_out_of_range`.'
+              example: 7
+            dunning_campaign_code:
+              type:
+                - string
+                - 'null'
+              description: 'Core 11.19.0. The dunning campaign the plan''s unpaid invoices follow, before the customer''s and the billing entity''s. `null` unlinks it. An unknown code returns `404` `dunning_campaign_not_found`. Editing it never creates a new plan version.'
+              example: block_after_grace
             tax_codes:
               $ref: '#/components/schemas/TaxCodes'
             minimum_commitment:
@@ -35790,6 +36021,7 @@ components:
               - credit_note.generated
               - credit_note.refund_failure
               - dunning_campaign.finished
+              - dunning.step
               - event.error
               - events.errors
               - feature.created
@@ -35915,6 +36147,7 @@ components:
                   - credit_note.generated
                   - credit_note.refund_failure
                   - dunning_campaign.finished
+                  - dunning.step
                   - event.error
                   - events.errors
                   - feature.created
@@ -36038,6 +36271,7 @@ components:
                   - credit_note.generated
                   - credit_note.refund_failure
                   - dunning_campaign.finished
+                  - dunning.step
                   - event.error
                   - events.errors
                   - feature.created
@@ -36405,6 +36639,107 @@ components:
           example: EUR
         customer_external_id:
           type: string
+    DunningStepObject:
+      type: object
+      description: 'Core 11.19.0. One step of the dunning policy of an unpaid invoice. See [Dunning policy](/guides/billing/dunning).'
+      required:
+        - lago_invoice_id
+        - invoice_number
+        - lago_customer_id
+        - step
+        - day
+        - grace_days
+        - end_action
+        - started_at
+        - deadline_at
+        - total_due_amount_cents
+        - currency
+      properties:
+        lago_invoice_id:
+          type: string
+          format: uuid
+          description: Unique identifier of the unpaid invoice, created by Nozle.
+          example: 00000000-0000-4000-8000-000000000006
+        invoice_number:
+          type: string
+          description: Number of the unpaid invoice.
+          example: ACME-47DD-012-001
+        lago_customer_id:
+          type: string
+          format: uuid
+          description: Unique identifier of the customer, created by Nozle.
+          example: 00000000-0000-4000-8000-000000000003
+        external_customer_id:
+          type:
+            - string
+            - 'null'
+          description: The customer external unique identifier (provided by your own application).
+          example: customer_123
+        dunning_campaign_code:
+          type: string
+          description: Code of the dunning campaign the invoice follows (the plan's, else the customer's, its billing entity's, then the default billing entity's).
+          example: block_after_grace
+        step:
+          type: string
+          enum:
+            - payment_failed
+            - reminder
+            - final_reminder
+            - end_action
+            - resolved
+          description: 'The step that ran. `payment_failed` on day 0, `reminder` on round(grace × 3 / 7), `final_reminder` the day before the end, `end_action` on the last day, `resolved` once when the invoice no longer needs paying.'
+          example: reminder
+        day:
+          type: integer
+          description: Day of the timeline the step ran on, counted from `started_at`.
+          example: 3
+        grace_days:
+          type: integer
+          description: '`unpaid_invoice_grace_days` of the plan behind the invoice (7 for an invoice without a plan).'
+          example: 7
+        end_action:
+          type: string
+          enum:
+            - block
+          description: What happens on the last day of the grace. `block` refuses the customer's usage with `402` `customer_payment_overdue`.
+          example: block
+        started_at:
+          type: string
+          format: date-time
+          description: Day 0 of the invoice's timeline.
+          example: '2026-10-20T09:00:00Z'
+        deadline_at:
+          type: string
+          format: date-time
+          description: When the end action runs, `started_at` plus `grace_days`.
+          example: '2026-10-27T09:00:00Z'
+        next_action:
+          type:
+            - string
+            - 'null'
+          enum:
+            - reminder
+            - final_reminder
+            - end_action
+            - retry
+            - null
+          description: The next step of the timeline, a retry included. `null` after the last one and on `resolved`.
+          example: retry
+        next_action_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: When `next_action` runs.
+          example: '2026-10-25T09:00:00Z'
+        total_due_amount_cents:
+          type: integer
+          description: Amount still owed on the invoice, in cents.
+          example: 4900
+        currency:
+          $ref: '#/components/schemas/Currency'
+          description: Currency of the invoice.
+          example: USD
     EventErrorsObject:
       type: object
       required:
@@ -40312,7 +40647,7 @@ components:
           description: Whether the customer may use the feature now.
         reason:
           type: string
-          description: Denial code. Present only when `allowed` is `false`.
+          description: Denial code. Present only when `allowed` is `false`. `customer_payment_overdue` (Engine 2.22.0) comes with HTTP `402`, every other reason with `200`.
           enum:
             - feature_not_found
             - no_subscription
@@ -40320,6 +40655,7 @@ components:
             - no_entitlement
             - usage_limit_exceeded
             - economic_policy_denied
+            - customer_payment_overdue
         feature_type:
           type: string
           description: Feature type, such as `boolean`, `config` or `metered`. Absent when the feature or subscription is missing, and when a metered feature has neither an entitlement nor a charge.
@@ -41209,6 +41545,15 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/EngineError'
+    EngineCustomerPaymentOverdue:
+      description: 'Engine 2.22.0. `customer_payment_overdue`: the customer''s unpaid invoices are past the grace of their plan and their [dunning policy](/guides/billing/dunning) ends with `block`. Nothing is tracked and the provider is not called. Do not retry: the next request after the invoices are paid, voided or credited works. A suspended workspace gets `workspace_suspended` instead; see [Errors](/api/errors#workspace-billing-errors).'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/EngineError'
+          example:
+            code: customer_payment_overdue
+            error: "This customer's invoices are unpaid past their grace period. Usage resumes once they are paid."
     EngineUnavailable:
       description: A dependency is busy or unavailable. Retry after the Retry-After seconds when the header is present.
       content:

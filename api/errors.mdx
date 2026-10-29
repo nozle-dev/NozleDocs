@@ -12,7 +12,7 @@ description: HTTP errors, validation failures, and retry guidance
 | `401` | Missing or invalid credential. |
 | `403` | Credential lacks permission or a publishable key attempted a protected operation. |
 | `404` | Resource was not found within the authenticated organization. |
-| `402` | Your workspace is blocked by Nozle over a missing card or unpaid Nozle invoices: `card_required` or `workspace_suspended`. See [Workspace billing errors](#workspace-billing-errors). |
+| `402` | Payment required. `workspace_suspended` (or `card_required`): your workspace is blocked by Nozle, see [Workspace billing errors](#workspace-billing-errors). `customer_payment_overdue`: one of your customers is blocked by your dunning policy, see [Customer payment overdue](#customer-payment-overdue). |
 | `409` | Idempotency key or resource-state conflict, such as another checkout in progress. Reload the state, then retry. |
 | `422` | Request is syntactically valid but violates a product rule, or the resource's current state refuses it (for example a voided invoice). |
 | `429` | Request was rate limited. |
@@ -113,10 +113,11 @@ _Unreleased._ These errors are about your own workspace's account with Nozle, no
 
 | Status and `code` | What happened | What to do |
 |---|---|---|
-| `402` `card_required` | The workspace has no verified card. Dashboard, Core REST, account MCP, the Engine API with an API key, the LLM proxy and event ingestion are refused. | A member adds a card in the dashboard. Nothing is charged. The next request works. |
-| `402` `workspace_suspended` | Nozle invoices of your workspace stayed unpaid for 7 days after the first failed charge. Wins over `card_required` when both apply. | Do not retry blindly: every retry is refused until the invoices are paid. Pay the Nozle invoices (the **Nozle invoices** page or the link in the emails). The next request works again. |
+| `402` `workspace_suspended` | Nozle invoices of your workspace stayed unpaid until the end of the grace of your Nozle plan (7 days by default). Wins over `card_required` when both apply. | Do not retry blindly: every retry is refused until the invoices are paid. Pay the Nozle invoices (the **Nozle invoices** page or the link in the emails). The next request works again. |
+| `402` `card_required` | Nozle no longer asks for a card at onboarding and no longer sets this code. A workspace flagged before that change gets it until the flag is cleared at the release. | A member adds a card in the dashboard, or waits for the flag to be cleared. |
+| `422` `workspace_past_due` | A downgrade or a cancellation of your Nozle plan while a Nozle invoice is past due. Upgrades, paying and adding a payment method are allowed. Dashboard GraphQL carries it in `extensions.code`. | Pay the owed Nozle invoices, then change the plan. |
 
-Do not retry either error. The Nozle SDKs surface a `402` as their API error with `code` `workspace_suspended` or `card_required`, and never retry it.
+Do not retry either `402`. The Nozle SDKs surface a `402` as their API error with `code` `workspace_suspended` or `card_required`, and never retry it.
 
 Bodies by surface (`CODE` is `card_required` or `workspace_suspended`):
 
@@ -136,4 +137,18 @@ Texts:
 | Engine API and event ingestion | `Add a card to your Nozle workspace to use the API.` | `This workspace is suspended because its Nozle invoices are unpaid. Pay them to resume.` |
 | Account MCP | `Add a card to your Nozle workspace` | `Pay the Nozle invoices to unblock this workspace` |
 
-A refused event is not queued and is not billed later: see [what is lost](/guides/getting-started/workspace-billing#suspension-on-day-7).
+A refused event is not queued and is not billed later: see [what is lost](/guides/getting-started/workspace-billing#suspension).
+
+## Customer payment overdue
+
+_Unreleased (Engine 2.22.0, Core 11.19.0)._ The Engine answers `402` `customer_payment_overdue` for one of your customers whose unpaid invoices are past the grace of their plan, when the dunning campaign they follow ends with `block`. Your other customers are not affected. See [Dunning policy](/guides/billing/dunning).
+
+| Surface | Body |
+|---|---|
+| `GET /can` | `{"allowed": false, "reason": "customer_payment_overdue", "code": "customer_payment_overdue", "error": "<text>"}` |
+| `POST /usage/check`, `POST /usage/track`, LLM proxy | `{"code": "customer_payment_overdue", "error": "<text>"}` |
+| `POST /events` | `{"status": 402, "error": "<text>", "code": "customer_payment_overdue"}` |
+| `POST /events/batch`, every event refused | `{"status": 402, "error": "<text>", "code": "customer_payment_overdue", "error_details": {"<index>": {"external_customer_id": ["customer_payment_overdue"]}}}` |
+| `POST /events/batch`, some events refused | `200` with the stored `events` and the refused ones in `error_details`, keyed by index. |
+
+The text is `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` Do not retry: the block lifts on the next request after the invoices are paid, voided or credited. Refused events are not queued.

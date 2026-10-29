@@ -5,6 +5,21 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### No card at onboarding, plan grace days and the dunning policy (Core 11.15.4 to 11.19.0, Engine 2.22.0, dashboard 2.4.0, Node 0.23.0, React 0.24.0)
+
+_October 29, 2026_
+
+- **No card at onboarding.** A new workspace is not asked for a card. While no payment method can be charged, the usage notices (50%, 80%, 90%, 100%) ask you to add one, a daily reminder does from 50%, and overage is billed at the end of the billing period. `card_required` is no longer set. See [Workspace billing](/guides/getting-started/workspace-billing).
+- **Automatic upgrade at the MRR limit** runs with or without a payment method, and waits while a plan change checkout you started is open.
+- **Grace days on every plan.** `limit_grace_days` and `unpaid_invoice_grace_days`, 0 to 90, default 7 (`0` acts at once), in the REST plan payload, GraphQL and the plan form. Editing them never creates a plan version. Your workspace is suspended (`402` `workspace_suspended`) at the end of the grace of its Nozle plan instead of a fixed day 7. See [Grace days and dunning](/guides/billing/plans#grace-days-and-dunning).
+- **Retries on days 1 and 5 only**, and only after a soft decline. Payment emails state the real deadline and link to **Update card**. An "all good" email follows a paid past-due period.
+- **Past due:** upgrades, paying and adding a payment method stay allowed; downgrades and cancellations of your Nozle plan are refused with `422` `workspace_past_due`. See [Errors](/api/errors#workspace-billing-errors).
+- **Dunning policy for your customers.** A dunning campaign with the end action `block` runs a timeline over the plan's `unpaid_invoice_grace_days`, and a plan can point to its campaign (`dunning_campaign_code`). Customers carry `dunning_blocked_at`, `dunning_day` and `dunning_next_action_at`. New webhook `dunning.step` and customer email. See [Dunning policy](/guides/billing/dunning).
+- **`402` `customer_payment_overdue`.** The Engine refuses a blocked customer on `/can`, `/usage/check`, `/usage/track`, `/events` and the LLM proxy. `/events/batch` stores the other customers' events and lists the refused ones by index in `error_details`. See [Customer payment overdue](/api/errors#customer-payment-overdue).
+- **Node 0.23.0:** `can()` returns the overdue case as a denial, `isCustomerPaymentOverdue(error)`, and `refusedEventIndexes` for batches. **React 0.24.0:** `PaymentMethodDisplay` opens the hosted card page by default. See [Node.js errors](/sdks/node/errors#customer-payment-overdue) and [PaymentMethodDisplay](/sdks/react/components/payment-method-display).
+- **Indian cards (Core 11.15.4).** A card whose mandate ended (for example cancelled at the bank) no longer gets a second charge attempt, a mandate Nozle missed is looked up at the payment provider, and the dashboard hides **Pay now** while an automatic debit waits for the bank.
+- **Billing alignment** is documented: see [Subscriptions](/guides/billing/subscriptions#billing-alignment).
+
 ### Card page: Link recognises the customer, wallets (Core 11.15.0)
 
 _October 29, 2026_
