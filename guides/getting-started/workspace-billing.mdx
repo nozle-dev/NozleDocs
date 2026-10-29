@@ -1,53 +1,91 @@
 ---
 title: Workspace billing
-description: The card Nozle asks for at onboarding, automatic upgrades, failed payments, suspension on day 7 and how your workspace resumes
+description: No card at onboarding, usage notices, automatic upgrades, the grace before suspension, failed payments and how your workspace resumes
 ---
 
-This page is about what your workspace pays Nozle. It never touches how you bill your own customers. For prices, limits and what each plan includes, see [Nozle plans and pricing](/guides/getting-started/nozle-plans).
+This page is about what your workspace pays Nozle. It never touches how you bill your own customers (for that, see [Dunning policy](/guides/billing/dunning)). For prices, limits and what each plan includes, see [Nozle plans and pricing](/guides/getting-started/nozle-plans).
 
-Your [sandbox](/guides/getting-started/sandbox) is free on every plan and never billed. It follows your live workspace: when the workspace needs a card or is suspended, sandbox keys get the same `402`. Your plan, card and Nozle invoices are managed in live.
+Your [sandbox](/guides/getting-started/sandbox) is free on every plan and never billed. It follows your live workspace: when the workspace is suspended, sandbox keys get the same `402`. Your plan, payment method and Nozle invoices are managed in live.
 
 <Note>
-The card requirement, day-7 suspension, resume and catch-up billing are _Unreleased_ until deployed. So are the Nozle card page and automatic charges of Indian cards through a mandate (see [India cards](#india-cards)).
+No card at onboarding, the usage and payment method reminders, the per-plan grace, the retries on days 1 and 5 and the past-due rules are _Unreleased_ (Core 11.16.0 to 11.18.0, dashboard 2.4.0) until deployed. So are the Nozle card page and automatic charges of Indian cards through a mandate (see [India cards](#india-cards)).
 </Note>
 
-## Card at onboarding
+## No card at onboarding
 
-Every workspace adds a card before it can use Nozle, on every plan including the free Starter plan. There is no switch for this: it is always on.
+A new workspace is not asked for a card, on any plan. It starts on Starter and the dashboard is usable at once.
 
-- The card is verified on a page that offers cards only and explains that the card can be reused for later charges. Where Nozle's card page is enabled, that page is hosted by Nozle and uses Stripe's secure card fields; otherwise it is a Stripe-hosted page. **Nothing is charged** when you add it.
-- Any member of the workspace can add the card. Once it is saved, Nozle opens for everyone.
-- After the card, the AI onboarding opens. Until you have finished setting up, the dashboard shows one banner (verify your card, or finish setting up) instead of a checklist.
-- If you close the page after paying, or Stripe's notification is delayed or lost, Nozle checks with Stripe on its own when you return, or when you choose **Check again**. You are not asked for the card twice.
-- Existing workspaces without a card are flagged within the hour after the release and see the same step.
-- Nozle keeps only Stripe's identifiers and the status of the card. It never stores the card number, brand, expiry or any other card detail.
+- Adding a payment method stays available from the banner and under **Nozle invoices** (**Update card**). Nothing is charged when you add it.
+- While the workspace has no payment method Nozle can charge without a member, the dashboard shows an optional banner: the events used this period, that overage is billed at the end of the billing period, and a button to add one. A card issued in India without a usable mandate counts as no payment method. The dashboard reads this from GraphQL `workspaceBilling.paymentMethodMissing`.
+- Nozle keeps only the payment provider's identifiers and the status of the payment method. It never stores the card number, brand, expiry or any other card detail.
+- `402` `card_required` is no longer set. Workspaces flagged before this release are cleared when it is deployed. See [Errors](/api/errors#workspace-billing-errors).
 
-Without a verified card, the dashboard and every API key call are refused with `402` `card_required`: the dashboard, Core REST, account MCP tokens (also ones issued earlier), the Engine API (events, `/can`, plans, checkout, billing, credits), the LLM proxy and event ingestion. Add the card in the dashboard and the next request works. If the workspace is also suspended, `workspace_suspended` is answered instead. See [Errors](/api/errors#workspace-billing-errors).
+## Usage notices and the payment method reminder
+
+Every member gets an email when the workspace reaches 50%, 80%, 90% and 100% of its included events or of its MRR limit, once per threshold in each billing period (the highest threshold crossed).
+
+While no payment method can be charged:
+
+- Those notices end with **Add a payment method**. The events notices say that overage is billed only at the end of the billing period. The MRR notices say that at the limit the plan upgrades automatically, and that the upgrade's invoice must be paid or the workspace is paused once its grace ends.
+- From 50% of either limit, every member also gets a reminder to add a payment method once a day. It stops as soon as a payment method can be charged, and while the workspace is past due (the payment emails take over).
+
+## Overage
+
+Events over the included amount are never blocked and there is no grace at the moment you cross it. They are billed as overage at $0.04 per 1,000 events on the invoice at the end of the billing period. See [Events over the included amount](/guides/getting-started/nozle-plans#events-over-the-included-amount).
+
+If that invoice is paid (the saved payment method is charged), nothing else happens. If it stays unpaid, grace B starts (see below).
 
 ## Plan limits and automatic upgrade
 
-When your tracked MRR passes the limit of your plan, Nozle moves the workspace to the next plan now (Starter to Growth, Growth to Scale). The prorated difference goes on an invoice that is charged to your saved card and emailed to every member. Events over the included amount are never blocked: they are billed as overage at $0.04 per 1,000 events at the end of the month. See [MRR limit and automatic upgrade](/guides/getting-started/nozle-plans#mrr-limit-and-automatic-upgrade).
+When your tracked MRR passes the limit of your plan, Nozle moves the workspace to the next plan now (Starter to Growth, Growth to Scale), so your app is never blocked by the limit. See [MRR limit and automatic upgrade](/guides/getting-started/nozle-plans#mrr-limit-and-automatic-upgrade).
 
-If the charge for that invoice fails, the plan stays upgraded and the invoice follows the failed-payment steps below.
+- The upgrade runs with or without a payment method. The prorated difference goes on an invoice that is charged to your saved payment method, if any, and emailed to every member. Without one, the email gives the date by which the invoice must be paid.
+- **A manual upgrade wins.** While a plan change checkout of the workspace is open (pending, processing, or a charge in flight), the automatic upgrade waits. It runs at the next hourly check if that checkout ended without an upgrade and the limit is still exceeded.
+- On the top plan there is nothing to upgrade to: you get the notices only.
+- If the upgrade's invoice stays unpaid, grace A starts (see below). The plan stays upgraded.
+
+## Grace A and grace B
+
+Each Nozle plan holds two grace periods, in whole days:
+
+| Grace | Plan field | Starts when |
+|---|---|---|
+| A | `limit_grace_days` | The invoice of an automatic upgrade at the MRR limit is unpaid. |
+| B | `unpaid_invoice_grace_days` | Any other invoice, such as the invoice at the end of a billing period with overage, is unpaid. |
+
+Both are 7 days by default. The grace of the workspace's past-due period is the one of the plan behind its oldest owed invoice. At the end of the grace the workspace is suspended. Every email and banner states the real deadline. These are the same fields you set on your own plans: see [Grace days and dunning](/guides/billing/plans#grace-days-and-dunning).
 
 ## When a payment fails
 
-Day 0 is the first failed automatic charge of a Nozle invoice.
+Day 0 is the moment a Nozle invoice is unpaid: its automatic charge failed, or it stayed unpaid for one hour after it was issued (no payment method, or a charge that needs a member). A debit that is still processing (an Indian card during the bank's notice) is not a failure and does not start day 0. An invoice below the payment provider's minimum charge never makes the workspace past due: its amount is carried to the next Nozle invoice (see [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum)).
+
+With the default grace of 7 days:
 
 | Day | What happens |
 |---|---|
-| 0 | Every member gets an email with the amount due, the invoice numbers, the date access will be blocked and a **Pay** link. The dashboard shows a banner on every page. |
-| 1 to 6 | Nozle retries the charge once a day for each failed invoice. |
+| 0 | Every member gets an email with the amount due, the invoice numbers, the payment deadline, a **Pay** link and an **Update card** link. The dashboard shows a banner on every page with the amount and the deadline. |
+| 1 | Nozle retries each failed charge once, only if the failure may succeed later (a soft decline). |
 | 3 | Reminder email to every member. |
-| 6 | Last reminder email: access is blocked tomorrow. |
-| 7 | The workspace is suspended if the invoices are still unpaid. Every member gets an email. |
+| 5 | Second and last retry, on the same rule. |
+| 6 | Final reminder with the deadline. |
+| 7 | The workspace is suspended if anything is still owed. Every member gets the "service paused" email. |
 
-- The **Pay** link in each email needs no login. It opens a hosted payment page for the amount due now. Every click opens a new page, so the amount is always current.
+For another grace, the reminder falls on `round(grace × 3 / 7)`, the final reminder on the day before the end, and the suspension on the last day. Retries stay on days 1 and 5 when they fall before the end. A grace of 0 suspends on day 0. Each email is sent once per past-due period, so a grace changed while the workspace is past due never skips a step.
+
+- The **Pay** link in each email needs no login. It opens a hosted payment page for the amount due now. Every click opens a new page, so the amount is always current. It works for a workspace that never added a card.
+- While an automatic debit of an invoice is waiting for the bank, paying that invoice is refused with `payment_already_processing`, so it is not charged twice. **Nozle invoices** shows **Debit in progress** instead of **Pay** on that invoice, and the banners drop their **Pay now** link.
 - The banner can be dismissed and comes back after 3 hours.
 - Any member can pay under **Nozle invoices** in the dashboard.
-- Adding or changing the card retries the charge at once. If nothing is owed any more, the cycle ends and the banner disappears.
-- Paying before day 7 means the workspace is never suspended.
-- The **Pay** link opens the Nozle card page in pay mode when the workspace card is handled by Nozle's card page: you pay the invoice there and, for a card issued in India, the bank registers the mandate in the same step. Otherwise it opens Stripe's hosted page.
+- Adding or changing the payment method retries the charge at once. If nothing is owed any more, the cycle ends and the banner disappears.
+- Paying before the deadline means the workspace is never suspended.
+- The **Pay** link opens the Nozle card page in pay mode when the workspace card is handled by Nozle's card page: you pay the invoice there and, for a card issued in India, the bank registers the mandate in the same step. Otherwise it opens the payment provider's hosted page.
+
+## While past due
+
+While a Nozle invoice is past due:
+
+- **Allowed:** upgrading the plan (also while an invoice of the plan is owed), paying, and adding or changing the payment method.
+- **Refused:** every way to downgrade or cancel the Nozle plan, with the code `workspace_past_due` (HTTP `422`, or GraphQL `extensions.code`): a downgrade now or scheduled for the end of the period, a downgrade checkout, its plan change preview, and cancelling. The plan change dialog says to pay the invoice first, with a **Pay now** link. A move to another version of the same plan is not a downgrade and goes on. See [Errors](/api/errors#workspace-billing-errors).
 
 ## Banners and emails about payments
 
@@ -62,24 +100,25 @@ Core tells the dashboard when to show each of these, read live from the payment 
 
 ### What a failed payment asks of you
 
-The first failed-payment email and the reminder on day 3 say what to do, based on why the latest failed charge failed (Stripe's error and decline codes, never the message text). The dashboard reads the same outcome in the GraphQL field `workspaceBilling.failureAction` (`CONFIRM_PAYMENT`, `CHANGE_CARD` or `RETRY_LATER`), which is `null` unless the status is `past_due`. The banner copy follows it.
+The first failed-payment email and the reminder on day 3 say what to do, based on why the latest failed charge failed (the payment provider's structured error and decline codes, never the message text). The dashboard reads the same outcome in the GraphQL field `workspaceBilling.failureAction` (`CONFIRM_PAYMENT`, `CHANGE_CARD`, `RETRY_LATER` or `ADD_PAYMENT_METHOD`), which is `null` unless the status is `past_due`. The banner copy follows it.
 
 | `failureAction` | What happened | What the email and banner say |
 |---|---|---|
 | `CONFIRM_PAYMENT` | Your bank asked you to confirm the payment (authentication needed, or the India mandate is missing, cancelled or not approved). | "Your bank asked you to confirm this payment". Use **Pay now** to confirm it with your bank. Nozle does not retry it: nothing happens until a member pays. |
 | `CHANGE_CARD` | The card will not work for this invoice (for example lost, stolen or expired). | "This card could not be charged". Use **Change card** to pay with another card. Nozle does not retry it. |
-| `RETRY_LATER` | The card may work later (for example insufficient funds). | "Declined or needs your approval". Nozle retries the card once a day until day 6, and you can pay at any time. |
+| `RETRY_LATER` | The card may work later (for example insufficient funds). | "Declined or needs your approval". Nozle retries the card on days 1 and 5 (before the deadline), and you can pay at any time. |
+| `ADD_PAYMENT_METHOD` | No payment failed: the workspace has no payment method Nozle can charge (_Unreleased_). | Pay with the **Pay** link, or add a payment method. Nothing says a card was declined. |
 
-The last reminder (day 6) and the suspension email do not promise a retry in any case.
+The final reminder and the suspension email do not promise a retry in any case.
 
 Emails to every member:
 
 - **Approval requested.** When a Nozle invoice is charged to an India card and the bank asks for your approval, one email gives the amount, the invoice number, the deadline and the **Pay** link. Approve at the bank, or pay with the link.
 - **Upcoming automatic payment.** "We plan to charge ... on the date", with a **Pay now** button, once per planned debit time. If the plan is cancelled, a second email says the charge will not happen.
 
-## Suspension on day 7
+## Suspension
 
-When the Nozle invoices are still unpaid 7 days after the first failed charge, Nozle suspends the workspace. A suspended workspace answers `402` with the code `workspace_suspended`, also when it has no card.
+When the Nozle invoices are still unpaid at the end of the grace (7 days by default, see [Grace A and grace B](#grace-a-and-grace-b)), Nozle suspends the workspace. A suspended workspace answers `402` with the code `workspace_suspended`.
 
 **What stops:**
 
@@ -98,7 +137,7 @@ When the Nozle invoices are still unpaid 7 days after the first failed charge, N
 
 While suspended, the renewals of your own customers and the finalization of their draft invoices are paused. Dunning, credit top-ups, trials, overdue marking and your outgoing webhooks keep running.
 
-**What is lost:** events sent during the suspension are refused with `402`. They are not queued and cannot be billed afterwards. Keep your own copy if you need to resend them. If you want your app to keep working while Nozle is blocked, decide that in your own code. The Nozle SDKs throw their API error with `code` `workspace_suspended` (or `card_required`) and never retry a `402`. See [The can() endpoint](/guides/entitlements/can-endpoint#unavailable-or-blocked).
+**What is lost:** events sent during the suspension are refused with `402`. They are not queued and cannot be billed afterwards. Keep your own copy if you need to resend them. If you want your app to keep working while Nozle is blocked, decide that in your own code. The Nozle SDKs throw their API error with `code` `workspace_suspended` and never retry a `402`. See [The can() endpoint](/guides/entitlements/can-endpoint#unavailable-or-blocked).
 
 ## Resume
 
@@ -106,11 +145,11 @@ The workspace resumes the moment the owed Nozle invoices are all paid. Paying on
 
 Then Nozle catches up on your own customers: it bills the time that was paused, using the original billing periods, so customers get the invoices they would have had and no period is skipped or billed twice. Expect a burst of invoices to your customers, sent in one go. Then it checks your usage limits again.
 
-No separate email confirms the resume.
+Once nothing is owed any more after a past-due period (paid, a payment method that could be charged, a credit), every member gets one "all good" email. A suspended workspace gets the "service resumed" wording.
 
 ## Change the card
 
-Use **Change card** in the dashboard. It opens the card page, or the Stripe billing portal on the payment method screen only. When you are done, you return to the dashboard. A new card retries any owed invoice at once.
+Use **Change card** in the dashboard. It opens the card page, or the payment provider's billing portal on the payment method screen only. When you are done, you return to the dashboard. A new card retries any owed invoice at once.
 
 ## India cards
 
@@ -119,4 +158,4 @@ Cards issued in India can be charged automatically after a one-time approval at 
 - **Bills up to about INR 15,000.** Charged automatically. The bank sends a notice 24 hours before the debit, so the payment stays **processing** for up to 26 hours. A processing payment does not start the failed-payment steps above.
 - **Bills above about INR 15,000** (or above the mandate maximum, whichever is lower) need your approval each time: approve the bank's notice before the debit, or the charge is declined. Use the **Pay** link in the email if you prefer to pay on the hosted page.
 - **Cards saved before the card page**, and cards whose mandate the bank refused or cancelled, have no active mandate. Their invoices are paid on the hosted **Pay** link or under **Nozle invoices**, as before. Add the card again to register a mandate. Paying through the **Pay** link registers one too when the card was issued in India (_Unreleased_).
-- **When a charge fails** for a reason that retrying cannot fix (the bank needs you to act, the mandate is missing or cancelled, or the card is lost or expired), Nozle does not retry it daily: every member gets the **Pay** link at once and the failed-payment steps above still apply.
+- **When a charge fails** for a reason that retrying cannot fix (the bank needs you to act, the mandate is missing or cancelled, or the card is lost or expired), Nozle does not retry it: every member gets the **Pay** link at once and the failed-payment steps above still apply.

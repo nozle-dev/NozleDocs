@@ -34,7 +34,7 @@ Not every local failure is typed. `Meter` with 0 or more than 100 events returns
 
 ## Workspace blocked (`402`)
 
-Your workspace answers HTTP `402` when it has no verified card (`card_required`) or when its Nozle invoices stayed unpaid for 7 days (`workspace_suspended`). See [Workspace billing errors](/api/errors#workspace-billing-errors). Do not retry: the SDK never retries a `402`, and every retry is refused until a member adds a card or pays the Nozle invoices. Calls work again at once afterwards. Events sent while blocked are refused, not queued.
+Your workspace answers HTTP `402` `workspace_suspended` when its Nozle invoices stayed unpaid past the grace of your Nozle plan (7 days by default). `card_required` is only for a workspace still flagged from before Nozle stopped asking for a card at onboarding. See [Workspace billing errors](/api/errors#workspace-billing-errors). Do not retry: the SDK never retries a `402`, and every retry is refused until a member adds a card or pays the Nozle invoices. Calls work again at once afterwards. Events sent while blocked are refused, not queued. A customer blocked by your [dunning policy](/guides/billing/dunning) gets `402` `customer_payment_overdue` instead; this SDK raises it as the same API error with that `code`.
 
 ```go
 var apiErr *nozle.APIError

@@ -42,6 +42,12 @@ Every Stripe checkout is a Stripe-hosted Checkout Session: a new subscription's 
 
 Credit top-ups and invoice payment URLs also open a Stripe-hosted page, valid for 24 hours.
 
+From Core 11.16.0 (_Unreleased_):
+
+- **Only the customer's payment methods.** The hosted page of an invoice offers only the payment methods set on the customer (`provider_payment_methods`), like the pay link and the automatic charge. It no longer offers every method of your Stripe account, so a customer cannot pay with one (Cash App, Klarna...) that a renewal could never charge again.
+- **A card saved while paying is recorded.** When the customer pays on Stripe Checkout and the card is saved for later (an invoice pay link, a subscription or a plan change checkout), Nozle records it as the customer's payment method, like a card saved on the card page, with the India mandate when the charge carries one. Renewals then charge it automatically, and [`PaymentMethodDisplay`](/sdks/react/components/payment-method-display) shows it.
+- **Return URL of a pay link.** GraphQL `generatePaymentUrl(returnUrl:)` and REST [`POST /invoices/{id}/payment_url`](#pay-links) take an optional return URL: where the provider sends the customer after paying (Stripe success and cancel URL, Razorpay payment link callback). The Node SDK's `checkoutInvoice(invoiceId, { returnUrl })` sends it from 0.23.0. An invoice checkout given a return URL no longer reuses an open Checkout Session that returns elsewhere.
+
 A card issued in India needs an e-mandate before Nozle can charge it automatically, and Stripe Checkout cannot register one. A first payment through Stripe Checkout therefore leaves an Indian card without a mandate: the customer pays that first invoice by hand and later invoices use the hosted page until a card is saved on Nozle's card page. With a publishable key, the invoice pay link of a customer from India opens the card page too, so paying through it registers the mandate. When the Stripe connection has a publishable key, card setup links (not checkout) open that Nozle-hosted page and return the customer to the return URL with `nozle_card=succeeded`, `processing` or `failed`. See [Indian cards and automatic payments](/integrations/stripe#indian-cards-and-automatic-payments).
 
 ### Card page in your app
@@ -101,6 +107,24 @@ The nested `checkout` of the status response is present while the checkout is `a
 To retry a new-subscription checkout, call checkout again for the same plan: while the first order is unpaid it returns that same order. The React "Payment failed. You can retry checkout." button does this. See [Retry a new-subscription checkout](/integrations/razorpay#retry-a-new-subscription-checkout).
 
 `POST /checkout` never returns `type: "hosted"` for Razorpay. A Razorpay payment link comes from an invoice payment URL (`POST /invoices/{id}/payment_url`) or a credit top-up purchase, as an `rzp.io` `payment_url` with no checkout ID to poll. Redirect the customer to it; the `payment_link.paid` webhook settles it.
+
+## Pay links
+
+A pay link pays one invoice. Create it with `POST /invoices/{id}/payment_url` (REST), `generatePaymentUrl` (GraphQL) or, through the Engine, `POST /checkout` with `invoice_id` (the Node SDK's `checkoutInvoice`).
+
+```json
+{
+  "return_url": "https://app.example.com/billing/paid"
+}
+```
+
+`return_url` is optional and validated like every checkout return URL (see [Return URLs](#return-urls-and-your-organizations-origins)); a refused one answers `422` `return_url: [invalid_or_untrusted]`. Without it, the customer stays on the provider's page after paying. An unexpired pay link keeps the return URL it was created with.
+
+A pay link is refused with `422` and `error_details.base`:
+
+- `payment_already_processing` while an automatic debit of the invoice is waiting for the bank (for example an Indian card during the bank's notice), so the customer is not charged twice. Wait for the debit's outcome.
+- `invoice_carried_forward` when the amount due is below the provider's minimum charge and was carried to the next invoice. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
+- `invalid_invoice_status_or_payment_status` when the invoice is paid, voided, draft, closed, failed or has nothing due.
 
 ## API shape
 

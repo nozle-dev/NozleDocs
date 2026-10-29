@@ -55,7 +55,7 @@ import {
 
 ## Rendering PaymentMethodDisplay
 
-Pass the card and a handler for the update button:
+Inside a `BillingProvider` configured with `createManagePaymentMethod`, pass the card: the update button opens the hosted card page (React 0.24.0). To run your own flow instead, pass a handler for the update button:
 
 ```tsx components/saved-card.tsx
 const card: PaymentMethod = { brand: 'visa', last4: '4242', expMonth: 8, expYear: 2029 }
@@ -112,21 +112,22 @@ export function NoCard() {
 </ResponseField>
 
 <ResponseField name="onUpdatePaymentMethod" type="() => void">
-  Fires when "Update Payment Method" is clicked.
+  Fires when "Update Payment Method" is clicked, instead of the default card flow.
 </ResponseField>
 
 <ResponseField name="updateHref" type="string" default="/billing/update-payment">
-  Without `onUpdatePaymentMethod`, the button opens this URL in the same window.
+  Without `onUpdatePaymentMethod` and outside a `BillingProvider` with `createManagePaymentMethod`, the button opens this URL in the same window.
 </ResponseField>
 
-<Warning>
-  The default `/billing/update-payment` is a path in your own app. If your app has no page there, the click only reloads your app. Pass `onUpdatePaymentMethod`, or `updateHref`, so the button reaches your card flow. For the Nozle card page, call `managePaymentMethod(returnUrl)` from `useManagePaymentMethod()` in the handler:
+<Note>
+  From React 0.24.0 (_Unreleased_), the button opens the hosted card page by default. What a click does, in order:
 
-  ```tsx
-  const { managePaymentMethod } = useManagePaymentMethod();
-  <PaymentMethodDisplay paymentMethod={card} onUpdatePaymentMethod={() => managePaymentMethod(window.location.href)} />
-  ```
-</Warning>
+  1. `onUpdatePaymentMethod`, when you pass it.
+  2. Inside a `BillingProvider` with `createManagePaymentMethod`: `useManagePaymentMethod()` asks your backend for the card page ([Manage payment method](/api/manage-payment-method)) and opens it, returning to the current page. The button shows "Loading..." while the request runs, and the error message below it if the request fails.
+  3. Otherwise: `updateHref`. The default `/billing/update-payment` is a path in your own app; if your app has no page there, the click only reloads your app.
+
+  Before 0.24.0 only steps 1 and 3 exist: call `managePaymentMethod(window.location.href)` from `useManagePaymentMethod()` in `onUpdatePaymentMethod` to reach the card page.
+</Note>
 
 <ResponseField name="appearance" type="Appearance">
   Theme, variables and element overrides on top of the provider's. See [Appearance](/sdks/react/styling).
@@ -138,6 +139,8 @@ export function NoCard() {
 |---|---|
 | Card passed | Brand, `•••• <last4>`, `Expires MM/YY` and the update button. |
 | No `paymentMethod` | "No payment method on file." and the update button. |
+| Card page requested (0.24.0) | The button reads "Loading..." and is disabled. |
+| Card page request failed (0.24.0) | The error message below the button. |
 
 ### Appearance
 

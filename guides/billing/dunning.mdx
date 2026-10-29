@@ -1,0 +1,130 @@
+---
+title: Dunning policy
+description: Grace, retries, reminders and the block of a customer whose invoices stay unpaid
+---
+
+_Unreleased (Core 11.16.0, Engine 2.22.0)._ A dunning policy decides what happens to one of your customers while an invoice stays unpaid: when Nozle retries the charge, when it reminds the customer, and what it does when the grace ends. This page is about your customers. For what your own workspace pays Nozle, see [Workspace billing](/guides/getting-started/workspace-billing).
+
+Automatic dunning is part of the Growth, Scale and Enterprise [Nozle plans](/guides/getting-started/nozle-plans#premium-features). On Starter the dashboard's dunning pages say that dunning is not on your plan, with a link to the plans. A customer excluded from dunning is never dunned.
+
+## Turn the policy on
+
+A policy is a dunning campaign with an **end action**. Today the only end action is `block`: once the grace of an unpaid invoice ends, the customer's usage is refused until the invoice is paid.
+
+- A campaign without an end action keeps the attempt cadence it has today (days between attempts, maximum attempts). Nothing changes for it.
+- Set the end action in the dashboard on the campaign's **End action** (**Classic cadence** or **Block after the plan's grace**), or with the GraphQL field `endAction` (`DunningCampaignEndActionEnum`, value `block`) on `createDunningCampaign` or `updateDunningCampaign`. `null` (the default, **Classic cadence**) means no policy.
+- The grace comes from the plan: `unpaid_invoice_grace_days`, 0 to 90 days, 7 by default. See [Grace days on a plan](/guides/billing/plans#grace-days-and-dunning).
+
+### Which campaign an invoice follows
+
+Each unpaid invoice follows the first campaign found in this order:
+
+1. The campaign of the plan behind the invoice (`dunning_campaign_code` on the plan).
+2. The campaign applied to the customer.
+3. The campaign applied to the customer's billing entity.
+4. The campaign of your default billing entity.
+
+The policy applies when that campaign has an end action. A customer with several subscriptions has one timeline per unpaid invoice, each with the grace of the plan behind that invoice. An invoice without a plan uses 7 days. The invoice of a plan change bills the replaced plan and the new one: it follows the campaign and grace of the new plan.
+
+An invoice whose amount due is below the payment provider's minimum charge is never dunned: its amount is carried to the customer's next invoice. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
+
+## The timeline
+
+Day 0 of an invoice is the day its charge failed, or the moment it is past its due date and has stayed unpaid for one hour without a charge waiting for the bank. A debit that is still processing (for example an Indian card during the bank's notice) is not a failure and does not start day 0.
+
+With the default grace of 7 days:
+
+| Day | Step |
+|---|---|
+| 0 | `payment_failed`: webhook, and the customer email when it is on (it replaces the failed payment email, see [Customer emails](#customer-emails)). |
+| 1 | Retry the charge, only after a soft decline. |
+| 3 | `reminder`. |
+| 5 | Retry the charge, only after a soft decline. |
+| 6 | `final_reminder`, with the deadline. |
+| 7 | `end_action`: the customer is blocked. |
+| Any day | `resolved` once the invoice no longer needs paying. The block lifts at once. |
+
+For another grace, the reminder falls on `round(grace × 3 / 7)`, the final reminder on the day before the end, and the end action on the last day. Retries stay on days 1 and 5 when they fall before the end. With a grace of 0, day 0 runs the end action at once.
+
+Nozle never retries a charge that cannot succeed without the customer: an authentication request, no usable mandate, an amount above the mandate's ceiling, or no payment method at all. It never retries a hard decline either (for example a lost, stolen or expired card). Failures are classified from the payment provider's structured decline codes, never from message text. When the customer saves a new valid default payment method, every invoice of that customer the policy runs on is retried at once, and the block lifts as soon as they are paid. An Indian card whose mandate becomes inactive does not trigger this retry.
+
+## What resolves it
+
+The block clears as soon as no invoice past its grace is owed and not being debited:
+
+- the invoice is paid (pay link, a retry, a new payment method),
+- it is voided or covered by a credit note,
+- or an automatic debit of it is in flight (the block comes back if that debit fails).
+
+The `resolved` step is sent once the invoice no longer needs paying.
+
+## The blocked customer
+
+While blocked, the Engine refuses the customer with HTTP `402` and the code `customer_payment_overdue`. The customer is matched by `external_customer_id` or by the external id of its subscription. The state is read on every request, so paying lifts the block on the next call.
+
+| Route | What the customer gets |
+|---|---|
+| `GET /can` | `402` `{"allowed": false, "reason": "customer_payment_overdue", "code": "customer_payment_overdue", "error": "..."}`. Checked once the customer's subscription is found. |
+| `POST /usage/check`, `POST /usage/track` | `402` `{"code": "customer_payment_overdue", "error": "..."}`. Nothing is tracked. |
+| `POST /events` | `402` `{"status": 402, "error": "...", "code": "customer_payment_overdue"}`. The event is not stored. |
+| `POST /events/batch` | See [Batches](#batches). |
+| LLM proxy (`/proxy/openai/*`, `/proxy/anthropic/*`) | `402` in the error shape of the provider, with `code` `customer_payment_overdue` in `error.code` and at the top level, for the `X-Nozle-Customer-Id` customer, before the provider is called. See [LLM proxy errors](/api/llm-proxy#errors). |
+
+Events refused while the customer is blocked are not queued. Your app decides what the customer sees: the Node SDK returns `can()` as a denial with `reason: "customer_payment_overdue"`, so you can show a "pay your invoice" screen instead of an error. See [Node.js errors](/sdks/node/errors#customer-payment-overdue).
+
+### Batches
+
+An events batch is not refused as a whole because one customer is blocked.
+
+- First, every event is validated. Any invalid event fails the whole batch with `422` `validation_errors`, as before.
+- Then the events of blocked customers are set aside. The other events are stored and returned in `events` with `200`. The refused ones are listed by their position in the request under `error_details`:
+
+```json
+{
+  "events": [ ... ],
+  "error_details": {
+    "2": { "external_customer_id": ["customer_payment_overdue"] }
+  }
+}
+```
+
+- When every event of the batch is refused, the answer is `402` with `code` `customer_payment_overdue` and the same `error_details`, and nothing is stored.
+
+### Where the policy stands
+
+The customer shows where its timeline is, in the REST customer object (and so in the `customer.*` webhooks) and in the GraphQL `Customer` type:
+
+| Field | Meaning |
+|---|---|
+| `dunning_blocked_at` | When the customer was blocked. `null` when it is not. |
+| `dunning_day` | The day of the timeline that the furthest unpaid invoice is on. `null` without a dunned invoice. |
+| `dunning_next_action_at` | When the next step runs, a retry included (only after a soft decline). `null` when none is planned. |
+
+They are updated each time the policy runs: every hour, when a dunned invoice changes and when a payment method is saved. The customer page of the dashboard shows the block (**Usage blocked for unpaid invoices**) or the dunning day and the next step (**In dunning**).
+
+## The `dunning.step` webhook
+
+Each step sends `dunning.step` (object key `dunning_step`). It carries the invoice and customer identifiers and:
+
+| Field | Meaning |
+|---|---|
+| `invoice_number` | Number of the unpaid invoice. |
+| `external_customer_id` | Your id of the customer. |
+| `dunning_campaign_code` | The campaign the invoice follows. |
+| `step` | `payment_failed`, `reminder`, `final_reminder`, `end_action` or `resolved`. |
+| `day` | The day of the timeline the step ran on. |
+| `grace_days` | The grace of the plan behind the invoice. |
+| `end_action` | `block`. |
+| `started_at` | Day 0 of the invoice. |
+| `deadline_at` | When the end action runs: `started_at` plus `grace_days`. |
+| `next_action` | The next step (`reminder`, `final_reminder`, `end_action` or `retry`). `retry` only when the last decline is retried (a soft decline); after a hard decline or one that needs the customer, the next message step. `null` after the last one and on `resolved`. |
+| `next_action_at` | When `next_action` runs. |
+| `total_due_amount_cents`, `currency` | What is still owed on the invoice. |
+
+`resolved` is sent once, when a dunned invoice no longer needs paying. `dunning_campaign.finished` is unchanged and still belongs to campaigns without an end action. See the [full payload](/api/webhook-events#dunningstep).
+
+## Customer emails
+
+The billing entity email `dunning.step` (off until you turn it on, in the entity's `email_settings`) sends the customer one email per step, in your brand, with the amount, the invoice number, the deadline and the pay link. The wording escalates from the failed payment to the final reminder and the block. See [Customer emails](/guides/settings/customer-emails).
+
+The customer gets one email on day 0, not two: when `dunning.step` is on, the failed payment email (`invoice.payment_failure`) is not sent for an invoice a dunning policy runs on. It is still sent for other invoices, and the `invoice.payment_failure` webhook is unchanged.

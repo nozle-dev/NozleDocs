@@ -23,6 +23,36 @@ The list holds the invoices Core's API shows, other than drafts, so `status` is 
 4. Verified payment events update invoice and subscription state.
 5. The invoice PDF becomes available for customer delivery.
 
+## Amounts below the provider minimum
+
+_Unreleased (Core 11.16.0)._ A payment provider refuses a charge below its minimum. When an invoice's amount due is above zero but below the minimum of the customer's payment provider, Nozle does not charge it and does not dun it. Like Stripe Billing, it carries the amount to the customer's next invoice in the same currency.
+
+| Provider | Minimum charge |
+|---|---|
+| Stripe | Stripe's documented minimum per currency, for example USD 0.50, EUR 0.50, GBP 0.30, INR 0.50, AUD 0.50, CAD 0.50, JPY 50, MXN 10.00, HUF 175. See [Stripe's minimum charge amounts](https://docs.stripe.com/currencies#minimum-and-maximum-charge-amounts). A currency Stripe does not list is not checked. |
+| Razorpay | INR 1.00. |
+
+The small invoice:
+
+- is settled by the carry: `payment_status` becomes `succeeded` and `total_due_amount_cents` `0`, with the `invoice.payment_status_updated` webhook. It never makes the customer past due, overdue or dunned.
+- shows `carried_forward_amount_cents` (the amount carried) and `carried_forward_invoice_id` (the invoice that took it, `null` until the customer's next invoice is finalized).
+
+The next invoice:
+
+- adds the carried amount to its total after taxes, since the small invoice already charged its taxes.
+- shows `carried_in_amount_cents` and `carried_in_invoices`, a list of `nozle_id`, `number` and `amount_cents` of each earlier invoice carried into it. The PDF has a line `Balance carried forward from invoice <number>`.
+- is carried again when the sum is still below the minimum, until it can be charged.
+
+If the invoice that took a carried amount is voided, the amount moves on to the following invoice. Credit top-ups and self-billed invoices are never carried, and neither is an invoice of a customer without a payment provider or with a payment still processing.
+
+The fields are in the REST invoice object and the invoice webhooks, and in the GraphQL `Invoice` type (`carriedForwardAmountCents`, `carriedForwardInvoiceId`, `carriedInAmountCents`, `carriedInInvoices`).
+
+Where the amount is carried instead of charged:
+
+- **Pay links and invoice checkout** answer `422` with `error_details.base` `invoice_carried_forward` instead of a payment page the provider would refuse.
+- **Payment requests** (dunning, or created through the API or the dashboard) carry their invoices below the minimum and ask for the others. When none is left, `POST /payment_requests` answers `422` `invoices_carried_forward` and nothing is created.
+- **Automatic charges** and retries carry the invoice instead of failing with `amount_below_provider_minimum`.
+
 ## React applications
 
 The current React SDK does not fetch customer invoices. Expose a narrow merchant endpoint and render the returned fields in your application.

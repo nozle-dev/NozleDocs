@@ -94,6 +94,7 @@ An endpoint with no `event_types` receives every type, and gets every type Nozle
 | Event | Object key | When it fires |
 |---|---|---|
 | `dunning_campaign.finished` | `dunning_campaign` | A dunning campaign has run its last attempt for a customer. |
+| `dunning.step` | `dunning_step` | A step of the [dunning policy](/guides/billing/dunning) ran for an unpaid invoice of a customer, or the invoice no longer needs paying (`resolved`). |
 
 ### Event Ingestion
 
@@ -292,6 +293,34 @@ Sent once per [paid top-up](/guides/credits/top-ups) purchase, when the credits 
     "payment_url": null,
     "replayed": false,
     "created_at": "2026-10-27T14:12:01Z"
+  }
+}
+```
+
+### `dunning.step`
+
+_Unreleased (Core 11.16.0)._ Sent for each step of the [dunning policy](/guides/billing/dunning) of an unpaid invoice: `payment_failed` on day 0, `reminder`, `final_reminder`, `end_action` on the last day of the grace, and `resolved` once when the invoice no longer needs paying. Only campaigns with an end action send it; `dunning_campaign.finished` is unchanged for the others. `next_action` is the next step of the timeline (`retry` included) and is `null` after the last one and on `resolved`. The invoice and customer ids are left out of this example; the Dunning Campaigns webhook reference lists every key.
+
+```json
+{
+  "webhook_type": "dunning.step",
+  "object_type": "dunning_step",
+  "organization_id": "00000000-0000-4000-8000-000000000001",
+  "livemode": true,
+  "dunning_step": {
+    "invoice_number": "ACME-47DD-012-001",
+    "external_customer_id": "customer_123",
+    "dunning_campaign_code": "block_after_grace",
+    "step": "reminder",
+    "day": 3,
+    "grace_days": 7,
+    "end_action": "block",
+    "started_at": "2026-10-20T09:00:00Z",
+    "deadline_at": "2026-10-27T09:00:00Z",
+    "next_action": "retry",
+    "next_action_at": "2026-10-25T09:00:00Z",
+    "total_due_amount_cents": 4900,
+    "currency": "USD"
   }
 }
 ```

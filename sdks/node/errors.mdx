@@ -46,7 +46,7 @@ The message keeps the `<operation> failed: <status> <status text>` form, and the
 
 ## Workspace blocked (`402`)
 
-Your workspace answers HTTP `402` when it has no verified card (`card_required`) or when its Nozle invoices stayed unpaid for 7 days (`workspace_suspended`). See [Workspace billing errors](/api/errors#workspace-billing-errors). Do not retry: the SDK never retries a `402`, and every retry is refused until a member adds a card or pays the Nozle invoices. Calls work again at once afterwards. Events sent while blocked are refused, not queued.
+Your workspace answers HTTP `402` `workspace_suspended` when its Nozle invoices stayed unpaid past the grace of your Nozle plan (7 days by default). `card_required` is only for a workspace still flagged from before Nozle stopped asking for a card at onboarding. See [Workspace billing errors](/api/errors#workspace-billing-errors). Do not retry: the SDK never retries a `402`, and every retry is refused until a member pays the Nozle invoices. Calls work again at once afterwards. Events sent while blocked are refused, not queued.
 
 ```ts
 try {
@@ -60,6 +60,33 @@ try {
   }
 }
 ```
+
+## Customer payment overdue
+
+_Unreleased (0.23.0, needs Engine 2.22.0)._ One of your customers whose unpaid invoices are past the grace of their plan is blocked by your [dunning policy](/guides/billing/dunning) with HTTP `402` `customer_payment_overdue`. This is about that customer, not your workspace.
+
+- `can()` does not throw. It returns `{ allowed: false, reason: 'customer_payment_overdue', used: 0, limit: null, remaining: null }`, so you can ask the customer to pay. `createBillingHandler`'s entitlement route, and so React `useEntitlement`, returns the same denial as data.
+- `track()`, `usage.check()` and `usage.track()` throw `NozleApiError` with `code` `customer_payment_overdue` (the `CUSTOMER_PAYMENT_OVERDUE` constant). Nothing is tracked.
+- `isCustomerPaymentOverdue(error)` is `true` for that `NozleApiError`, and for the LLM proxy's `402` surfaced by a provider SDK that keeps the response body (`status` 402 with `code` or `error.code`). From Engine 2.22.0 the proxy answers in the provider's error shape, so the OpenAI and Anthropic SDKs surface `error.code`; see [LLM proxy errors](/api/llm-proxy#errors). `NozleApiError.message` reads the proxy's nested `error.message` too.
+- `/events/batch`: a partial batch is a `200` that stores the other customers' events and lists the refused ones by position in `error_details` (`EventBatchResponse`). `refusedEventIndexes(body.error_details, CUSTOMER_PAYMENT_OVERDUE)` returns those positions in ascending order. When every event is refused the batch answers `402` and stores nothing; `error.refusedEventIndexes(CUSTOMER_PAYMENT_OVERDUE)` lists them on the `NozleApiError`.
+
+```ts
+import { CUSTOMER_PAYMENT_OVERDUE, isCustomerPaymentOverdue } from '@nozle-js/node'
+
+const decision = await nozle.can('customer_123', 'api_calls')
+if (!decision.allowed && decision.reason === CUSTOMER_PAYMENT_OVERDUE) {
+  // Show "pay your invoice" with a link to your billing page.
+}
+
+try {
+  await nozle.track('customer_123', 'api_calls', { tokens: 100 })
+} catch (error) {
+  if (!isCustomerPaymentOverdue(error)) throw error
+  // The event was refused and is not queued.
+}
+```
+
+Other `402`s (`workspace_suspended`, `card_required`) still throw from `can()`.
 
 ## Branch on the status
 

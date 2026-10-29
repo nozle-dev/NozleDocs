@@ -120,15 +120,50 @@ Engine finds the subscription to bill before it calls the provider. Without `X-N
 
 These come from Engine. Provider errors are returned unchanged, with the provider's status and body.
 
-| Status | Body | Meaning |
-|--------|------|---------|
-| `400` | `{"code": "invalid_request", "error": "missing X-Nozle-Customer-Id header"}` | `X-Nozle-Customer-Id` is missing. |
-| `401` | `{"code": "unauthorized", "error": "missing X-Nozle-Key header"}` | `X-Nozle-Key` is missing. |
-| `401` | `{"code": "unauthorized", "error": "invalid nozle key"}` | The key is unknown. |
-| `403` | `{"code": "publishable_key_not_allowed", ...}` | A publishable key was used. |
-| `403` | `{"code": "permission_denied", "error": "API key requires event:write permission"}` | The key cannot write events, so the call is refused before it reaches the provider. |
-| `422` | `{"code": "active_subscription_not_found", "error": "customer has no matching active subscription"}` | The customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer. The provider is not called. |
-| `422` | `{"code": "active_subscription_ambiguous", "error": "customer has multiple active subscriptions; set X-Nozle-Subscription"}` | The customer has several active subscriptions. Send `X-Nozle-Subscription`. The provider is not called. |
-| `502` | Empty | Engine could not reach the provider. |
-| `503` | `{"code": "unavailable", "error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |
-| `503` | `{"code": "unavailable", "error": "subscription lookup is unavailable"}` | The subscription could not be looked up. The provider is not called. Retry later. |
+From Engine 2.22.0 (_Unreleased_), every refusal of the proxy has the error shape of the provider the route targets, so the provider's SDK surfaces the code. The top-level `code` is kept. Before, the body was `{"code": "...", "error": "<message>"}`, with `error` a string.
+
+OpenAI routes:
+
+```json
+{
+  "error": {
+    "message": "This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.",
+    "type": "payment_required",
+    "code": "customer_payment_overdue"
+  },
+  "code": "customer_payment_overdue"
+}
+```
+
+Anthropic routes:
+
+```json
+{
+  "type": "error",
+  "error": {
+    "type": "billing_error",
+    "message": "This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.",
+    "code": "customer_payment_overdue"
+  },
+  "code": "customer_payment_overdue"
+}
+```
+
+`error.type` follows the status: `invalid_request_error` for `400` and `422`, `authentication_error` for `401`, `payment_required` (OpenAI) or `billing_error` (Anthropic) for `402`, `permission_error` for `403`, and `api_error` for `503`.
+
+| Status | `code` | Message | Meaning |
+|--------|--------|---------|---------|
+| `400` | `invalid_request` | `missing X-Nozle-Customer-Id header` | `X-Nozle-Customer-Id` is missing. |
+| `400` | `invalid_request` | `request body could not be read` | The request body could not be read. |
+| `401` | `unauthorized` | `missing X-Nozle-Key header` | `X-Nozle-Key` is missing. |
+| `401` | `unauthorized` | `invalid nozle key` | The key is unknown. |
+| `402` | `workspace_suspended` or `card_required` | | Your workspace is blocked by Nozle. See [Workspace billing errors](/api/errors#workspace-billing-errors). |
+| `402` | `customer_payment_overdue` | `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` | _Unreleased (Engine 2.22.0)._ The customer is blocked by your [dunning policy](/guides/billing/dunning). The provider is not called. |
+| `403` | `publishable_key_not_allowed` | `publishable keys are limited to GET /api/v1/plans` | A publishable key was used. |
+| `403` | `permission_denied` | `API key requires event:write permission` | The key cannot write events, so the call is refused before it reaches the provider. |
+| `422` | `active_subscription_not_found` | `customer has no matching active subscription` | The customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer. The provider is not called. |
+| `422` | `active_subscription_ambiguous` | `customer has multiple active subscriptions; set X-Nozle-Subscription` | The customer has several active subscriptions. Send `X-Nozle-Subscription`. The provider is not called. |
+| `502` | | Empty body | Engine could not reach the provider. |
+| `503` | `unavailable` | `API key verification is unavailable` | The key could not be verified. Retry later. |
+| `503` | `unavailable` | `subscription lookup is unavailable` | The subscription could not be looked up. The provider is not called. Retry later. |
+| `503` | `unavailable` | `customer payment state is unavailable` | _Unreleased (Engine 2.22.0)._ Whether the customer is blocked could not be read. The provider is not called. Retry later. |

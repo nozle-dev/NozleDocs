@@ -52,4 +52,19 @@ Changing the price, charges, credits or entitlements of a plan that has subscrib
 
 A plan family can sell one plan per interval and currency, each at its own fixed price. See [Multi-currency pricing](/guides/billing/multi-currency-pricing).
 
+## Grace days and dunning
+
+_Unreleased (Core 11.16.0)._ A plan says how long a subscriber keeps access while one of its invoices stays unpaid. Set the grace days on the plan form under **Unpaid invoices**, or in the REST `plan` payload of `POST /plans` and `PUT /plans/{code}`. Pick the campaign on the plan form under **Dunning policy** (shown when your Nozle plan includes dunning), or through the API (REST `dunning_campaign_code`, GraphQL `dunningCampaignId`).
+
+| Field | Meaning |
+|---|---|
+| `unpaid_invoice_grace_days` | Days between day 0 of an unpaid invoice of the plan and the end action of its [dunning policy](/guides/billing/dunning). Whole days, 0 to 90, default 7. `0` blocks at once. |
+| `limit_grace_days` | Days after the unpaid invoice of an automatic upgrade at the plan's MRR limit. Whole days, 0 to 90, default 7. Nozle reads it for its own plans (see [Workspace billing](/guides/getting-started/workspace-billing#grace-a-and-grace-b)). The dunning policy of your customers reads `unpaid_invoice_grace_days` only. |
+| `dunning_campaign_code` | The dunning campaign the plan's unpaid invoices follow, before the customer's or the billing entity's. `null` unlinks it. An unknown code returns `404` `dunning_campaign_not_found`. |
+
+- A value outside 0 to 90 is refused with `value_is_out_of_range`.
+- Editing these fields never creates a new plan version, even when the plan has subscribers. New versions copy them.
+- In a [plan family](/guides/billing/multi-currency-pricing) sold in several currencies, the grace days and the campaign are shared: editing them on one currency variant gives the same values to the family's other current variants of that interval at once, in place, whatever their subscriptions. A new currency variant starts with the values of its family's variants of the same interval, unless you give others.
+- Deleting a dunning campaign unlinks the plans that point to it.
+
 See [subscriptions](/guides/billing/subscriptions) for activation and lifecycle changes, and the [production integration checklist](/guides/getting-started/production-readiness) for features requiring additional setup.
