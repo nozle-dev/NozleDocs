@@ -4776,11 +4776,15 @@ paths:
         - The Engine host serves this list at `https://api.nozle.app/engine/api/v1/plans` with the same body. Engine forwards `page` and `per_page` to Core.
         - A publishable key, or a secret key with `include_hidden=false`, does not receive the plans of plan families hidden from the pricing table, and `families[].features` leaves out hidden features. Hiding is a listing setting only: every plan carries all its entitlements and charges, including those of hidden features.
 
+        - **Currencies** (Core 11.10.0). With `currency`, or a secret key's `external_customer_id`, only plans in that currency are listed. Without either, a secret key lists every plan, all currency variants included, and a publishable key lists each plan family's `default_currency` plans (plans without a family are all listed). Every plan of a family carries `family` and `prices`. See [Multi-currency pricing](/guides/billing/multi-currency-pricing).
+
         Because a publishable key ships in browsers, anything stored on a plan is readable by anyone who has the key. See [Public plan catalog](/api/list-plans).
       operationId: findAllPlans
       parameters:
         - $ref: '#/components/parameters/page'
         - $ref: '#/components/parameters/per_page'
+        - $ref: '#/components/parameters/plans_currency'
+        - $ref: '#/components/parameters/plans_external_customer_id'
         - name: include_hidden
           in: query
           description: Secret keys only. Send `false` to get the pricing table view that a publishable key always gets, without the plans of plan families hidden from the pricing table and without hidden features in `families[].features`. Any other value, or no value, returns everything. A publishable key ignores it.
@@ -4904,6 +4908,8 @@ paths:
         This endpoint updates a specific plan with subscription and usage-based charges. It supports flexible billing cadence (in-advance or in-arrears) and allows for both recurring and metered charges. Usage thresholds (`usage_thresholds`) need progressive billing, which comes with the Growth, Scale and Enterprise Nozle plans, so without it a non-empty list is refused with `422` with `feature_not_available` in `error_details.usage_thresholds`, and nothing is saved. An empty list is accepted and changes nothing.
 
         **Plan versioning.** When the plan has active subscriptions and the change alters what it bills or grants, Nozle saves the change as the plan's next version (same code) and returns that new, current version: the existing subscriptions stay on the version they are on until a version migration moves them, and new subscriptions get the new version. Name, description and invoice name are shared by every version and never create one. `disable_version: true` changes the current version in place instead. Only the current version can be edited: an edit of an older version (for example a form opened before another save) is refused with `409` and `plan_version_not_current`. See [Plan versioning](/guides/billing/plan-versions).
+
+        **Plan families sold in several currencies** (Core 11.10.0). A change to the structure of this plan is copied, in the same transaction, to the family's other plans of the same interval; a money-only change affects this plan only. Money is never copied between currencies: send the other currencies' new amounts in `currency_amounts`, or the edit is refused with `422` and `plan_family: [plan_family_variant_prices_missing]`. A plan of the family with active, pending or incomplete subscriptions always gets the change as a new version. See [Multi-currency pricing](/guides/billing/multi-currency-pricing).
       operationId: updatePlan
       requestBody:
         description: Plan payload
@@ -4938,7 +4944,7 @@ paths:
 
         This endpoint also returns a plan with a trial or pay-in-arrears billing, and, to a secret key, a plan that is pending deletion (`pending_deletion: true`). An unknown code, the code of a per-customer override plan, or a plan pending deletion read with a publishable key returns `404` with the code `plan_not_found`.
 
-        A publishable key receives a plan of a family hidden from the pricing table, or whose family was deleted, so the SDK can describe a subscriber's own plan. The plan carries all its entitlements and charges, including those of features hidden from the pricing table.
+        A publishable key receives a plan of a family hidden from the pricing table, or whose family was deleted, so the SDK can describe a subscriber's own plan. The plan carries all its entitlements and charges, including those of features hidden from the pricing table. From Core 11.10.0, such a plan comes without `family` and `prices` for a publishable key, so the codes of the hidden family's other plans are not revealed.
 
         The Engine host also serves this path at `https://api.nozle.app/engine/api/v1/plans/{code}` and returns Core's body unchanged.
 
@@ -7788,7 +7794,7 @@ paths:
       tags:
         - Checkout
       summary: Create a subscription
-      description: Creates a subscription without checkout. Requires an organization secret key (`sk_`) with `subscription:write`; trusted internal authentication is refused. Engine first reads the customer from Core and returns `404 customer_not_found` when it does not exist (Core would otherwise create an empty customer). It then calls Core `POST /subscriptions` with external ID `sub-<customer_id>-<plan_code>`, and on success adds `subscription_id` and `status` to Core's response. Core's status code is kept; Core errors are forwarded unchanged.
+      description: Creates a subscription without checkout. Requires an organization secret key (`sk_`) with `subscription:write`; trusted internal authentication is refused. Engine first reads the customer from Core and returns `404 customer_not_found` when it does not exist (Core would otherwise create an empty customer). It then calls Core `POST /subscriptions` with external ID `sub-<customer_id>-<plan_code>` (`sub-<customer_id>-<plan_family_code>` for a subscription by family, Engine 2.21.0), and on success adds `subscription_id` and `status` to Core's response. Core's status code is kept; Core errors are forwarded unchanged.
       operationId: engineCreateSubscription
       security:
         - bearerAuth: []
@@ -13067,7 +13073,7 @@ paths:
         - Plans
       summary: List the public plan catalog (Engine)
       description: |-
-        Engine proxy for Core's `GET /plans`. Engine calls Core `GET /api/v1/plans` with the caller's query string (`page`, `per_page`) and copies Core's status code and body unchanged, so a `200` body is the same `PlansPaginated` object Core returns. Engine also serves `GET /api/v1/plans/{code}` the same way, as a proxy for Core's `GET /plans/{code}`.
+        Engine proxy for Core's `GET /plans`. Engine calls Core `GET /api/v1/plans` with the caller's query string (`page`, `per_page`, and from Engine 2.21.0 `currency` and `external_customer_id`) and copies Core's status code and body unchanged, so a `200` body is the same `PlansPaginated` object Core returns. Engine also serves `GET /api/v1/plans/{code}` the same way, as a proxy for Core's `GET /plans/{code}`.
 
         **Keys.** These two plan routes are the only Engine routes that accept a publishable `pk_` key. They also accept a secret `sk_` key and the trusted internal credential. Engine forwards a `pk_` or `sk_` key to Core as the caller's own credential. The internal credential works only for the organization Engine is configured to act for; any other organization returns `403`.
 
@@ -13082,6 +13088,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/page'
         - $ref: '#/components/parameters/per_page'
+        - $ref: '#/components/parameters/plans_currency'
+        - $ref: '#/components/parameters/plans_external_customer_id'
       responses:
         '200':
           description: Core's plan list, passed through unchanged.
@@ -21730,6 +21738,22 @@ webhooks:
           description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
 components:
   parameters:
+    plans_currency:
+      name: currency
+      in: query
+      required: false
+      description: 'Core 11.10.0 (on the Engine host, Engine 2.21.0). ISO 4217 code. Lists only plans in this currency, with or without a plan family. An unknown currency returns `422` with `currency: [value_is_invalid]`. On the Engine, a repeated value, one longer than 255 bytes or one with a control character returns `400 invalid_request`.'
+      schema:
+        type: string
+        example: EUR
+    plans_external_customer_id:
+      name: external_customer_id
+      in: query
+      required: false
+      description: Core 11.10.0 (on the Engine host, Engine 2.21.0). Secret keys only. Without `currency`, lists plans in this customer's locked currency. Ignored for an unknown customer, a customer without a currency yet, and an organization that allows several currencies per customer. A publishable key never reads a customer (the Engine drops the parameter). A customer-scoped Engine request lists for its own customer and returns `403 customer_scope_mismatch` when this names another one.
+      schema:
+        type: string
+        example: customer_123
     plan_version_code:
       name: code
       in: path
@@ -32627,8 +32651,64 @@ components:
           type:
             - string
             - 'null'
-          description: Code of the plan family the plan belongs to. A plan family groups the billing intervals of one offer (for example "Pro" monthly and yearly). `null` for a per-customer override plan, which has no family.
+          description: Code of the plan family the plan belongs to. A plan family groups the billing intervals and currencies of one offer (for example "Pro" monthly and yearly, in USD and EUR). `null` for a per-customer override plan, which has no family.
           example: startup
+        family:
+          type: object
+          description: 'Core 11.10.0. The plan''s family, on every plan of a family in `GET /plans` and `GET /plans/{code}`. Absent for a plan without a family, and for a publishable key reading a plan of a family hidden from the pricing table with `GET /plans/{code}`. See [Multi-currency pricing](/guides/billing/multi-currency-pricing).'
+          required:
+            - code
+            - currencies
+            - default_currency
+          properties:
+            code:
+              type: string
+              description: Code of the plan family.
+              example: pro
+            currencies:
+              type: array
+              description: The currencies the family's current plans sell, in display order.
+              items:
+                type: string
+              example:
+                - USD
+                - EUR
+            default_currency:
+              type: string
+              description: The currency the pricing table shows first. Always one of `currencies`.
+              example: USD
+        prices:
+          type: array
+          description: Core 11.10.0. Every current plan of the family, in every interval and currency, plans pending deletion left out. Present when `family` is. One plan per interval and currency.
+          items:
+            type: object
+            required:
+              - currency
+              - interval
+              - plan_code
+              - amount_cents
+            properties:
+              currency:
+                type: string
+                description: ISO 4217 code of the plan.
+                example: EUR
+              interval:
+                type: string
+                enum:
+                  - weekly
+                  - monthly
+                  - quarterly
+                  - semiannual
+                  - yearly
+                example: monthly
+              plan_code:
+                type: string
+                description: Code of the plan that sells this interval and currency. Use it, or `plan_family_code` with `interval` and `currency`, to check out.
+                example: pro_eur
+              amount_cents:
+                type: integer
+                description: Base price per interval, in the minor unit of `currency`.
+                example: 900
         pending_deletion:
           type: boolean
           description: '`true` when deletion of the plan was requested and is still being processed in the background. The plan is going away and should not be offered to new customers; `GET /plans` still lists it until the deletion finishes. Filter on `pending_deletion` when you build a pricing page.'
@@ -33072,9 +33152,21 @@ components:
                   - 'null'
               plan_codes:
                 type: array
-                description: Codes of the family's plans. A publishable key does not receive the codes of plans pending deletion.
+                description: Codes of the family's plans in the listed currency (every plan of the family for a secret key without `currency`). A publishable key does not receive the codes of plans pending deletion.
                 items:
                   type: string
+              currencies:
+                type: array
+                description: Core 11.10.0. The currencies the family's current plans sell, in display order.
+                items:
+                  type: string
+                example:
+                  - USD
+                  - EUR
+              default_currency:
+                type: string
+                description: Core 11.10.0. The currency the pricing table shows first. Always one of `currencies`.
+                example: USD
               features:
                 type: array
                 items:
@@ -33236,7 +33328,7 @@ components:
                 - string
                 - 'null'
               example: startup
-              description: Code of the plan family the plan belongs to, for example the monthly and yearly versions of one plan. Without it, or with a code that does not exist yet, the call creates a new family for the plan. A family holds at most one plan per `interval`, all in the same `amount_currency`; otherwise the call returns `422` with the error `plan_family_interval_already_exist` on `interval` or `plan_family_currency_mismatch` on `amount_currency`. A plan that joins a family that already has plans takes the family's features and privileges.
+              description: Code of the plan family the plan belongs to, for example the monthly and yearly versions of one plan. Without it, or with a code that does not exist yet, the call creates a new family for the plan. A family holds at most one current plan per `interval` and `amount_currency` (Core 11.10.0; before, one currency per family); otherwise the call returns `422` with the error `plan_family_interval_already_exist` on `interval`. A plan in a new currency adds that currency to the family. In a family sold in several currencies, the plans of one interval may differ only in money (`plan_family_variant_mismatch`); see [Multi-currency pricing](/guides/billing/multi-currency-pricing). A plan that joins a family that already has plans takes the family's features and privileges.
             show_on_pricing:
               type: boolean
               default: true
@@ -33591,7 +33683,7 @@ components:
                 - string
                 - 'null'
               example: startup
-              description: Code of the plan family the plan belongs to, for example the monthly and yearly versions of one plan. Without it, or with a code that does not exist yet, the call creates a new family for the plan. A family holds at most one plan per `interval`, all in the same `amount_currency`; otherwise the call returns `422` with the error `plan_family_interval_already_exist` on `interval` or `plan_family_currency_mismatch` on `amount_currency`. A plan that joins a family that already has plans takes the family's features and privileges.
+              description: Code of the plan family the plan belongs to, for example the monthly and yearly versions of one plan. Without it, or with a code that does not exist yet, the call creates a new family for the plan. A family holds at most one current plan per `interval` and `amount_currency` (Core 11.10.0; before, one currency per family); otherwise the call returns `422` with the error `plan_family_interval_already_exist` on `interval`. A plan in a new currency adds that currency to the family. In a family sold in several currencies, the plans of one interval may differ only in money (`plan_family_variant_mismatch`); see [Multi-currency pricing](/guides/billing/multi-currency-pricing). A plan that joins a family that already has plans takes the family's features and privileges.
             show_on_pricing:
               type: boolean
               default: true
@@ -33904,6 +33996,40 @@ components:
               description: List of usage thresholds to apply to the plan.
               items:
                 $ref: '#/components/schemas/UsageThresholdInput'
+            currency_amounts:
+              type: object
+              description: |-
+                Core 11.10.0. Amounts for the other currencies of the plan's family, used when this edit changes the structure of a family sold in several currencies. A structural edit is copied to the family's other plans of the same interval, and money is never copied between currencies: each new or rescaled amount of another currency must come from here, or the whole edit is refused with `plan_family_variant_prices_missing` (its `field` paths are the paths used here).
+
+                Keyed by uppercase currency code. Inside a currency: `amount_cents`; `charges`, keyed by feature code (a second charge of one feature is `<code>#2`), each with `min_amount_cents`, `pricing_unit_conversion_rate`, `properties` (ranges given with their `from_value` and `to_value`) and `filters` keyed by filter key such as `region=eu`; `fixed_charges` keyed by add-on code, each with `properties`; `minimum_commitment` with `amount_cents`; `usage_thresholds` with `amount_cents`, in this plan's order.
+
+                A currency that is not another plan of this plan's interval, or a path this plan does not have, returns `422` with `currency_amounts: [value_is_invalid]` and `currency_amounts_invalid` (`currency`, `field`). Not needed on plan create. The part-edit endpoints (charges, filters, fixed charges) do not take it. See [Multi-currency pricing](/guides/billing/multi-currency-pricing#edit-prices-in-several-currencies).
+              additionalProperties:
+                type: object
+                additionalProperties: true
+              example:
+                INR:
+                  amount_cents: 80000
+                  charges:
+                    api_calls:
+                      min_amount_cents: 0
+                      properties:
+                        graduated_ranges:
+                          - from_value: 11
+                            to_value: 100
+                            per_unit_amount: '83'
+                            flat_amount: '0'
+                      filters:
+                        region=eu:
+                          amount: '90'
+                  fixed_charges:
+                    seats:
+                      properties:
+                        amount: '800'
+                  minimum_commitment:
+                    amount_cents: 400000
+                  usage_thresholds:
+                    - amount_cents: 800000
             cascade_updates:
               type: boolean
               description: This field determines whether the changes made to the plan should be cascaded to the children plans. When set to `true`, the changes will be cascaded into children. Conversely, when set to `false`, the changes will only be applied to the plan itself. If not defined in the request, default value is `false`.
@@ -34518,9 +34644,9 @@ components:
               description: The currency of the authorization.
         subscription:
           type: object
+          description: Send `plan_code`, or `plan_family_code` with `interval` (and optional `currency`).
           required:
             - external_customer_id
-            - plan_code
             - external_id
           properties:
             billing_entity_code:
@@ -34534,7 +34660,25 @@ components:
             plan_code:
               type: string
               example: premium
-              description: The unique code representing the plan to be attached to the customer. This code must correspond to the `code` property of one of the active plans.
+              description: The unique code representing the plan to be attached to the customer. This code must correspond to the `code` property of one of the active plans. Required unless `plan_family_code` is sent.
+            plan_family_code:
+              type: string
+              example: pro
+              description: 'Core 11.10.0. Sells a plan family instead of `plan_code`; Nozle picks the family''s current plan for `interval` and `currency`. Cannot be combined with `plan_code` (`422`, `plan_family_code: [incompatible_with_plan_code]`). An unknown family returns `404 plan_family_not_found`. See [Multi-currency pricing](/guides/billing/multi-currency-pricing#checkout-and-subscribe-by-family).'
+            interval:
+              type: string
+              enum:
+                - weekly
+                - monthly
+                - quarterly
+                - semiannual
+                - yearly
+              example: yearly
+              description: 'Required with `plan_family_code` (`interval: [value_is_mandatory]` without it, `[value_is_invalid]` for an unknown value).'
+            currency:
+              type: string
+              example: EUR
+              description: 'With `plan_family_code`, the ISO 4217 code of the plan to sell. Without it, the currency of the subscription being changed, else the customer''s locked currency, else the family''s default currency. A currency the family does not sell for that interval returns `422` with `currency: [currency_not_offered]`.'
             plan_version:
               type: integer
               minimum: 1
@@ -36930,9 +37074,9 @@ components:
           description: External ID of the Entity whose subscription to change. Optional; selects the subscription as for `/can`.
     BillingSubscribeRequest:
       type: object
+      description: Send `plan_code`, or `plan_family_code` with `interval` (and optional `currency`). Neither returns `400`.
       required:
         - customer_id
-        - plan_code
       properties:
         customer_id:
           type: string
@@ -36941,6 +37085,24 @@ components:
         plan_code:
           type: string
           example: pro
+        plan_family_code:
+          type: string
+          example: pro
+          description: 'Core 11.10.0, Engine 2.21.0. The subscription''s external ID is then `sub-<customer_id>-<plan_family_code>`. Sells a plan family instead of `plan_code`; Nozle picks the family''s current plan for `interval` and `currency`. Cannot be combined with `plan_code` (`422`, `plan_family_code: [incompatible_with_plan_code]`). An unknown family returns `404 plan_family_not_found`. See [Multi-currency pricing](/guides/billing/multi-currency-pricing#checkout-and-subscribe-by-family).'
+        interval:
+          type: string
+          enum:
+            - weekly
+            - monthly
+            - quarterly
+            - semiannual
+            - yearly
+          example: yearly
+          description: 'Required with `plan_family_code` (`interval: [value_is_mandatory]` without it, `[value_is_invalid]` for an unknown value).'
+        currency:
+          type: string
+          example: EUR
+          description: 'With `plan_family_code`, the ISO 4217 code of the plan to sell. Without it, the currency of the subscription being changed, else the customer''s locked currency, else the family''s default currency. A currency the family does not sell for that interval returns `422` with `currency: [currency_not_offered]`.'
         plan_version:
           type: integer
           minimum: 1
@@ -36965,16 +37127,34 @@ components:
               example: active
     BillingCheckoutRequest:
       type: object
-      description: Either `invoice_id` (pay an existing invoice) or `plan_code` with a customer is required.
+      description: Either `invoice_id` (pay an existing invoice), or `plan_code` (or `plan_family_code` with `interval`) with a customer, is required.
       properties:
         customer_id:
           type: string
-          description: External customer ID. Required with `plan_code`. Falls back to the customer of trusted internal authentication, then to `organization_id`.
+          description: External customer ID. Required with `plan_code` or `plan_family_code`. Falls back to the customer of trusted internal authentication, then to `organization_id`.
           example: customer_123
         plan_code:
           type: string
-          description: Plan to check out. Required unless `invoice_id` is sent.
+          description: Plan to check out. Required unless `invoice_id` or `plan_family_code` is sent.
           example: growth
+        plan_family_code:
+          type: string
+          example: pro
+          description: 'Core 11.10.0, Engine 2.21.0. Sells a plan family instead of `plan_code`; Nozle picks the family''s current plan for `interval` and `currency`. Cannot be combined with `plan_code` (`422`, `plan_family_code: [incompatible_with_plan_code]`). An unknown family returns `404 plan_family_not_found`. See [Multi-currency pricing](/guides/billing/multi-currency-pricing#checkout-and-subscribe-by-family).'
+        interval:
+          type: string
+          enum:
+            - weekly
+            - monthly
+            - quarterly
+            - semiannual
+            - yearly
+          example: yearly
+          description: 'Required with `plan_family_code` (`interval: [value_is_mandatory]` without it, `[value_is_invalid]` for an unknown value).'
+        currency:
+          type: string
+          example: EUR
+          description: 'With `plan_family_code`, the ISO 4217 code of the plan to sell. Without it, the currency of the subscription being changed, else the customer''s locked currency, else the family''s default currency. A currency the family does not sell for that interval returns `422` with `currency: [currency_not_offered]`.'
         organization_id:
           type: string
           deprecated: true

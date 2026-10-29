@@ -1,0 +1,416 @@
+---
+title: Multi-currency pricing
+description: Sell one plan in several currencies at fixed prices, with one plan per interval and currency in a plan family.
+---
+
+<Note>
+Available from Core 11.10.0. The Engine parts (catalog parameters on the Engine host, checkout and subscribe by family, `group_by=family`, `GET /fx/rates`) need Engine 2.21.0. The SDK parts need Node `0.22.0`, React `0.23.0`, Python `0.21.0` and Go `v0.20.0`.
+</Note>
+
+A plan family is the product your customers see, for example "Pro". Its plans are **variants**: one plan per interval and currency. "Pro" sold monthly and yearly in USD and EUR is one family with four plans:
+
+| Plan code | Interval | Currency | Price |
+| --- | --- | --- | --- |
+| `pro_usd` | monthly | USD | $10.00 |
+| `pro_eur` | monthly | EUR | €9.00 |
+| `pro_usd_yearly` | yearly | USD | $100.00 |
+| `pro_eur_yearly` | yearly | EUR | €90.00 |
+
+Every variant is an ordinary plan with its own code, so everything that takes a plan code keeps working. On top of that you can sell the family by `plan_family_code`, `interval` and `currency`, and Nozle picks the variant.
+
+A family holds at most one current plan per interval **and currency**. A second plan for the same pair is refused with `422` and `interval: plan_family_interval_already_exist`. Per-customer override plans do not count.
+
+## Prices are fixed
+
+Each variant carries its own prices, set by you. **Nothing is converted at billing time**: a customer on `pro_eur` is invoiced €9.00 every month, whatever the exchange rate. Stripe Checkout is opened with Adaptive Pricing disabled, so the customer pays in the invoice currency too.
+
+Exchange rates are used only for analytics, to show totals across currencies in your default currency. See [Analytics](#analytics-per-currency-and-converted-totals).
+
+## The parity rule
+
+In a family that sells more than one currency, the variants of one interval must be the same plan in every way except money. Each variant is compared with the **reference variant** of its interval: the one in the family's `default_currency`, else the first currency that has one.
+
+**Must match** (structure):
+
+- the plan's `pay_in_advance`, `trial_period` and monthly billing settings (`bill_charges_monthly`, `bill_fixed_charges_monthly`);
+- the charges, by feature code: `charge_model`, `pay_in_advance`, `invoiceable`, `prorated`, `regroup_paid_fees`, `accepts_target_wallet`, the pricing unit code, the filters and every property that is not money (graduated and volume range bounds, `package_size`, `free_units`, `free_units_per_events`, `rate`, grouping keys);
+- the fixed charges, by add-on code: `charge_model`, `pay_in_advance`, `prorated`, `units` and their properties that are not money;
+- feature entitlements (`usage_limit`, `hard_limit`, privilege values);
+- active credit grant rules and credit pool policies, by credit system code;
+- the minimum commitment (whether there is one, and its invoice name);
+- usage thresholds (how many, and which are `recurring`).
+
+**May differ** (money):
+
+| Where | Money fields |
+| --- | --- |
+| Plan | `amount_cents` |
+| `standard` and `package` charges | `amount` |
+| `graduated` and `volume` charges | `per_unit_amount`, `flat_amount` |
+| `graduated_percentage` charges | `flat_amount`, `from_value`, `to_value` (the bounds of these ranges are amounts) |
+| `percentage` charges | `fixed_amount`, `free_units_per_total_aggregation`, `per_transaction_max_amount`, `per_transaction_min_amount` |
+| Charges of a custom aggregation metric | `custom_properties`, as a whole (the aggregator returns the amount to bill) |
+| Every charge | `min_amount_cents`, the pricing unit `conversion_rate` |
+| Minimum commitment and usage thresholds | `amount_cents` |
+
+A field that is `null` counts as absent. Two charges of one feature (or two fixed charges of one add-on) are paired by charge code, then by position.
+
+**Taxes are not compared and not copied.** Each variant keeps its own taxes, so a VAT tax on the EUR variant only is fine.
+
+A variant that breaks the rule is refused with `plan_family_variant_mismatch`, naming the variant, its reference and the first field that differs:
+
+```json
+{
+  "status": 422,
+  "error": "Unprocessable Entity",
+  "code": "validation_errors",
+  "error_details": {
+    "plan_family": ["plan_family_variant_mismatch"],
+    "plan_family_variant_mismatch": [
+      {
+        "plan_code": "pro_eur",
+        "currency": "EUR",
+        "interval": "monthly",
+        "reference_plan_code": "pro_usd",
+        "reference_currency": "USD",
+        "field": "charges.api_calls.properties.graduated_ranges.0.to_value"
+      }
+    ]
+  }
+}
+```
+
+`custom` charges (opaque properties) cannot be sold in several currencies for one interval: `plan_family_custom_charge_not_supported`. An interval sold in one currency may keep them.
+
+## Add a currency
+
+A family sells exactly the currencies of its current plans. You add a currency by creating a plan in it, and remove one by deleting the plans that sell it. Nozle keeps the family's `currencies` in step on every change.
+
+**Dashboard.** On the plan page, the **Currencies** card lists the family's currencies and marks the default. **Add a currency** copies each default-currency plan into the new currency (code `<plan>_<currency>`, for example `pro_eur`), then opens the price grid: one column per currency, one row per money field. Fill in the new column and save. A plan in a multi-currency family keeps its currency fixed in the plan editor.
+
+**API.** Create the variant with `POST /plans`, the family's code and the new currency. Copy the reference variant's structure and set your own amounts:
+
+```bash
+curl -X POST https://api.nozle.app/core/api/v1/plans \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "plan": {
+      "name": "Pro",
+      "code": "pro_eur",
+      "plan_family_code": "pro",
+      "interval": "monthly",
+      "amount_cents": 900,
+      "amount_currency": "EUR",
+      "pay_in_advance": true,
+      "charges": [
+        {
+          "feature_id": "<the api_calls feature id>",
+          "charge_model": "graduated",
+          "properties": {
+            "graduated_ranges": [
+              { "from_value": 0, "to_value": 10, "per_unit_amount": "0", "flat_amount": "0" },
+              { "from_value": 11, "to_value": null, "per_unit_amount": "0.9", "flat_amount": "0" }
+            ]
+          }
+        }
+      ]
+    }
+  }'
+```
+
+The new variant takes the entitlements and usage limits of the variant of its interval, and is checked against the parity rule.
+
+**Order and default.** The order of `currencies` and the `default_currency` are set with the GraphQL `updatePlanFamily` mutation (`currencies`, `defaultCurrency`); there is no REST endpoint. `currencies` must list exactly the currencies the family sells, and the default must be one of them:
+
+| Error | Cause |
+| --- | --- |
+| `currencies: plan_family_currency_in_use` | A currency the family sells is left out of `currencies`. |
+| `currencies: plan_family_currency_not_sold` | `currencies` names a currency no current plan of the family sells. |
+| `default_currency: plan_family_currency_not_sold` | The default is not a sold currency. |
+
+When the default currency's last plan is deleted, the default moves to the first currency still sold.
+
+**AI onboarding.** A draft plan may carry `currency_prices`, for example `{"EUR": {"amount_cents": 900, "charges": {...}}}`. Applying the draft creates one family: the plan in its own currency under its code, plus `<code>_<currency>` (lowercase currency) for each extra currency, with the same structure and its own amounts.
+
+### Pick prices with today's rate
+
+`GET /fx/rates` on the Engine (Engine 2.21.0, `analytic:read`, secret key only) returns the stored rate of each currency, so you can compute a starting price and then round it yourself. The result is still a fixed price: nothing reads the rate later.
+
+```bash
+curl "https://api.nozle.app/engine/api/v1/fx/rates?base=USD&date=2026-10-29" \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY"
+```
+
+```json
+{ "base": "USD", "date": "2026-10-29", "source": "ECB reference rates, currency-api where the ECB has none, official pegs", "rates": { "EUR": "0.92", "INR": "83.1" } }
+```
+
+Each rate is a decimal string: units of the currency per 1 `base`. Both parameters are optional (`base` defaults to `USD`, `date` to the latest rates); each currency takes its latest stored rate on or before `date`. An unknown `base` answers `422 unknown_currency`, a date before every stored rate `404 fx_rates_not_found`, a malformed date `400 invalid_date`.
+
+## Edit prices in several currencies
+
+**Money is never copied between currencies.** When you edit one variant:
+
+- **A money-only edit** changes only that variant.
+- **A structural edit** (a new charge, new tiers, another charge model) is copied, in the same transaction, to the other variants of the same interval. Each of them keeps its own amounts where it still has them.
+
+For each money value of another variant, Nozle uses, in this order:
+
+1. the amount you send in `currency_amounts` for that currency;
+2. the variant's own value for the same part, while that part is unchanged: the same charge (same feature and charge model), graduated and volume ranges with the same bounds (`from_value`, `to_value`), graduated percentage ranges while their count is unchanged, the same filter, the same pricing unit, its own minimum commitment, and its thresholds while their `recurring` flags are unchanged;
+3. the edited variant's value, only when that value is `null`, zero or empty.
+
+Anything else is missing and **the whole edit is refused** with `plan_family_variant_prices_missing`, which lists every missing amount:
+
+```json
+{
+  "status": 422,
+  "error": "Unprocessable Entity",
+  "code": "validation_errors",
+  "error_details": {
+    "plan_family": ["plan_family_variant_prices_missing"],
+    "plan_family_variant_prices_missing": [
+      { "plan_code": "pro_inr", "currency": "INR", "field": "charges.api_calls.properties.graduated_ranges.1.per_unit_amount" },
+      { "plan_code": "pro_inr", "currency": "INR", "field": "charges.storage.properties.amount" }
+    ]
+  }
+}
+```
+
+Changes that scale money also drop the other variants' own amounts, so they need `currency_amounts`: a new `package_size` (€1 per 100 units becoming €10 per 1,000 needs the new amount in every currency), a change of a threshold's `recurring` flag, and any change to `custom_properties`.
+
+Send the missing amounts with the edit in `plan.currency_amounts` on `PUT /plans/{code}` (GraphQL `UpdatePlanInput.currencyAmounts`), keyed by currency and using the same paths as the error's `field`:
+
+```json
+{
+  "plan": {
+    "charges": [ "... the edited pro_usd charges ..." ],
+    "currency_amounts": {
+      "INR": {
+        "amount_cents": 80000,
+        "charges": {
+          "api_calls": {
+            "min_amount_cents": 0,
+            "pricing_unit_conversion_rate": "83",
+            "properties": {
+              "graduated_ranges": [
+                { "from_value": 11, "to_value": 100, "per_unit_amount": "83", "flat_amount": "0" }
+              ]
+            },
+            "filters": { "region=eu": { "amount": "90" } }
+          },
+          "storage": { "properties": { "amount": "400" } }
+        },
+        "fixed_charges": { "seats": { "properties": { "amount": "800" } } },
+        "minimum_commitment": { "amount_cents": 400000 },
+        "usage_thresholds": [ { "amount_cents": 800000 } ]
+      }
+    }
+  }
+}
+```
+
+- Charges are keyed by feature code and fixed charges by add-on code. A second charge of the same feature or add-on is `<code>#2`.
+- Ranges are given with their bounds (`from_value`, `to_value`), which say which range the amounts are for.
+- `usage_thresholds` are listed in the edited variant's order.
+- `currency_amounts` is not needed when you create a plan: a new variant carries its own amounts.
+
+A currency that is not another variant of the edited plan's interval (a lowercase code, a family that sells one currency, or a plan that moves to another family, interval or currency), or a path the edited plan does not have, refuses the edit:
+
+```json
+{
+  "status": 422,
+  "error": "Unprocessable Entity",
+  "code": "validation_errors",
+  "error_details": {
+    "currency_amounts": ["value_is_invalid"],
+    "currency_amounts_invalid": [
+      { "currency": "eur", "field": null },
+      { "currency": "EUR", "field": "charges.api_calls.properties.rate" }
+    ]
+  }
+}
+```
+
+The part-edit endpoints (`/plans/{code}/charges`, their filters and `/plans/{code}/fixed_charges`) take no `currency_amounts`. In a multi-currency family, a part edit that adds money in another currency is refused with `plan_family_variant_prices_missing`; make the change with `PUT /plans/{code}` instead.
+
+**Versions.** A variant with active, pending or incomplete subscriptions always gets the change as a [new version](/guides/billing/plan-versions), and its subscribers keep theirs. A variant with only ended subscriptions gets a version when its pricing changes; one without subscriptions changes in place. A version migration never changes currency.
+
+Usage limits set on one variant apply to every variant of its interval.
+
+## The customer's currency
+
+Available from Core 11.9.0.
+
+A customer bills in one currency, set by the first paid object created for it (a subscription, an invoice, a wallet or credit top-up, a fixed amount coupon). A subscription in another currency is then refused with `currency: customer_currency_mismatch`. See [customer currency](/api/create-customer#customer-currency).
+
+To let customers hold objects in several currencies, set the organization setting `allow_multiple_currencies_per_customer` to `true`. Each subscription still keeps its own currency.
+
+## Plan changes stay in one currency
+
+A plan change never switches currency. Moving a subscription to a plan in another currency is refused with `plan_code: currencies_does_not_match`, on every plan change path. Plan change options list only plans in the subscription's currency.
+
+A plan change by family (`plan_family_code` + `interval` without `currency`) picks the variant in the currency of the subscription being changed: the one named by `subscription_id` (Core: `external_subscription_id`), else, for a checkout, the customer's only active subscription.
+
+## Read the catalog in one currency
+
+`GET /plans` takes two new query parameters:
+
+| Parameter | Description |
+| --- | --- |
+| `currency` | ISO 4217 code. Only plans in this currency are listed, with or without a family. An unknown currency answers `422` with `currency: value_is_invalid`. |
+| `external_customer_id` | Secret keys only. Lists plans in the customer's locked currency when `currency` is not sent. Ignored for an unknown customer, a customer without a currency yet, and an organization that allows several currencies per customer. A publishable key never reads a customer. |
+
+Without either, a secret key lists every plan, all variants included. The publishable pricing table lists each family's `default_currency` variants; plans without a family are all listed.
+
+Every plan of a family, listed or read with `GET /plans/{code}`, carries `family` and `prices`. `prices` lists every current variant of the family, in every interval and currency, so a pricing page can show a currency switch without another request:
+
+```json
+{
+  "code": "pro_usd",
+  "interval": "monthly",
+  "amount_cents": 1000,
+  "amount_currency": "USD",
+  "plan_family_code": "pro",
+  "family": { "code": "pro", "currencies": ["USD", "EUR"], "default_currency": "USD" },
+  "prices": [
+    { "currency": "USD", "interval": "monthly", "plan_code": "pro_usd", "amount_cents": 1000 },
+    { "currency": "EUR", "interval": "monthly", "plan_code": "pro_eur", "amount_cents": 900 },
+    { "currency": "USD", "interval": "yearly", "plan_code": "pro_usd_yearly", "amount_cents": 10000 },
+    { "currency": "EUR", "interval": "yearly", "plan_code": "pro_eur_yearly", "amount_cents": 90000 }
+  ]
+}
+```
+
+`families[]` adds `currencies` and `default_currency`, and its `plan_codes` list the variants of the listed currency. See the [public plan catalog](/api/list-plans#currencies).
+
+## Checkout and subscribe by family
+
+`POST /checkout` and `POST /subscribe` on the Engine (Engine 2.21.0), and Core's `POST /checkout_sessions` and `POST /subscriptions`, accept `plan_family_code` + `interval` + optional `currency` instead of `plan_code`:
+
+```json
+{
+  "customer_id": "customer_123",
+  "plan_family_code": "pro",
+  "interval": "yearly",
+  "currency": "EUR",
+  "return_url": "https://app.example.com/settings/billing"
+}
+```
+
+Nozle picks the family's current variant for that interval and currency. Without `currency` it uses the currency of the subscription being changed, else the customer's locked currency, else the family's default currency.
+
+A subscription created by family through the Engine `POST /subscribe` gets the external ID `sub-<customer_id>-<plan_family_code>`.
+
+`POST /subscriptions/transitions` and Entity checkout batches still take a plan code. Read the variant's code from `prices[]`.
+
+## SDKs
+
+**Node** (`@nozle-js/node` 0.22.0):
+
+```ts
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
+const eurPlans = await nozle.plans({ currency: 'EUR' })
+const customerPlans = await nozle.plans({ externalCustomerId: 'customer_123' })
+
+await nozle.checkout(
+  'customer_123',
+  { planFamilyCode: 'pro', interval: 'yearly', currency: 'EUR' },
+  'https://app.example.com/settings/billing',
+)
+await nozle.subscribe('customer_123', { planFamilyCode: 'free', interval: 'monthly' })
+```
+
+Each family plan has `family` (`code`, `currencies`, `default_currency`) and `prices` (`currency`, `interval`, `plan_code`, `amount_cents`).
+
+**React** (`@nozle-js/react` 0.23.0):
+
+```tsx
+import { PricingTable, CheckoutButton } from '@nozle-js/react'
+
+<PricingTable currency="EUR" />
+<PricingTable currencies={['USD', 'EUR', 'INR']} />
+<CheckoutButton planFamilyCode="pro" interval="yearly" currency="EUR" />
+```
+
+- `currency` loads the catalog in that currency (`GET /plans?currency=`). With the `plans` prop, only plans in that currency are shown.
+- When the families are sold in two or more currencies, a currency switch shows above the interval switch; choosing a currency loads the catalog in it. `currencies` sets the currencies offered, by default those of the families.
+- A card never mixes currencies, so savings and the upgrade direction compare like with like. Checkout from the table passes the chosen `currency`.
+- `createCheckout` receives `planCode`, or `planFamilyCode` + `interval`, plus an optional `currency`. Your backend passes `planCode ?? { planFamilyCode, interval, currency }` to `nozle.checkout()`.
+
+**Python** (`nozle` 0.21.0):
+
+```python
+from nozle import Nozle
+
+nozle = Nozle()  # reads NOZLE_SECRET_KEY
+
+eur_plans = nozle.plans(currency="EUR")
+
+nozle.checkout(
+    "customer_123",
+    plan_family_code="pro",
+    interval="yearly",
+    currency="EUR",
+    return_url="https://app.example.com/settings/billing",
+)
+nozle.subscribe("customer_123", plan_family_code="free", interval="monthly")
+```
+
+**Go** (`github.com/nozle-dev/nozle-go` v0.20.0):
+
+```go
+plans, err := client.Plans(ctx, nozle.WithCurrency("EUR"))
+
+checkout, err := client.Checkout(ctx, nozle.CheckoutParams{
+    CustomerID:     "customer_123",
+    PlanFamilyCode: "pro",
+    Interval:       "yearly",
+    Currency:       "EUR",
+    ReturnURL:      "https://app.example.com/settings/billing",
+})
+```
+
+`Plan.Family` (`Code`, `Currencies`, `DefaultCurrency`) and `Plan.Prices` (`Currency`, `Interval`, `PlanCode`, `AmountCents`) are set for family plans. `nozle.WithExternalCustomerID(id)` lists the customer's locked currency.
+
+The SDKs check a family request before sending it. Node needs `planFamilyCode` and `interval`. Python and Go refuse both a plan code and a family, a family without an interval, and an interval or currency without a family.
+
+## Analytics per currency and converted totals
+
+Revenue is always reported in the currency it was billed in, next to a total converted into your default currency:
+
+- `GET /analytics/overview` returns `mrr_by_currency` with the MRR and ARR of each plan currency, plus `mrr_total_default_cents`, `arr_total_default_cents` and `fx_date`. `GET /analytics/invoices-summary` does the same for outstanding and overdue amounts. A converted total is `null` when one of its currencies has no rate. See the [dashboard](/guides/margin/dashboard).
+- `GET /analytics/revenue-by-plan?group_by=family` (Engine 2.21.0) puts all variants of a family, in every currency and interval, and the override plans of those variants, in one series with `family_code` and `family_name` (`plan_id` and `plan_name` are then `null`). Each point keeps the split per currency (`by_currency`) and the converted `total_default`. A plan outside any family stays its own series with `family_code: null`. `group_by=plan` is the default and is unchanged; another value answers `400 invalid_request`. With `basis=invoiced` the series hold the one invoiced currency.
+
+The conversion uses the official peg for AED, SAR, QAR, BHD, OMR and JOD, otherwise the ECB reference rate, with a second daily public source for currencies the ECB does not publish. It only changes what analytics show, never what a customer pays.
+
+## Razorpay sells INR only
+
+Razorpay checkout supports only INR. A customer assigned to Razorpay buys the family's INR variant: pass `currency: "INR"`, or rely on the customer's locked INR currency. A Razorpay checkout of an invoice in another currency is refused with `422 razorpay_requires_inr`. Customers paying in other currencies use Stripe. See the [Razorpay integration](/integrations/razorpay).
+
+## Errors
+
+All are `422 validation_errors` unless noted. The key in `error_details` is shown before the colon.
+
+| Error | When |
+| --- | --- |
+| `plan_family: plan_family_variant_mismatch` | A variant differs from its reference in something other than money. `plan_family_variant_mismatch` lists `plan_code`, `currency`, `interval`, `reference_plan_code`, `reference_currency` and the first differing `field`. |
+| `plan_family: plan_family_variant_prices_missing` | A structural edit leaves another variant without an amount. `plan_family_variant_prices_missing` lists `plan_code`, `currency` and `field`. Send them in `currency_amounts`. |
+| `plan_family: plan_family_custom_charge_not_supported` | A `custom` charge on an interval sold in several currencies. Same detail as above. |
+| `currency_amounts: value_is_invalid` | `currency_amounts` names a currency that is not another variant of the interval, or a path the plan does not have. `currency_amounts_invalid` lists `currency` and `field`. |
+| `interval: plan_family_interval_already_exist` | The family already has a current plan for that interval and currency. |
+| `currencies: plan_family_currency_in_use` | `updatePlanFamily` leaves out a currency the family sells. |
+| `currencies` or `default_currency: plan_family_currency_not_sold` | `updatePlanFamily` names a currency the family does not sell. |
+| `currency: value_is_invalid` | `GET /plans` with an unknown `currency`. |
+| `currency: currency_not_offered` | Checkout or subscribe by family: the family has no variant for that interval and currency. |
+| `interval: value_is_mandatory`, `interval: value_is_invalid` | Checkout or subscribe by family without an interval, or with an unknown one. |
+| `plan_family_code: incompatible_with_plan_code` | Both `plan_code` and `plan_family_code` were sent. |
+| `404 plan_family_not_found` | No family has that `plan_family_code`. |
+| `currency: customer_currency_mismatch` | The variant's currency is not the customer's locked currency. |
+| `plan_code: currencies_does_not_match` | A plan change to a plan in another currency. |
+| `422 razorpay_requires_inr` | A Razorpay checkout of an invoice that is not in INR. |
+| `400 invalid_request` (Engine) | `currency` or `external_customer_id` on the Engine `GET /plans` is repeated, longer than 255 bytes or has a control character. |

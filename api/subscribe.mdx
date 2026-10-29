@@ -13,8 +13,20 @@ Create a subscription directly without going through a checkout flow. Use this f
   External customer ID. The customer must already exist: create it first with [Create Customer](/api/create-customer). An unknown ID returns `404` and creates nothing.
 </ParamField>
 
-<ParamField body="plan_code" type="string" required>
-  The plan code to subscribe the customer to (e.g. `pro`). Without `plan_version`, the customer gets the code's current version.
+<ParamField body="plan_code" type="string">
+  The plan code to subscribe the customer to (e.g. `pro`). Without `plan_version`, the customer gets the code's current version. Required unless you send `plan_family_code` and `interval`.
+</ParamField>
+
+<ParamField body="plan_family_code" type="string">
+  Engine 2.21.0 and Core 11.10.0. Subscribe to a plan family instead of a plan code: Nozle picks the family's current plan for `interval` and `currency`. Cannot be combined with `plan_code`. See [Multi-currency pricing](/guides/billing/multi-currency-pricing#checkout-and-subscribe-by-family).
+</ParamField>
+
+<ParamField body="interval" type="string">
+  With `plan_family_code`, required: `weekly`, `monthly`, `quarterly`, `semiannual` or `yearly`.
+</ParamField>
+
+<ParamField body="currency" type="string">
+  With `plan_family_code`: the ISO 4217 code of the variant, for example `EUR`. Without it, Nozle uses the currency of the subscription with the same ID, else the customer's locked currency, else the family's default currency.
 </ParamField>
 
 <ParamField body="plan_version" type="integer">
@@ -24,7 +36,7 @@ Create a subscription directly without going through a checkout flow. Use this f
 ### Response
 
 <ResponseField name="subscription_id" type="string" required>
-  The subscription's external ID, `sub-<customer_id>-<plan_code>`. Use it in later subscription calls.
+  The subscription's external ID, `sub-<customer_id>-<plan_code>`, or `sub-<customer_id>-<plan_family_code>` for a subscription by family. Use it in later subscription calls.
 </ResponseField>
 
 <ResponseField name="status" type="string" required>
@@ -37,13 +49,15 @@ The response also carries Core's full `subscription` object, with the plan, bill
 
 | Status | Code | Meaning |
 |--------|------|---------|
-| `400` | | `plan_code` or `customer_id` is missing, or `plan_version` is below 1. |
+| `400` | | `customer_id` is missing, neither `plan_code` nor `plan_family_code` is given, or `plan_version` is below 1. |
 | `404` | `plan_version_not_found` | The code has no such version. |
 | `422` | `validation_errors` (`plan_version: plan_version_change_not_supported`) | The customer's subscription to this code is on another version. Calling again with the same code and no `plan_version` returns it on its own version; a [version migration](/api/plan-versions) moves it. |
 | `404` | `customer_not_found` | No customer has this `customer_id`. Create it with `POST /customers`, then call `subscribe` again. No subscription is created. |
 | `404` | `plan_not_found` | No plan has this `plan_code`. |
+| `404` | `plan_family_not_found` | No plan family has this `plan_family_code`. |
+| `422` | `validation_errors` | By family: `plan_family_code: incompatible_with_plan_code`, `interval: value_is_mandatory` or `value_is_invalid`, `currency: currency_not_offered`. Any plan: `currency: customer_currency_mismatch` when the plan is not in the customer's currency. |
 | `502` | | The customer could not be verified; retry. |
 
 ### Subscription ID and repeat calls
 
-The subscription external ID is always `sub-<customer_id>-<plan_code>`. Calling `subscribe` again with the same customer and plan returns `200` with the same subscription and creates no second one. Subscribing the same customer to a different plan creates a second active subscription next to the first; it does not replace it. Use [Upgrade](/api/upgrade) to change plans.
+The subscription external ID is always `sub-<customer_id>-<plan_code>`, or `sub-<customer_id>-<plan_family_code>` by family: one subscription per customer and family, whatever its interval and currency. Calling `subscribe` again with the same customer and plan returns `200` with the same subscription and creates no second one. Subscribing the same customer to a different plan creates a second active subscription next to the first; it does not replace it. Use [Upgrade](/api/upgrade) to change plans.

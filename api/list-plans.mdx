@@ -37,20 +37,72 @@ Only the current version of each plan code is returned. Older versions, which ex
 
 - A `pk_` key does not receive plans that are pending deletion, and `families[].plan_codes` leaves their codes out. `GET /plans/{code}` returns `404` with `"code": "plan_not_found"` for one.
 - An `sk_` key receives them, with `pending_deletion: true`.
-- A `pk_` key, or an `sk_` key with `include_hidden=false`, does not receive plans whose plan family is hidden from the pricing table in the list. Hiding a family is a listing setting only: `GET /plans/{code}` still returns a plan of a hidden family, or of a deleted family, to a `pk_` key, so the SDK can describe a subscriber's own plan.
+- A `pk_` key, or an `sk_` key with `include_hidden=false`, does not receive plans whose plan family is hidden from the pricing table in the list. Hiding a family is a listing setting only: `GET /plans/{code}` still returns a plan of a hidden family, or of a deleted family, to a `pk_` key, so the SDK can describe a subscriber's own plan. From Core 11.10.0 that plan comes without `family` and `prices`, so a `pk_` key never sees the codes of a hidden family's other plans.
 - `include_hidden` (secret keys only): send `include_hidden=false` to get the same pricing table view as a `pk_` key. Any other value, or none, returns every plan.
+- A plan family sold in several currencies is listed in one currency at a time. See [Currencies](#currencies).
 - Every plan, listed or read by code, carries all its entitlements and charges, including those of features hidden from the pricing table. Only the pricing table rows (`families[].features`) leave hidden features out.
 
 A plan created through `POST /plans`, the dashboard onboarding or the Agent Kit starts in a new plan family that is shown on the pricing table, so it is listed at once. Send `show_on_pricing: false` in `plan` (GraphQL `showOnPricing: false`) to create it hidden. A plan that joins an existing family with `plan_family_code` keeps that family's visibility.
 
 ### Plan families
 
-A plan family groups the billing intervals of one offer, for example "Pro" monthly and "Pro" yearly. Every plan has `plan_family_code`, and the list returns a `families` array with the display settings (`show_on_pricing`, `pricing_position`, `pricing_highlighted`, `badge_text`, `cta_text`, `plan_codes` and the feature rows) for the families of the returned plans.
+A plan family groups the billing intervals and currencies of one offer, for example "Pro" monthly and yearly, in USD and EUR. Every plan has `plan_family_code`, and the list returns a `families` array with the display settings (`show_on_pricing`, `pricing_position`, `pricing_highlighted`, `badge_text`, `cta_text`, `plan_codes`, `currencies`, `default_currency` and the feature rows) for the families of the returned plans.
 
 - `POST /plans` and `PUT /plans/{code}` accept `plan_family_code`. A code that does not exist yet creates the family; without a code the plan gets its own family.
-- A family holds at most one plan per `interval`, all in one currency. Otherwise the call returns `422` with `interval: plan_family_interval_already_exist` or `amount_currency: plan_family_currency_mismatch`.
+- From Core 11.10.0, a family holds at most one current plan per `interval` and currency. A second one returns `422` with `interval: plan_family_interval_already_exist`. Before, all plans of a family had one currency (`amount_currency: plan_family_currency_mismatch`, now removed).
+- A family's `currencies` are the currencies its current plans sell (Core 11.10.0). Creating a plan in a new currency adds it; deleting the last plan of a currency removes it, and the default moves to the first currency still sold. The GraphQL `updatePlanFamily` mutation only reorders `currencies` and picks `defaultCurrency` among them: leaving out a sold currency returns `currencies: plan_family_currency_in_use`, naming one that is not sold `plan_family_currency_not_sold` (on `currencies` or `default_currency`). There is no REST endpoint for it.
+- In a family sold in several currencies, the plans of one interval may differ only in money, and an edit of one plan is copied to the others of its interval without copying money. See [Multi-currency pricing](/guides/billing/multi-currency-pricing).
 - A plan that joins a family with other plans takes the family's features and privileges.
 - `POST`, `PATCH` and `DELETE /plans/{code}/entitlements` (and `.../privileges/{code}`) change the features and privileges of every plan in the family. `usage_limit` and `hard_limit` apply only to the plan in the path, because usage is counted per billing period.
+
+### Currencies
+
+Available from Core 11.10.0. On the Engine host, the two parameters need Engine 2.21.0.
+
+| Parameter | Description |
+|---|---|
+| `currency` | ISO 4217 code. Only plans in this currency are listed, with or without a family. An unknown currency returns `422` with `{"currency": ["value_is_invalid"]}`. |
+| `external_customer_id` | Secret keys only. When `currency` is not sent, lists the plans in this customer's locked currency. Ignored for an unknown customer, a customer without a currency yet, and an organization that allows several currencies per customer (`allow_multiple_currencies_per_customer`). |
+
+Without either parameter:
+
+- an `sk_` key receives every plan, all currency variants included, as before;
+- a `pk_` key (the pricing table) receives each family's `default_currency` plans. Plans without a family are all returned.
+
+A publishable key never reads a customer: the Engine drops `external_customer_id` from a `pk_` request. A customer-scoped Engine request (trusted internal authentication with `X-Nozle-Customer-Id`) always lists in its own customer's currency and returns `403 customer_scope_mismatch` when `external_customer_id` names another customer. On the Engine, a repeated `currency` or `external_customer_id`, a value longer than 255 bytes, or one with a control character returns `400 invalid_request`.
+
+Every plan of a family, listed or read with `GET /plans/{code}`, carries `family` and `prices` (see [Fields](#plan)). In `families[]`, `currencies` lists the currencies the family sells, in display order, `default_currency` is the one the pricing table shows first, and `plan_codes` lists the plans of the listed currency (every plan of the family for an `sk_` key without a currency).
+
+```bash
+curl "https://api.nozle.app/engine/api/v1/plans?currency=EUR" \
+  -H "Authorization: Bearer $NOZLE_PUBLISHABLE_KEY"
+```
+
+```json
+{
+  "plans": [
+    {
+      "code": "pro_eur",
+      "interval": "monthly",
+      "amount_cents": 900,
+      "amount_currency": "EUR",
+      "plan_family_code": "pro",
+      "family": { "code": "pro", "currencies": ["USD", "EUR"], "default_currency": "USD" },
+      "prices": [
+        { "currency": "USD", "interval": "monthly", "plan_code": "pro_usd", "amount_cents": 1000 },
+        { "currency": "EUR", "interval": "monthly", "plan_code": "pro_eur", "amount_cents": 900 },
+        { "currency": "USD", "interval": "yearly", "plan_code": "pro_usd_yearly", "amount_cents": 10000 },
+        { "currency": "EUR", "interval": "yearly", "plan_code": "pro_eur_yearly", "amount_cents": 90000 }
+      ]
+    }
+  ],
+  "families": [
+    { "code": "pro", "currencies": ["USD", "EUR"], "default_currency": "USD", "plan_codes": ["pro_eur", "pro_eur_yearly"] }
+  ]
+}
+```
+
+The example shows only the currency fields. To sell the plan in the chosen currency, check out its `code`, or `plan_family_code` with `interval` and `currency`; see [Checkout and subscribe by family](/guides/billing/multi-currency-pricing#checkout-and-subscribe-by-family).
 
 ### Pagination
 
@@ -141,6 +193,8 @@ Identifiers are named `nozle_id`. Amounts named `*_cents` are integers in the mi
 | `name` | string | Plan name. |
 | `description` | string or `null` | Plan description. |
 | `plan_family_code` | string or `null` | Code of the plan family. See [Plan families](#plan-families). |
+| `family` | object | Plans of a family only (Core 11.10.0): `code`, `currencies` (the currencies the family sells, in display order) and `default_currency`. |
+| `prices` | array | Plans of a family only (Core 11.10.0): every current plan of the family, in every interval and currency, as `{ "currency", "interval", "plan_code", "amount_cents" }`. Plans pending deletion are left out. |
 | `interval` | string | `weekly`, `monthly`, `quarterly`, `semiannual` or `yearly`. |
 | `amount_cents` | integer | Base price per `interval`, before tax, in the minor unit of `amount_currency`. `0` for a free or pure usage-based plan. Usage prices are in `charges`. |
 | `amount_currency` | string | ISO 4217 currency code, such as `USD`. |
@@ -228,14 +282,14 @@ Fields: `nozle_id`, `plan_id`, `plan_code`, `credit_system_id`, `credit_system_c
 
 ## React, Node, Python and Go
 
-The SDKs declare only five fields for each plan (`code`, `name`, `amount_cents`, `amount_currency`, `interval`), but the API sends the fields above.
+The SDKs declare only five fields for each plan (`code`, `name`, `amount_cents`, `amount_currency`, `interval`), plus `family` and `prices` from Node `0.22.0`, React `0.23.0`, Python `0.21.0` and Go `v0.20.0`, but the API sends the fields above. Those versions also take the catalog `currency`: Node `plans({ currency, externalCustomerId })`, React `PricingTable` `currency` and `currencies`, Python `plans(currency=..., external_customer_id=...)`, Go `Plans(ctx, nozle.WithCurrency("EUR"))`. See [Multi-currency pricing](/guides/billing/multi-currency-pricing#sdks).
 
 | Client | At runtime |
 |---|---|
 | React `usePlans` / `CatalogPlan` | The plan objects from this response. `PricingTable` renders only the fields it knows. |
 | Node `plans()` | The plan objects. |
 | Python `plans()` | The plan dictionaries. |
-| Go `Plans()` | Only the five declared fields; the Go `Plan` struct drops the rest. |
+| Go `Plans()` | Only the five declared fields, plus `Family` and `Prices` from `v0.20.0`; the Go `Plan` struct drops the rest. |
 
 In TypeScript, read an undeclared field by widening the type yourself. See [`usePlans`](/sdks/react/hooks#useplans).
 

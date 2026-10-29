@@ -72,6 +72,29 @@ Match on the status and `code`, not on the message text.
 
 An event that was accepted but never counted usually means the event name does not equal the feature code, or processing has not finished: events are processed asynchronously, so read usage again after a few seconds.
 
+## Multi-currency plan family errors
+
+Available from Core 11.10.0. These come from plans sold in several currencies. All are `422` with `code: validation_errors` unless noted; the key in `error_details` comes before the colon. See [Multi-currency pricing](/guides/billing/multi-currency-pricing).
+
+| Status and `code` | What happened | What to do |
+|---|---|---|
+| `422` `plan_family: plan_family_variant_mismatch` | A plan of the family differs from the reference plan of its interval in something other than money. `error_details.plan_family_variant_mismatch` lists `plan_code`, `currency`, `interval`, `reference_plan_code`, `reference_currency` and the first differing `field`. | Make the structure match; only money may differ. See [the parity rule](/guides/billing/multi-currency-pricing#the-parity-rule). |
+| `422` `plan_family: plan_family_variant_prices_missing` | An edit changes the structure, and another currency's plan has no amount for a new or rescaled part (a new charge or tier, a changed `package_size`, a changed threshold `recurring` flag, changed `custom_properties`). Nothing is saved. `error_details.plan_family_variant_prices_missing` lists `plan_code`, `currency` and `field`. | Send the amounts in `currency_amounts` with `PUT /plans/{code}`. A part-edit endpoint cannot take them. See [Edit prices](/guides/billing/multi-currency-pricing#edit-prices-in-several-currencies). |
+| `422` `plan_family: plan_family_custom_charge_not_supported` | A `custom` charge on an interval sold in several currencies. Same detail as above. | Sell that interval in one currency, or use another charge model. |
+| `422` `currency_amounts: value_is_invalid` | `currency_amounts` names a currency that is not another plan of the edited plan's interval, or a path that plan does not have. `error_details.currency_amounts_invalid` lists `currency` and `field`. | Use uppercase codes of the family's other currencies and the paths of the error's `field`. |
+| `422` `interval: plan_family_interval_already_exist` | The family already has a current plan for this interval and currency. | Edit that plan, or use another family. |
+| `422` `currencies: plan_family_currency_in_use` | `updatePlanFamily` leaves out a currency the family sells. | List every sold currency. Stop selling one by deleting its plans. |
+| `422` `currencies: plan_family_currency_not_sold`, `default_currency: plan_family_currency_not_sold` | `updatePlanFamily` names a currency no current plan of the family sells. | Create a plan in that currency first. |
+| `422` `currency: value_is_invalid` | `GET /plans` with an unknown `currency`. | Send an ISO 4217 code. |
+| `422` `currency: currency_not_offered` | Checkout or subscribe by `plan_family_code`: the family has no plan for this interval and currency. | Pick one of the family's `prices[]`. |
+| `422` `interval: value_is_mandatory`, `interval: value_is_invalid` | Checkout or subscribe by `plan_family_code` without an `interval`, or with an unknown one. | Send `weekly`, `monthly`, `quarterly`, `semiannual` or `yearly`. |
+| `422` `plan_family_code: incompatible_with_plan_code` | Both `plan_code` and `plan_family_code` were sent. | Send one of them. |
+| `404` `plan_family_not_found` | No plan family has this `plan_family_code`. | Check the code in `families[]` of `GET /plans`. |
+| `400` `invalid_request` (Engine 2.21.0) | `currency` or `external_customer_id` on the Engine `GET /plans` is repeated, longer than 255 bytes or has a control character. | Send each once. |
+| `403` `customer_scope_mismatch` (Engine 2.21.0) | A customer-scoped catalog request names another customer in `external_customer_id`. | Leave it out; the request lists its own customer's currency. |
+| `422` `unknown_currency`, `404` `fx_rates_not_found`, `400` `invalid_date` (Engine 2.21.0) | `GET /fx/rates` with a `base` that has no stored rate, a `date` before every stored rate, or a malformed `date`. | Use an ISO 4217 code, a later date, and `YYYY-MM-DD`. |
+| `400` `invalid_request` (Engine 2.21.0) | `GET /analytics/revenue-by-plan` with a `group_by` other than `plan` or `family`. | Send `plan` or `family`. |
+
 ## Sandbox errors
 
 _Unreleased._ These come from a [sandbox](/guides/getting-started/sandbox), mostly from the dashboard.
