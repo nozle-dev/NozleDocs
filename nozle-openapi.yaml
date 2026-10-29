@@ -4404,7 +4404,7 @@ paths:
       description: |-
         This endpoint generates a checkout link for a specific invoice. An invoice that is paid, voided, draft, closed, failed or has nothing due returns `422 validation_errors` with `error_details.base` `invalid_invoice_status_or_payment_status`.
 
-        From Core 11.15.4, `422 validation_errors` with `error_details.base`:
+        From Core 11.16.0, `422 validation_errors` with `error_details.base`:
         - `payment_already_processing` while an automatic debit of the invoice is waiting for the bank to settle (paying meanwhile would charge twice).
         - `invoice_carried_forward` when the amount due is below the payment provider's minimum charge: it was carried to the customer's next invoice and this invoice is settled. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
 
@@ -4423,7 +4423,7 @@ paths:
                 return_url:
                   type: string
                   format: uri
-                  description: 'Core 11.15.4. Where the payment provider sends the customer after paying a new pay link (Stripe success and cancel URL, Razorpay payment link callback). Validated like every checkout return URL: an HTTPS URL on Nozle''s origins or your organization''s `checkout_return_origins`, else `422` with `return_url: [invalid_or_untrusted]`. Without it, the customer stays on the provider''s page.'
+                  description: 'Core 11.16.0. Where the payment provider sends the customer after paying a new pay link (Stripe success and cancel URL, Razorpay payment link callback). Validated like every checkout return URL: an HTTPS URL on Nozle''s origins or your organization''s `checkout_return_origins`, else `422` with `return_url: [invalid_or_untrusted]`. Without it, the customer stays on the provider''s page.'
                   example: https://app.example.com/billing/paid
       responses:
         '200':
@@ -4612,7 +4612,7 @@ paths:
       description: |-
         This endpoint is used to create a payment request to collect payments of overdue invoices of a given customer. `payment_method` is used when given.
 
-        From Core 11.15.4, invoices whose amount due is below the payment provider's minimum charge (Stripe's minimum per currency, Razorpay INR 1) are carried to the customer's next invoice instead of being requested: the request asks for the others. When none is left, the call returns `422` with `code` `invoices_carried_forward` and nothing is created. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
+        From Core 11.16.0, invoices whose amount due is below the payment provider's minimum charge (Stripe's minimum per currency, Razorpay INR 1) are carried to the customer's next invoice instead of being requested: the request asks for the others. When none is left, the call returns `422` with `code` `invoices_carried_forward` and nothing is created. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
 
         For a customer who pays through Razorpay, the request reaches the customer only as a payment link sent by email. When the customer's billing entity has no email, the call returns `422` with `billing_entity: [billing_entity_email_missing]`, and without a recipient `email`, `email: [email_missing]`. Nothing is created in either case. Add an email to the billing entity first.
       operationId: createPaymentRequest
@@ -8006,7 +8006,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '422':
-          description: 'Core: `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active` (also right after a late upgrade payment for this plan was applied), `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`, or `base: [invalid_invoice_status_or_payment_status]` for an invoice checkout of an invoice that is paid, voided, draft, closed, failed or has nothing due, or `base: [payment_already_processing]` while a Stripe payment of the invoice''s last Checkout Session is processing or has succeeded, or from Core 11.15.4 while an automatic debit of the invoice is waiting for the bank, or `base: [invoice_carried_forward]` from Core 11.15.4 when the invoice''s amount due is below the provider''s minimum charge and was carried to the next invoice). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
+          description: 'Core: `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active` (also right after a late upgrade payment for this plan was applied), `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`, or `base: [invalid_invoice_status_or_payment_status]` for an invoice checkout of an invoice that is paid, voided, draft, closed, failed or has nothing due, or `base: [payment_already_processing]` while a Stripe payment of the invoice''s last Checkout Session is processing or has succeeded, or from Core 11.16.0 while an automatic debit of the invoice is waiting for the bank, or `base: [invoice_carried_forward]` from Core 11.16.0 when the invoice''s amount due is below the provider''s minimum charge and was carried to the next invoice). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
           content:
             application/json:
               schema:
@@ -15258,7 +15258,7 @@ webhooks:
     post:
       operationId: dunningStep
       summary: A step of the dunning policy ran for an unpaid invoice
-      description: 'Core 11.19.0. A step of the [dunning policy](/guides/billing/dunning) ran for an unpaid invoice of a customer: `payment_failed` (day 0), `reminder`, `final_reminder`, `end_action` (the last day of the grace) or `resolved` (sent once when the invoice no longer needs paying). Only dunning campaigns with an `end_action` send it.'
+      description: 'Core 11.16.0. A step of the [dunning policy](/guides/billing/dunning) ran for an unpaid invoice of a customer: `payment_failed` (day 0), `reminder`, `final_reminder`, `end_action` (the last day of the grace) or `resolved` (sent once when the invoice no longer needs paying). Only dunning campaigns with an `end_action` send it.'
       parameters:
         - $ref: '#/components/parameters/webhook_signature'
         - $ref: '#/components/parameters/webhook_signature_algorithm'
@@ -26480,20 +26480,20 @@ components:
             - string
             - 'null'
           format: date-time
-          description: 'Core 11.19.0. When the [dunning policy](/guides/billing/dunning) blocked the customer: an unpaid invoice is past the grace of its plan and the campaign ends with `block`. The Engine then answers `402` `customer_payment_overdue` for the customer. `null` when not blocked.'
+          description: 'Core 11.16.0. When the [dunning policy](/guides/billing/dunning) blocked the customer: an unpaid invoice is past the grace of its plan and the campaign ends with `block`. The Engine then answers `402` `customer_payment_overdue` for the customer. `null` when not blocked.'
           example: null
         dunning_day:
           type:
             - integer
             - 'null'
-          description: Core 11.19.0. Day of the dunning timeline that the customer's furthest unpaid invoice is on. `null` without a dunned invoice.
+          description: Core 11.16.0. Day of the dunning timeline that the customer's furthest unpaid invoice is on. `null` without a dunned invoice.
           example: null
         dunning_next_action_at:
           type:
             - string
             - 'null'
           format: date-time
-          description: Core 11.19.0. When the next step of the dunning policy runs, a retry included (only after a soft decline). `null` when none is planned.
+          description: Core 11.16.0. When the next step of the dunning policy runs, a retry included (only after a soft decline). `null` when none is planned.
           example: null
         billing_configuration:
           $ref: '#/components/schemas/CustomerBillingConfiguration'
@@ -27646,22 +27646,22 @@ components:
           type: integer
         carried_forward_amount_cents:
           type: integer
-          description: Core 11.15.4. The amount due of this invoice carried to the customer's next invoice because it was below the payment provider's minimum charge (Stripe's minimum per currency, Razorpay INR 1). `0` when nothing was carried. A carried invoice is settled (`payment_status` `succeeded`, `total_due_amount_cents` `0`) and is never charged or dunned. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
+          description: Core 11.16.0. The amount due of this invoice carried to the customer's next invoice because it was below the payment provider's minimum charge (Stripe's minimum per currency, Razorpay INR 1). `0` when nothing was carried. A carried invoice is settled (`payment_status` `succeeded`, `total_due_amount_cents` `0`) and is never charged or dunned. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
           example: 0
         carried_forward_invoice_id:
           type:
             - string
             - 'null'
           format: uuid
-          description: Core 11.15.4. The invoice that took the carried amount. `null` until the customer's next invoice in the same currency is finalized, and when nothing was carried.
+          description: Core 11.16.0. The invoice that took the carried amount. `null` until the customer's next invoice in the same currency is finalized, and when nothing was carried.
           example: null
         carried_in_amount_cents:
           type: integer
-          description: Core 11.15.4. The amounts of earlier invoices carried into this one, added to its total after taxes (the earlier invoices already charged their taxes). `0` when none.
+          description: Core 11.16.0. The amounts of earlier invoices carried into this one, added to its total after taxes (the earlier invoices already charged their taxes). `0` when none.
           example: 0
         carried_in_invoices:
           type: array
-          description: Core 11.15.4. The earlier invoices whose amounts were carried into this one. The PDF shows a line `Balance carried forward from invoice <number>` for each.
+          description: Core 11.16.0. The earlier invoices whose amounts were carried into this one. The PDF shows a line `Balance carried forward from invoice <number>` for each.
           items:
             type: object
             required:
@@ -32862,7 +32862,7 @@ components:
           type:
             - string
             - 'null'
-          description: 'Core 11.19.0. The dunning campaign the plan''s unpaid invoices follow, before the customer''s and the billing entity''s. `null` unlinks it. An unknown code returns `404` `dunning_campaign_not_found`. Editing it never creates a new plan version.'
+          description: 'Core 11.16.0. The dunning campaign the plan''s unpaid invoices follow, before the customer''s and the billing entity''s. `null` unlinks it. An unknown code returns `404` `dunning_campaign_not_found`. Editing it never creates a new plan version.'
           example: block_after_grace
         parent_id:
           type:
@@ -33605,7 +33605,7 @@ components:
               type:
                 - string
                 - 'null'
-              description: 'Core 11.19.0. The dunning campaign the plan''s unpaid invoices follow, before the customer''s and the billing entity''s. `null` unlinks it. An unknown code returns `404` `dunning_campaign_not_found`. Editing it never creates a new plan version.'
+              description: 'Core 11.16.0. The dunning campaign the plan''s unpaid invoices follow, before the customer''s and the billing entity''s. `null` unlinks it. An unknown code returns `404` `dunning_campaign_not_found`. Editing it never creates a new plan version.'
               example: block_after_grace
             tax_codes:
               $ref: '#/components/schemas/TaxCodes'
@@ -33978,7 +33978,7 @@ components:
               type:
                 - string
                 - 'null'
-              description: 'Core 11.19.0. The dunning campaign the plan''s unpaid invoices follow, before the customer''s and the billing entity''s. `null` unlinks it. An unknown code returns `404` `dunning_campaign_not_found`. Editing it never creates a new plan version.'
+              description: 'Core 11.16.0. The dunning campaign the plan''s unpaid invoices follow, before the customer''s and the billing entity''s. `null` unlinks it. An unknown code returns `404` `dunning_campaign_not_found`. Editing it never creates a new plan version.'
               example: block_after_grace
             tax_codes:
               $ref: '#/components/schemas/TaxCodes'
@@ -36672,7 +36672,7 @@ components:
           type: string
     DunningStepObject:
       type: object
-      description: 'Core 11.19.0. One step of the dunning policy of an unpaid invoice. See [Dunning policy](/guides/billing/dunning).'
+      description: 'Core 11.16.0. One step of the dunning policy of an unpaid invoice. See [Dunning policy](/guides/billing/dunning).'
       required:
         - invoice_id
         - invoice_number
@@ -37608,7 +37608,7 @@ components:
           description: Backward-compatible alias for `return_url`.
         invoice_id:
           type: string
-          description: Nozle invoice to collect payment for instead of starting a plan checkout. Cannot be combined with `subscription_id`. From Core 11.15.4 the hosted Stripe page offers only the customer's payment methods, a card saved while paying is recorded as the customer's payment method, and a `return_url` replaces an open Checkout Session that returns elsewhere.
+          description: Nozle invoice to collect payment for instead of starting a plan checkout. Cannot be combined with `subscription_id`. From Core 11.16.0 the hosted Stripe page offers only the customer's payment methods, a card saved while paying is recorded as the customer's payment method, and a `return_url` replaces an open Checkout Session that returns elsewhere.
         external_entity_id:
           type: string
           description: Customer Entity whose own subscription is checked out. Cannot be combined with `subscription_id`.

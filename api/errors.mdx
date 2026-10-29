@@ -68,8 +68,8 @@ Match on the status and `code`, not on the message text.
 | `422` `currencies_does_not_match` on `plan_code` (every plan change path from Core 11.9.0) | A plan change targets a plan in another currency. | Pick a plan in the subscription's currency. |
 | `422` `payment_provider_required` | The customer's payment provider is not connected. | Connect it, or assign one to the customer. See [checkout](/guides/billing/checkout). |
 | `422` `payment_already_processing` in `error_details.base` (pay link, invoice checkout) | An automatic debit of the invoice is waiting for the bank to settle (for example an Indian card during the bank's notice), or a payment of its last Checkout Session is processing. Paying now would charge twice. | Wait for the `invoice.payment_status_updated` webhook. If the debit fails, ask for a pay link again. |
-| `422` `invoice_carried_forward` in `error_details.base` (pay link, invoice checkout, Core 11.15.4) | The amount due is below the payment provider's minimum charge, so it was carried to the customer's next invoice. The invoice is settled. | Nothing to pay now. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum). |
-| `422` `invoices_carried_forward` (`POST /payment_requests`, Core 11.15.4) | Every invoice of the payment request is below the payment provider's minimum charge and was carried to the next invoice. Nothing is created. | Nothing to collect now. |
+| `422` `invoice_carried_forward` in `error_details.base` (pay link, invoice checkout, Core 11.16.0) | The amount due is below the payment provider's minimum charge, so it was carried to the customer's next invoice. The invoice is settled. | Nothing to pay now. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum). |
+| `422` `invoices_carried_forward` (`POST /payment_requests`, Core 11.16.0) | Every invoice of the payment request is below the payment provider's minimum charge and was carried to the next invoice. Nothing is created. | Nothing to collect now. |
 | `503` `credit_usage_contention` (`Retry-After: 1`), `credit_usage_temporarily_unavailable` (`Retry-After: 1`), `credit_usage_publication_backlog` (`Retry-After: 30`) | The credit balance is busy, or publication is delayed: 1,000 or more usage events are still being retried, or the oldest is older than 5 minutes. A dead-lettered event no longer blocks usage. | Retry the same request with the same `Idempotency-Key` after the `Retry-After` seconds. |
 | `503` `usage_unavailable` from `can()` | The usage lookup failed. The body carries a `request_id`. | Treat it as an unavailable decision, not a denial, and retry after a second. Quote the `request_id` if it persists. |
 
@@ -145,7 +145,7 @@ A refused event is not queued and is not billed later: see [what is lost](/guide
 
 ## Customer payment overdue
 
-_Unreleased (Engine 2.22.0, Core 11.19.0)._ The Engine answers `402` `customer_payment_overdue` for one of your customers whose unpaid invoices are past the grace of their plan, when the dunning campaign they follow ends with `block`. Your other customers are not affected. See [Dunning policy](/guides/billing/dunning).
+_Unreleased (Engine 2.22.0, Core 11.16.0)._ The Engine answers `402` `customer_payment_overdue` for one of your customers whose unpaid invoices are past the grace of their plan, when the dunning campaign they follow ends with `block`. Your other customers are not affected. See [Dunning policy](/guides/billing/dunning).
 
 | Surface | Body |
 |---|---|

@@ -42,7 +42,7 @@ Every Stripe checkout is a Stripe-hosted Checkout Session: a new subscription's 
 
 Credit top-ups and invoice payment URLs also open a Stripe-hosted page, valid for 24 hours.
 
-From Core 11.15.4 (_Unreleased_):
+From Core 11.16.0 (_Unreleased_):
 
 - **Only the customer's payment methods.** The hosted page of an invoice offers only the payment methods set on the customer (`provider_payment_methods`), like the pay link and the automatic charge. It no longer offers every method of your Stripe account, so a customer cannot pay with one (Cash App, Klarna...) that a renewal could never charge again.
 - **A card saved while paying is recorded.** When the customer pays on Stripe Checkout and the card is saved for later (an invoice pay link, a subscription or a plan change checkout), Nozle records it as the customer's payment method, like a card saved on the card page, with the India mandate when the charge carries one. Renewals then charge it automatically, and [`PaymentMethodDisplay`](/sdks/react/components/payment-method-display) shows it.
