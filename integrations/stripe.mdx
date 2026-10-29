@@ -350,6 +350,26 @@ Indian rules (RBI) do not let a business debit a card issued in India on its own
 
 **Turn it on.** Set the **Publishable key** on the Stripe connection. Without it, nothing changes and cards are saved on Stripe Checkout as before. A card saved on Stripe Checkout has no mandate, so it cannot be charged automatically if it was issued in India.
 
+### The publishable key: why, with it, without it
+
+**Why Nozle asks for it.** Stripe Checkout cannot register an e-mandate. Only a page that runs Stripe.js, with a SetupIntent or PaymentIntent that carries the mandate options, can. Nozle's card page does that, and Stripe.js needs your Stripe account's publishable key to start. The key is public: Stripe designed it to appear in web pages. It cannot read data or move money. It is not your secret key. Find it in the Stripe dashboard under **Developers > API keys**, and paste it in **Settings > Integrations > Stripe > Edit** (GraphQL: `publishableKey`). It must be in the same mode, test or live, as the secret key of the connection.
+
+| | Without the key | With the key |
+|---|---|---|
+| **Saving a card** | Stripe Checkout, Stripe's own page | Nozle's card page with Stripe's secure card fields |
+| **Card from India** | Saved without a mandate. It cannot be charged automatically: the customer pays each invoice on the pay link | One OTP from the bank registers the mandate. Renewals are then charged automatically, after the bank's 24 hour notice |
+| **Card from anywhere else** | Works as before | Works as before, with no extra step. The mandate settings are ignored |
+| **Pay link of an invoice** | Stripe Checkout | Nozle's page when the customer pays by card, or is from India |
+| **Workspace card step** | Stripe Checkout | Nozle's card page |
+| **Payment requests, crypto, paid plan upgrade checkout** | Stripe Checkout | Stripe Checkout. They cannot register a mandate |
+| **Look and feel** | Stripe's | Nozle's brand. In your app you can show it in a frame (see below) |
+
+**If you do not set it.** Nothing breaks. Everything keeps working through Stripe Checkout, exactly as before. Only cards issued in India lose automatic renewals, because Checkout cannot register their mandate.
+
+**If you remove it later.** New card saves go back to Stripe Checkout. Cards and mandates already saved stay, and automatic charges of a card with an active mandate carry on: charging does not need the key. Only the card page and the links that open it need it.
+
+**Wrong key.** A key of the other mode is refused when you save the connection. A key from a different Stripe account than the secret key is not detected when you save. Card saves then fail on the page, so copy both keys from the same account.
+
 **What the customer sees.** When the customer adds a card, the link opens a card page on Nozle's domain, with Stripe's secure card fields. For a card issued in India the bank asks for one OTP, and that registers the mandate with the card. For a card issued anywhere else the page behaves like any card form: no extra step. Nothing is charged when a card is only saved. Card details go from the browser to Stripe's fields and never reach Nozle, which keeps only Stripe's ids and the mandate status. The link is signed and expires after 24 hours.
 
 The card page is used for the card setup links of a customer (the `customer.checkout_url_generated` webhook carries the link), and for Nozle's own workspace card step. It is used only when the customer's payment methods are `card` or `card` with `link`. The pay link of an invoice (the link in the emails, the workspace pay link and the dashboard **Pay** button) opens the same page when the connection has a publishable key and either the customer pays by card (or Link) only and the link would save the card, or the customer is from India (_Unreleased_). The customer pays the invoice there and, for a card issued in India, the bank registers the mandate in the same authentication. The page reads the amount from the invoice when it asks Stripe for the payment, so it is always the amount due at that moment. It answers `410` once the invoice is no longer payable. Other links (payment requests, crypto) and the paid plan upgrade checkout still use Stripe Checkout, which cannot register a mandate, and Checkout does not save the card of a customer from India. [`POST /customers/{customer_id}/payment-method/manage`](/api/manage-payment-method) returns the same page when the connection has a publishable key and the customer pays by card only; otherwise it returns the Stripe Billing Portal.
