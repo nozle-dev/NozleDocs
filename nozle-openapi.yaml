@@ -15307,9 +15307,9 @@ webhooks:
               organization_id: 00000000-0000-4000-8000-000000000001
               livemode: true
               dunning_step:
-                lago_invoice_id: 00000000-0000-4000-8000-000000000006
+                invoice_id: 00000000-0000-4000-8000-000000000006
                 invoice_number: ACME-47DD-012-001
-                lago_customer_id: 00000000-0000-4000-8000-000000000003
+                customer_id: 00000000-0000-4000-8000-000000000003
                 external_customer_id: customer_123
                 dunning_campaign_code: block_after_grace
                 step: reminder
@@ -36643,9 +36643,9 @@ components:
       type: object
       description: 'Core 11.19.0. One step of the dunning policy of an unpaid invoice. See [Dunning policy](/guides/billing/dunning).'
       required:
-        - lago_invoice_id
+        - invoice_id
         - invoice_number
-        - lago_customer_id
+        - customer_id
         - step
         - day
         - grace_days
@@ -36655,7 +36655,7 @@ components:
         - total_due_amount_cents
         - currency
       properties:
-        lago_invoice_id:
+        invoice_id:
           type: string
           format: uuid
           description: Unique identifier of the unpaid invoice, created by Nozle.
@@ -36664,7 +36664,7 @@ components:
           type: string
           description: Number of the unpaid invoice.
           example: ACME-47DD-012-001
-        lago_customer_id:
+        customer_id:
           type: string
           format: uuid
           description: Unique identifier of the customer, created by Nozle.
