@@ -39,6 +39,8 @@ When a payment fails, Nozle records the failed payment status. Dunning and retri
 - Automatic dunning: configurable retry schedule. It is part of the Growth, Scale and Enterprise [Nozle plans](/guides/getting-started/nozle-plans#premium-features). The hourly run creates a payment request for each overdue invoice of a customer with a campaign, on the campaign's schedule: it retries the payment with the customer's payment provider, or emails the customer the payment link when there is none. A customer or billing entity can use only a dunning campaign of your own organization. For a customer who pays through Razorpay the payment link goes out by email, so the billing entity needs an email: without one, the payment request is refused with `billing_entity_email_missing` instead of being created for nobody.
 - Dunning policy (_Unreleased_): a campaign with an end action follows a timeline over the plan's grace days instead of the attempt cadence, and blocks the customer's usage when the grace ends. See [Dunning policy](/guides/billing/dunning).
 - Manual dunning: manually trigger retry
+- Amounts below the payment provider's minimum charge (_Unreleased_) are not charged or dunned: they are carried to the customer's next invoice. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
+- Pay now and pay links are refused with `payment_already_processing` while an automatic debit of the invoice is waiting for the bank. See [Pay links](/guides/billing/checkout#pay-links).
 
 **Product credit top-ups:**
 

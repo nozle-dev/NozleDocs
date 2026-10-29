@@ -398,7 +398,13 @@ const pdf = await nozle.invoices.downloadUrl(invoice.nozle_id)                  
 const overdue = await nozle.invoices.list('cus_123', { paymentOverdue: true })
 ```
 
-Pay an open invoice with `checkoutInvoice`.
+Pay an open invoice with `checkoutInvoice`. From 0.23.0 (_Unreleased_), pass `returnUrl` so the customer comes back to your page after paying instead of staying on the provider's page. It is validated like every checkout return URL.
+
+```ts
+const result = await nozle.checkoutInvoice(invoiceId, {
+  returnUrl: 'https://app.example.com/billing/paid',
+})
+```
 
 A PDF is generated the first time it is asked for, so the download call returns no URL until it exists; ask again a few seconds later, or wait for the `invoice.generated` webhook.
 

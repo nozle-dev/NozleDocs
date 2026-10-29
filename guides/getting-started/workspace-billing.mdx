@@ -57,7 +57,7 @@ Both are 7 days by default. The grace of the workspace's past-due period is the 
 
 ## When a payment fails
 
-Day 0 is the moment a Nozle invoice is unpaid: its automatic charge failed, or it stayed unpaid for one hour after it was issued (no payment method, or a charge that needs a member). A debit that is still processing (an Indian card during the bank's notice) is not a failure and does not start day 0.
+Day 0 is the moment a Nozle invoice is unpaid: its automatic charge failed, or it stayed unpaid for one hour after it was issued (no payment method, or a charge that needs a member). A debit that is still processing (an Indian card during the bank's notice) is not a failure and does not start day 0. An invoice below the payment provider's minimum charge never makes the workspace past due: its amount is carried to the next Nozle invoice (see [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum)).
 
 With the default grace of 7 days:
 
@@ -70,10 +70,11 @@ With the default grace of 7 days:
 | 6 | Final reminder with the deadline. |
 | 7 | The workspace is suspended if anything is still owed. Every member gets the "service paused" email. |
 
-For another grace, the reminder falls on `round(grace × 3 / 7)`, the final reminder on the day before the end, and the suspension on the last day. Retries stay on days 1 and 5 when they fall before the end. A grace of 0 suspends on day 0.
+For another grace, the reminder falls on `round(grace × 3 / 7)`, the final reminder on the day before the end, and the suspension on the last day. Retries stay on days 1 and 5 when they fall before the end. A grace of 0 suspends on day 0. Each email is sent once per past-due period, so a grace changed while the workspace is past due never skips a step.
 
-- The **Pay** link in each email needs no login. It opens a hosted payment page for the amount due now. Every click opens a new page, so the amount is always current.
-- The banner can be dismissed and comes back after 3 hours. It hides **Pay now** while an automatic debit of an owed invoice is waiting for the bank.
+- The **Pay** link in each email needs no login. It opens a hosted payment page for the amount due now. Every click opens a new page, so the amount is always current. It works for a workspace that never added a card.
+- While an automatic debit of an invoice is waiting for the bank, paying that invoice is refused with `payment_already_processing`, so it is not charged twice. **Nozle invoices** shows **Debit in progress** instead of **Pay** on that invoice, and the banners drop their **Pay now** link.
+- The banner can be dismissed and comes back after 3 hours.
 - Any member can pay under **Nozle invoices** in the dashboard.
 - Adding or changing the payment method retries the charge at once. If nothing is owed any more, the cycle ends and the banner disappears.
 - Paying before the deadline means the workspace is never suspended.
@@ -84,7 +85,7 @@ For another grace, the reminder falls on `round(grace × 3 / 7)`, the final remi
 While a Nozle invoice is past due:
 
 - **Allowed:** upgrading the plan (also while an invoice of the plan is owed), paying, and adding or changing the payment method.
-- **Refused:** downgrading and cancelling the Nozle plan, with the code `workspace_past_due` (HTTP `422`, or GraphQL `extensions.code`). The plan change dialog says to pay the invoice first. See [Errors](/api/errors#workspace-billing-errors).
+- **Refused:** every way to downgrade or cancel the Nozle plan, with the code `workspace_past_due` (HTTP `422`, or GraphQL `extensions.code`): a downgrade now or scheduled for the end of the period, a downgrade checkout, its plan change preview, and cancelling. The plan change dialog says to pay the invoice first, with a **Pay now** link. A move to another version of the same plan is not a downgrade and goes on. See [Errors](/api/errors#workspace-billing-errors).
 
 ## Banners and emails about payments
 
@@ -99,13 +100,14 @@ Core tells the dashboard when to show each of these, read live from the payment 
 
 ### What a failed payment asks of you
 
-The first failed-payment email and the reminder on day 3 say what to do, based on why the latest failed charge failed (the payment provider's structured error and decline codes, never the message text). The dashboard reads the same outcome in the GraphQL field `workspaceBilling.failureAction` (`CONFIRM_PAYMENT`, `CHANGE_CARD` or `RETRY_LATER`), which is `null` unless the status is `past_due`. The banner copy follows it.
+The first failed-payment email and the reminder on day 3 say what to do, based on why the latest failed charge failed (the payment provider's structured error and decline codes, never the message text). The dashboard reads the same outcome in the GraphQL field `workspaceBilling.failureAction` (`CONFIRM_PAYMENT`, `CHANGE_CARD`, `RETRY_LATER` or `ADD_PAYMENT_METHOD`), which is `null` unless the status is `past_due`. The banner copy follows it.
 
 | `failureAction` | What happened | What the email and banner say |
 |---|---|---|
 | `CONFIRM_PAYMENT` | Your bank asked you to confirm the payment (authentication needed, or the India mandate is missing, cancelled or not approved). | "Your bank asked you to confirm this payment". Use **Pay now** to confirm it with your bank. Nozle does not retry it: nothing happens until a member pays. |
 | `CHANGE_CARD` | The card will not work for this invoice (for example lost, stolen or expired). | "This card could not be charged". Use **Change card** to pay with another card. Nozle does not retry it. |
 | `RETRY_LATER` | The card may work later (for example insufficient funds). | "Declined or needs your approval". Nozle retries the card on days 1 and 5 (before the deadline), and you can pay at any time. |
+| `ADD_PAYMENT_METHOD` | No payment failed: the workspace has no payment method Nozle can charge (_Unreleased_). | Pay with the **Pay** link, or add a payment method. Nothing says a card was declined. |
 
 The final reminder and the suspension email do not promise a retry in any case.
 

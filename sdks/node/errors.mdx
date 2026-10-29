@@ -67,7 +67,7 @@ _Unreleased (0.23.0, needs Engine 2.22.0)._ One of your customers whose unpaid i
 
 - `can()` does not throw. It returns `{ allowed: false, reason: 'customer_payment_overdue', used: 0, limit: null, remaining: null }`, so you can ask the customer to pay. `createBillingHandler`'s entitlement route, and so React `useEntitlement`, returns the same denial as data.
 - `track()`, `usage.check()` and `usage.track()` throw `NozleApiError` with `code` `customer_payment_overdue` (the `CUSTOMER_PAYMENT_OVERDUE` constant). Nothing is tracked.
-- `isCustomerPaymentOverdue(error)` is `true` for that `NozleApiError`, and for the LLM proxy's `402` surfaced by a provider SDK that keeps the response body.
+- `isCustomerPaymentOverdue(error)` is `true` for that `NozleApiError`, and for the LLM proxy's `402` surfaced by a provider SDK that keeps the response body (`status` 402 with `code` or `error.code`). From Engine 2.22.0 the proxy answers in the provider's error shape, so the OpenAI and Anthropic SDKs surface `error.code`; see [LLM proxy errors](/api/llm-proxy#errors). `NozleApiError.message` reads the proxy's nested `error.message` too.
 - `/events/batch`: a partial batch is a `200` that stores the other customers' events and lists the refused ones by position in `error_details` (`EventBatchResponse`). `refusedEventIndexes(body.error_details, CUSTOMER_PAYMENT_OVERDUE)` returns those positions in ascending order. When every event is refused the batch answers `402` and stores nothing; `error.refusedEventIndexes(CUSTOMER_PAYMENT_OVERDUE)` lists them on the `NozleApiError`.
 
 ```ts

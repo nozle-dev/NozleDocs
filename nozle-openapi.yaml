@@ -4401,10 +4401,30 @@ paths:
       tags:
         - Invoices
       summary: Generate a payment URL
-      description: This endpoint generates a checkout link for a specific invoice. An invoice that is paid, voided, draft, closed, failed or has nothing due returns `422 validation_errors` with `error_details.base` `invalid_invoice_status_or_payment_status`.
+      description: |-
+        This endpoint generates a checkout link for a specific invoice. An invoice that is paid, voided, draft, closed, failed or has nothing due returns `422 validation_errors` with `error_details.base` `invalid_invoice_status_or_payment_status`.
+
+        From Core 11.15.4, `422 validation_errors` with `error_details.base`:
+        - `payment_already_processing` while an automatic debit of the invoice is waiting for the bank to settle (paying meanwhile would charge twice).
+        - `invoice_carried_forward` when the amount due is below the payment provider's minimum charge: it was carried to the customer's next invoice and this invoice is settled. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
+
+        An unexpired pay link keeps the return URL it was created with.
       parameters:
         - $ref: '#/components/parameters/invoice_id'
       operationId: invoicePaymentUrl
+      requestBody:
+        description: Optional. Where to send the customer after paying.
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                return_url:
+                  type: string
+                  format: uri
+                  description: 'Core 11.15.4. Where the payment provider sends the customer after paying a new pay link (Stripe success and cancel URL, Razorpay payment link callback). Validated like every checkout return URL: an HTTPS URL on Nozle''s origins or your organization''s `checkout_return_origins`, else `422` with `return_url: [invalid_or_untrusted]`. Without it, the customer stays on the provider''s page.'
+                  example: https://app.example.com/billing/paid
       responses:
         '200':
           description: Payment URL has been generated
@@ -4591,6 +4611,8 @@ paths:
       summary: Create a payment request
       description: |-
         This endpoint is used to create a payment request to collect payments of overdue invoices of a given customer. `payment_method` is used when given.
+
+        From Core 11.15.4, invoices whose amount due is below the payment provider's minimum charge (Stripe's minimum per currency, Razorpay INR 1) are carried to the customer's next invoice instead of being requested: the request asks for the others. When none is left, the call returns `422` with `code` `invoices_carried_forward` and nothing is created. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
 
         For a customer who pays through Razorpay, the request reaches the customer only as a payment link sent by email. When the customer's billing entity has no email, the call returns `422` with `billing_entity: [billing_entity_email_missing]`, and without a recipient `email`, `email: [email_missing]`. Nothing is created in either case. Add an email to the billing entity first.
       operationId: createPaymentRequest
@@ -7984,7 +8006,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '422':
-          description: 'Core: `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active` (also right after a late upgrade payment for this plan was applied), `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`, or `base: [invalid_invoice_status_or_payment_status]` for an invoice checkout of an invoice that is paid, voided, draft, closed, failed or has nothing due, or `base: [payment_already_processing]` while a Stripe payment of the invoice''s last Checkout Session is processing or has succeeded). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
+          description: 'Core: `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active` (also right after a late upgrade payment for this plan was applied), `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`, or `base: [invalid_invoice_status_or_payment_status]` for an invoice checkout of an invoice that is paid, voided, draft, closed, failed or has nothing due, or `base: [payment_already_processing]` while a Stripe payment of the invoice''s last Checkout Session is processing or has succeeded, or from Core 11.15.4 while an automatic debit of the invoice is waiting for the bank, or `base: [invoice_carried_forward]` from Core 11.15.4 when the invoice''s amount due is below the provider''s minimum charge and was carried to the next invoice). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
           content:
             application/json:
               schema:
@@ -13276,26 +13298,19 @@ paths:
               schema:
                 type: string
         '400':
-          $ref: '#/components/responses/EngineBadRequest'
+          $ref: '#/components/responses/OpenAIProxyBadRequest'
         '401':
-          $ref: '#/components/responses/EngineUnauthorized'
+          $ref: '#/components/responses/OpenAIProxyUnauthorized'
         '402':
-          $ref: '#/components/responses/EngineCustomerPaymentOverdue'
+          $ref: '#/components/responses/OpenAIProxyPaymentRequired'
         '403':
-          $ref: '#/components/responses/EngineForbidden'
+          $ref: '#/components/responses/OpenAIProxyForbidden'
         '422':
-          description: No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EngineError'
-              example:
-                code: active_subscription_ambiguous
-                error: customer has multiple active subscriptions; set X-Nozle-Subscription
+          $ref: '#/components/responses/OpenAIProxyNoSubscription'
         '502':
           description: Engine could not reach the provider or read its response. The body is empty.
         '503':
-          $ref: '#/components/responses/EngineUnavailable'
+          $ref: '#/components/responses/OpenAIProxyUnavailable'
     get:
       servers:
         - url: https://api.nozle.app/engine/api/v1
@@ -13366,26 +13381,19 @@ paths:
               schema:
                 type: string
         '400':
-          $ref: '#/components/responses/EngineBadRequest'
+          $ref: '#/components/responses/OpenAIProxyBadRequest'
         '401':
-          $ref: '#/components/responses/EngineUnauthorized'
+          $ref: '#/components/responses/OpenAIProxyUnauthorized'
         '402':
-          $ref: '#/components/responses/EngineCustomerPaymentOverdue'
+          $ref: '#/components/responses/OpenAIProxyPaymentRequired'
         '403':
-          $ref: '#/components/responses/EngineForbidden'
+          $ref: '#/components/responses/OpenAIProxyForbidden'
         '422':
-          description: No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EngineError'
-              example:
-                code: active_subscription_ambiguous
-                error: customer has multiple active subscriptions; set X-Nozle-Subscription
+          $ref: '#/components/responses/OpenAIProxyNoSubscription'
         '502':
           description: Engine could not reach the provider or read its response. The body is empty.
         '503':
-          $ref: '#/components/responses/EngineUnavailable'
+          $ref: '#/components/responses/OpenAIProxyUnavailable'
   /proxy/anthropic/{providerPath}:
     parameters:
       - name: providerPath
@@ -13484,26 +13492,19 @@ paths:
               schema:
                 type: string
         '400':
-          $ref: '#/components/responses/EngineBadRequest'
+          $ref: '#/components/responses/AnthropicProxyBadRequest'
         '401':
-          $ref: '#/components/responses/EngineUnauthorized'
+          $ref: '#/components/responses/AnthropicProxyUnauthorized'
         '402':
-          $ref: '#/components/responses/EngineCustomerPaymentOverdue'
+          $ref: '#/components/responses/AnthropicProxyPaymentRequired'
         '403':
-          $ref: '#/components/responses/EngineForbidden'
+          $ref: '#/components/responses/AnthropicProxyForbidden'
         '422':
-          description: No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EngineError'
-              example:
-                code: active_subscription_ambiguous
-                error: customer has multiple active subscriptions; set X-Nozle-Subscription
+          $ref: '#/components/responses/AnthropicProxyNoSubscription'
         '502':
           description: Engine could not reach the provider or read its response. The body is empty.
         '503':
-          $ref: '#/components/responses/EngineUnavailable'
+          $ref: '#/components/responses/AnthropicProxyUnavailable'
     get:
       servers:
         - url: https://api.nozle.app/engine/api/v1
@@ -13581,26 +13582,19 @@ paths:
               schema:
                 type: string
         '400':
-          $ref: '#/components/responses/EngineBadRequest'
+          $ref: '#/components/responses/AnthropicProxyBadRequest'
         '401':
-          $ref: '#/components/responses/EngineUnauthorized'
+          $ref: '#/components/responses/AnthropicProxyUnauthorized'
         '402':
-          $ref: '#/components/responses/EngineCustomerPaymentOverdue'
+          $ref: '#/components/responses/AnthropicProxyPaymentRequired'
         '403':
-          $ref: '#/components/responses/EngineForbidden'
+          $ref: '#/components/responses/AnthropicProxyForbidden'
         '422':
-          description: No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EngineError'
-              example:
-                code: active_subscription_ambiguous
-                error: customer has multiple active subscriptions; set X-Nozle-Subscription
+          $ref: '#/components/responses/AnthropicProxyNoSubscription'
         '502':
           description: Engine could not reach the provider or read its response. The body is empty.
         '503':
-          $ref: '#/components/responses/EngineUnavailable'
+          $ref: '#/components/responses/AnthropicProxyUnavailable'
   /cost-models:
     post:
       servers:
@@ -26499,7 +26493,7 @@ components:
             - string
             - 'null'
           format: date-time
-          description: Core 11.19.0. When the next step of the dunning policy runs, a retry included. `null` when none is planned.
+          description: Core 11.19.0. When the next step of the dunning policy runs, a retry included (only after a soft decline). `null` when none is planned.
           example: null
         billing_configuration:
           $ref: '#/components/schemas/CustomerBillingConfiguration'
@@ -27650,6 +27644,43 @@ components:
           type: integer
         total_offsetted_credit_note_amount_cents:
           type: integer
+        carried_forward_amount_cents:
+          type: integer
+          description: Core 11.15.4. The amount due of this invoice carried to the customer's next invoice because it was below the payment provider's minimum charge (Stripe's minimum per currency, Razorpay INR 1). `0` when nothing was carried. A carried invoice is settled (`payment_status` `succeeded`, `total_due_amount_cents` `0`) and is never charged or dunned. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
+          example: 0
+        carried_forward_invoice_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: Core 11.15.4. The invoice that took the carried amount. `null` until the customer's next invoice in the same currency is finalized, and when nothing was carried.
+          example: null
+        carried_in_amount_cents:
+          type: integer
+          description: Core 11.15.4. The amounts of earlier invoices carried into this one, added to its total after taxes (the earlier invoices already charged their taxes). `0` when none.
+          example: 0
+        carried_in_invoices:
+          type: array
+          description: Core 11.15.4. The earlier invoices whose amounts were carried into this one. The PDF shows a line `Balance carried forward from invoice <number>` for each.
+          items:
+            type: object
+            required:
+              - nozle_id
+              - number
+              - amount_cents
+            properties:
+              nozle_id:
+                type: string
+                format: uuid
+                description: The earlier invoice.
+              number:
+                type: string
+                description: Its number.
+                example: ACME-47DD-012-001
+              amount_cents:
+                type: integer
+                description: The amount carried from it (its `carried_forward_amount_cents`).
+                example: 30
         xml_url:
           type:
             - string
@@ -36723,7 +36754,7 @@ components:
             - end_action
             - retry
             - null
-          description: The next step of the timeline, a retry included. `null` after the last one and on `resolved`.
+          description: The next step of the timeline. `retry` only when the last decline is retried (a soft decline); after a hard decline or one that needs the customer, the next message step. `null` after the last one and on `resolved`.
           example: retry
         next_action_at:
           type:
@@ -37194,6 +37225,75 @@ components:
         request_id:
           type: string
           description: Request id to quote to support, when the Engine includes it.
+    OpenAIProxyError:
+      type: object
+      description: 'Engine 2.22.0. A refusal of an OpenAI route of the LLM proxy, in OpenAI''s error shape so the OpenAI SDK surfaces `error.code`. The top-level `code` is the same code. Before Engine 2.22.0 the body was `{"code", "error"}` with `error` a string.'
+      required:
+        - error
+        - code
+      properties:
+        error:
+          type: object
+          required:
+            - message
+            - type
+            - code
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+              enum:
+                - invalid_request_error
+                - authentication_error
+                - payment_required
+                - permission_error
+                - rate_limit_error
+                - api_error
+              description: '`invalid_request_error` for `400` and `422`, `authentication_error` for `401`, `payment_required` for `402`, `permission_error` for `403`, `rate_limit_error` for `429`, else `api_error`.'
+            code:
+              type: string
+              description: The Nozle error code, for example `customer_payment_overdue`.
+        code:
+          type: string
+          description: The same code, kept at the top level.
+    AnthropicProxyError:
+      type: object
+      description: 'Engine 2.22.0. A refusal of an Anthropic route of the LLM proxy, in Anthropic''s error shape so the Anthropic SDK surfaces it. The top-level `code` is the same code. Before Engine 2.22.0 the body was `{"code", "error"}` with `error` a string.'
+      required:
+        - type
+        - error
+        - code
+      properties:
+        type:
+          type: string
+          enum:
+            - error
+        error:
+          type: object
+          required:
+            - type
+            - message
+            - code
+          properties:
+            type:
+              type: string
+              enum:
+                - invalid_request_error
+                - authentication_error
+                - billing_error
+                - permission_error
+                - rate_limit_error
+                - api_error
+              description: '`invalid_request_error` for `400` and `422`, `authentication_error` for `401`, `billing_error` for `402`, `permission_error` for `403`, `rate_limit_error` for `429`, else `api_error`.'
+            message:
+              type: string
+            code:
+              type: string
+              description: The Nozle error code, for example `customer_payment_overdue`.
+        code:
+          type: string
+          description: The same code, kept at the top level.
     BillingCoreError:
       type: object
       description: Error body produced by Core and forwarded unchanged by Engine. Checkout errors always carry `status`, `error` and `code`; some conflict responses of other routes carry only `code`. Validation failures carry `error_details`, an object whose keys are field names and whose values are arrays of error codes.
@@ -37508,7 +37608,7 @@ components:
           description: Backward-compatible alias for `return_url`.
         invoice_id:
           type: string
-          description: Nozle invoice to collect payment for instead of starting a plan checkout. Cannot be combined with `subscription_id`.
+          description: Nozle invoice to collect payment for instead of starting a plan checkout. Cannot be combined with `subscription_id`. From Core 11.15.4 the hosted Stripe page offers only the customer's payment methods, a card saved while paying is recorded as the customer's payment method, and a `return_url` replaces an open Checkout Session that returns elsewhere.
         external_entity_id:
           type: string
           description: Customer Entity whose own subscription is checked out. Cannot be combined with `subscription_id`.
@@ -41554,6 +41654,156 @@ components:
           example:
             code: customer_payment_overdue
             error: "This customer's invoices are unpaid past their grace period. Usage resumes once they are paid."
+    OpenAIProxyBadRequest:
+      description: '`invalid_request`: `X-Nozle-Customer-Id` is missing, or the request body could not be read. In the OpenAI error shape from Engine 2.22.0.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpenAIProxyError'
+          example:
+            error:
+              message: 'missing X-Nozle-Customer-Id header'
+              type: invalid_request_error
+              code: invalid_request
+            code: invalid_request
+    OpenAIProxyUnauthorized:
+      description: '`unauthorized`: `X-Nozle-Key` is missing or unknown. In the OpenAI error shape from Engine 2.22.0.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpenAIProxyError'
+          example:
+            error:
+              message: 'invalid nozle key'
+              type: authentication_error
+              code: unauthorized
+            code: unauthorized
+    OpenAIProxyPaymentRequired:
+      description: '`customer_payment_overdue` (Engine 2.22.0): the customer''s unpaid invoices are past the grace of their plan and their [dunning policy](/guides/billing/dunning) ends with `block`; the provider is not called. `workspace_suspended` or `card_required`: your workspace is blocked by Nozle, see [Errors](/api/errors#workspace-billing-errors). Do not retry. In the OpenAI error shape from Engine 2.22.0.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpenAIProxyError'
+          example:
+            error:
+              message: 'This customer''s invoices are unpaid past their grace period. Usage resumes once they are paid.'
+              type: payment_required
+              code: customer_payment_overdue
+            code: customer_payment_overdue
+    OpenAIProxyForbidden:
+      description: '`publishable_key_not_allowed` (a publishable key) or `permission_denied` (the key cannot write events). In the OpenAI error shape from Engine 2.22.0.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpenAIProxyError'
+          example:
+            error:
+              message: 'API key requires event:write permission'
+              type: permission_error
+              code: permission_denied
+            code: permission_denied
+    OpenAIProxyNoSubscription:
+      description: 'No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called. In the OpenAI error shape from Engine 2.22.0.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpenAIProxyError'
+          example:
+            error:
+              message: 'customer has multiple active subscriptions; set X-Nozle-Subscription'
+              type: invalid_request_error
+              code: active_subscription_ambiguous
+            code: active_subscription_ambiguous
+    OpenAIProxyUnavailable:
+      description: '`unavailable`: the key, the subscription or the customer payment state could not be read. The provider is not called. Retry later. In the OpenAI error shape from Engine 2.22.0.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpenAIProxyError'
+          example:
+            error:
+              message: 'subscription lookup is unavailable'
+              type: api_error
+              code: unavailable
+            code: unavailable
+    AnthropicProxyBadRequest:
+      description: '`invalid_request`: `X-Nozle-Customer-Id` is missing, or the request body could not be read. In the Anthropic error shape from Engine 2.22.0.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AnthropicProxyError'
+          example:
+            type: error
+            error:
+              type: invalid_request_error
+              message: 'missing X-Nozle-Customer-Id header'
+              code: invalid_request
+            code: invalid_request
+    AnthropicProxyUnauthorized:
+      description: '`unauthorized`: `X-Nozle-Key` is missing or unknown. In the Anthropic error shape from Engine 2.22.0.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AnthropicProxyError'
+          example:
+            type: error
+            error:
+              type: authentication_error
+              message: 'invalid nozle key'
+              code: unauthorized
+            code: unauthorized
+    AnthropicProxyPaymentRequired:
+      description: '`customer_payment_overdue` (Engine 2.22.0): the customer''s unpaid invoices are past the grace of their plan and their [dunning policy](/guides/billing/dunning) ends with `block`; the provider is not called. `workspace_suspended` or `card_required`: your workspace is blocked by Nozle, see [Errors](/api/errors#workspace-billing-errors). Do not retry. In the Anthropic error shape from Engine 2.22.0.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AnthropicProxyError'
+          example:
+            type: error
+            error:
+              type: billing_error
+              message: 'This customer''s invoices are unpaid past their grace period. Usage resumes once they are paid.'
+              code: customer_payment_overdue
+            code: customer_payment_overdue
+    AnthropicProxyForbidden:
+      description: '`publishable_key_not_allowed` (a publishable key) or `permission_denied` (the key cannot write events). In the Anthropic error shape from Engine 2.22.0.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AnthropicProxyError'
+          example:
+            type: error
+            error:
+              type: permission_error
+              message: 'API key requires event:write permission'
+              code: permission_denied
+            code: permission_denied
+    AnthropicProxyNoSubscription:
+      description: 'No subscription to bill. `active_subscription_not_found` when the customer is unknown, has no active subscription, or `X-Nozle-Subscription` names no active subscription of the customer; `active_subscription_ambiguous` when the customer has several active subscriptions and no `X-Nozle-Subscription`. The provider is not called. In the Anthropic error shape from Engine 2.22.0.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AnthropicProxyError'
+          example:
+            type: error
+            error:
+              type: invalid_request_error
+              message: 'customer has multiple active subscriptions; set X-Nozle-Subscription'
+              code: active_subscription_ambiguous
+            code: active_subscription_ambiguous
+    AnthropicProxyUnavailable:
+      description: '`unavailable`: the key, the subscription or the customer payment state could not be read. The provider is not called. Retry later. In the Anthropic error shape from Engine 2.22.0.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AnthropicProxyError'
+          example:
+            type: error
+            error:
+              type: api_error
+              message: 'subscription lookup is unavailable'
+              code: unavailable
+            code: unavailable
     EngineUnavailable:
       description: A dependency is busy or unavailable. Retry after the Retry-After seconds when the header is present.
       content:
