@@ -48,3 +48,24 @@ The response wraps the customer in a `customer` object.
 <ResponseField name="customer.email" type="string">
   Customer email address.
 </ResponseField>
+
+## Customer currency
+
+<Note>
+Available from Core 11.9.0.
+</Note>
+
+A customer bills in one currency. Its `currency` is set by the first paid object created for it: a subscription, an invoice (including a one-off invoice), a wallet or credit top-up, or a fixed amount coupon. After that, creating one of these in another currency returns `422` with `{"currency": ["customer_currency_mismatch"]}`. Entity checkouts, quote approval and the invoice preview of a new subscription follow the same rule. The invoice preview answered `{"base": ["customer_currency_does_not_match"]}` before Core 11.9.0.
+
+Changing the currency of a customer on this endpoint returns `422` with `{"currency": ["customer_currency_locked"]}` while the customer has any of these:
+
+- an active, pending or incomplete subscription
+- an unpaid invoice
+- a wallet balance or a pending wallet transaction
+- a credit note with credit left
+
+From Core 11.9.0 a plan change never switches currency. Moving a subscription to a plan in another currency returns `422` with `{"plan_code": ["currencies_does_not_match"]}`, on every plan change path: subscription options, previews, quotes and checkout.
+
+A fixed amount coupon in another currency than the invoice is not applied, and is reported with `not_applicable_reason: "currency_mismatch"`.
+
+To let customers hold objects in several currencies, set the organization setting `allow_multiple_currencies_per_customer` to `true` (default `false`) with `PUT /api/v1/organizations` or the GraphQL `updateOrganization` mutation. A plan change still keeps the subscription's currency.

@@ -27,6 +27,15 @@ Fixed subscription revenue remains at customer and company level in Version One.
 
 Each organization selects one reporting currency for Cost Intelligence. Cost Rules and Shared Costs must use that currency. Values in other currencies are not combined without an immutable conversion rate.
 
+If none is set, the currency of the Cost Rules of the first event Nozle rates becomes the reporting currency. An event that cannot be rated in it is marked `uncosted` with one of these failure codes, adds no cost, and appears in the Uncosted queue:
+
+| Failure code | Meaning | What to do |
+|---|---|---|
+| `mixed_reporting_currencies` | The Cost Rules that match the event use different currencies. | Publish the matching Cost Rules in one currency. |
+| `reporting_currency_mismatch` | The matching Cost Rules share a currency, but it is not the organization's reporting currency. | Publish the Cost Rules in the reporting currency, then rate the event again. |
+
+Both apply to Feature Events and Cost Events. The `/can` estimate reports `mixed_reporting_currencies` as `economics.reason` too. See [currencies in `/can`](/guides/entitlements/can-endpoint#currencies).
+
 ## Cost report endpoint
 
 `GET /cost-intelligence/report` needs a secret key; with [API key permissions](/api/authentication#key-permissions), the key needs `analytic:read`. It returns the calculated cost portion of the report. It reads aggregated ledger projections from ClickHouse and the authoritative Uncosted queue from PostgreSQL. The dashboard’s GraphQL layer adds finalized billing revenue afterward.

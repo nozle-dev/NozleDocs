@@ -128,7 +128,7 @@ What a `pk_` key receives. The example shows one entry of each array. Optional f
 
 ## Fields
 
-Identifiers are named `nozle_id`. Amounts named `*_cents` are integers in cents of the plan currency. Amounts inside a charge's `properties` are decimal strings in currency units (for example `"14.99"` is 14.99 USD), not cents.
+Identifiers are named `nozle_id`. Amounts named `*_cents` are integers in the minor unit of the plan currency, despite the name: cents for USD, but JPY has no minor unit (`500` is 500 JPY) and KWD, BHD, JOD and OMR have three decimals (`1500` is 1.500 KWD). Amounts inside a charge's `properties` are decimal strings in currency units (for example `"14.99"` is 14.99 USD), not minor units.
 
 ### Plan
 
@@ -142,7 +142,7 @@ Identifiers are named `nozle_id`. Amounts named `*_cents` are integers in cents 
 | `description` | string or `null` | Plan description. |
 | `plan_family_code` | string or `null` | Code of the plan family. See [Plan families](#plan-families). |
 | `interval` | string | `weekly`, `monthly`, `quarterly`, `semiannual` or `yearly`. |
-| `amount_cents` | integer | Base price per `interval`, before tax, in cents of `amount_currency`. `0` for a free or pure usage-based plan. Usage prices are in `charges`. |
+| `amount_cents` | integer | Base price per `interval`, before tax, in the minor unit of `amount_currency`. `0` for a free or pure usage-based plan. Usage prices are in `charges`. |
 | `amount_currency` | string | ISO 4217 currency code, such as `USD`. |
 | `trial_period` | number or `null` | Free trial length in days. |
 | `pay_in_advance` | boolean | `true` bills the base price at the start of each period, `false` at the end. |
@@ -177,7 +177,7 @@ Identifiers are named `nozle_id`. Amounts named `*_cents` are integers in cents 
 | `invoiceable` | boolean | `false` means no invoice is issued for the charge itself. |
 | `regroup_paid_fees` | string or `null` | `invoice` or `null`. |
 | `prorated` | boolean | Whether the charge is prorated in the billing period. |
-| `min_amount_cents` | integer | Minimum spend for the charge per period, in cents. `0` for none. |
+| `min_amount_cents` | integer | Minimum spend for the charge per period, in the minor unit of the plan currency. `0` for none. |
 | `accepts_target_wallet` | boolean | Whether the charge accepts a target prepaid wallet. |
 | `applied_pricing_unit` | object or `null` | `{ "code", "conversion_rate" }` when the charge is priced in a pricing unit. |
 | `parent_id` | string (UUID) or `null` | Parent charge of an override. |
@@ -192,7 +192,7 @@ Fields: `nozle_id`, `plan_code`, `commitment_type` (always `minimum_commitment`)
 
 ### Usage threshold (`usage_thresholds[]`)
 
-Fields: `nozle_id`, `threshold_display_name`, `amount_cents` (usage amount in cents that triggers a progressive billing invoice), `recurring` (`true` repeats the invoice each time usage grows by `amount_cents`), `created_at` and `updated_at`.
+Fields: `nozle_id`, `threshold_display_name`, `amount_cents` (usage amount, in the minor unit of the plan currency, that triggers a progressive billing invoice), `recurring` (`true` repeats the invoice each time usage grows by `amount_cents`), `created_at` and `updated_at`.
 
 ### Tax (`taxes[]`)
 
