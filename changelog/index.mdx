@@ -5,6 +5,17 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Webhooks: the `standard` signature, 8 attempts and recovery (Core, Node 0.25.0, Python 0.23.0, Go v0.22.0)
+
+_October 30, 2026_
+
+- **`standard` signature scheme, the only scheme.** Webhooks follow the Standard Webhooks specification: `webhook-id`, `webhook-timestamp` and `webhook-signature` (`v1,<base64>`, HMAC-SHA256 with the endpoint's `whsec_` secret). Verification rejects a timestamp more than 5 minutes off. Endpoints have no signature choice any more, and the `X-Nozle-Signature*` and `X-Nozle-Unique-Key` headers and the webhook public key endpoints are removed. See [Receive Nozle webhooks](/api/receive-webhooks).
+- **Secret rotation.** `POST /webhook_endpoints/{id}/rotate_secret` keeps the previous secret valid for 24 hours and sends both signatures meanwhile. Endpoints return `secret`, `previous_secret_expires_at` and `disabled_at`.
+- **More reliable delivery.** Up to 8 attempts over about a day (5 s, 5 min, 30 min, 2 h, 5 h, 10 h, 10 h), a 10-second timeout (was 30), and a `3xx` counts as a failure. A `webhook-delivery: abort-message` response header stops retries. An endpoint with no successful delivery for 5 days is disabled and you get the `webhook_endpoint.failing` email; re-enable it with `disabled: false`.
+- **Replay and test.** `GET /webhooks`, `POST /webhooks/{id}/retry`, `POST /webhook_endpoints/{id}/recover` (failed deliveries since a time, up to 14 days back, 10,000 at most) and `POST /webhook_endpoints/{id}/test`.
+- **Private addresses are refused.** Endpoint URLs that point to private, loopback, link-local or metadata addresses are rejected when saved and when sent.
+- **SDKs.** `webhooks.verify()` takes the endpoint secret in Node 0.25.0 (`secret`, `toleranceSeconds`), Python 0.23.0 (`webhook_secret`, `tolerance_seconds`) and Go v0.22.0 (`WithWebhookSecrets`, `WithWebhookTolerance`). A failed check has the same code in all three: `missing_signature`, `missing_secret`, `invalid_timestamp`, `invalid_signature` or `invalid_payload`.
+
 ### No card at onboarding, plan grace days and the dunning policy (Core 11.16.0, Engine 2.22.0, dashboard 2.4.0, Node 0.23.0, React 0.24.0)
 
 _October 29, 2026_
@@ -174,7 +185,7 @@ _Unreleased_
 
 _October 21, 2026_
 
-- Core webhooks to Nozle's Engine are verified with the sending organization's own `hmac_key`. Every organization's `hmac` endpoint is accepted; an unsigned, forged or cross-organization request, or one whose organization is unknown, gets `401` in every environment, and the Engine answers `503` if the key cannot be read so that Core retries. **Engine webhook endpoints must use the `hmac` signature algorithm**: `jwt` endpoints are rejected. See [Webhooks to the Engine](/api/receive-webhooks#webhooks-to-the-engine).
+- Core webhooks to Nozle's Engine are verified with the sending organization's own `hmac_key`. Every organization's `hmac` endpoint is accepted; an unsigned, forged or cross-organization request, or one whose organization is unknown, gets `401` in every environment, and the Engine answers `503` if the key cannot be read so that Core retries. **Engine webhook endpoints must use the `hmac` signature algorithm**: `jwt` endpoints are rejected. See [Webhooks to the Engine](/api/receive-webhooks).
 - A signed webhook that names another organization's subscription no longer creates that subscription's credit grants.
 - The `NOZLE_WEBHOOK_SECRET` setting is removed and ignored.
 

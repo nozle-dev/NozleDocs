@@ -11,7 +11,7 @@ The Go SDK exposes `ValidationError`, `AuthenticationError`, `TransportError`, a
 | `AuthenticationError` | Wrong key type, detected before any request (for example a `pk_` key on `TrackUsage`: `nozle: usage.track: secret sk_ key required`). `errors.As` to `*ValidationError` does not match it. |
 | `TransportError` | No HTTP response due to a connection or timeout failure. |
 | `APIError` | Non-success response or invalid JSON success payload. |
-| `WebhookVerificationError` | `VerifyWebhook` found the request not genuine. `Code` is `missing_signature`, `unsupported_algorithm`, `missing_hmac_key`, `invalid_signature` or `invalid_payload`. From `v0.12.0`. |
+| `WebhookVerificationError` | `VerifyWebhook` found the request not genuine. `Code` is `missing_signature`, `missing_secret` (no secret given), `invalid_timestamp`, `invalid_signature` or `invalid_payload` (the codes from `v0.22.0`, the same in every SDK). From `v0.12.0`. |
 | `SetupError` | Passed to `WrapHTTPClient`'s `OnError` with `Code` `feature_not_found` when no Feature has the event code: the usage is stored but not billed. From `v0.12.0`. |
 
 ```go

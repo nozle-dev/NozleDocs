@@ -35,7 +35,7 @@ Run the integration in your [sandbox](/guides/getting-started/sandbox) first, wi
 
 ## Webhooks
 
-- [ ] Your receiver verifies the signature on the raw body, deduplicates on `X-Nozle-Unique-Key`, answers `2xx` within 30 seconds and returns `200` for events it does not handle. See [receive webhooks](/api/receive-webhooks).
+- [ ] Your endpoint uses the `standard` signature scheme, and your receiver verifies the signature and the 5-minute timestamp window on the raw body, deduplicates on `webhook-id`, answers `2xx` within 10 seconds (a redirect counts as a failure) and returns `200` for events it does not handle. See [receive webhooks](/api/receive-webhooks).
 - [ ] You do not rely on delivery order, and you read the object from the API when you need its latest state.
 - [ ] If one receiver handles live and sandbox deliveries, it branches on the payload's `livemode` before acting.
 

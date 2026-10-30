@@ -13,16 +13,17 @@ Create an endpoint in the dashboard under **Developers > Webhooks**, or with `PO
 {
   "webhook_endpoint": {
     "webhook_url": "https://app.example.com/nozle/webhooks",
-    "signature_algo": "hmac",
     "name": "Production",
     "event_types": ["subscription.started", "invoice.payment_status_updated"]
   }
 }
 ```
 
-`name` is a label. `event_types` limits the events the endpoint receives: leave it out, or send `null` or `["*"]`, to receive every type. `signature_algo` is `jwt` (the default) or `hmac`. The URL must be valid and each URL can be registered once per organization. The dashboard form selects `hmac` by default, while the API uses `jwt` when you send no value. The API reference has a Webhook Endpoints section.
+`name` is a label. `event_types` limits the events the endpoint receives: leave it out, or send `null` or `["*"]`, to receive every type. Every endpoint is signed with the `standard` scheme described below. Each URL can be registered once per organization. The API reference has a Webhook Endpoints section.
 
-Payloads carry only `nozle_id` and the plain key names. From Core 6.0.0 the former-prefix keys and the former `X-*-Signature` headers are gone: see [legacy key names](/api/api-standards#legacy-key-names-removed-in-core-600).
+The URL must be public: see [Endpoint URLs](#endpoint-urls).
+
+Payloads carry only `nozle_id` and the plain key names. From Core 6.0.0 the former-prefix keys are gone: see [legacy key names](/api/api-standards#legacy-key-names-removed-in-core-600).
 
 Each delivery is a JSON body with a `webhook_type` such as `subscription.started`, `livemode` (`false` for a [sandbox](/guides/getting-started/sandbox) delivery) and the object it is about, for example `subscription`. The [webhook events](/api/webhook-events) page lists every event type, when it fires and what its payload holds.
 
@@ -32,11 +33,35 @@ A failed credit note refund is sent as `credit_note.refund_failure`. An unknown 
 
 | Header | Value |
 |---|---|
-| `X-Nozle-Signature` | The signature of the body, in the format set by `signature_algo`. |
-| `X-Nozle-Signature-Algorithm` | `jwt` or `hmac`. |
-| `X-Nozle-Unique-Key` | The delivery ID. It is the same on every attempt of one webhook. |
+| `webhook-id` | The delivery ID. It is the same on every attempt of one webhook. |
+| `webhook-timestamp` | Unix time in seconds, set on each attempt, so it changes on every retry. |
+| `webhook-signature` | One or more space-separated signatures, each written `v1,<base64>`. |
 
-Each header is also sent under its former-prefix name, with the same value. Read the `X-Nozle-` names.
+## The `standard` scheme
+
+`standard` follows the Standard Webhooks specification, so the same code works with any library that implements it.
+
+- The endpoint secret looks like `whsec_` followed by Base64 text. Read it on the endpoint in **Developers > Webhooks** (members with the `developers:manage` permission), or in the `secret` field the REST API returns to any API key with the `webhook_endpoint` read permission. Keep the secret, and every API key with that permission, on your server.
+- The signed content is `webhook-id`, `.`, `webhook-timestamp`, `.` and the raw request body, joined as one string.
+- The signature is `Base64(HMAC-SHA256(key, signed content))`. The key is the Base64-decoded part of the secret after `whsec_`.
+- Reject a request whose `webhook-timestamp` is more than 5 minutes (300 seconds) from your clock, in either direction. This stops a replay of a captured request.
+- Compare in constant time, and accept the request when any `v1` signature in the header matches. Ignore entries with another version.
+
+### Test your code
+
+This sample is published by the Standard Webhooks project. Your verification must accept it when the clock check is skipped:
+
+```text
+secret            = whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw
+webhook-id        = msg_p5jXN8AQM9LWM0D4loKWxJek
+webhook-timestamp = 1614265330
+body              = {"test": 2432232314}
+signature         = v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=
+```
+
+### Rotate the secret
+
+`POST /webhook_endpoints/{id}/rotate_secret` (or **Rotate secret** in the dashboard) creates a new secret and returns the endpoint. The previous secret keeps working for 24 hours, and the response has `previous_secret_expires_at`. During that time every delivery carries two signatures in `webhook-signature`, one per secret, so you can deploy the new secret without dropping a delivery. Configure the new secret, then stop using the old one. Verification that accepts any listed signature handles both without changes.
 
 ## Verify the signature
 
@@ -44,7 +69,7 @@ Verify the **raw request body** before you parse it. A framework that parses and
 
 ### With the SDK
 
-The server SDKs check both formats and return the parsed event. For `jwt` they read Nozle's public key once with your secret key and cache it. For `hmac`, pass the signing secret. Webhook verification requires `@nozle-js/node` `0.13.0`, `nozle-sdk` `0.13.0` or `github.com/nozle-dev/nozle-go` `v0.12.0`.
+The server SDKs verify the headers, the timestamp and the signature, make no network call, and return the parsed event. Pass the endpoint secret; pass both secrets while you rotate. Verification requires `@nozle-js/node` `0.25.0`, `nozle-sdk` `0.23.0` or `github.com/nozle-dev/nozle-go` `v0.22.0`.
 
 <Tabs>
 <Tab title="Node.js">
@@ -56,7 +81,7 @@ const nozle = new Nozle()
 // Next.js route handler, Remix, Hono, Bun or Deno: answers 200, 400 when the request is not genuine,
 // 405 for a method other than POST, or 500 when onEvent throws.
 export const POST = createWebhookHandler(nozle, {
-  hmacKey: process.env.NOZLE_WEBHOOK_HMAC_KEY, // only for hmac endpoints
+  secret: process.env.NOZLE_WEBHOOK_SECRET, // a string, or an array while you rotate
   onEvent: async (event) => {
     if (await alreadyHandled(event.id)) return
     if (event.type === 'subscription.started') await activate(event.object)
@@ -64,7 +89,7 @@ export const POST = createWebhookHandler(nozle, {
 })
 ```
 
-Elsewhere, call `nozle.webhooks.verify({ body, headers, hmacKey })` with the raw body; it throws `WebhookVerificationError` with a `code`.
+Elsewhere, call `nozle.webhooks.verify({ body, headers, secret })` with the raw body; it throws `WebhookVerificationError` with a `code`. `toleranceSeconds` changes the 300-second window.
 </Tab>
 <Tab title="Python">
 ```python
@@ -75,100 +100,146 @@ nozle = Nozle()
 @app.post("/nozle/webhooks")  # Flask
 def nozle_webhook():
     try:
-        event = nozle.webhooks.verify(request.get_data(), request.headers, hmac_key=HMAC_KEY)
+        event = nozle.webhooks.verify(request.get_data(), request.headers, webhook_secret=WEBHOOK_SECRET)
     except WebhookVerificationError as error:
         return {"code": error.code}, 400
+    if already_handled(event.id):
+        return {"received": True}
     if event.type == "subscription.started":
         activate(event.object)
     return {"received": True}
 ```
+
+`webhook_secret` is a string or a list while you rotate. `tolerance_seconds` changes the 300-second window.
 </Tab>
 <Tab title="Go">
 ```go
 import nozle "github.com/nozle-dev/nozle-go"
 
 client := nozle.New("") // reads NOZLE_SECRET_KEY
-http.Handle("/nozle/webhooks", client.WebhookHandler(hmacKey, func(ctx context.Context, e nozle.WebhookEvent) error {
+http.Handle("/nozle/webhooks", client.WebhookHandler(func(ctx context.Context, e nozle.WebhookEvent) error {
 	if e.Type == "subscription.started" {
 		return activate(ctx, e.Object) // an error answers 500, so Nozle tries again
 	}
 	return nil
-}))
+}, nozle.WithWebhookSecrets(os.Getenv("NOZLE_WEBHOOK_SECRET"))))
 ```
 
-The handler answers 200, 400 when the request is not genuine, 405 for a method other than POST, or 500 when `onEvent` returns an error or Nozle's public key cannot be read. Or call `client.VerifyWebhook(ctx, body, r.Header, hmacKey)`; a forged request returns a `*nozle.WebhookVerificationError`.
+The handler answers 200, 400 when the request is not genuine, 405 for a method other than POST, or 500 when `onEvent` returns an error. Or call `client.VerifyWebhook(ctx, body, r.Header, nozle.WithWebhookSecrets(secret))`; a forged request returns a `*nozle.WebhookVerificationError`. Pass several secrets to `WithWebhookSecrets` while you rotate, and use `WithWebhookTolerance` to change the window.
 </Tab>
 </Tabs>
 
-The event has `id` (the `X-Nozle-Unique-Key`, for skipping duplicates), `type`, `objectType` (Python `object_type`), `organizationId`, `object` and the whole `payload`. A failed check has the code `missing_signature`, `unsupported_algorithm`, `missing_hmac_key`, `invalid_signature` or `invalid_payload`.
+The event has `id` (the `webhook-id`, for skipping duplicates), `type`, `objectType` (Python `object_type`), `organizationId`, `object` and the whole `payload`. A failed check has the code `missing_signature`, `missing_secret`, `invalid_timestamp`, `invalid_signature` or `invalid_payload`, the same in every SDK.
 
 ### Without the SDK
-
-### `hmac`
-
-The signature is `Base64(HMAC-SHA256(hmac_key, raw body))`. The `hmac_key` is your organization's signing secret, shown on the **Developers > Webhooks** page of the dashboard.
 
 <Tabs>
 <Tab title="Node.js">
 ```ts
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
-function isValid(rawBody: Buffer, signature: string, hmacKey: string): boolean {
-  const expected = createHmac('sha256', hmacKey).update(rawBody).digest()
-  const received = Buffer.from(signature, 'base64')
-  return received.length === expected.length && timingSafeEqual(received, expected)
+function isValid(rawBody: Buffer, headers: Record<string, string>, secret: string): boolean {
+  const id = headers['webhook-id']
+  const timestamp = headers['webhook-timestamp']
+  const signatures = headers['webhook-signature']
+  if (!id || !timestamp || !signatures) return false
+  if (!/^\d+$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false
+  const key = Buffer.from(secret.replace(/^whsec_/, ''), 'base64')
+  const expected = createHmac('sha256', key).update(`${id}.${timestamp}.`).update(rawBody).digest()
+  return signatures.split(' ').some((entry) => {
+    const [version, value] = entry.split(',')
+    if (version !== 'v1' || !value) return false
+    const received = Buffer.from(value, 'base64')
+    return received.length === expected.length && timingSafeEqual(received, expected)
+  })
 }
 ```
 </Tab>
 <Tab title="Python">
 ```python
-import base64, hashlib, hmac
+import base64, hashlib, hmac, time
 
-def is_valid(raw_body: bytes, signature: str, hmac_key: str) -> bool:
-    expected = hmac.new(hmac_key.encode(), raw_body, hashlib.sha256).digest()
-    return hmac.compare_digest(base64.b64decode(signature), expected)
+def is_valid(raw_body: bytes, headers: dict, secret: str) -> bool:
+    webhook_id = headers.get("webhook-id")
+    timestamp = headers.get("webhook-timestamp")
+    signatures = headers.get("webhook-signature")
+    if not (webhook_id and timestamp and signatures) or not timestamp.isdigit():
+        return False
+    if abs(time.time() - int(timestamp)) > 300:
+        return False
+    key = base64.b64decode(secret.removeprefix("whsec_"))
+    signed = f"{webhook_id}.{timestamp}.".encode() + raw_body
+    expected = hmac.new(key, signed, hashlib.sha256).digest()
+    for entry in signatures.split():
+        version, _, value = entry.partition(",")
+        if version == "v1" and hmac.compare_digest(base64.b64decode(value), expected):
+            return True
+    return False
 ```
 </Tab>
 <Tab title="Go">
 ```go
-func isValid(rawBody []byte, signature, hmacKey string) bool {
-	received, err := base64.StdEncoding.DecodeString(signature)
+func isValid(rawBody []byte, h http.Header, secret string) bool {
+	id, ts, sigs := h.Get("webhook-id"), h.Get("webhook-timestamp"), h.Get("webhook-signature")
+	seconds, err := strconv.ParseInt(ts, 10, 64)
+	if id == "" || sigs == "" || err != nil {
+		return false
+	}
+	if math.Abs(float64(time.Now().Unix()-seconds)) > 300 {
+		return false
+	}
+	key, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(secret, "whsec_"))
 	if err != nil {
 		return false
 	}
-	mac := hmac.New(sha256.New, []byte(hmacKey))
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(id + "." + ts + "."))
 	mac.Write(rawBody)
-	return hmac.Equal(received, mac.Sum(nil))
+	expected := mac.Sum(nil)
+	for _, entry := range strings.Fields(sigs) {
+		version, value, _ := strings.Cut(entry, ",")
+		received, err := base64.StdEncoding.DecodeString(value)
+		if version == "v1" && err == nil && hmac.Equal(received, expected) {
+			return true
+		}
+	}
+	return false
 }
 ```
 </Tab>
 </Tabs>
 
-### `jwt`
-
-The signature is an RS256 JWT. Its claims are `data`, the payload as a JSON string, and `iss`. Fetch the public key from `GET /webhooks/json_public_key` with your secret key. The response is `{"webhook": {"public_key": "..."}}`, where the key is the PEM text encoded in Base64.
-
-```ts
-import jwt from 'jsonwebtoken'
-
-const pem = Buffer.from(publicKeyBase64, 'base64').toString('utf8')
-const claims = jwt.verify(signature, pem, { algorithms: ['RS256'] }) as { data: string }
-const isGenuine = claims.data === rawBody.toString('utf8')
-```
-
-Cache the key; it changes only when Nozle rotates it. The older `GET /webhooks/public_key` returns the same key as plain text and is deprecated.
-
 ## Webhooks to the Engine
 
-An endpoint that points at Nozle's Engine (`/webhooks/nozle`) is verified with the sending organization's own signing key, the same `hmac_key` as above. It must use the `hmac` signature algorithm: `jwt` endpoints are rejected. An unsigned, forged or cross-organization request, or one whose organization is unknown, gets `401` in every environment and nothing is processed. If Nozle cannot read the key, the Engine answers `503` and Core retries. A signed webhook that names another organization's subscription does not create that subscription's credit grants.
+Endpoints whose URL path ends with `/webhooks/nozle` are verified by the Engine with the endpoint's signing secret, using the `standard` scheme, and during a rotation also with the previous secret. An unsigned, forged or cross-organization request, or one whose organization is unknown, gets `401` in every environment and nothing is processed. A signed webhook that names another organization's subscription does not create that subscription's credit grants.
 
 ## Delivery, retries and ordering
 
-- Respond with a `2xx` within 30 seconds. Any other status, a timeout or a connection error is a failed attempt.
-- Nozle makes up to 3 attempts, the second about 3 seconds after the first and the third about 20 seconds after the second. After the third failure the webhook is marked failed and is not sent again.
-- Delivery is at least once. Deduplicate on `X-Nozle-Unique-Key`.
+- Respond with `200`, `201`, `202` or `204` within 10 seconds. Any other status is a failed attempt, a `3xx` included: Nozle never follows redirects, so register the final URL. A timeout or a connection error is a failed attempt too.
+- Nozle makes up to 8 attempts. After a failed attempt it waits 5 seconds, 5 minutes, 30 minutes, 2 hours, 5 hours, 10 hours and 10 hours, each with up to 15% extra delay. After the eighth failure the webhook is marked failed.
+- To stop retries of one webhook, answer with the response header `webhook-delivery: abort-message`. The webhook ends as failed and no failing email is sent. Use it for a delivery you will never accept, such as an event for an account you no longer have.
+- Delivery is at least once. Deduplicate on `webhook-id`, which is the same on every attempt. The `webhook-timestamp` is new on every attempt, so verify each attempt against its own timestamp.
 - Order is not guaranteed. Treat a payload as the state of the object at that moment and read the object from the API when you need the latest.
-- The signature does not contain a timestamp, so a replayed delivery cannot be rejected by its age. The unique key is what protects you from handling one twice.
 - Return `200` for event types you do not handle, so they are not retried.
 
 Nozle keeps delivery records for 90 days.
+
+### An endpoint that keeps failing
+
+When an endpoint has had failed deliveries and no successful one for 5 days, Nozle disables it: `disabled_at` is set and you receive the endpoint-failing email. A disabled endpoint receives nothing, manual retries included, until you re-enable it with `PUT /webhook_endpoints/{id}` and `{"webhook_endpoint": {"disabled": false}}` (no other field is needed), or in the dashboard.
+
+### Endpoint URLs
+
+The URL must be public. Nozle rejects private, loopback, link-local and cloud metadata, carrier-grade NAT, multicast and reserved addresses, whether you give an IP address or a name that resolves to one. A save is refused with `url_not_allowed`, and the same check runs again on every delivery.
+
+### Manage endpoints and deliveries
+
+These calls need an API key with the `webhook_endpoint` permission: read for `GET`, write for the rest. Every key with read permission receives the endpoint `secret`, so keep these keys on your server. Endpoints return `nozle_id`, `webhook_url`, `secret`, `previous_secret_expires_at`, `disabled_at`, `name`, `event_types` and `created_at`.
+
+- `POST /webhook_endpoints/{id}/rotate_secret` with an empty body returns the endpoint with the new `secret` and `previous_secret_expires_at`. It is `null` again once the 24-hour grace has passed.
+- `GET /webhooks` lists webhooks. Filter with `webhook_endpoint_id`, `status[]` (`pending`, `succeeded`, `failed`, `retrying`), `event_type[]` (repeat a filter for several values, for example `?status[]=failed&status[]=retrying`), and `from_date` and `to_date` (ISO 8601, matched on the last update). It is paginated with `page` and `per_page`. An unknown status gives `422`.
+- `POST /webhooks/{id}/retry` sends one webhook again with its original `webhook-id` and a new timestamp and signature. A webhook that already succeeded gives `422` `is_succeeded`.
+- `POST /webhook_endpoints/{id}/recover` with `{"since": "2026-10-28T00:00:00Z"}` sends again the endpoint's failed webhooks created at or after that time, up to 10,000 and at most 14 days back. The answer is `{"recover": {"webhook_endpoint_id": "...", "retried_webhooks": 12}}`. A bad `since` gives `422` with `error_details.since` set to `invalid_date`, `too_old` or `in_the_future`. Deduplicate on `webhook-id`, as always.
+- `POST /webhook_endpoints/{id}/test` with an empty body creates a `webhook_endpoint.test` webhook, whatever the endpoint's event types, and sends it asynchronously. The answer is the webhook with status `pending`. The payload carries no secret.
+
+A disabled endpoint answers `422` `webhook_endpoint_disabled` to recover and test. That body and `is_succeeded` carry `status`, `error` and `code` only, with no `error_details`.
