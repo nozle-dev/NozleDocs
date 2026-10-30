@@ -5,6 +5,14 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Credit notes and refunds in the SDKs (Node 0.27.0, Python 0.25.0, Go v0.24.0)
+
+_October 31, 2026_
+
+- **Preview, issue, refund, list, read and void credit notes from the SDKs.** `creditNotes` (Node), `credit_notes` (Python, sync and async) and `PreviewCreditNote`, `CreateCreditNote`, `RefundCreditNote`, `ListCreditNotes`, `GetCreditNote`, `VoidCreditNote` (Go) call Core's `/credit_notes` routes with your secret key. Preview returns the total with taxes and what can be refunded. A refund goes back to the original payment method (Stripe or Razorpay), and a partial refund is fewer or smaller items; credit and offset amounts are supported too. See the SDK billing pages: [Node.js](/sdks/node/billing#credit-notes-and-refunds), [Python](/sdks/python/billing#credit-notes-and-refunds), [Go](/sdks/go/billing#credit-notes-and-refunds).
+- **Never retried:** the SDKs send no `Idempotency-Key` with credit note requests yet, so creating, refunding and voiding are not retried. Core accepts one on create since 11.22.0. Previews and reads are.
+- Needs a workspace with credit notes enabled (`403` `feature_unavailable` otherwise). Nozle stores only the provider's refund id and status.
+
 ### Webhooks: the `standard` signature, 8 attempts and recovery (Core, Node 0.25.0, Python 0.23.0, Go v0.22.0)
 
 _October 30, 2026_

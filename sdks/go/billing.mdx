@@ -277,6 +277,55 @@ Pay an open invoice with `CheckoutInvoice`.
 
 A PDF is generated the first time it is asked for, so the download call returns no URL until it exists; ask again a few seconds later, or wait for the `invoice.generated` webhook.
 
+## Credit notes and refunds
+
+From `v0.24.0`. Needs a secret key and a workspace with credit notes enabled; otherwise the call fails with `403` `feature_unavailable`. A credit note lowers a finalized invoice. Its total is settled by crediting the customer's balance, refunding the original payment method (Stripe or Razorpay, started by Nozle), offsetting what the customer still owes on the invoice, or a mix. Nozle stores only the provider's refund id and status, never card or bank details.
+
+```go
+items := []nozle.CreditNoteItem{{FeeID: "fee_123", AmountCents: 500}} // FeeID: fees[].nozle_id of the invoice
+
+// Preview first: nothing is created. Taxes and coupons are applied.
+preview, err := client.PreviewCreditNote(ctx, nozle.PreviewCreditNoteParams{InvoiceID: "inv_123", Items: items})
+// preview.MaxCreditableAmountCents is the credit note's total; MaxRefundableAmountCents is what was paid
+// and not refunded yet.
+
+// Refund the items to the original payment method. A partial refund is fewer or smaller items.
+note, err := client.RefundCreditNote(ctx, nozle.RefundCreditNoteParams{
+    InvoiceID: "inv_123", Items: items, Reason: nozle.CreditNoteReasonDuplicatedCharge,
+    Metadata: map[string]string{"ticket": "T-42"},
+})
+// *note.RefundStatus is "pending", then "succeeded" or "failed".
+
+// Or choose the split yourself. The three amounts add up to preview.MaxCreditableAmountCents.
+_, err = client.CreateCreditNote(ctx, nozle.CreateCreditNoteParams{
+    InvoiceID: "inv_123", Items: items, RefundAmountCents: 300, CreditAmountCents: 200,
+    Reason: nozle.CreditNoteReasonOrderChange,
+})
+
+page, err := client.ListCreditNotes(ctx, nozle.ListCreditNotesParams{CustomerID: "cus_123", RefundStatus: "failed"})
+note, err = client.GetCreditNote(ctx, note.NozleID)
+note, err = client.VoidCreditNote(ctx, note.NozleID) // voids the unused credit; never undoes a paid refund or an offset
+```
+
+`Reason` is one of the `CreditNoteReason...` constants (`duplicated_charge`, `product_unsatisfactory`, `order_change`, `order_cancellation`, `fraudulent_charge` or `other` (the default)). `RefundCreditNote` is a preview followed by a `CreateCreditNote` whose `RefundAmountCents` is the previewed total. When less was paid than the items are worth it returns an `*APIError` with code `CodeRefundExceedsPaidAmount` and creates nothing; set `CreditRemainder: true` to refund what was paid and credit the rest. `CreateCreditNoteParams` takes `CreditAmountCents`, `RefundAmountCents`, `OffsetAmountCents`, `Reason`, `Description` (printed on the PDF) and `Metadata`. `ListCreditNotesParams` filters by `CustomerID`, `InvoiceNumber`, `Reason`, `CreditStatus` (`available`, `consumed`, `voided`), `RefundStatus` (`pending`, `succeeded`, `failed`), `Currency`, `IssuingDateFrom`, `IssuingDateTo`, `AmountFrom`, `AmountTo`, `Page` and `PerPage`; empty fields are not sent.
+
+A refund is started with the payment provider after the call returns. Follow `RefundStatus` with `GetCreditNote` or the `credit_note.refund_failure` webhook.
+
+The SDK sends no `Idempotency-Key` with credit note requests yet (Core 11.22.0 accepts one on create), so it never retries the calls that create or change a credit note, whatever the retry setting says. Preview and reads are retried. After a network error or a `5xx` on a create, list the customer's credit notes by invoice number before trying again.
+
+Test errors with `apiErr.HasCode(nozle.CodeCannotRefundUnpaidInvoice)`; the constants are `CodeInvalidTypeOrStatus`, `CodeCannotRefundUnpaidInvoice`, `CodeHigherThanRemainingInvoiceAmount`, `CodeHigherThanRemainingFeeAmount`, `CodeDoesNotMatchItemAmounts`, `CodeNoVoidableAmount` and `CodeRefundExceedsPaidAmount`.
+
+| Status and code | Meaning |
+|---|---|
+| `422` `invalid_type_or_status` | The invoice is a draft, or a prepaid-credit invoice that cannot be credited. |
+| `422` `validation_errors`, `refund_amount_cents`: `cannot_refund_unpaid_invoice` | Nothing was paid on the invoice. |
+| `422` `validation_errors`, `higher_than_remaining_invoice_amount` | A credit, refund or offset is above what is left on the invoice (paid and not refunded, for a refund). |
+| `422` `validation_errors`, `amount_cents`: `higher_than_remaining_fee_amount` | An item is above what is left of its fee. |
+| `422` `validation_errors`, `does_not_match_item_amounts` | Credit, refund and offset do not add up to the items with taxes. |
+| `422` `no_voidable_amount` | `void` on a credit note with no credit balance left. |
+| `404` `credit_note_not_found`, `invoice_not_found`, `fee_not_found` | The id does not exist in this workspace. |
+| `422` `refund_exceeds_paid_amount` | Raised by the SDK's refund helper before any credit note is created: less was paid than the items are worth. |
+
 ## Alerts
 
 From `v0.12.0`.
