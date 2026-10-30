@@ -41,7 +41,7 @@ A failed credit note refund is sent as `credit_note.refund_failure`. An unknown 
 
 `standard` follows the Standard Webhooks specification, so the same code works with any library that implements it.
 
-- The endpoint secret looks like `whsec_` followed by Base64 text. Read it on the endpoint in **Developers > Webhooks**, or in the `secret` field of the endpoint (needs the `developers:manage` permission). Keep it on your server.
+- The endpoint secret looks like `whsec_` followed by Base64 text. Read it on the endpoint in **Developers > Webhooks** (members with the `developers:manage` permission), or in the `secret` field the REST API returns to any API key with the `webhook_endpoint` read permission. Keep the secret, and every API key with that permission, on your server.
 - The signed content is `webhook-id`, `.`, `webhook-timestamp`, `.` and the raw request body, joined as one string.
 - The signature is `Base64(HMAC-SHA256(key, signed content))`. The key is the Base64-decoded part of the secret after `whsec_`.
 - Reject a request whose `webhook-timestamp` is more than 5 minutes (300 seconds) from your clock, in either direction. This stops a replay of a captured request.
@@ -129,7 +129,7 @@ The handler answers 200, 400 when the request is not genuine, 405 for a method o
 </Tab>
 </Tabs>
 
-The event has `id` (the `webhook-id`, for skipping duplicates), `type`, `objectType` (Python `object_type`), `organizationId`, `object` and the whole `payload`. A failed check has the code `missing_signature`, `missing_secret` (Python `missing_webhook_secret`), `invalid_timestamp`, `invalid_signature` or `invalid_payload`.
+The event has `id` (the `webhook-id`, for skipping duplicates), `type`, `objectType` (Python `object_type`), `organizationId`, `object` and the whole `payload`. A failed check has the code `missing_signature`, `missing_secret`, `invalid_timestamp`, `invalid_signature` or `invalid_payload`, the same in every SDK.
 
 ### Without the SDK
 
@@ -211,7 +211,7 @@ func isValid(rawBody []byte, h http.Header, secret string) bool {
 
 ## Webhooks to the Engine
 
-An endpoint whose URL ends in `/webhooks/nozle` points at Nozle's Engine. The Engine verifies it with the `standard` scheme, using the endpoint's `secret` and, during a rotation, its previous secret. An unsigned, forged or cross-organization request, or one whose organization is unknown, gets `401` in every environment and nothing is processed. If Nozle cannot read the secret, the Engine answers `503` and Core retries. A signed webhook that names another organization's subscription does not create that subscription's credit grants.
+Endpoints whose URL path ends with `/webhooks/nozle` are verified by the Engine with the endpoint's signing secret, using the `standard` scheme, and during a rotation also with the previous secret. An unsigned, forged or cross-organization request, or one whose organization is unknown, gets `401` in every environment and nothing is processed. A signed webhook that names another organization's subscription does not create that subscription's credit grants.
 
 ## Delivery, retries and ordering
 
@@ -226,7 +226,7 @@ Nozle keeps delivery records for 90 days.
 
 ### An endpoint that keeps failing
 
-When an endpoint has had failed deliveries and no successful one for 5 days, Nozle disables it: `disabled_at` is set and you receive the endpoint-failing email. A disabled endpoint receives nothing, manual retries included, until you re-enable it with `PUT /webhook_endpoints/{id}` and `"disabled": false`, or in the dashboard.
+When an endpoint has had failed deliveries and no successful one for 5 days, Nozle disables it: `disabled_at` is set and you receive the endpoint-failing email. A disabled endpoint receives nothing, manual retries included, until you re-enable it with `PUT /webhook_endpoints/{id}` and `{"webhook_endpoint": {"disabled": false}}` (no other field is needed), or in the dashboard.
 
 ### Endpoint URLs
 
@@ -234,12 +234,12 @@ The URL must be public. Nozle rejects private, loopback, link-local and cloud me
 
 ### Manage endpoints and deliveries
 
-These calls need an API key with the `webhook_endpoint` permission: read for `GET`, write for the rest. Endpoints return `nozle_id`, `webhook_url`, `secret`, `previous_secret_expires_at`, `disabled_at`, `name`, `event_types` and `created_at`.
+These calls need an API key with the `webhook_endpoint` permission: read for `GET`, write for the rest. Every key with read permission receives the endpoint `secret`, so keep these keys on your server. Endpoints return `nozle_id`, `webhook_url`, `secret`, `previous_secret_expires_at`, `disabled_at`, `name`, `event_types` and `created_at`.
 
 - `POST /webhook_endpoints/{id}/rotate_secret` with an empty body returns the endpoint with the new `secret` and `previous_secret_expires_at`. It is `null` again once the 24-hour grace has passed.
-- `GET /webhooks` lists webhooks. Filter with `webhook_endpoint_id`, `status[]` (`pending`, `succeeded`, `failed`, `retrying`), `event_type[]`, and `from_date` and `to_date` (ISO 8601, matched on the last update). It is paginated with `page` and `per_page`. An unknown status gives `422`.
+- `GET /webhooks` lists webhooks. Filter with `webhook_endpoint_id`, `status[]` (`pending`, `succeeded`, `failed`, `retrying`), `event_type[]` (repeat a filter for several values, for example `?status[]=failed&status[]=retrying`), and `from_date` and `to_date` (ISO 8601, matched on the last update). It is paginated with `page` and `per_page`. An unknown status gives `422`.
 - `POST /webhooks/{id}/retry` sends one webhook again with its original `webhook-id` and a new timestamp and signature. A webhook that already succeeded gives `422` `is_succeeded`.
 - `POST /webhook_endpoints/{id}/recover` with `{"since": "2026-10-28T00:00:00Z"}` sends again the endpoint's failed webhooks created at or after that time, up to 10,000 and at most 14 days back. The answer is `{"recover": {"webhook_endpoint_id": "...", "retried_webhooks": 12}}`. A bad `since` gives `422` with `error_details.since` set to `invalid_date`, `too_old` or `in_the_future`. Deduplicate on `webhook-id`, as always.
 - `POST /webhook_endpoints/{id}/test` with an empty body creates a `webhook_endpoint.test` webhook, whatever the endpoint's event types, and sends it asynchronously. The answer is the webhook with status `pending`. The payload carries no secret.
 
-A disabled endpoint answers `422` `webhook_endpoint_disabled` to recover and test.
+A disabled endpoint answers `422` `webhook_endpoint_disabled` to recover and test. That body and `is_succeeded` carry `status`, `error` and `code` only, with no `error_details`.

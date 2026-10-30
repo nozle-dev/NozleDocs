@@ -7477,7 +7477,13 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'A bad `since` (`validation_errors` with `error_details.since`), or a disabled endpoint (`webhook_endpoint_disabled`, without `error_details`).'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+                  - $ref: '#/components/schemas/ApiErrorNotAllowed'
   /webhook_endpoints/{id}/test:
     parameters:
       - name: id
@@ -7506,7 +7512,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          $ref: '#/components/responses/NotAllowed'
   /webhooks:
     get:
       tags:
@@ -7523,9 +7529,12 @@ paths:
           schema:
             type: string
             format: uuid
-        - name: status
+        - name: status[]
           in: query
-          description: Only webhooks with one of these statuses.
+          description: Only webhooks with one of these statuses. Repeat the parameter for several, for example `status[]=failed&status[]=retrying`.
+          required: false
+          style: form
+          explode: true
           schema:
             type: array
             items:
@@ -7535,13 +7544,21 @@ paths:
                 - succeeded
                 - failed
                 - retrying
-        - name: event_type
+            example:
+              - failed
+              - retrying
+        - name: event_type[]
           in: query
-          description: Only webhooks of one of these event types, for example `invoice.created`.
+          description: Only webhooks of one of these event types. Repeat the parameter for several, for example `event_type[]=invoice.created`.
+          required: false
+          style: form
+          explode: true
           schema:
             type: array
             items:
               type: string
+            example:
+              - invoice.created
         - name: from_date
           in: query
           description: Only webhooks updated on or after this time (ISO 8601).
@@ -7593,7 +7610,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          $ref: '#/components/responses/NotAllowed'
   /webhook_endpoints:
     post:
       tags:
@@ -36165,7 +36182,7 @@ components:
           type:
             - string
             - 'null'
-          description: 'The endpoint secret (`whsec_...`) used to verify `standard` signatures. Returned only to callers with the `developers:manage` permission.'
+          description: 'The endpoint secret (`whsec_...`) used to verify `standard` signatures. The REST API returns it to any API key with the `webhook_endpoint` read permission; the dashboard (GraphQL) shows it only to members with `developers:manage`. Keep such API keys on your server.'
           example: whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw
         previous_secret_expires_at:
           type:
@@ -36500,8 +36517,6 @@ components:
       properties:
         webhook_endpoint:
           type: object
-          required:
-            - webhook_url
           properties:
             disabled:
               type: boolean
