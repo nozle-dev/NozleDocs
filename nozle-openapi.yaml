@@ -7420,15 +7420,15 @@ paths:
       tags:
         - Webhook Endpoints
       summary: Rotate the secret of a webhook endpoint
-      description: Creates a new `whsec_` secret. The previous secret stays valid for 24 hours (`previous_secret_expires_at`), and both signatures are sent in `webhook-signature` meanwhile.
+      description: Creates a new `whsec_` secret. The previous secret stays valid for 24 hours, `previous_secret_expires_at` says until when, and both signatures are sent in `webhook-signature` meanwhile. Send an empty body. Needs the `webhook_endpoint` write permission.
       operationId: rotateWebhookEndpointSecret
       responses:
         '200':
-          description: OK
+          description: The endpoint with its new secret
           content:
             application/json:
               schema:
-                {$ref: '#/components/schemas/WebhookEndpoint'}
+                $ref: '#/components/schemas/WebhookEndpoint'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -7449,7 +7449,7 @@ paths:
       tags:
         - Webhook Endpoints
       summary: Recover failed webhooks of an endpoint
-      description: Sends again every failed delivery of the endpoint since `since`, up to 14 days back.
+      description: Sends again the failed webhooks of this endpoint created at or after `since`, up to 10,000 of them and at most 14 days back. Each keeps its `webhook-id` and gets a new timestamp and signature. A `422` has `error_details.since` set to `invalid_date`, `too_old` or `in_the_future`, or the code `webhook_endpoint_disabled` for a disabled endpoint. Needs the `webhook_endpoint` write permission.
       operationId: recoverWebhookEndpoint
       requestBody:
         required: true
@@ -7463,15 +7463,15 @@ paths:
                 since:
                   type: string
                   format: date-time
-                  description: Send again every failed delivery of the endpoint since this time. At most 14 days back.
+                  description: Resend failed webhooks created at or after this time. At most 14 days back.
                   example: '2026-10-28T00:00:00Z'
       responses:
         '200':
-          description: OK
+          description: How many webhooks were queued again
           content:
             application/json:
               schema:
-                {$ref: '#/components/schemas/WebhookActionResult'}
+                $ref: '#/components/schemas/WebhookRecoverResult'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -7492,15 +7492,15 @@ paths:
       tags:
         - Webhook Endpoints
       summary: Send a test event to a webhook endpoint
-      description: Sends a test event, signed like any other delivery.
+      description: Creates a `webhook_endpoint.test` webhook for the endpoint, whatever its event-type filter, and sends it asynchronously. The response has status `pending`. The payload carries no secret. A disabled endpoint answers `422` with the code `webhook_endpoint_disabled`. Send an empty body. Needs the `webhook_endpoint` write permission.
       operationId: testWebhookEndpoint
       responses:
         '200':
-          description: OK
+          description: The test webhook
           content:
             application/json:
               schema:
-                {$ref: '#/components/schemas/WebhookActionResult'}
+                $ref: '#/components/schemas/WebhookResult'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -7511,55 +7511,65 @@ paths:
     get:
       tags:
         - Webhooks
-      summary: List webhook deliveries
-      description: Lists the webhooks Nozle created for your endpoints, newest first.
+      summary: List webhooks
+      description: Lists the webhooks Nozle created for your endpoints. Needs the `webhook_endpoint` read permission. An unknown `status` is rejected with `422`.
       operationId: findAllWebhooks
       parameters:
         - $ref: '#/components/parameters/page'
         - $ref: '#/components/parameters/per_page'
-        - name: status
-          in: query
-          description: Delivery status, for example `succeeded` or `failed`.
-          schema:
-            type: string
         - name: webhook_endpoint_id
           in: query
-          description: Only deliveries to this endpoint.
+          description: Only webhooks of this endpoint.
           schema:
             type: string
             format: uuid
-        - name: webhook_type
+        - name: status
           in: query
-          description: Only deliveries of this event type, for example `invoice.created`.
+          description: Only webhooks with one of these statuses.
           schema:
-            type: string
+            type: array
+            items:
+              type: string
+              enum:
+                - pending
+                - succeeded
+                - failed
+                - retrying
+        - name: event_type
+          in: query
+          description: Only webhooks of one of these event types, for example `invoice.created`.
+          schema:
+            type: array
+            items:
+              type: string
         - name: from_date
           in: query
-          description: Only deliveries created on or after this date.
+          description: Only webhooks updated on or after this time (ISO 8601).
           schema:
             type: string
             format: date-time
         - name: to_date
           in: query
-          description: Only deliveries created on or before this date.
+          description: Only webhooks updated on or before this time (ISO 8601).
           schema:
             type: string
             format: date-time
       responses:
         '200':
-          description: Webhook deliveries
+          description: Webhooks
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: true
+                $ref: '#/components/schemas/WebhooksPaginated'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /webhooks/{id}/retry:
     parameters:
       - name: id
         in: path
-        description: Identifier of the webhook delivery (the `webhook-id` header).
+        description: Unique identifier of the webhook (its `webhook-id`).
         required: true
         schema:
           type: string
@@ -7567,17 +7577,17 @@ paths:
           example: 1a901a90-1a90-1a90-1a90-1a901a901a90
     post:
       tags:
-        - Webhook Endpoints
-      summary: Resend a webhook
-      description: Sends one delivery again, with its original `webhook-id`.
+        - Webhooks
+      summary: Send a webhook again
+      description: Sends one webhook again, with its original `webhook-id` and a new timestamp and signature. A webhook that already succeeded answers `422` `is_succeeded`. A disabled endpoint receives nothing, manual retries included. Needs the `webhook_endpoint` write permission.
       operationId: retryWebhook
       responses:
         '200':
-          description: OK
+          description: The webhook
           content:
             application/json:
               schema:
-                {$ref: '#/components/schemas/WebhookActionResult'}
+                $ref: '#/components/schemas/WebhookResult'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -36162,7 +36172,7 @@ components:
             - string
             - 'null'
           format: date-time
-          description: When the previous secret stops being valid after a rotation (24 hours after `rotate_secret`). `null` when no rotation is in progress.
+          description: When the previous secret stops being valid after a rotation (24 hours after `rotate_secret`). `null` when no rotation happened or the grace has passed.
         disabled_at:
           type:
             - string
@@ -36266,10 +36276,99 @@ components:
               - wallet_transaction.created
               - wallet_transaction.updated
               - wallet_transaction.payment_failure
-    WebhookActionResult:
+    WebhookObject:
       type: object
-      additionalProperties: true
-      description: The result of a webhook action. The body names what was queued.
+      required:
+        - nozle_id
+        - webhook_endpoint_id
+        - webhook_type
+        - status
+      properties:
+        nozle_id:
+          type: string
+          format: uuid
+          description: The webhook id. It is the `webhook-id` header of every attempt.
+        webhook_endpoint_id:
+          type: string
+          format: uuid
+        webhook_type:
+          type: string
+          example: invoice.created
+        status:
+          type: string
+          enum:
+            - pending
+            - succeeded
+            - failed
+            - retrying
+        endpoint:
+          type: string
+          description: The URL the webhook is sent to.
+        http_status:
+          type:
+            - integer
+            - 'null'
+          description: HTTP status of the last attempt.
+        retries:
+          type: integer
+          description: Number of retries made so far.
+        object_type:
+          type:
+            - string
+            - 'null'
+        object_id:
+          type:
+            - string
+            - 'null'
+        payload:
+          type: object
+          additionalProperties: true
+        response:
+          description: Body of the last response from your endpoint.
+        last_retried_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    WebhookResult:
+      type: object
+      required:
+        - webhook
+      properties:
+        webhook:
+          $ref: '#/components/schemas/WebhookObject'
+    WebhooksPaginated:
+      type: object
+      required:
+        - webhooks
+        - meta
+      properties:
+        webhooks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookObject'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    WebhookRecoverResult:
+      type: object
+      required:
+        - recover
+      properties:
+        recover:
+          type: object
+          properties:
+            webhook_endpoint_id:
+              type: string
+              format: uuid
+            retried_webhooks:
+              type: integer
+              description: How many failed webhooks were queued again.
     WebhookEndpointsPaginated:
       type: object
       required:
@@ -36406,7 +36505,7 @@ components:
           properties:
             disabled:
               type: boolean
-              description: Send `false` to re-enable an endpoint Nozle disabled (clears `disabled_at`).
+              description: Send `true` to disable the endpoint, or `false` to re-enable one Nozle disabled (clears `disabled_at`).
               example: false
             webhook_url:
               type: string

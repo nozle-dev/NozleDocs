@@ -21,7 +21,7 @@ Create an endpoint in the dashboard under **Developers > Webhooks**, or with `PO
 
 `name` is a label. `event_types` limits the events the endpoint receives: leave it out, or send `null` or `["*"]`, to receive every type. Every endpoint is signed with the `standard` scheme described below. Each URL can be registered once per organization. The API reference has a Webhook Endpoints section.
 
-The URL must be public. Nozle refuses private, loopback, link-local and cloud metadata addresses, both IP addresses and names that resolve to them, when you save the endpoint and again on every delivery. Use a tunnel to test against a local server.
+The URL must be public: see [Endpoint URLs](#endpoint-urls).
 
 Payloads carry only `nozle_id` and the plain key names. From Core 6.0.0 the former-prefix keys are gone: see [legacy key names](/api/api-standards#legacy-key-names-removed-in-core-600).
 
@@ -211,13 +211,13 @@ func isValid(rawBody []byte, h http.Header, secret string) bool {
 
 ## Webhooks to the Engine
 
-An endpoint that points at Nozle's Engine (`/webhooks/nozle`) is verified with the `standard` scheme and the endpoint secret of the sending organization, like any other receiver. An unsigned, forged or cross-organization request, or one whose organization is unknown, gets `401` in every environment and nothing is processed. If Nozle cannot read the secret, the Engine answers `503` and Core retries. A signed webhook that names another organization's subscription does not create that subscription's credit grants.
+An endpoint whose URL ends in `/webhooks/nozle` points at Nozle's Engine. The Engine verifies it with the `standard` scheme, using the endpoint's `secret` and, during a rotation, its previous secret. An unsigned, forged or cross-organization request, or one whose organization is unknown, gets `401` in every environment and nothing is processed. If Nozle cannot read the secret, the Engine answers `503` and Core retries. A signed webhook that names another organization's subscription does not create that subscription's credit grants.
 
 ## Delivery, retries and ordering
 
-- Respond with a `2xx` within 10 seconds. A `3xx` is a failure: Nozle does not follow redirects, so register the final URL. Any other status, a timeout or a connection error is a failed attempt.
+- Respond with `200`, `201`, `202` or `204` within 10 seconds. Any other status is a failed attempt, a `3xx` included: Nozle never follows redirects, so register the final URL. A timeout or a connection error is a failed attempt too.
 - Nozle makes up to 8 attempts. After a failed attempt it waits 5 seconds, 5 minutes, 30 minutes, 2 hours, 5 hours, 10 hours and 10 hours, each with up to 15% extra delay. After the eighth failure the webhook is marked failed.
-- To stop retries of one webhook, answer with the response header `webhook-delivery: abort-message`. Use it for a delivery you will never accept, such as an event for an account you no longer have.
+- To stop retries of one webhook, answer with the response header `webhook-delivery: abort-message`. The webhook ends as failed and no failing email is sent. Use it for a delivery you will never accept, such as an event for an account you no longer have.
 - Delivery is at least once. Deduplicate on `webhook-id`, which is the same on every attempt. The `webhook-timestamp` is new on every attempt, so verify each attempt against its own timestamp.
 - Order is not guaranteed. Treat a payload as the state of the object at that moment and read the object from the API when you need the latest.
 - Return `200` for event types you do not handle, so they are not retried.
@@ -226,11 +226,20 @@ Nozle keeps delivery records for 90 days.
 
 ### An endpoint that keeps failing
 
-When an endpoint has failed deliveries and has had no successful delivery for 5 days, Nozle disables it: `disabled_at` is set, you receive the `webhook_endpoint.failing` email, and no new webhooks are created for it. Fix your receiver, then re-enable it with `PUT /webhook_endpoints/{id}` and `"disabled": false`, or in the dashboard.
+When an endpoint has had failed deliveries and no successful one for 5 days, Nozle disables it: `disabled_at` is set and you receive the endpoint-failing email. A disabled endpoint receives nothing, manual retries included, until you re-enable it with `PUT /webhook_endpoints/{id}` and `"disabled": false`, or in the dashboard.
 
-### Replay, recover and test
+### Endpoint URLs
 
-- `GET /webhooks` lists deliveries. Filter by `status`, `webhook_endpoint_id`, `webhook_type` and a date range.
-- `POST /webhooks/{id}/retry` sends one delivery again, with its original `webhook-id`.
-- `POST /webhook_endpoints/{id}/recover` with `{"since": "2026-10-28T00:00:00Z"}` sends again every failed delivery of the endpoint since that time, up to 14 days back. Deduplicate on `webhook-id`, as always.
-- `POST /webhook_endpoints/{id}/test` sends a test event to the endpoint, signed like any other delivery.
+The URL must be public. Nozle rejects private, loopback, link-local and cloud metadata, carrier-grade NAT, multicast and reserved addresses, whether you give an IP address or a name that resolves to one. A save is refused with `url_not_allowed`, and the same check runs again on every delivery.
+
+### Manage endpoints and deliveries
+
+These calls need an API key with the `webhook_endpoint` permission: read for `GET`, write for the rest. Endpoints return `nozle_id`, `webhook_url`, `secret`, `previous_secret_expires_at`, `disabled_at`, `name`, `event_types` and `created_at`.
+
+- `POST /webhook_endpoints/{id}/rotate_secret` with an empty body returns the endpoint with the new `secret` and `previous_secret_expires_at`. It is `null` again once the 24-hour grace has passed.
+- `GET /webhooks` lists webhooks. Filter with `webhook_endpoint_id`, `status[]` (`pending`, `succeeded`, `failed`, `retrying`), `event_type[]`, and `from_date` and `to_date` (ISO 8601, matched on the last update). It is paginated with `page` and `per_page`. An unknown status gives `422`.
+- `POST /webhooks/{id}/retry` sends one webhook again with its original `webhook-id` and a new timestamp and signature. A webhook that already succeeded gives `422` `is_succeeded`.
+- `POST /webhook_endpoints/{id}/recover` with `{"since": "2026-10-28T00:00:00Z"}` sends again the endpoint's failed webhooks created at or after that time, up to 10,000 and at most 14 days back. The answer is `{"recover": {"webhook_endpoint_id": "...", "retried_webhooks": 12}}`. A bad `since` gives `422` with `error_details.since` set to `invalid_date`, `too_old` or `in_the_future`. Deduplicate on `webhook-id`, as always.
+- `POST /webhook_endpoints/{id}/test` with an empty body creates a `webhook_endpoint.test` webhook, whatever the endpoint's event types, and sends it asynchronously. The answer is the webhook with status `pending`. The payload carries no secret.
+
+A disabled endpoint answers `422` `webhook_endpoint_disabled` to recover and test.
