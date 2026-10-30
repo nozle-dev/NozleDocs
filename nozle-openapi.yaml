@@ -4,7 +4,7 @@ info:
   description: |-
     One specification for the Nozle API. Core operations use the default server https://api.nozle.app/core/api/v1. Engine operations name their own server, https://api.nozle.app/engine/api/v1. Both live on the one host https://api.nozle.app.
 
-    **Legacy key names, removed in Core 6.0.0.** REST responses, webhook payloads and CSV exports carry only the Nozle names: `nozle_id` and the plain `<key>` names such as `customer_id` and `invoice_id`. The former-prefix keys, the former EU tax codes, the former CSV id columns and the former webhook headers are gone. Webhook deliveries carry `X-Nozle-Signature`, `X-Nozle-Signature-Algorithm` and `X-Nozle-Unique-Key`. nozle-js and nozle-python older than 0.10.0 and nozle-go older than 0.9.1 cannot read a credit system id from Core 6.0.0.
+    **Legacy key names, removed in Core 6.0.0.** REST responses, webhook payloads and CSV exports carry only the Nozle names: `nozle_id` and the plain `<key>` names such as `customer_id` and `invoice_id`. The former-prefix keys, the former EU tax codes, the former CSV id columns and the former webhook headers are gone. Webhook deliveries carry `webhook-id`, `webhook-timestamp` and `webhook-signature`. nozle-js and nozle-python older than 0.10.0 and nozle-go older than 0.9.1 cannot read a credit system id from Core 6.0.0.
 
     **Live and sandbox (unreleased).** Live and sandbox use the same servers. The API key decides the environment: live keys start with `sk_nozle_` or `pk_nozle_`, sandbox keys with `sk_nozle_test_` or `pk_nozle_test_`, and each only reaches its own organization's data. A key whose prefix does not match its organization's environment, or a key of a reset sandbox, is refused with `401`. Every response to an accepted key, Core and Engine, carries the header `X-Nozle-Livemode: true` (live) or `false` (sandbox); browsers can read it. Webhook payloads carry `livemode` the same way. See https://docs.nozle.dev/guides/getting-started/sandbox.
   version: 1.50.0
@@ -7584,39 +7584,6 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
-  /webhooks/public_key:
-    get:
-      tags:
-        - Webhooks
-      summary: Retrieve webhook public key
-      description: This endpoint is used to retrieve the public key used to verify the webhooks signature
-      operationId: fetchPublicKey
-      responses:
-        '200':
-          description: Public key
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: MEgCQQCo9+BpMRYQ/dL3DS2CyJxRF+j6ctbT3/Qp84+KeFhnii7NT7fELilKUSnxS30WAvQCCo2yU1orfgqr41mM70MBAgMBAAE=
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /webhooks/json_public_key:
-    get:
-      tags:
-        - Webhooks
-      summary: Retrieve webhook public key as JSON
-      description: This endpoint retrieves the public key used to verify webhook signatures, wrapped in a JSON object. Prefer it over the deprecated plain-text public-key endpoint.
-      operationId: fetchJsonPublicKey
-      responses:
-        '200':
-          description: Public key
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WebhookPublicKey'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
   /webhook_endpoints:
     post:
       tags:
@@ -14027,9 +13994,9 @@ webhooks:
       summary: A new alert was triggered
       description: A usage alert on a subscription (or a wallet balance alert) crosses one of its thresholds.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the triggered alert
         content:
@@ -14097,9 +14064,9 @@ webhooks:
       summary: A new feature has been created
       description: A feature is created.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the new feature
         content:
@@ -14154,9 +14121,9 @@ webhooks:
       summary: A feature has been updated
       description: A feature is updated, or one of its privileges is removed.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the feature
         content:
@@ -14211,9 +14178,9 @@ webhooks:
       summary: A feature has been deleted
       description: A feature is deleted.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the feature
         content:
@@ -14268,9 +14235,9 @@ webhooks:
       summary: A new customer has been created
       description: A customer is created, from the API, the dashboard or an upsert that creates one.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the new customer
         content:
@@ -14370,9 +14337,9 @@ webhooks:
       summary: A customer has been updated
       description: A customer is updated, from the API (an upsert on an existing `external_id`) or the dashboard.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the customer
         content:
@@ -14471,9 +14438,9 @@ webhooks:
       summary: A customer was created on an accouting integration
       description: A customer is created in an accounting integration (for example NetSuite or Xero).
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the customer
         content:
@@ -14573,9 +14540,9 @@ webhooks:
       summary: An error was encountered while syncing a customer to an accounting provider
       description: Syncing a customer to an accounting integration fails.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the customer and of the provider error
         content:
@@ -14630,9 +14597,9 @@ webhooks:
       summary: A customer has been created on a payment provider
       description: A customer is created at a payment provider (Stripe, Razorpay and the other providers).
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the customer
         content:
@@ -14731,9 +14698,9 @@ webhooks:
       summary: An error was encountered while syncing a customer to a payment provider
       description: Creating or syncing a customer at a payment provider fails.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the customer and of the payment provider error
         content:
@@ -14788,9 +14755,9 @@ webhooks:
       summary: A checkout URL was generated for a customer
       description: A provider checkout URL is generated for a customer, for example to add a payment method. For a Stripe connection with a publishable key and a customer who pays by card only, the URL is a Nozle-hosted card page (not stripe.com) that registers an e-mandate for cards issued in India; the customer returns to the return URL with nozle_card=succeeded, processing or failed appended.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the customer with the generated checkout URL
         content:
@@ -14843,9 +14810,9 @@ webhooks:
       summary: An error was encountered while fetching taxes for a customer on a tax provider
       description: Fetching taxes for a customer from a tax integration (Anrok or Avalara) fails.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the customer and of the tax provider error
         content:
@@ -14900,9 +14867,9 @@ webhooks:
       summary: VIES VAT number has been checked for a customer
       description: The EU VAT number of a customer is checked against VIES. The `vies_check` field has the VIES answer, or the error when the check fails.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the customer with the VIES VAT check status
         content:
@@ -15008,9 +14975,9 @@ webhooks:
       summary: A new credit note has been created
       description: A credit note is created, including the one made when a draft invoice is refreshed and finalized.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the new credit note
         content:
@@ -15199,9 +15166,9 @@ webhooks:
       summary: A new credit note PDF has been generated
       description: The PDF of a credit note has been generated. `file_url` is set.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the credit note
         content:
@@ -15329,9 +15296,9 @@ webhooks:
       summary: The refund of a credit note has failed on a payment provider
       description: Refunding a credit note at the payment provider fails. Endpoints that subscribed with the former name `credit_note.provider_refund_failure` receive it under this name.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the credit note and of the provider error
         content:
@@ -15383,9 +15350,9 @@ webhooks:
       summary: The dunning campaign has been completed for a customer
       description: A dunning campaign has run its last attempt for a customer.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the finished dunning campaign and the overdue balance
         content:
@@ -15438,9 +15405,9 @@ webhooks:
       summary: A step of the dunning policy ran for an unpaid invoice
       description: 'Core 11.16.0. A step of the [dunning policy](/guides/billing/dunning) ran for an unpaid invoice of a customer: `payment_failed` (day 0), `reminder`, `final_reminder`, `end_action` (the last day of the grace) or `resolved` (sent once when the invoice no longer needs paying). Only dunning campaigns with an `end_action` send it.'
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: The step, the invoice it ran for and where the timeline stands
         content:
@@ -15504,9 +15471,9 @@ webhooks:
       summary: An error has been detected on an event
       description: Deprecated. An ingested usage event cannot be processed, for example when its target wallet does not exist. Use `events.errors`.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event and of the error
         content:
@@ -15568,9 +15535,9 @@ webhooks:
       summary: Errors were encountered while post-processing some events
       description: The periodic check of ingested events finds events with an unknown billable metric code, a missing aggregation property or invalid filter values.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the events errors
         content:
@@ -15623,9 +15590,9 @@ webhooks:
       summary: A pay in advance fee has been created
       description: A pay-in-advance fee is created (an instant usage charge or a non-invoiceable fee).
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the new fee
         content:
@@ -15726,9 +15693,9 @@ webhooks:
       summary: An error was encountered while fetching taxes for a fee on a tax provider
       description: Reserved. Core accepts this type in `event_types` but no code path sends it today.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the fee and of the tax provider error
         content:
@@ -15782,9 +15749,9 @@ webhooks:
       summary: A new invoice has been emitted
       description: 'An invoice is finalized: a subscription invoice, a pay-in-advance or progressive billing invoice, or an invoice regenerated from a voided one.'
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the new invoice
         content:
@@ -16018,9 +15985,9 @@ webhooks:
       summary: A new one off invoice has been emitted
       description: A one-off invoice is created.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the new invoice
         content:
@@ -16206,9 +16173,9 @@ webhooks:
       summary: A new prepaid credit invoice has been emitted
       description: An invoice for prepaid credits (a wallet top-up) is finalized.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the new invoice
         content:
@@ -16392,9 +16359,9 @@ webhooks:
       summary: A new invoice PDF has been generated
       description: The PDF of an invoice has been generated. `file_url` is set.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the invoice
         content:
@@ -16526,9 +16493,9 @@ webhooks:
       summary: A new draft invoice has been emitted
       description: An invoice is created as a draft, while it is in its grace period or has been refreshed.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the new invoice
         content:
@@ -16760,9 +16727,9 @@ webhooks:
       summary: An invoice has been voided
       description: An invoice is voided.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the invoice
         content:
@@ -16950,9 +16917,9 @@ webhooks:
       summary: A payment dispute has been lost for an invoice payment
       description: A payment dispute on an invoice is lost. The payload wraps the invoice in `payment_dispute_lost` with the provider reason.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the invoice and of the payment dispute
         content:
@@ -17086,9 +17053,9 @@ webhooks:
       summary: A payment dispute for an invoice payment was updated
       description: A payment dispute on an invoice was opened, needs a response, is under review or was won. The payload wraps the invoice and the dispute in `payment_dispute_updated`. The invoice is unchanged; a lost dispute is sent as `invoice.payment_dispute_lost`.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the invoice and of the payment dispute
         content:
@@ -17222,9 +17189,9 @@ webhooks:
       summary: The payment status of an invoice has been updated
       description: The payment status of an invoice changes (pending, succeeded, failed).
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the invoice
         content:
@@ -17411,9 +17378,9 @@ webhooks:
       summary: An invoice payment is overdue
       description: An unpaid invoice passes its due date and is marked overdue.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the invoice
         content:
@@ -17601,9 +17568,9 @@ webhooks:
       summary: A payment attempt for an invoice has failed on a payment provider
       description: A payment attempt for an invoice fails at the provider, or a duplicate payment is refunded. `provider_error` says why.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the invoice and of the payment provider error
         content:
@@ -17661,9 +17628,9 @@ webhooks:
       summary: An error was encountered while processing data on an integration
       description: An integration (accounting, CRM or tax) reports an error that is not tied to one customer.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the integration and of the integration error
         content:
@@ -17717,9 +17684,9 @@ webhooks:
       summary: An action is required to process a payment
       description: A payment needs the customer to act, for example 3D Secure authentication. `next_action` has the details.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the payment and of the required action
         content:
@@ -17791,9 +17758,9 @@ webhooks:
       summary: A payment will be debited automatically
       description: 'Nozle will debit a payment automatically from the customer''s saved card or mandate at `scheduled_at`. It is sent once per payment and `scheduled_at`; a changed `scheduled_at` sends it again. The payload is the payment object plus `scheduled_at` and `method_type`. Nozle emails the customer with this notice when the connection setting `upcomingDebitEmail` is on (default: on for Razorpay and for INR payments on Stripe); you can send your own message from this webhook instead. It is sent for Stripe card payments that the bank debits after its notice, and for Razorpay card and UPI debits when the debit is scheduled (not for a bank eMandate, and not when `pre_debit_notice` is off).'
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the payment and of the automatic debit
         content:
@@ -17859,9 +17826,9 @@ webhooks:
       summary: An announced automatic debit will not happen
       description: 'An automatic debit announced by `payment.scheduled` will not happen. It is sent only after `payment.scheduled` was sent for the payment. The payload is the payment object plus `scheduled_at` (the announced time) and `reason`; it has no `method_type`.'
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the payment and of the automatic debit
         content:
@@ -17927,9 +17894,9 @@ webhooks:
       summary: A payment has been successfully processed
       description: A payment succeeds at the provider (Stripe, Razorpay and the other providers).
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the successfully processed payment
         content:
@@ -17999,9 +17966,9 @@ webhooks:
       summary: An error was raised by a payment provider
       description: A payment provider connection reports an error, for example when Nozle cannot register its webhook at Stripe.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the payment provider and of the error
         content:
@@ -18057,9 +18024,9 @@ webhooks:
       summary: An new payment request has been created
       description: A payment request is created, by dunning or automatically for an invoice that Core did not charge (`automatic` is `true`).
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the new payment request
         content:
@@ -18202,9 +18169,9 @@ webhooks:
       summary: A payment attempt for a payment request has failed on a payment provider
       description: A payment attempt for a payment request fails, or its Pay link cannot be built. `provider_error` says why, for example `payment_request_invoices_changed`.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the payment request and of the provider error
         content:
@@ -18263,9 +18230,9 @@ webhooks:
       summary: The payment status of an invoice has been updated
       description: The payment status of a payment request changes. An automatic request is closed when its invoice is paid another way, settled by a credit note or voided.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the payment request
         content:
@@ -18408,9 +18375,9 @@ webhooks:
       summary: A new plan has been created
       description: A plan is created.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the new plan
         content:
@@ -18497,9 +18464,9 @@ webhooks:
       summary: A plan has been updated
       description: A plan is updated, including changes to its entitlements or pricing display.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the plan
         content:
@@ -18586,9 +18553,9 @@ webhooks:
       summary: A plan version has been created
       description: A pricing change of a plan that customers pay for saved its next version. `plan` is the new, current version; subscriptions stay on the version they are on until a version migration moves them.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: The new version
         content:
@@ -18630,9 +18597,9 @@ webhooks:
       summary: A plan has been deleted
       description: A plan is deleted.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the plan
         content:
@@ -18718,9 +18685,9 @@ webhooks:
       summary: A subscription has been terminated
       description: A subscription is terminated, by the API, at its end date or when it is replaced.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the subscription
         content:
@@ -18888,9 +18855,9 @@ webhooks:
       summary: A subscription is incomplete and waiting for payment
       description: A subscription waits for its first payment and stays incomplete.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the subscription
         content:
@@ -19058,9 +19025,9 @@ webhooks:
       summary: A subscription has been canceled
       description: A payment-gated subscription is canceled because an activation rule failed.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the subscription
         content:
@@ -19228,9 +19195,9 @@ webhooks:
       summary: An subscription has started
       description: A subscription starts or is activated, including the new subscription of a plan change.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the subscription
         content:
@@ -19399,9 +19366,9 @@ webhooks:
       summary: A subscription has been updated
       description: A subscription is updated, a plan change is scheduled or canceled, or its entitlements change. A subscription that a plan change replaces also gets this event.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the subscription
         content:
@@ -19570,9 +19537,9 @@ webhooks:
       summary: A subscription will be terminated in the future
       description: A subscription is about to end, ahead of its `ending_at`.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the subscription
         content:
@@ -19740,9 +19707,9 @@ webhooks:
       summary: A subscription trial period has ended
       description: The free trial of a subscription ends.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the subscription
         content:
@@ -19910,9 +19877,9 @@ webhooks:
       summary: A usage threshold has been reached by a subscription
       description: The lifetime usage of a subscription reaches a usage threshold. `usage_threshold` is the threshold that was reached.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the subscription and of the reached threshold
         content:
@@ -20100,9 +20067,9 @@ webhooks:
       summary: The balance of a wallet has been depleted
       description: The ongoing balance of a wallet reaches zero.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the wallet
         content:
@@ -20177,9 +20144,9 @@ webhooks:
       summary: A new wallet transaction has been created
       description: A wallet transaction (a top-up, a grant or a void) is created.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the wallet transaction
         content:
@@ -20278,9 +20245,9 @@ webhooks:
       summary: A wallet transaction has been updated
       description: A wallet transaction is settled or marked as failed.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the wallet transaction
         content:
@@ -20379,9 +20346,9 @@ webhooks:
       summary: A payment attempt for a wallet transaction has failed on a payment provider
       description: The payment for a wallet top-up fails at the provider. `provider_error` says why.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the wallet transaction and of the provider error
         content:
@@ -20438,9 +20405,9 @@ webhooks:
       summary: A customer has been created in a CRM integration
       description: A customer is created in a CRM integration (for example HubSpot or Salesforce).
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -20540,9 +20507,9 @@ webhooks:
       summary: Syncing a customer to a CRM integration has failed
       description: Syncing a customer to a CRM integration fails. The error object names the provider in `accounting_provider` and `accounting_provider_code`, the same keys as the accounting error.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -20597,9 +20564,9 @@ webhooks:
       summary: An invoice has been synced again to a CRM integration
       description: An invoice is synced again to a CRM integration (Salesforce).
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -20833,9 +20800,9 @@ webhooks:
       summary: An order has been created
       description: An order form is signed and the order is created.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -20905,9 +20872,9 @@ webhooks:
       summary: An order has been executed
       description: An order is executed. `execution_record` lists what was created.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -20977,9 +20944,9 @@ webhooks:
       summary: An order has failed
       description: Executing an order fails and the order is marked `failed`, for example when the customer was deleted. `execution_record.errors` has the reasons. Sent once per failed execution.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21049,9 +21016,9 @@ webhooks:
       summary: An order form has been created
       description: An order form is created for an approved quote.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21113,9 +21080,9 @@ webhooks:
       summary: An order form has been signed
       description: An order form is signed.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21177,9 +21144,9 @@ webhooks:
       summary: An order form has expired
       description: An order form passes its expiry date and expires.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21241,9 +21208,9 @@ webhooks:
       summary: An order form has been voided
       description: An order form is voided.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21305,9 +21272,9 @@ webhooks:
       summary: A payment receipt has been created
       description: A payment receipt is created for a successful payment.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21383,9 +21350,9 @@ webhooks:
       summary: A payment receipt PDF has been generated
       description: The PDF of a payment receipt has been generated. `file_url` is set.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21461,9 +21428,9 @@ webhooks:
       summary: A paid plan change needs review
       description: A paid plan change cannot be applied and its intent goes to review. The payment is refunded. Sent once per intent, even when two payments of the same checkout are reviewed at the same moment.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21522,9 +21489,9 @@ webhooks:
       summary: A quote has been created
       description: A quote is created. The payload is the quote with the version it was created with.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21593,9 +21560,9 @@ webhooks:
       summary: A quote has been approved
       description: A quote version is approved.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21664,9 +21631,9 @@ webhooks:
       summary: A quote has been voided
       description: A quote version is voided.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21735,9 +21702,9 @@ webhooks:
       summary: The credits of a paid top-up can be spent
       description: The Engine granted the credits of a paid top-up purchase, so they are in the customer's balance and can be spent. Sent once per purchase, after the grant is committed. A paid invoice alone does not mean the credits are spendable; wait for this event or poll `GET /credit-top-up-purchases/{id}` until `fulfillment_status` is `fulfilled`.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21812,9 +21779,9 @@ webhooks:
       summary: A wallet has been created
       description: A wallet is created.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21890,9 +21857,9 @@ webhooks:
       summary: A wallet has been terminated
       description: A wallet is terminated.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -21968,9 +21935,9 @@ webhooks:
       summary: A wallet has been updated
       description: A wallet is updated or its balance changes.
       parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
         - $ref: '#/components/parameters/webhook_signature'
-        - $ref: '#/components/parameters/webhook_signature_algorithm'
-        - $ref: '#/components/parameters/webhook_unique_key'
       requestBody:
         description: Details of the event
         content:
@@ -22222,35 +22189,30 @@ components:
       schema:
         type: string
         example: sub_1234567890
-    webhook_signature:
-      name: X-Nozle-Signature
+    webhook_id:
+      name: webhook-id
       in: header
-      description: Signature of the webhook payload
+      description: Unique id of the webhook. It is the same on every attempt, so use it to deduplicate.
       required: true
       schema:
         type: string
-        example: "Ap¶5É¿\x9D\x9FÎ£6ÐfV£Ä\x15\x15ºõÔõÔ[D\x8BæAâÿüÚ"
-    webhook_signature_algorithm:
-      name: X-Nozle-Signature-Algorithm
-      in: header
-      description: Algorithm used to generate the signature
-      required: true
-      schema:
-        type: string
-        enum:
-          - jwt
-          - hmac
-          - standard
-        example: standard
-    webhook_unique_key:
-      name: X-Nozle-Unique-Key
-      in: header
-      description: Unique id of the webhook. It can be used for idempotency
-      required: true
-      schema:
-        type: string
-        format: uuid
         example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+    webhook_timestamp:
+      name: webhook-timestamp
+      in: header
+      description: Unix time in seconds of this attempt. Reject a request more than 300 seconds off your clock.
+      required: true
+      schema:
+        type: string
+        example: '1614265330'
+    webhook_signature:
+      name: webhook-signature
+      in: header
+      description: Space-separated list of signatures, each `v1,<base64>`, from the endpoint secret. Two are sent while a secret is being rotated.
+      required: true
+      schema:
+        type: string
+        example: v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=
   schemas:
     Currency:
       type: string
@@ -36189,14 +36151,6 @@ components:
           type: string
           description: The URL Nozle sends the webhooks to.
           example: https://app.example.com/nozle/webhooks
-        signature_algo:
-          type: string
-          description: The signature algo for the webhook.
-          example: standard
-          enum:
-            - jwt
-            - hmac
-            - standard
         secret:
           type:
             - string
@@ -36340,17 +36294,6 @@ components:
               type: string
               description: The URL of the webhook endpoint.
               example: https://foo.bar
-            signature_algo:
-              type:
-                - string
-                - 'null'
-              description: 'The signature used for the webhook: `standard` (recommended), or the legacy `jwt` and `hmac`. With no value, a new endpoint uses `standard`.'
-              example: standard
-              enum:
-                - standard
-                - jwt
-                - hmac
-                - null
             name:
               type:
                 - string
@@ -36469,17 +36412,6 @@ components:
               type: string
               description: The URL of the webhook endpoint.
               example: https://foo.bar
-            signature_algo:
-              type:
-                - string
-                - 'null'
-              description: 'The signature used for the webhook: `standard` (recommended), or the legacy `jwt` and `hmac`. With no value, a new endpoint uses `standard`.'
-              example: standard
-              enum:
-                - standard
-                - jwt
-                - hmac
-                - null
             name:
               type:
                 - string
@@ -37402,22 +37334,6 @@ components:
               additionalProperties: true
     CustomerPaymentProvidernErrorObject:
       $ref: '#/components/schemas/CustomerPaymentProviderErrorObject'
-    WebhookPublicKey:
-      type: object
-      required:
-        - webhook
-      properties:
-        webhook:
-          $ref: '#/components/schemas/WebhookPublicKeyObject'
-    WebhookPublicKeyObject:
-      type: object
-      required:
-        - public_key
-      properties:
-        public_key:
-          type: string
-          description: Base64-encoded public key used to verify webhook signatures.
-          example: MEgCQQCo9+BpMRYQ/dL3DS2CyJxRF+j6ctbT3/Qp84+KeFhnii7NT7fELilKUSnxS30WAvQCCo2yU1orfgqr41mM70MBAgMBAAE=
     EngineError:
       type: object
       description: Error body of an Engine operation. Branch on `code` when it is present; `error` is a human-readable message.
