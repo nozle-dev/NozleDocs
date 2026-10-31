@@ -37,6 +37,7 @@ Proxies all requests to `https://api.openai.com/v1/*`. Usage is recorded for cha
 | `X-Nozle-Subscription` | External subscription ID to bill. It must be an active subscription of that customer. Needed when the customer has several active subscriptions. |
 | `X-Nozle-Feature-Code` | Code of the usage event. Default `llm_tokens`. Must match a metered Feature to bill. |
 | `X-Nozle-Feature` | Stored as the `feature` property of the event. |
+| `X-Nozle-Credit-Hold` | Metric amount to reserve in credits before the provider is called, for example the most tokens the call can use. Engine 2.30.0. See [Credit holds](#credit-holds). |
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/openai/v1/chat/completions \
@@ -74,6 +75,7 @@ Proxies all requests to `https://api.anthropic.com/v1/*`.
 | `X-Nozle-Subscription` | External subscription ID to bill. It must be an active subscription of that customer. Needed when the customer has several active subscriptions. |
 | `X-Nozle-Feature-Code` | Code of the usage event. Default `llm_tokens`. Must match a metered Feature to bill. |
 | `X-Nozle-Feature` | Stored as the `feature` property of the event. |
+| `X-Nozle-Credit-Hold` | Metric amount to reserve in credits before the provider is called, for example the most tokens the call can use. Engine 2.30.0. See [Credit holds](#credit-holds). |
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/anthropic/v1/messages \
@@ -110,11 +112,33 @@ Engine finds the subscription to bill before it calls the provider. Without `X-N
 ## How it works
 
 - The path after `/proxy/openai/` or `/proxy/anthropic/` is sent to the provider host unchanged, with the same method, query string, headers and body, except as noted below.
-- Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding. All other headers, including `Authorization` and `x-api-key`, are forwarded. `Accept-Encoding` is set to `identity` so the usage can be read.
+- Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature`, `X-Nozle-Feature-Code` and `X-Nozle-Credit-Hold` before forwarding. All other headers, including `Authorization` and `x-api-key`, are forwarded. `Accept-Encoding` is set to `identity` so the usage can be read.
 - A chat completion stream (`"stream": true` to `/chat/completions`) is sent with `stream_options.include_usage: true`, because OpenAI leaves usage out of streams otherwise.
 - Streaming (`text/event-stream`) responses are passed through as they arrive; usage is read from the stream as it passes.
 - Usage is recognised by the shape of the response: chat completions, the Responses API, and Anthropic messages, including cached input and cache writes.
 - An event is recorded only for a successful response that reports more than zero tokens. It carries `external_customer_id` and the resolved `external_subscription_id`, so it is billed to that subscription. Its `transaction_id` is `llm-<format>-<response id>`, so the same response is never billed twice. Its properties are `provider`, `provider_host`, `model`, `input_tokens` (all input, including cached), `output_tokens`, `latency_ms` and, when sent, `feature`. Recording runs in the background; a recording failure does not change the response.
+
+## Credit holds
+
+From Engine 2.30.0, a call can reserve the customer's credits before it reaches the provider, so concurrent calls cannot spend the same credits. Holds are opt-in per request: without `X-Nozle-Credit-Hold`, the proxy works as described above. See [Create a Credit Hold](/api/create-usage-hold) for how holds reserve credits.
+
+```bash title="cURL"
+curl -X POST https://api.nozle.app/engine/api/v1/proxy/openai/v1/chat/completions \
+  -H "X-Nozle-Key: sk_nozle_your_secret_key" \
+  -H "X-Nozle-Customer-Id: cust_123" \
+  -H "X-Nozle-Feature-Code: llm_tokens" \
+  -H "X-Nozle-Credit-Hold: 4000" \
+  -H "Authorization: Bearer sk-customer-openai-key" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "<openai-model>", "max_tokens": 2000, "messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+- **The amount is yours to give.** `X-Nozle-Credit-Hold` is a positive decimal metric amount of the Feature in `X-Nozle-Feature-Code` (default `llm_tokens`), for example the prompt size plus `max_tokens`. Engine never estimates it from the request body. Any other value answers `400 invalid_request`. The header is not forwarded to the provider.
+- **Taken after the usage limit and margin checks.** When the balance does not cover the amount, the proxy answers `402 insufficient_credits` and the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id` with the hold's ID, and the hold lasts the default 15 minutes.
+- **Paid from the hold.** When the call succeeds, the proxy finalizes the hold with the token usage it reads from the response, priced by the Feature's credit rate from the event properties. That credit spend sends the call's usage event, so it replaces the usage event the proxy would otherwise send, and the call is billed once. Less usage than held releases the rest.
+- **No usage, no charge.** A provider error, a response the proxy cannot read, or a stream cut before its usage releases the hold.
+- **Fallback.** If the finalize fails, or the actual usage exceeds the hold and the free balance, the hold is released and the usage is sent as a plain usage event, as without a hold. A finalize of 0 tokens also sends the plain event.
+- **When no hold is taken.** For a Feature with no credit rate, a Feature the plan bills in money, or a Feature that is not consumable, the call goes ahead without a hold. If holds are unavailable, the call is not refused (fail open, as the usage limit check does).
 
 ## Errors
 
@@ -155,9 +179,11 @@ Anthropic routes:
 |--------|--------|---------|---------|
 | `400` | `invalid_request` | `missing X-Nozle-Customer-Id header` | `X-Nozle-Customer-Id` is missing. |
 | `400` | `invalid_request` | `request body could not be read` | The request body could not be read. |
+| `400` | `invalid_request` | `X-Nozle-Credit-Hold must be a positive decimal metric amount` | Engine 2.30.0. `X-Nozle-Credit-Hold` is not a positive decimal. The provider is not called. |
 | `401` | `unauthorized` | `missing X-Nozle-Key header` | `X-Nozle-Key` is missing. |
 | `401` | `unauthorized` | `invalid nozle key` | The key is unknown. |
 | `402` | `workspace_suspended` or `card_required` | | Your workspace is blocked by Nozle. See [Workspace billing errors](/api/errors#workspace-billing-errors). |
+| `402` | `insufficient_credits` | `the customer's credit balance does not cover the requested hold` | Engine 2.30.0. The `X-Nozle-Credit-Hold` amount is not covered by the customer's free credits. The provider is not called. |
 | `402` | `customer_payment_overdue` | `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` | _Unreleased (Engine 2.22.0)._ The customer is blocked by your [dunning policy](/guides/billing/dunning). The provider is not called. |
 | `403` | `publishable_key_not_allowed` | `publishable keys are limited to GET /api/v1/plans` | A publishable key was used. |
 | `403` | `permission_denied` | `API key requires event:write permission` | The key cannot write events, so the call is refused before it reaches the provider. |

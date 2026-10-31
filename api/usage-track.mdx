@@ -93,4 +93,10 @@ A consumed amount that does not end within 12 decimals is rounded up to the 12th
 
 `Idempotency-Key` is required and must not exceed 255 bytes; otherwise the request returns `400 invalid_request`. Retry HTTP `503` with the same idempotency key and the same body, including the same `timestamp`. The `503` codes are `credit_usage_contention` (`Retry-After: 1`), `credit_usage_publication_backlog` (`Retry-After: 30`), and `credit_usage_temporarily_unavailable` (`Retry-After: 1`). `credit_usage_publication_backlog` means the organization has 1,000 or more usage events still being retried, or the oldest one is older than 5 minutes. It clears by itself once the events are accepted again. A dead-lettered event, one that failed after about a day of retries, does not block usage and does not count toward either limit; Nozle support requeues it. A replay returns the original result without consuming credits again, and that includes an `allowed=false` denial. Reusing a key with a different body returns `409` with `{"code": "idempotency_key_reused"}`. The SDKs remember the time they filled in only on the same client, for the last 1000 keys; a retry from another process or after a restart must send the stored time, so store it once per unit of work.
 
+## Credit holds
+
+From Engine 2.30.0, `/usage/track` cannot spend credits reserved by another caller's open [credit hold](/api/create-usage-hold): they are left out of `available`, and a track that needs them answers `allowed: false` with `insufficient_credits`. An expired hold stops reserving at its `expires_at`.
+
+When the amount is known only after the work, hold the credits first and [finalize the hold](/api/finalize-usage-hold) with the actual usage instead of calling `/usage/track`. A finalize writes the same consume operation and billing event as a track. It may spend more than was held when the hold plus the free balance covers the difference; otherwise it answers `allowed: false`, charges nothing and leaves the hold open.
+
 For staged validation and canary guidance, see [Credit Rollout and Acceptance](/guides/credits/rollout).

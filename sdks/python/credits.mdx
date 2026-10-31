@@ -31,6 +31,8 @@ print(balance["sources"])
 all_balances = nozle.credits.list_balances("workspace_123")
 ```
 
+`available` already leaves out credits reserved by open [credit holds](#credit-holds). From Engine 2.30.0, `held` reports them on the balance and on each source; Entity balances add `entity_held`, `shared_held` and `held`. An older Engine does not send these keys, so read them with `.get()`.
+
 ## Customer operation history
 
 ```python
@@ -162,6 +164,50 @@ if not result["allowed"]:
 <Warning>
 **Retrying `usage.track`.** Pass the same `idempotency_key` **and the same `timestamp`** on every retry. If you omit `timestamp`, the SDK fills in the current time once per idempotency key and reuses it when the same key is sent again on the same client (it remembers the last 1,000 keys). A retry from another process, or after a restart, gets a new time, no longer matches the first request, and the API returns `409 idempotency_key_reused`; pass a fixed `timestamp` there. Store one time per unit of work (RFC 3339 with an offset, for example `2026-10-12T16:00:00.000Z`) and reuse it. A matching replay returns the original `operation_id`, and the balance changes once. The event time must fall after the credit rate became effective. A `409` means the first call was committed: do not retry.
 </Warning>
+
+## Credit holds
+
+Available from `nozle` 0.27.0 on `Nozle` and `AsyncNozle`, with Engine 2.30.0. When the cost is known only after the work, reserve credits first, then finalize with the actual usage or release them. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits).
+
+```python
+hold = nozle.usage.holds.create(
+    "workspace_123",
+    "agent_execution",
+    entity_id="user_42",
+    credit_system_code="ai_credits",
+    properties={"tokens": 8000},  # the most the work can use
+    ttl_seconds=600,  # default 900, at most 86400
+    idempotency_key="hold-run-0183f",
+)
+if not hold["allowed"]:  # status "denied", reason "insufficient_credits"
+    raise RuntimeError("not enough credits")
+
+try:
+    tokens = run_agent()
+except Exception:
+    nozle.usage.holds.release(hold["hold_id"])
+    raise
+
+result = nozle.usage.holds.finalize(hold["hold_id"], properties={"tokens": tokens})
+print(result["credits_consumed"], result["credits_released"], result["hold_expired"])
+
+nozle.usage.holds.get(hold["hold_id"])
+nozle.usage.holds.list("workspace_123", status="held")
+```
+
+| Method | Endpoint |
+|--------|----------|
+| `create(customer_id, feature_code, *, idempotency_key, entity_id=None, credit_system_code=None, properties=None, timestamp=None, ttl_seconds=None)` | [`POST /usage/holds`](/api/create-usage-hold) |
+| `finalize(hold_id, *, properties=None, timestamp=None)` | [`POST /usage/holds/{hold_id}/finalize`](/api/finalize-usage-hold) |
+| `release(hold_id)` | [`POST /usage/holds/{hold_id}/release`](/api/release-usage-hold) |
+| `get(hold_id)` | [`GET /usage/holds/{hold_id}`](/api/get-usage-hold) |
+| `list(customer_id, *, status=None)` | [`GET /customers/{customer_id}/credit-holds`](/api/list-customer-credit-holds) |
+
+- A denial is a result, not an error: `allowed: False`, `status` `denied`, `reason` `insufficient_credits`.
+- `finalize()` returns the `usage.track()` result plus `hold_id`, `hold_status`, `credits_held`, `credits_released` and `hold_expired`. Above the hold it spends free balance too, or answers `allowed: False` and keeps the hold open. Zero usage releases the hold.
+- `release()` is idempotent. Engine errors keep their code on `NozleAPIError`: `hold_not_found` (404), `hold_already_resolved` (409), `hold_ttl_invalid` (400). An invalid `ttl_seconds` or `status` raises `NozleValidationError` before any request.
+- A `timestamp` the SDK fills in is reused for the same idempotency key (create) and the same hold (finalize) on this client, so retries replay. Pass `timestamp` when a retry may come from another process.
+- Types: `CreditHold`, `CreditHoldResult`, `CreditHoldFinalizeResult`, `CreditHoldList`, `CreditHoldStatus`.
 
 ## Legacy wallet adapter
 

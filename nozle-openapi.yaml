@@ -10436,7 +10436,8 @@ paths:
                     credit_system_name: AI Credits
                     unit_name: credit
                     system_status: active
-                    available: '625.5'
+                    available: '617.5'
+                    held: '8'
                     as_of: '2026-07-20T12:00:00.750Z'
                     sources:
                       - &id019
@@ -10451,6 +10452,7 @@ paths:
                         subscription_id: b85038ab-8ef6-45a8-9643-43b24a891362
                         initial: '625.5'
                         remaining: '625.5'
+                        held: '8'
                         valid_from: '2026-07-01T00:00:00Z'
                         expires_at: '2026-08-01T00:00:00Z'
                         priority: 100
@@ -10726,6 +10728,9 @@ paths:
                     entity_available: '480.000000000001'
                     shared_available: '250'
                     effective_available: '730.000000000001'
+                    entity_held: '0'
+                    shared_held: '0'
+                    held: '0'
                     consumed: '42'
                     pool_policy: entity_then_customer
                     as_of: '2026-07-22T12:00:00.750Z'
@@ -12205,16 +12210,362 @@ paths:
             	CreditSystemCode: "ai_credits",
             	Properties:       map[string]any{"model": "example-model"},
             }, "agent-execution-0183f")
+  /usage/holds:
+    post:
+      summary: Create a credit hold
+      description: 'Engine 2.30.0. Reserves the credits of one usage on the sources `POST /usage/track` would spend, in the same order and under the same pool policy, without changing the balance or sending anything to billing. Until it is finalized, released or expired, the held credits are left out of `available` for `/usage/check`, `/usage/track`, other holds, the balance endpoints and Entity transfers. The body is the `/usage/track` body plus `ttl_seconds`; send in `properties` the most the work can use. The rate is pinned on the hold for its finalize. A short balance returns `200` with `allowed: false`, `status: denied` and `reason: insufficient_credits`, stored under the key so a retry gets the same answer. Requires an organization secret key or trusted internal authentication; publishable keys are rejected. With API key permissions, a secret key needs `credit_system:write`.'
+      operationId: engineCreateCreditHold
+      tags:
+        - Usage
+      servers: *id002
+      security: *id003
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Idempotency key, at most 255 bytes. Required. A missing, blank or longer value returns `400 invalid_request`. A retry with the same key and body returns the first answer, including a denial, and reserves nothing again; the same key with a different body returns `409 idempotency_key_reused`.
+          schema:
+            type: string
+            maxLength: 255
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreditsUsageHoldCreateRequest'
+            example:
+              customer_id: customer_123
+              entity_id: user_42
+              feature_code: agent_execution
+              credit_system_code: ai_credits
+              properties:
+                tokens: 8000
+              timestamp: '2026-10-31T12:00:00.750Z'
+              ttl_seconds: 600
+      responses:
+        '200':
+          description: 'Hold result. Check `allowed`; `allowed: false` is a normal result.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditsUsageHoldCreateResponse'
+        '400':
+          $ref: '#/components/responses/EngineBadRequest'
+          description: '`code: invalid_request`: invalid JSON, an unknown field, a body over 1 MiB, a missing `customer_id`, `feature_code` or `timestamp`, or a missing or invalid `Idempotency-Key`. `code: hold_ttl_invalid`: `ttl_seconds` is not an integer from 1 to 86400.'
+        '401': *id006
+        '402':
+          $ref: '#/components/responses/EngineCustomerPaymentOverdue'
+        '403':
+          $ref: '#/components/responses/EngineForbidden'
+          description: 'A publishable key, `code: permission_denied` when API key permissions are enabled and the secret key lacks `credit_system:write`, or `code: customer_scope_mismatch` when internal authentication is scoped to another customer.'
+        '404':
+          $ref: '#/components/responses/EngineNotFound'
+          description: '`code` is `customer_not_found`, `active_subscription_not_found`, `feature_not_found` or `entity_not_found`, as on `POST /usage/track`.'
+        '409':
+          $ref: '#/components/responses/EngineConflict'
+          description: '`code: idempotency_key_reused`: the key was used with a different body. `code: feature_billed_in_money`: the plan bills the Feature with a priced charge as well as credits.'
+        '422':
+          $ref: '#/components/responses/EngineUnprocessable'
+          description: '`code` is `active_subscription_ambiguous`, `feature_not_consumable`, `entity_inactive`, `credit_pool_policy_not_configured` or `credit_usage_configuration_invalid`, as on `POST /usage/track`.'
+        '500':
+          description: 'Unexpected server error. The body has `code: internal_error`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+        '503':
+          description: 'Retry after `Retry-After` with the same `Idempotency-Key` and body. `credit_usage_contention`: the balance stayed locked through every attempt. `credit_usage_temporarily_unavailable`: the database could not be reached.'
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying; `1`.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const hold = await nozle.usage.holds.create(
+              { customerId: 'customer_123', featureCode: 'agent_execution', properties: { tokens: 8000 }, ttlSeconds: 600 },
+              { idempotencyKey: 'run_0183f' },
+            )
+        - lang: Python
+          label: Python
+          source: |-
+            hold = nozle.usage.holds.create(
+                "customer_123",
+                "agent_execution",
+                properties={"tokens": 8000},
+                ttl_seconds=600,
+                idempotency_key="run_0183f",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            hold, err := client.CreateCreditHold(ctx, nozle.CreditHoldParams{
+            	CustomerID: "customer_123", FeatureCode: "agent_execution",
+            	Properties: map[string]any{"tokens": 8000}, TTLSeconds: 600,
+            }, "run_0183f")
+  /usage/holds/{hold_id}/finalize:
+    post:
+      summary: Finalize a credit hold
+      description: 'Engine 2.30.0. Spends the actual usage of a held call as one ordinary consume operation, priced at the rate pinned on the hold, and releases the rest. The customer, Entity, subscription, Feature and Credit System come from the hold. Less than held releases the rest; zero releases the whole hold (`credits_consumed: "0"`, no `operation_id`). More than held passes when the hold plus the free balance covers it; otherwise it answers `200` with `allowed: false` and `reason: insufficient_credits`, charges nothing and leaves the hold open. After expiry it runs as a plain track (`hold_expired: true`). A repeated finalize with the same body replays the first answer. Never refused for an overdue customer. With API key permissions, a secret key needs `credit_system:write`.'
+      operationId: engineFinalizeCreditHold
+      tags:
+        - Usage
+      servers: *id002
+      security: *id003
+      parameters:
+        - &id_hold_id
+          name: hold_id
+          in: path
+          required: true
+          description: Hold ID returned by `POST /usage/holds`.
+          schema:
+            type: string
+          example: 6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreditsUsageHoldFinalizeRequest'
+            example:
+              properties:
+                tokens: 5500
+              timestamp: '2026-10-31T12:03:12.000Z'
+      responses:
+        '200':
+          description: 'Finalize result. Check `allowed`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditsUsageHoldFinalizeResponse'
+        '400':
+          $ref: '#/components/responses/EngineBadRequest'
+          description: '`code: invalid_request`: invalid JSON, an unknown field, or a missing or invalid `timestamp`.'
+        '401': *id006
+        '403':
+          $ref: '#/components/responses/EngineForbidden'
+          description: 'A publishable key, or `code: permission_denied` when the secret key lacks `credit_system:write`.'
+        '404':
+          $ref: '#/components/responses/EngineNotFound'
+          description: '`code: hold_not_found`: no hold with this ID in the organization (or, with customer-scoped internal authentication, for another customer).'
+        '409':
+          $ref: '#/components/responses/EngineConflict'
+          description: '`code: hold_already_resolved`: the hold was released or denied, or was finalized with other usage.'
+        '422':
+          $ref: '#/components/responses/EngineUnprocessable'
+          description: '`code` is `entity_inactive` or `credit_usage_configuration_invalid` (the actual usage cannot be priced, for example a missing metric value).'
+        '500':
+          description: 'Unexpected server error. The body has `code: internal_error`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+        '503':
+          description: 'Retry after `Retry-After` with the same body. `credit_usage_contention` (`1`), `credit_usage_publication_backlog` (`30`) or `credit_usage_temporarily_unavailable` (`1`), as on `POST /usage/track`.'
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const result = await nozle.usage.holds.finalize(hold.hold_id, { properties: { tokens: 5500 } })
+        - lang: Python
+          label: Python
+          source: |-
+            result = nozle.usage.holds.finalize(hold["hold_id"], properties={"tokens": 5500})
+        - lang: Go
+          label: Go
+          source: |-
+            result, err := client.FinalizeCreditHold(ctx, hold.HoldID, nozle.FinalizeCreditHoldParams{
+            	Properties: map[string]any{"tokens": 5500},
+            })
+  /usage/holds/{hold_id}/release:
+    post:
+      summary: Release a credit hold
+      description: 'Engine 2.30.0. Ends an open hold without spending; its credits become spendable at once. Idempotent: a released, denied or expired hold is returned unchanged, and an open hold past its expiry is marked `expired`. A finalized hold returns `409 hold_already_resolved`. No request body. With API key permissions, a secret key needs `credit_system:write`.'
+      operationId: engineReleaseCreditHold
+      tags:
+        - Usage
+      servers: *id002
+      security: *id003
+      parameters:
+        - *id_hold_id
+      responses:
+        '200':
+          description: The hold after the release.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditsUsageHold'
+        '401': *id006
+        '403':
+          $ref: '#/components/responses/EngineForbidden'
+          description: 'A publishable key, or `code: permission_denied` when the secret key lacks `credit_system:write`.'
+        '404':
+          $ref: '#/components/responses/EngineNotFound'
+          description: '`code: hold_not_found`.'
+        '409':
+          $ref: '#/components/responses/EngineConflict'
+          description: '`code: hold_already_resolved`: the hold was finalized.'
+        '503':
+          description: 'Retry after `Retry-After`: `credit_usage_contention` or `credit_usage_temporarily_unavailable`.'
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying; `1`.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            await nozle.usage.holds.release(hold.hold_id)
+        - lang: Python
+          label: Python
+          source: |-
+            nozle.usage.holds.release(hold["hold_id"])
+        - lang: Go
+          label: Go
+          source: |-
+            released, err := client.ReleaseCreditHold(ctx, hold.HoldID)
+  /usage/holds/{hold_id}:
+    get:
+      summary: Get a credit hold
+      description: 'Engine 2.30.0. Reads one hold. An open hold past its expiry reads as `expired` before the sweep marks it. With API key permissions, a secret key needs `credit_system:read`.'
+      operationId: engineGetCreditHold
+      tags:
+        - Usage
+      servers: *id002
+      security: *id003
+      parameters:
+        - *id_hold_id
+      responses:
+        '200':
+          description: The hold.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditsUsageHold'
+        '401': *id006
+        '403':
+          $ref: '#/components/responses/EngineForbidden'
+          description: 'A publishable key, or `code: permission_denied` when the secret key lacks `credit_system:read`.'
+        '404':
+          $ref: '#/components/responses/EngineNotFound'
+          description: '`code: hold_not_found`.'
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const hold = await nozle.usage.holds.get('6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10')
+        - lang: Python
+          label: Python
+          source: |-
+            hold = nozle.usage.holds.get("6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10")
+        - lang: Go
+          label: Go
+          source: |-
+            hold, err := client.GetCreditHold(ctx, "6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10")
+  /customers/{customer_id}/credit-holds:
+    get:
+      summary: List customer credit holds
+      description: 'Engine 2.30.0. Lists the customer''s newest 100 holds, newest first, including its Entities'' holds. `status=held` lists the holds that reserve credits now; `status=expired` also lists open holds past their expiry. Requires an organization secret key or trusted internal authentication; a secret key needs `credit_system:read`. Publishable keys are rejected.'
+      operationId: engineListCustomerCreditHolds
+      tags:
+        - Credits
+      servers: *id002
+      security: *id003
+      parameters:
+        - *id004
+        - name: status
+          in: query
+          required: false
+          description: Only holds with this status. Any other value returns `400 invalid_request`.
+          schema:
+            type: string
+            enum:
+              - held
+              - denied
+              - finalized
+              - released
+              - expired
+      responses:
+        '200':
+          description: The customer's holds.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditsCustomerHoldList'
+        '400':
+          $ref: '#/components/responses/EngineBadRequest'
+          description: '`code: invalid_request`: an unknown `status` or an empty customer ID.'
+        '401': *id006
+        '403':
+          $ref: '#/components/responses/EngineForbidden'
+          description: 'A publishable key, `code: permission_denied` when the secret key lacks `credit_system:read`, or `code: customer_scope_mismatch`.'
+        '404':
+          $ref: '#/components/responses/EngineNotFound'
+          description: '`code: customer_not_found`.'
+        '503':
+          description: '`code: credit_read_temporarily_unavailable`. Retry after `Retry-After`.'
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying; `1`.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const { holds } = await nozle.usage.holds.list('customer_123', { status: 'held' })
+        - lang: Python
+          label: Python
+          source: |-
+            holds = nozle.usage.holds.list("customer_123", status="held")["holds"]
+        - lang: Go
+          label: Go
+          source: |-
+            list, err := client.ListCreditHolds(ctx, "customer_123", nozle.CreditHoldStatusHeld)
   /check-and-deduct:
     post:
       summary: Check and deduct legacy wallet credits
-      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet against concurrent check-and-deduct calls, and when its `credits_balance` covers `credits`, spends them through Core''s `POST /wallet_transactions` (`voided_credits`), which records a voided outbound wallet transaction, sends `wallet.updated` and `wallet_transaction.created` and runs wallet alerts. Not idempotent: an `Idempotency-Key` header is ignored and a retry deducts again; use `POST /usage/track` for retries. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; With API key permissions, the secret key needs `credit_system:write`, as on `POST /usage/track`, and `wallet_transaction:write`; without either the answer is `403` with `code: permission_denied` before any deduction.'
+      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet against concurrent check-and-deduct calls, and when its `credits_balance` covers `credits`, spends them through Core''s `POST /wallet_transactions` (`voided_credits`), which records a voided outbound wallet transaction, sends `wallet.updated` and `wallet_transaction.created` and runs wallet alerts. From Engine 2.30.0 it takes an optional `Idempotency-Key`: the first answer under a key (allowed or not) is stored with the deduction, and a retry with the same key, customer and credits replays it without deducting again; the key with another customer or amount returns `409 idempotency_key_reused`. Without a key every retry deducts again, and a Core deduction whose Engine commit fails is not recorded, so its retry deducts again too; use `POST /usage/track` when exactly-once matters. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; With API key permissions, the secret key needs `credit_system:write`, as on `POST /usage/track`, and `wallet_transaction:write`; without either the answer is `403` with `code: permission_denied` before any deduction.'
       operationId: engineCheckAndDeductCredits
       tags:
         - Credits
       servers: *id002
       security: *id003
       deprecated: true
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Engine 2.30.0. Optional idempotency key, at most 255 bytes. A retry with the same key, `customer_id` and `credits` replays the first answer. A value that is only whitespace or longer than 255 bytes returns `400 invalid_request`.
+          schema:
+            type: string
+            maxLength: 255
+            minLength: 1
       requestBody:
         required: true
         content:
@@ -12252,7 +12603,7 @@ paths:
                     allowed: false
                     remaining: 2
         '400':
-          description: The body has `code` `bad_request`.
+          description: The body has `code` `bad_request`, or `invalid_request` for an invalid `Idempotency-Key`.
           content:
             application/json:
               schema: *id001
@@ -12265,6 +12616,10 @@ paths:
                   value:
                     code: bad_request
                     error: customer_id and positive credits are required
+                invalid_idempotency_key:
+                  value:
+                    code: invalid_request
+                    error: Idempotency-Key must not be blank or exceed 255 bytes
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
@@ -12279,6 +12634,15 @@ paths:
                   value:
                     code: wallet_not_found
                     error: No active wallet found for this customer.
+        '409':
+          description: Engine 2.30.0. The `Idempotency-Key` was already used with another `customer_id` or `credits`. Nothing was deducted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+              example:
+                code: idempotency_key_reused
+                error: Idempotency-Key was already used with a different request
         '500':
           description: The deduction failed, for example Core refused the wallet transaction. Nothing was deducted.
           content:
@@ -39412,7 +39776,10 @@ components:
           description: Amount when the source was created, as a decimal string without trailing zeros.
         remaining:
           type: string
-          description: Amount not yet consumed, as a decimal string.
+          description: Amount not yet consumed, as a decimal string. It includes `held`.
+        held:
+          type: string
+          description: Engine 2.30.0. Part of `remaining` reserved by open credit holds, at most `remaining`, as a decimal string.
         valid_from:
           type: string
           format: date-time
@@ -39444,6 +39811,7 @@ components:
         - unit_name
         - system_status
         - available
+        - held
         - as_of
         - sources
       properties:
@@ -39467,7 +39835,10 @@ components:
           description: Status of the Credit System, for example `active`.
         available:
           type: string
-          description: Sum of `remaining` over sources whose `available` is `true`, as a decimal string.
+          description: What can be spent now, as a decimal string. The sum of `remaining` minus `held` over sources whose `available` is `true`.
+        held:
+          type: string
+          description: Engine 2.30.0. Credits reserved by open credit holds on those sources, already left out of `available`, as a decimal string.
         as_of:
           type: string
           format: date-time
@@ -39510,6 +39881,9 @@ components:
         - entity_available
         - shared_available
         - effective_available
+        - entity_held
+        - shared_held
+        - held
         - consumed
         - pool_policy
         - as_of
@@ -39537,13 +39911,22 @@ components:
           type: string
         entity_available:
           type: string
-          description: Available amount in Entity-owned sources.
+          description: Available amount in Entity-owned sources, open holds left out.
         shared_available:
           type: string
-          description: Available amount in the shared customer pool.
+          description: Available amount in the shared customer pool, open holds left out.
         effective_available:
           type: string
           description: Amount the Entity can spend under the current pool policy. `0` when the Entity is inactive or no unambiguous policy exists.
+        entity_held:
+          type: string
+          description: Engine 2.30.0. Credits reserved by open holds on Entity-owned sources, already left out of `entity_available`.
+        shared_held:
+          type: string
+          description: Engine 2.30.0. Credits reserved by open holds on the shared customer pool (by any Entity or customer-level usage), already left out of `shared_available`.
+        held:
+          type: string
+          description: 'Engine 2.30.0. Held part of the pool the Entity spends from: `entity_held` for `entity_only`, both for `entity_then_customer`, `shared_held` for `customer_only`; `0` when the Entity is inactive or no policy applies.'
         consumed:
           type: string
           description: Amount consumed by this Entity.
@@ -40569,6 +40952,244 @@ components:
             source_scope: customer
             amount: '2'
             remaining: '623.5'
+    CreditsUsageHoldCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - customer_id
+        - feature_code
+        - timestamp
+      description: The `POST /usage/track` body plus `ttl_seconds`. Unknown fields are rejected. The body must be one JSON object of at most 1 MiB.
+      properties:
+        customer_id:
+          type: string
+          description: External customer ID (trimmed).
+        entity_id:
+          type: string
+          description: External Entity ID to attribute and pool the usage. Omit for customer-level usage.
+        subscription_id:
+          type: string
+          description: External ID of the active subscription of the customer that pays for the usage. Optional; chosen as on `POST /usage/track`.
+        feature_code:
+          type: string
+          description: Code of a consumable Feature.
+        credit_system_code:
+          type: string
+          description: Credit System to use. Omit when only one effective rate applies.
+        properties:
+          type: object
+          additionalProperties: true
+          description: Event properties of the most the work can use; the hold reserves the credits they cost. Omitted means `{}`.
+        timestamp:
+          allOf:
+            - $ref: '#/components/schemas/CreditsEventTime'
+          description: Required. Time of the usage. Send the same value on every retry.
+        ttl_seconds:
+          type: integer
+          minimum: 1
+          maximum: 86400
+          description: Seconds until the hold expires. Default 900. A value outside 1 to 86400 returns `400 hold_ttl_invalid`.
+    CreditsUsageHoldFinalizeRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - timestamp
+      description: The actual usage of the held call. Unknown fields are rejected.
+      properties:
+        properties:
+          type: object
+          additionalProperties: true
+          description: Event properties of the actual usage. Omitted means `{}`; a zero amount releases the hold.
+        timestamp:
+          allOf:
+            - $ref: '#/components/schemas/CreditsEventTime'
+          description: Required. Time of the usage. Send the same value on every retry; a finalized hold replays only the same body.
+    CreditsUsageHold:
+      type: object
+      description: A credit hold. Amounts are decimal strings. Empty optional fields are omitted.
+      required:
+        - hold_id
+        - status
+        - customer_id
+        - feature_code
+        - credit_system
+        - metric_amount
+        - credits_required
+        - credits_held
+        - expires_at
+        - created_at
+        - resolved_at
+      properties:
+        hold_id:
+          type: string
+          description: Hold identifier.
+        status:
+          type: string
+          enum:
+            - held
+            - denied
+            - finalized
+            - released
+            - expired
+          description: '`held` while it reserves credits; `denied` when the balance was short at creation. An open hold past `expires_at` reads as `expired`.'
+        customer_id:
+          type: string
+          description: External customer ID.
+        entity_id:
+          type: string
+          description: External Entity ID. Omitted for customer-level usage.
+        subscription_id:
+          type: string
+          description: External ID of the subscription that pays. Omitted when none does.
+        feature_code:
+          type: string
+        credit_system:
+          type: string
+          description: Credit System code.
+        pool_policy:
+          type: string
+          enum:
+            - entity_only
+            - entity_then_customer
+            - customer_only
+          description: Pool policy the hold spends under. Omitted for customer-level usage.
+        metric_amount:
+          type: string
+          description: Metric amount the hold was created for.
+        credits_required:
+          type: string
+          description: Credits that amount costs at the pinned rate.
+        credits_held:
+          type: string
+          description: Credits reserved; `0` for a denied hold.
+        expires_at:
+          type: string
+          format: date-time
+          description: Time the hold stops reserving.
+        created_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: Time the hold was denied, finalized, released or expired; `null` while it is open.
+        operation_id:
+          type: string
+          description: Credit operation that spent the usage. Only on a finalized hold.
+      example:
+        hold_id: 6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10
+        status: held
+        customer_id: customer_123
+        entity_id: user_42
+        feature_code: agent_execution
+        credit_system: ai_credits
+        pool_policy: entity_then_customer
+        metric_amount: '8000'
+        credits_required: '8'
+        credits_held: '8'
+        expires_at: '2026-10-31T12:10:00.912Z'
+        created_at: '2026-10-31T12:00:00.912Z'
+        resolved_at: null
+    CreditsUsageHoldCreateResponse:
+      description: 'The hold plus the decision. `allowed: false` (status `denied`, `reason: insufficient_credits`) reserves nothing.'
+      allOf:
+        - $ref: '#/components/schemas/CreditsUsageHold'
+        - type: object
+          required:
+            - allowed
+            - available
+          properties:
+            allowed:
+              type: boolean
+              description: Whether the credits were reserved.
+            reason:
+              type: string
+              description: Reason code when `allowed` is `false`, for example `insufficient_credits`.
+            available:
+              type: string
+              description: Spendable credits just before this hold, other callers' open holds already subtracted.
+      example:
+        hold_id: 6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10
+        status: held
+        customer_id: customer_123
+        entity_id: user_42
+        feature_code: agent_execution
+        credit_system: ai_credits
+        pool_policy: entity_then_customer
+        metric_amount: '8000'
+        credits_required: '8'
+        credits_held: '8'
+        expires_at: '2026-10-31T12:10:00.912Z'
+        created_at: '2026-10-31T12:00:00.912Z'
+        resolved_at: null
+        allowed: true
+        available: '625'
+    CreditsUsageHoldFinalizeResponse:
+      description: The `POST /usage/track` response of the actual usage plus the hold's outcome.
+      allOf:
+        - $ref: '#/components/schemas/CreditsUsageTrackResponse'
+        - type: object
+          required:
+            - hold_id
+            - hold_status
+            - credits_held
+            - credits_released
+            - hold_expired
+          properties:
+            hold_id:
+              type: string
+            hold_status:
+              type: string
+              enum:
+                - held
+                - finalized
+                - released
+                - expired
+              description: '`finalized` after a spend, `released` after a zero amount, `held` when a denied finalize left the hold open, `expired` when it had expired.'
+            credits_held:
+              type: string
+              description: Credits the hold reserved.
+            credits_released:
+              type: string
+              description: Reserved credits returned to the balance.
+            hold_expired:
+              type: boolean
+              description: '`true` when the hold had expired and the usage ran as a plain track.'
+      example:
+        allowed: true
+        operation_id: 1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f
+        entity_id: user_42
+        pool_policy: entity_then_customer
+        metric_amount: '5500'
+        credit_system: ai_credits
+        credits_consumed: '5.5'
+        remaining: '619.5'
+        deductions:
+          - balance_source_id: bf659149-0d70-4d2a-8a7b-a4569cc742eb
+            source_type: subscription_grant
+            source_scope: customer
+            amount: '5.5'
+            remaining: '619.5'
+        hold_id: 6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10
+        hold_status: finalized
+        credits_held: '8'
+        credits_released: '2.5'
+        hold_expired: false
+    CreditsCustomerHoldList:
+      type: object
+      required:
+        - customer_id
+        - holds
+      properties:
+        customer_id:
+          type: string
+        holds:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreditsUsageHold'
+          description: Newest first, at most 100.
     CreditsCheckAndDeductRequest:
       type: object
       required:

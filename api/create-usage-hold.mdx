@@ -1,0 +1,123 @@
+---
+title: Create a Credit Hold
+api: "POST https://api.nozle.app/engine/api/v1/usage/holds"
+description: Reserve credits before work whose final amount is known only afterwards
+---
+
+Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.30.0.
+
+**Auth:** secret key only. The customer, Feature, and optional Credit System must belong to the authenticated organization. When your organization has API key permissions, the key requires `credit_system:write`; a key without it returns `403 permission_denied`.
+
+A hold reserves the credits a usage would cost, on the same sources [`POST /usage/track`](/api/usage-track) would spend, in the same order and under the same pool policy. It does not change the balance and sends nothing to billing. Until it is finalized, released or expired, other callers cannot spend the held credits: [`/usage/check`](/api/usage-check), [`/usage/track`](/api/usage-track), other holds, the balance endpoints and Entity transfers all subtract it. Settle the hold with [Finalize a Credit Hold](/api/finalize-usage-hold) once the actual usage is known, or free it with [Release a Credit Hold](/api/release-usage-hold).
+
+Use a hold when several workers spend from one balance at the same time and each needs to know before it starts that the credits are there, for example concurrent agent runs or LLM calls. For a cost known in advance, call `/usage/track` directly. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits).
+
+```http
+POST /usage/holds
+Authorization: Bearer sk_nozle_...
+Idempotency-Key: run_0183f
+Content-Type: application/json
+```
+
+```json
+{
+  "customer_id": "customer_123",
+  "entity_id": "user_42",
+  "feature_code": "agent_execution",
+  "credit_system_code": "ai_credits",
+  "properties": { "tokens": 8000 },
+  "timestamp": "2026-10-31T12:00:00.750Z",
+  "ttl_seconds": 600
+}
+```
+
+The body is the [`/usage/track`](/api/usage-track) body plus `ttl_seconds`. `customer_id`, `feature_code` and `timestamp` are required, and `subscription_id`, `entity_id` and `credit_system_code` work as on `/usage/track`, including [which subscription pays](/api/usage-track#which-subscription-pays). Send in `properties` the most the work can use: the hold reserves the credits those properties cost at the current rate, and that rate is pinned on the hold for its finalize. Unknown fields return `400 invalid_request`.
+
+`ttl_seconds` is how long the hold lasts: an integer from 1 to 86400 (24 hours), default 900 (15 minutes). Any other value returns `400 hold_ttl_invalid`. An expired hold stops reserving at once; a sweep marks it `expired` within a minute.
+
+## Idempotency
+
+`Idempotency-Key` is required and must not exceed 255 bytes; otherwise the request returns `400 invalid_request`. A retry with the same key and the same body returns the first answer, including a denial, and reserves nothing again. The same key with a different body returns `409 idempotency_key_reused`. Retry `503` answers with the same key and body.
+
+## Response
+
+```json
+{
+  "hold_id": "6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10",
+  "status": "held",
+  "customer_id": "customer_123",
+  "entity_id": "user_42",
+  "feature_code": "agent_execution",
+  "credit_system": "ai_credits",
+  "pool_policy": "entity_then_customer",
+  "metric_amount": "8000",
+  "credits_required": "8",
+  "credits_held": "8",
+  "expires_at": "2026-10-31T12:10:00.912Z",
+  "created_at": "2026-10-31T12:00:00.912Z",
+  "resolved_at": null,
+  "allowed": true,
+  "available": "625"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `hold_id` | Hold identifier. Pass it to finalize, release and get. |
+| `status` | `held` when the credits are reserved, `denied` when they are not. |
+| `allowed` | `true` when the credits were reserved. |
+| `reason` | `insufficient_credits` when `allowed` is `false`. Omitted otherwise. |
+| `credits_required` | Credits the usage costs. |
+| `credits_held` | Credits reserved. `"0"` for a denied hold. |
+| `available` | Credits the customer or Entity could spend just before this hold, other callers' open holds already subtracted. The hold itself is not subtracted. |
+| `metric_amount` | Metric amount derived from `properties`. |
+| `expires_at` | Time the hold stops reserving. |
+| `resolved_at` | Time the hold was denied, finalized, released or expired; `null` while it is open. |
+| `entity_id`, `subscription_id`, `pool_policy`, `operation_id` | Included when they apply. `operation_id` is set once a finalize spent the usage. |
+
+A short balance answers `200` with `allowed: false`, `status: "denied"` and `reason: "insufficient_credits"`. The denial is stored under the key, so a retry gets the same answer; use a new key after adding credits.
+
+## Errors
+
+| Status | `code` | Meaning |
+|--------|--------|---------|
+| `400` | `invalid_request` | Invalid JSON, an unknown field, a missing `customer_id`, `feature_code` or `timestamp`, or a missing or invalid `Idempotency-Key`. |
+| `400` | `hold_ttl_invalid` | `ttl_seconds` is not an integer from 1 to 86400. |
+| `402` | `customer_payment_overdue` | The customer is blocked by your [dunning policy](/guides/billing/dunning). Nothing is held. |
+| `403` | `permission_denied` | The key lacks `credit_system:write`. |
+| `404` | `customer_not_found`, `active_subscription_not_found`, `feature_not_found`, `entity_not_found` | As on `/usage/track`. |
+| `409` | `idempotency_key_reused` | The key was used with a different body. |
+| `409` | `feature_billed_in_money` | See [Credits or money, not both](/api/usage-track#credits-or-money-not-both). |
+| `422` | `active_subscription_ambiguous`, `feature_not_consumable`, `entity_inactive`, `credit_pool_policy_not_configured`, `credit_usage_configuration_invalid` | As on `/usage/track`. |
+| `503` | `credit_usage_contention`, `credit_usage_temporarily_unavailable` | Retry after `Retry-After` with the same key and body. |
+
+## SDKs
+
+<CodeGroup>
+
+```ts Node.js
+const hold = await nozle.usage.holds.create(
+  { customerId: 'customer_123', featureCode: 'agent_execution', properties: { tokens: 8000 }, ttlSeconds: 600 },
+  { idempotencyKey: 'run_0183f' },
+)
+if (!hold.allowed) throw new Error(hold.reason)
+```
+
+```python Python
+hold = nozle.usage.holds.create(
+    "customer_123",
+    "agent_execution",
+    properties={"tokens": 8000},
+    ttl_seconds=600,
+    idempotency_key="run_0183f",
+)
+```
+
+```go Go
+hold, err := client.CreateCreditHold(ctx, nozle.CreditHoldParams{
+	CustomerID: "customer_123", FeatureCode: "agent_execution",
+	Properties: map[string]any{"tokens": 8000}, TTLSeconds: 600,
+}, "run_0183f")
+```
+
+</CodeGroup>

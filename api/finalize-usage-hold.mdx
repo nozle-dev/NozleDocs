@@ -1,0 +1,112 @@
+---
+title: Finalize a Credit Hold
+api: "POST https://api.nozle.app/engine/api/v1/usage/holds/{hold_id}/finalize"
+description: Spend the actual usage of a held call and release the rest
+---
+
+Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.30.0.
+
+**Auth:** secret key only. When your organization has API key permissions, the key requires `credit_system:write`.
+
+Send the actual usage once the work is done. Nozle spends it as one ordinary consume operation, exactly as [`/usage/track`](/api/usage-track) would, so the usage is billed once and appears in the operation history. The price is the rate pinned when the hold was taken, even if the Credit System rate changed since.
+
+```http
+POST /usage/holds/6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10/finalize
+Authorization: Bearer sk_nozle_...
+Content-Type: application/json
+```
+
+```json
+{
+  "properties": { "tokens": 5500 },
+  "timestamp": "2026-10-31T12:03:12.000Z"
+}
+```
+
+`timestamp` is required and takes the same forms as on `/usage/track`. `properties` gives the actual usage; the customer, Entity, subscription, Feature and Credit System come from the hold. Unknown fields return `400 invalid_request`. No `Idempotency-Key` is needed: the hold is the key.
+
+## Amounts
+
+- **Less than held:** the actual amount is spent and the rest is released (`credits_released`).
+- **Zero:** nothing is spent and the whole hold is released. `credits_consumed` is `"0"` and there is no `operation_id`.
+- **More than held:** allowed when the hold plus the free balance covers it. Otherwise the answer is `allowed: false` with `reason: "insufficient_credits"`, nothing is charged (no partial charge, the balance never goes negative) and the hold stays open, so you can retry or release it.
+- **After expiry:** the hold no longer reserves anything, so the finalize runs as a plain track against the free balance and answers `hold_expired: true`. If the free balance is short it answers `allowed: false`.
+
+## Retries
+
+A repeated finalize with the same body returns the first answer and spends nothing again. Sending other usage to a finalized hold returns `409 hold_already_resolved`, and so does finalizing a released or denied hold. Keep the `timestamp` fixed across retries; the SDKs reuse a timestamp they filled in for the same hold on the same client.
+
+## Response
+
+The [`/usage/track` response](/api/usage-track#response) plus the hold's outcome:
+
+```json
+{
+  "allowed": true,
+  "operation_id": "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+  "entity_id": "user_42",
+  "pool_policy": "entity_then_customer",
+  "metric_amount": "5500",
+  "credit_system": "ai_credits",
+  "credits_consumed": "5.5",
+  "remaining": "619.5",
+  "deductions": [
+    {
+      "balance_source_id": "bf659149-0d70-4d2a-8a7b-a4569cc742eb",
+      "source_type": "subscription_grant",
+      "source_scope": "customer",
+      "amount": "5.5",
+      "remaining": "619.5"
+    }
+  ],
+  "hold_id": "6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10",
+  "hold_status": "finalized",
+  "credits_held": "8",
+  "credits_released": "2.5",
+  "hold_expired": false
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `hold_id` | The hold. |
+| `hold_status` | `finalized` after a spend, `released` after an actual amount of 0, `held` when the finalize was denied and the hold stays open, `expired` when it had expired. |
+| `credits_held` | Credits the hold reserved. |
+| `credits_released` | Reserved credits returned to the balance. |
+| `hold_expired` | `true` when the hold had expired and the usage ran as a plain track. |
+
+A denied finalize answers `200` with `allowed: false`, `credits_required`, `available` and `reason`, like a denied `/usage/track`.
+
+## Errors
+
+| Status | `code` | Meaning |
+|--------|--------|---------|
+| `400` | `invalid_request` | Invalid JSON, an unknown field, or a missing or invalid `timestamp`. |
+| `403` | `permission_denied` | The key lacks `credit_system:write`. |
+| `404` | `hold_not_found` | No hold with this ID in your organization. |
+| `409` | `hold_already_resolved` | The hold was released or denied, or was finalized with other usage. |
+| `422` | `entity_inactive`, `credit_usage_configuration_invalid` | The Entity is no longer active, or the actual usage cannot be priced (for example a missing metric value). |
+| `503` | `credit_usage_contention`, `credit_usage_publication_backlog`, `credit_usage_temporarily_unavailable` | Retry after `Retry-After` with the same body. |
+
+A finalize is never refused for an overdue customer: the usage already happened.
+
+## SDKs
+
+<CodeGroup>
+
+```ts Node.js
+const result = await nozle.usage.holds.finalize(hold.hold_id, { properties: { tokens: 5500 } })
+console.log(result.credits_consumed, result.credits_released)
+```
+
+```python Python
+result = nozle.usage.holds.finalize(hold["hold_id"], properties={"tokens": 5500})
+```
+
+```go Go
+result, err := client.FinalizeCreditHold(ctx, hold.HoldID, nozle.FinalizeCreditHoldParams{
+	Properties: map[string]any{"tokens": 5500},
+})
+```
+
+</CodeGroup>

@@ -25,6 +25,8 @@ _ = err
 
 Use `GetCreditBalance` and `ListCreditBalances` for customer balances. `GetEntityCreditBalance` includes `EntityAvailable`, `SharedAvailable`, `EffectiveAvailable`, and `PoolPolicy`. Pool policy can be `entity_only`, `entity_then_customer`, or `customer_only`.
 
+`Available` already leaves out credits reserved by open [credit holds](#credit-holds). From Engine 2.30.0, `Held` on `CreditBalance` and `CreditSource`, and `EntityHeld`, `SharedHeld` and `Held` on `EntityCreditBalance`, report them.
+
 ## Operation history and transfers
 
 `ListCreditOperations` and `ListEntityCreditOperations` take `PageOptions{CreditSystemCode, Limit, Cursor}`. Limits are 1–100. Read `NextCursor` to fetch the next page. Operations include exact amounts, status, reason, rate snapshot, occurrence time, and source allocations. `AllocateCredits` and `DeallocateCredits` require stable idempotency keys of at most 255 UTF-8 bytes.
@@ -58,6 +60,56 @@ _ = err
 Set `UsageParams.Timestamp` (a string) once per operation and store it with the idempotency key. A retry with the same key, the same parameters and the same `Timestamp` replays the original result: the same `OperationID` and no second charge. A retry without a `Timestamp` sends a different body, and the API returns `*APIError` with `StatusCode` 409 (`idempotency_key_reused`).
 
 Set `UsageParams.Properties` for conversion or attribution metadata. `UsageResult` includes `Allowed`, exact `CreditsRequired`, `Available`, `ProjectedRemaining`, and deduction details. A check never reserves credits; inspect `Allowed` on the tracking result before granting the operation.
+
+## Credit holds
+
+Available from `nozle-go` v0.26.0 with Engine 2.30.0. When the cost is known only after the work, hold the credits first and finalize with the actual usage. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits).
+
+```go
+hold, err := client.CreateCreditHold(ctx, nozle.CreditHoldParams{
+  CustomerID: "workspace_123", EntityID: "user_42", FeatureCode: "agent_execution", CreditSystemCode: "ai_credits",
+  Properties: map[string]any{"tokens": 8000}, // the most the work can use
+  TTLSeconds: 600,                            // 0 uses the Engine default of 900; at most 86400
+}, "hold-run-0183f")
+if err != nil {
+  return err
+}
+if !hold.Allowed {
+  return fmt.Errorf("usage denied: %s", hold.Reason)
+}
+
+tokens, runErr := runAgent(ctx)
+if runErr != nil {
+  _, _ = client.ReleaseCreditHold(ctx, hold.HoldID)
+  return runErr
+}
+result, err := client.FinalizeCreditHold(ctx, hold.HoldID, nozle.FinalizeCreditHoldParams{
+  Properties: map[string]any{"tokens": tokens},
+})
+if err != nil {
+  return err
+}
+_ = result.CreditsReleased
+
+open, err := client.ListCreditHolds(ctx, "workspace_123", nozle.CreditHoldStatusHeld)
+one, err := client.GetCreditHold(ctx, hold.HoldID)
+_ = open
+_ = one
+```
+
+| Method | Endpoint |
+|--------|----------|
+| `CreateCreditHold(ctx, CreditHoldParams, idempotencyKey) (CreditHoldResult, error)` | [`POST /usage/holds`](/api/create-usage-hold) |
+| `FinalizeCreditHold(ctx, holdID, FinalizeCreditHoldParams) (CreditHoldFinalizeResult, error)` | [`POST /usage/holds/{hold_id}/finalize`](/api/finalize-usage-hold) |
+| `ReleaseCreditHold(ctx, holdID) (CreditHold, error)` | [`POST /usage/holds/{hold_id}/release`](/api/release-usage-hold) |
+| `GetCreditHold(ctx, holdID) (CreditHold, error)` | [`GET /usage/holds/{hold_id}`](/api/get-usage-hold) |
+| `ListCreditHolds(ctx, customerID, status) (CreditHoldList, error)` | [`GET /customers/{customer_id}/credit-holds`](/api/list-customer-credit-holds) |
+
+- `CreditHoldParams` has the `TrackUsage` fields plus `TTLSeconds`. A denial is `Allowed=false` with `Reason`, not an error.
+- `CreditHoldFinalizeResult` embeds `UsageResult` and adds `HoldID`, `HoldStatus`, `CreditsHeld`, `CreditsReleased` and `HoldExpired`. Usage above the hold passes only when free credit covers the difference; zero usage releases the hold; after expiry the finalize runs as a plain track with `HoldExpired=true`.
+- `ListCreditHolds` takes `""` for every status, or one of the `CreditHoldStatusHeld`, `CreditHoldStatusDenied`, `CreditHoldStatusFinalized`, `CreditHoldStatusReleased`, `CreditHoldStatusExpired` constants; another value is refused before any request. It returns the newest 100.
+- Errors come back as `*nozle.APIError` with `Code()` `CodeHoldNotFound` (404), `CodeHoldAlreadyResolved` (409: releasing a finalized hold, or finalizing a resolved hold with other usage) or `CodeHoldTTLInvalid` (400).
+- A missing `Timestamp` is filled in once per idempotency key (create) or hold ID (finalize) and reused, so a repeat replays the first answer. Create, finalize and release are retried under `WithMaxRetries`.
 
 ## Legacy wallet adapter
 
