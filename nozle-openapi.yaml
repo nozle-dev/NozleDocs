@@ -12095,7 +12095,7 @@ paths:
         - name: Idempotency-Key
           in: header
           required: true
-          description: Idempotency key, at most 255 bytes. Required. Used exactly as sent (not trimmed); a value that is empty or only whitespace is rejected. A missing, blank or longer value returns `400 invalid_request` (`Idempotency-Key is required and must not exceed 255 bytes`). From Engine 2.30.0, keys starting with `hold:` are reserved for finalized credit holds and return `400 invalid_request`. Retry an uncertain request with the same key and an identical body; the same key with a different request returns `409 idempotency_key_reused`.
+          description: Idempotency key, at most 255 bytes. Required. Used exactly as sent (not trimmed); a value that is empty or only whitespace is rejected. A missing, blank or longer value returns `400 invalid_request` (`Idempotency-Key is required and must not exceed 255 bytes`). From Engine 2.33.0, keys starting with `hold:` are reserved for finalized credit holds and return `400 invalid_request`. Retry an uncertain request with the same key and an identical body; the same key with a different request returns `409 idempotency_key_reused`.
           schema:
             type: string
             maxLength: 255
@@ -12213,7 +12213,7 @@ paths:
   /usage/holds:
     post:
       summary: Create a credit hold
-      description: 'Engine 2.30.0. Reserves the credits of one usage on the sources `POST /usage/track` would spend, in the same order and under the same pool policy, without changing the balance or sending anything to billing. Until it is finalized, released or expired, the held credits are left out of `available` for `/usage/check`, `/usage/track`, other holds, the balance endpoints and Entity transfers. The body is the `/usage/track` body plus `ttl_seconds`; send in `properties` the most the work can use. The rate is pinned on the hold for its finalize. A short balance returns `200` with `allowed: false`, `status: denied` and `reason: insufficient_credits`, stored under the key so a retry gets the same answer. Requires an organization secret key or trusted internal authentication; publishable keys are rejected. With API key permissions, a secret key needs `credit_system:write`.'
+      description: 'Engine 2.33.0. Reserves the credits of one usage on the sources `POST /usage/track` would spend, in the same order and under the same pool policy, without changing the balance or sending anything to billing. Until it is finalized, released or expired, the held credits are left out of `available` for `/usage/check`, `/usage/track`, other holds, the balance endpoints and Entity transfers. The body is the `/usage/track` body plus `ttl_seconds`; send in `properties` the most the work can use. The rate is pinned on the hold for its finalize. A short balance returns `200` with `allowed: false`, `status: denied` and `reason: insufficient_credits`, stored under the key so a retry gets the same answer. Requires an organization secret key or trusted internal authentication; publishable keys are rejected. With API key permissions, a secret key needs `credit_system:write`.'
       operationId: engineCreateCreditHold
       tags:
         - Usage
@@ -12313,7 +12313,7 @@ paths:
   /usage/holds/{hold_id}/finalize:
     post:
       summary: Finalize a credit hold
-      description: 'Engine 2.30.0. Spends the actual usage of a held call as one ordinary consume operation, priced at the rate pinned on the hold, and releases the rest. The customer, Entity, subscription, Feature and Credit System come from the hold. Less than held releases the rest; zero releases the whole hold (`credits_consumed: "0"`, no `operation_id`). More than held passes when the hold plus the free balance covers it; otherwise it answers `200` with `allowed: false` and `reason: insufficient_credits`, charges nothing and leaves the hold open. After expiry it runs as a plain track (`hold_expired: true`). A repeated finalize with the same body replays the first answer, including a zero finalize that released the hold. Never refused for an overdue customer. With API key permissions, a secret key needs `credit_system:write`.'
+      description: 'Engine 2.33.0. Spends the actual usage of a held call as one ordinary consume operation, priced at the rate pinned on the hold, and releases the rest. The customer, Entity, subscription, Feature and Credit System come from the hold. Less than held releases the rest; zero releases the whole hold (`credits_consumed: "0"`, no `operation_id`). More than held passes when the hold plus the free balance covers it; otherwise it answers `200` with `allowed: false` and `reason: insufficient_credits`, charges nothing and leaves the hold open. After expiry it runs as a plain track (`hold_expired: true`). A repeated finalize with the same body replays the first answer, including a zero finalize that released the hold. Never refused for an overdue customer. With API key permissions, a secret key needs `credit_system:write`.'
       operationId: engineFinalizeCreditHold
       tags:
         - Usage
@@ -12396,7 +12396,7 @@ paths:
   /usage/holds/{hold_id}/release:
     post:
       summary: Release a credit hold
-      description: 'Engine 2.30.0. Ends an open hold without spending; its credits become spendable at once. Idempotent: a released, denied or expired hold is returned unchanged, and an open hold past its expiry is marked `expired`. A finalized hold returns `409 hold_already_resolved`. No request body. With API key permissions, a secret key needs `credit_system:write`.'
+      description: 'Engine 2.33.0. Ends an open hold without spending; its credits become spendable at once. Idempotent: a released, denied or expired hold is returned unchanged, and an open hold past its expiry is marked `expired`. A finalized hold returns `409 hold_already_resolved`. No request body. With API key permissions, a secret key needs `credit_system:write`.'
       operationId: engineReleaseCreditHold
       tags:
         - Usage
@@ -12448,7 +12448,7 @@ paths:
   /usage/holds/{hold_id}:
     get:
       summary: Get a credit hold
-      description: 'Engine 2.30.0. Reads one hold. An open hold past its expiry reads as `expired` before the sweep marks it. With API key permissions, a secret key needs `credit_system:read`.'
+      description: 'Engine 2.33.0. Reads one hold. An open hold past its expiry reads as `expired` before the sweep marks it. With API key permissions, a secret key needs `credit_system:read`.'
       operationId: engineGetCreditHold
       tags:
         - Usage
@@ -12486,7 +12486,7 @@ paths:
   /customers/{customer_id}/credit-holds:
     get:
       summary: List customer credit holds
-      description: 'Engine 2.30.0. Lists the customer''s newest 100 holds, newest first, including its Entities'' holds. `status=held` lists the holds that reserve credits now; `status=expired` also lists open holds past their expiry. Requires an organization secret key or trusted internal authentication; a secret key needs `credit_system:read`. Publishable keys are rejected.'
+      description: 'Engine 2.33.0. Lists the customer''s newest 100 holds, newest first, including its Entities'' holds. `status=held` lists the holds that reserve credits now; `status=expired` also lists open holds past their expiry. Requires an organization secret key or trusted internal authentication; a secret key needs `credit_system:read`. Publishable keys are rejected.'
       operationId: engineListCustomerCreditHolds
       tags:
         - Credits
@@ -12550,7 +12550,7 @@ paths:
   /check-and-deduct:
     post:
       summary: Check and deduct legacy wallet credits
-      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet against concurrent check-and-deduct calls, and when its `credits_balance` covers `credits`, spends them through Core''s `POST /wallet_transactions` (`voided_credits`), which records a voided outbound wallet transaction, sends `wallet.updated` and `wallet_transaction.created` and runs wallet alerts. From Engine 2.30.0 it takes an optional `Idempotency-Key`: the first answer under a key (allowed or not) is stored with the deduction, and a retry with the same key, customer and credits replays it without deducting again; the key with another customer or amount returns `409 idempotency_key_reused`. Keys are kept 7 days. Without a key every retry deducts again, and a Core deduction whose Engine commit fails is not recorded, so its retry deducts again too; use `POST /usage/track` when exactly-once matters. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; With API key permissions, the secret key needs `credit_system:write`, as on `POST /usage/track`, and `wallet_transaction:write`; without either the answer is `403` with `code: permission_denied` before any deduction.'
+      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet against concurrent check-and-deduct calls, and when its `credits_balance` covers `credits`, spends them through Core''s `POST /wallet_transactions` (`voided_credits`), which records a voided outbound wallet transaction, sends `wallet.updated` and `wallet_transaction.created` and runs wallet alerts. From Engine 2.33.0 it takes an optional `Idempotency-Key`: the first answer under a key (allowed or not) is stored with the deduction, and a retry with the same key, customer and credits replays it without deducting again; the key with another customer or amount returns `409 idempotency_key_reused`. Keys are kept 7 days. Without a key every retry deducts again, and a Core deduction whose Engine commit fails is not recorded, so its retry deducts again too; use `POST /usage/track` when exactly-once matters. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; With API key permissions, the secret key needs `credit_system:write`, as on `POST /usage/track`, and `wallet_transaction:write`; without either the answer is `403` with `code: permission_denied` before any deduction.'
       operationId: engineCheckAndDeductCredits
       tags:
         - Credits
@@ -12561,7 +12561,7 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: Engine 2.30.0. Optional idempotency key, at most 255 bytes. A retry with the same key, `customer_id` and `credits` replays the first answer. Keys are kept 7 days; a retry after that deducts again. A value that is only whitespace or longer than 255 bytes returns `400 invalid_request`.
+          description: Engine 2.33.0. Optional idempotency key, at most 255 bytes. A retry with the same key, `customer_id` and `credits` replays the first answer. Keys are kept 7 days; a retry after that deducts again. A value that is only whitespace or longer than 255 bytes returns `400 invalid_request`.
           schema:
             type: string
             maxLength: 255
@@ -12635,7 +12635,7 @@ paths:
                     code: wallet_not_found
                     error: No active wallet found for this customer.
         '409':
-          description: Engine 2.30.0. The `Idempotency-Key` was already used with another `customer_id` or `credits`. Nothing was deducted.
+          description: Engine 2.33.0. The `Idempotency-Key` was already used with another `customer_id` or `credits`. Nothing was deducted.
           content:
             application/json:
               schema:
@@ -13770,7 +13770,7 @@ paths:
 
         **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
-        **Credit holds (Engine 2.30.0, opt-in).** With `X-Nozle-Credit-Hold: <metric amount>`, Engine reserves the credits of that amount of the `X-Nozle-Feature-Code` Feature after the usage limit and margin checks, before the provider is called; it never estimates the amount from the body. A short balance returns `402 insufficient_credits`, and an amount that is not a positive decimal `400 invalid_request`; the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`. The call is paid from the hold with the token usage Engine reads, in place of the usage event. A call with no usage read releases the hold. For a sum metric, usage above the hold plus the free balance is paid as far as the credit covers it at the hold's rate (the balance never goes negative; it can keep less than `0.000000000001`), and the unpaid rest of the metric is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id`. For a count metric, or when the finalize fails, the hold is released and the whole usage is sent as the usage event. When Engine cannot confirm that the hold was not finalized, nothing is sent and the hold expires. No hold is taken for a Feature with no credit rate, billed in money or not consumable, and the call is not refused when holds are unavailable.
+        **Credit holds (Engine 2.33.0, opt-in).** With `X-Nozle-Credit-Hold: <metric amount>`, Engine reserves the credits of that amount of the `X-Nozle-Feature-Code` Feature after the usage limit and margin checks, before the provider is called; it never estimates the amount from the body. A short balance returns `402 insufficient_credits`, and an amount that is not a positive decimal `400 invalid_request`; the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`. The call is paid from the hold with the token usage Engine reads, in place of the usage event. A call with no usage read releases the hold. For a sum metric, usage above the hold plus the free balance is paid as far as the credit covers it at the hold's rate (the balance never goes negative; it can keep less than `0.000000000001`), and the unpaid rest of the metric is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id`. For a count metric, or when the finalize fails, the hold is released and the whole usage is sent as the usage event. When Engine cannot confirm that the hold was not finalized, nothing is sent and the hold expires. No hold is taken for a Feature with no credit rate, billed in money or not consumable, and the call is not refused when holds are unavailable.
 
         Example: `POST /proxy/openai/v1/chat/completions` is sent to `https://api.openai.com/v1/chat/completions`.
       operationId: engineProxyOpenAIPost
@@ -13812,7 +13812,7 @@ paths:
         - name: X-Nozle-Credit-Hold
           in: header
           required: false
-          description: Engine 2.30.0. Positive decimal metric amount of the Feature to reserve in credits before the provider is called, for example the most tokens the call can use. Not forwarded to the provider.
+          description: Engine 2.33.0. Positive decimal metric amount of the Feature to reserve in credits before the provider is called, for example the most tokens the call can use. Not forwarded to the provider.
           schema:
             type: string
           example: '4000'
@@ -13839,7 +13839,7 @@ paths:
           description: The provider's response, passed through unchanged with the provider's status code, headers and body (JSON, or `text/event-stream` when streaming). Provider errors keep the provider's own error shape.
           headers:
             X-Nozle-Credit-Hold-Id:
-              description: Engine 2.30.0. ID of the credit hold taken for this call when `X-Nozle-Credit-Hold` was sent.
+              description: Engine 2.33.0. ID of the credit hold taken for this call when `X-Nozle-Credit-Hold` was sent.
               schema:
                 type: string
           content:
@@ -13879,7 +13879,7 @@ paths:
 
         **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
-        **Credit holds (Engine 2.30.0, opt-in).** With `X-Nozle-Credit-Hold: <metric amount>`, Engine reserves the credits of that amount of the `X-Nozle-Feature-Code` Feature after the usage limit and margin checks, before the provider is called; it never estimates the amount from the body. A short balance returns `402 insufficient_credits`, and an amount that is not a positive decimal `400 invalid_request`; the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`. The call is paid from the hold with the token usage Engine reads, in place of the usage event. A call with no usage read releases the hold. For a sum metric, usage above the hold plus the free balance is paid as far as the credit covers it at the hold's rate (the balance never goes negative; it can keep less than `0.000000000001`), and the unpaid rest of the metric is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id`. For a count metric, or when the finalize fails, the hold is released and the whole usage is sent as the usage event. When Engine cannot confirm that the hold was not finalized, nothing is sent and the hold expires. No hold is taken for a Feature with no credit rate, billed in money or not consumable, and the call is not refused when holds are unavailable.
+        **Credit holds (Engine 2.33.0, opt-in).** With `X-Nozle-Credit-Hold: <metric amount>`, Engine reserves the credits of that amount of the `X-Nozle-Feature-Code` Feature after the usage limit and margin checks, before the provider is called; it never estimates the amount from the body. A short balance returns `402 insufficient_credits`, and an amount that is not a positive decimal `400 invalid_request`; the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`. The call is paid from the hold with the token usage Engine reads, in place of the usage event. A call with no usage read releases the hold. For a sum metric, usage above the hold plus the free balance is paid as far as the credit covers it at the hold's rate (the balance never goes negative; it can keep less than `0.000000000001`), and the unpaid rest of the metric is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id`. For a count metric, or when the finalize fails, the hold is released and the whole usage is sent as the usage event. When Engine cannot confirm that the hold was not finalized, nothing is sent and the hold expires. No hold is taken for a Feature with no credit rate, billed in money or not consumable, and the call is not refused when holds are unavailable.
 
         Example: `POST /proxy/openai/v1/chat/completions` is sent to `https://api.openai.com/v1/chat/completions`.
       operationId: engineProxyOpenAIGet
@@ -13921,7 +13921,7 @@ paths:
         - name: X-Nozle-Credit-Hold
           in: header
           required: false
-          description: Engine 2.30.0. Positive decimal metric amount of the Feature to reserve in credits before the provider is called, for example the most tokens the call can use. Not forwarded to the provider.
+          description: Engine 2.33.0. Positive decimal metric amount of the Feature to reserve in credits before the provider is called, for example the most tokens the call can use. Not forwarded to the provider.
           schema:
             type: string
           example: '4000'
@@ -13936,7 +13936,7 @@ paths:
           description: The provider's response, passed through unchanged with the provider's status code, headers and body (JSON, or `text/event-stream` when streaming). Provider errors keep the provider's own error shape.
           headers:
             X-Nozle-Credit-Hold-Id:
-              description: Engine 2.30.0. ID of the credit hold taken for this call when `X-Nozle-Credit-Hold` was sent.
+              description: Engine 2.33.0. ID of the credit hold taken for this call when `X-Nozle-Credit-Hold` was sent.
               schema:
                 type: string
           content:
@@ -13984,7 +13984,7 @@ paths:
 
         **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
-        **Credit holds (Engine 2.30.0, opt-in).** With `X-Nozle-Credit-Hold: <metric amount>`, Engine reserves the credits of that amount of the `X-Nozle-Feature-Code` Feature after the usage limit and margin checks, before the provider is called; it never estimates the amount from the body. A short balance returns `402 insufficient_credits`, and an amount that is not a positive decimal `400 invalid_request`; the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`. The call is paid from the hold with the token usage Engine reads, in place of the usage event. A call with no usage read releases the hold. For a sum metric, usage above the hold plus the free balance is paid as far as the credit covers it at the hold's rate (the balance never goes negative; it can keep less than `0.000000000001`), and the unpaid rest of the metric is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id`. For a count metric, or when the finalize fails, the hold is released and the whole usage is sent as the usage event. When Engine cannot confirm that the hold was not finalized, nothing is sent and the hold expires. No hold is taken for a Feature with no credit rate, billed in money or not consumable, and the call is not refused when holds are unavailable.
+        **Credit holds (Engine 2.33.0, opt-in).** With `X-Nozle-Credit-Hold: <metric amount>`, Engine reserves the credits of that amount of the `X-Nozle-Feature-Code` Feature after the usage limit and margin checks, before the provider is called; it never estimates the amount from the body. A short balance returns `402 insufficient_credits`, and an amount that is not a positive decimal `400 invalid_request`; the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`. The call is paid from the hold with the token usage Engine reads, in place of the usage event. A call with no usage read releases the hold. For a sum metric, usage above the hold plus the free balance is paid as far as the credit covers it at the hold's rate (the balance never goes negative; it can keep less than `0.000000000001`), and the unpaid rest of the metric is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id`. For a count metric, or when the finalize fails, the hold is released and the whole usage is sent as the usage event. When Engine cannot confirm that the hold was not finalized, nothing is sent and the hold expires. No hold is taken for a Feature with no credit rate, billed in money or not consumable, and the call is not refused when holds are unavailable.
 
         Example: `POST /proxy/anthropic/v1/messages` is sent to `https://api.anthropic.com/v1/messages`.
       operationId: engineProxyAnthropicPost
@@ -14026,7 +14026,7 @@ paths:
         - name: X-Nozle-Credit-Hold
           in: header
           required: false
-          description: Engine 2.30.0. Positive decimal metric amount of the Feature to reserve in credits before the provider is called, for example the most tokens the call can use. Not forwarded to the provider.
+          description: Engine 2.33.0. Positive decimal metric amount of the Feature to reserve in credits before the provider is called, for example the most tokens the call can use. Not forwarded to the provider.
           schema:
             type: string
           example: '4000'
@@ -14061,7 +14061,7 @@ paths:
           description: The provider's response, passed through unchanged with the provider's status code, headers and body (JSON, or `text/event-stream` when streaming). Provider errors keep the provider's own error shape.
           headers:
             X-Nozle-Credit-Hold-Id:
-              description: Engine 2.30.0. ID of the credit hold taken for this call when `X-Nozle-Credit-Hold` was sent.
+              description: Engine 2.33.0. ID of the credit hold taken for this call when `X-Nozle-Credit-Hold` was sent.
               schema:
                 type: string
           content:
@@ -14101,7 +14101,7 @@ paths:
 
         **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
 
-        **Credit holds (Engine 2.30.0, opt-in).** With `X-Nozle-Credit-Hold: <metric amount>`, Engine reserves the credits of that amount of the `X-Nozle-Feature-Code` Feature after the usage limit and margin checks, before the provider is called; it never estimates the amount from the body. A short balance returns `402 insufficient_credits`, and an amount that is not a positive decimal `400 invalid_request`; the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`. The call is paid from the hold with the token usage Engine reads, in place of the usage event. A call with no usage read releases the hold. For a sum metric, usage above the hold plus the free balance is paid as far as the credit covers it at the hold's rate (the balance never goes negative; it can keep less than `0.000000000001`), and the unpaid rest of the metric is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id`. For a count metric, or when the finalize fails, the hold is released and the whole usage is sent as the usage event. When Engine cannot confirm that the hold was not finalized, nothing is sent and the hold expires. No hold is taken for a Feature with no credit rate, billed in money or not consumable, and the call is not refused when holds are unavailable.
+        **Credit holds (Engine 2.33.0, opt-in).** With `X-Nozle-Credit-Hold: <metric amount>`, Engine reserves the credits of that amount of the `X-Nozle-Feature-Code` Feature after the usage limit and margin checks, before the provider is called; it never estimates the amount from the body. A short balance returns `402 insufficient_credits`, and an amount that is not a positive decimal `400 invalid_request`; the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`. The call is paid from the hold with the token usage Engine reads, in place of the usage event. A call with no usage read releases the hold. For a sum metric, usage above the hold plus the free balance is paid as far as the credit covers it at the hold's rate (the balance never goes negative; it can keep less than `0.000000000001`), and the unpaid rest of the metric is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id`. For a count metric, or when the finalize fails, the hold is released and the whole usage is sent as the usage event. When Engine cannot confirm that the hold was not finalized, nothing is sent and the hold expires. No hold is taken for a Feature with no credit rate, billed in money or not consumable, and the call is not refused when holds are unavailable.
 
         Example: `POST /proxy/anthropic/v1/messages` is sent to `https://api.anthropic.com/v1/messages`.
       operationId: engineProxyAnthropicGet
@@ -14143,7 +14143,7 @@ paths:
         - name: X-Nozle-Credit-Hold
           in: header
           required: false
-          description: Engine 2.30.0. Positive decimal metric amount of the Feature to reserve in credits before the provider is called, for example the most tokens the call can use. Not forwarded to the provider.
+          description: Engine 2.33.0. Positive decimal metric amount of the Feature to reserve in credits before the provider is called, for example the most tokens the call can use. Not forwarded to the provider.
           schema:
             type: string
           example: '4000'
@@ -14165,7 +14165,7 @@ paths:
           description: The provider's response, passed through unchanged with the provider's status code, headers and body (JSON, or `text/event-stream` when streaming). Provider errors keep the provider's own error shape.
           headers:
             X-Nozle-Credit-Hold-Id:
-              description: Engine 2.30.0. ID of the credit hold taken for this call when `X-Nozle-Credit-Hold` was sent.
+              description: Engine 2.33.0. ID of the credit hold taken for this call when `X-Nozle-Credit-Hold` was sent.
               schema:
                 type: string
           content:
@@ -39835,7 +39835,7 @@ components:
           description: Amount not yet consumed, as a decimal string. It includes `held`.
         held:
           type: string
-          description: Engine 2.30.0. Part of `remaining` reserved by open credit holds, at most `remaining`, as a decimal string.
+          description: Engine 2.33.0. Part of `remaining` reserved by open credit holds, at most `remaining`, as a decimal string.
         valid_from:
           type: string
           format: date-time
@@ -39894,7 +39894,7 @@ components:
           description: What can be spent now, as a decimal string. The sum of `remaining` minus `held` over sources whose `available` is `true`.
         held:
           type: string
-          description: Engine 2.30.0. Credits reserved by open credit holds on those sources, already left out of `available`, as a decimal string.
+          description: Engine 2.33.0. Credits reserved by open credit holds on those sources, already left out of `available`, as a decimal string.
         as_of:
           type: string
           format: date-time
@@ -39976,13 +39976,13 @@ components:
           description: Amount the Entity can spend under the current pool policy. `0` when the Entity is inactive or no unambiguous policy exists.
         entity_held:
           type: string
-          description: Engine 2.30.0. Credits reserved by open holds on Entity-owned sources, already left out of `entity_available`.
+          description: Engine 2.33.0. Credits reserved by open holds on Entity-owned sources, already left out of `entity_available`.
         shared_held:
           type: string
-          description: Engine 2.30.0. Credits reserved by open holds on the shared customer pool (by any Entity or customer-level usage), already left out of `shared_available`.
+          description: Engine 2.33.0. Credits reserved by open holds on the shared customer pool (by any Entity or customer-level usage), already left out of `shared_available`.
         held:
           type: string
-          description: 'Engine 2.30.0. Held part of the pool the Entity spends from: `entity_held` for `entity_only`, both for `entity_then_customer`, `shared_held` for `customer_only`; `0` when the Entity is inactive or no policy applies.'
+          description: 'Engine 2.33.0. Held part of the pool the Entity spends from: `entity_held` for `entity_only`, both for `entity_then_customer`, `shared_held` for `customer_only`; `0` when the Entity is inactive or no policy applies.'
         consumed:
           type: string
           description: Amount consumed by this Entity.
@@ -42574,7 +42574,7 @@ components:
             code: customer_payment_overdue
             error: "This customer's invoices are unpaid past their grace period. Usage resumes once they are paid."
     OpenAIProxyBadRequest:
-      description: '`invalid_request`: `X-Nozle-Customer-Id` is missing, the request body could not be read, or (Engine 2.30.0) `X-Nozle-Credit-Hold` is not a positive decimal metric amount. In the OpenAI error shape from Engine 2.22.0.'
+      description: '`invalid_request`: `X-Nozle-Customer-Id` is missing, the request body could not be read, or (Engine 2.33.0) `X-Nozle-Credit-Hold` is not a positive decimal metric amount. In the OpenAI error shape from Engine 2.22.0.'
       content:
         application/json:
           schema:
@@ -42598,7 +42598,7 @@ components:
               code: unauthorized
             code: unauthorized
     OpenAIProxyPaymentRequired:
-      description: '`customer_payment_overdue` (Engine 2.22.0): the customer''s unpaid invoices are past the grace of their plan and their [dunning policy](/guides/billing/dunning) ends with `block`; the provider is not called. `workspace_suspended` or `card_required`: your workspace is blocked by Nozle, see [Errors](/api/errors#workspace-billing-errors). Do not retry. `insufficient_credits` (Engine 2.30.0): the customer''s free credits do not cover the `X-Nozle-Credit-Hold` amount; the provider is not called. In the OpenAI error shape from Engine 2.22.0.'
+      description: '`customer_payment_overdue` (Engine 2.22.0): the customer''s unpaid invoices are past the grace of their plan and their [dunning policy](/guides/billing/dunning) ends with `block`; the provider is not called. `workspace_suspended` or `card_required`: your workspace is blocked by Nozle, see [Errors](/api/errors#workspace-billing-errors). Do not retry. `insufficient_credits` (Engine 2.33.0): the customer''s free credits do not cover the `X-Nozle-Credit-Hold` amount; the provider is not called. In the OpenAI error shape from Engine 2.22.0.'
       content:
         application/json:
           schema:
@@ -42646,7 +42646,7 @@ components:
               code: unavailable
             code: unavailable
     AnthropicProxyBadRequest:
-      description: '`invalid_request`: `X-Nozle-Customer-Id` is missing, the request body could not be read, or (Engine 2.30.0) `X-Nozle-Credit-Hold` is not a positive decimal metric amount. In the Anthropic error shape from Engine 2.22.0.'
+      description: '`invalid_request`: `X-Nozle-Customer-Id` is missing, the request body could not be read, or (Engine 2.33.0) `X-Nozle-Credit-Hold` is not a positive decimal metric amount. In the Anthropic error shape from Engine 2.22.0.'
       content:
         application/json:
           schema:
@@ -42672,7 +42672,7 @@ components:
               code: unauthorized
             code: unauthorized
     AnthropicProxyPaymentRequired:
-      description: '`customer_payment_overdue` (Engine 2.22.0): the customer''s unpaid invoices are past the grace of their plan and their [dunning policy](/guides/billing/dunning) ends with `block`; the provider is not called. `workspace_suspended` or `card_required`: your workspace is blocked by Nozle, see [Errors](/api/errors#workspace-billing-errors). Do not retry. `insufficient_credits` (Engine 2.30.0): the customer''s free credits do not cover the `X-Nozle-Credit-Hold` amount; the provider is not called. In the Anthropic error shape from Engine 2.22.0.'
+      description: '`customer_payment_overdue` (Engine 2.22.0): the customer''s unpaid invoices are past the grace of their plan and their [dunning policy](/guides/billing/dunning) ends with `block`; the provider is not called. `workspace_suspended` or `card_required`: your workspace is blocked by Nozle, see [Errors](/api/errors#workspace-billing-errors). Do not retry. `insufficient_credits` (Engine 2.33.0): the customer''s free credits do not cover the `X-Nozle-Credit-Hold` amount; the provider is not called. In the Anthropic error shape from Engine 2.22.0.'
       content:
         application/json:
           schema:

@@ -25,7 +25,7 @@ _ = err
 
 Use `GetCreditBalance` and `ListCreditBalances` for customer balances. `GetEntityCreditBalance` includes `EntityAvailable`, `SharedAvailable`, `EffectiveAvailable`, and `PoolPolicy`. Pool policy can be `entity_only`, `entity_then_customer`, or `customer_only`.
 
-`Available` already leaves out credits reserved by open [credit holds](#credit-holds). From Engine 2.30.0, `Held` on `CreditBalance` and `CreditSource`, and `EntityHeld`, `SharedHeld` and `Held` on `EntityCreditBalance`, report them.
+`Available` already leaves out credits reserved by open [credit holds](#credit-holds). From Engine 2.33.0, `Held` on `CreditBalance` and `CreditSource`, and `EntityHeld`, `SharedHeld` and `Held` on `EntityCreditBalance`, report them.
 
 ## Operation history and transfers
 
@@ -63,7 +63,7 @@ Set `UsageParams.Properties` for conversion or attribution metadata. `UsageResul
 
 ## Credit holds
 
-Available from `nozle-go` v0.26.0 with Engine 2.30.0. When the cost is known only after the work, hold the credits first and finalize with the actual usage. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits).
+Available from `nozle-go` v0.26.0 with Engine 2.33.0. When the cost is known only after the work, hold the credits first and finalize with the actual usage. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits).
 
 ```go
 hold, err := client.CreateCreditHold(ctx, nozle.CreditHoldParams{
