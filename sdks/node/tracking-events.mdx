@@ -136,12 +136,69 @@ for (const r of result.results) {
 - **Partial batches.** Engine stores the valid events of a request and names the refused ones by position. An Engine before 2.28.0 refuses a whole request for one invalid event; the SDK then rejects the named events and resends the rest.
 - **Idempotency.** Every event has a `transactionId`, yours or a generated one returned in `results[i].transactionId`. A request retried after a network error, a timeout, a `429` or a `5xx` records each event once. IDs must be unique in one call.
 
-`trackBatch()` records events like `track()`; it does not deduct credits. There is no client-side buffer yet: collect events and call `trackBatch()`.
+`trackBatch()` records events like `track()`; it does not deduct credits. To batch events as they happen, use an [event buffer](#event-buffer).
+
+## Event buffer
+
+From `@nozle-js/node` 0.28.0, `createEventBuffer()` queues events in memory and sends them through `trackBatch()` in the background. Recording an event never waits for the network.
+
+```ts
+const buffer = nozle.createEventBuffer({
+  // maxBatchSize: 500, flushIntervalMs: 5000, maxQueueSize: 10_000, maxAttempts: 3
+  onError: (error, events) => console.error(error.code, error.message, events.map((e) => e.transactionId)),
+})
+
+const transactionId = buffer.track({ customerId: 'workspace_123', event: 'api_calls', metadata: { tokens: 100 } })
+
+// At shutdown, or at the end of a serverless handler:
+await buffer.close()
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `maxBatchSize` | `500` | 1 to 5000. A flush starts as soon as this many events are waiting. It is also the size of each request. |
+| `flushIntervalMs` | `5000` | Flushes whatever is waiting this often. `0` turns the timer off. |
+| `maxQueueSize` | `10000` | Most events held at once, waiting or in a request. |
+| `maxAttempts` | `3` | Flushes an event may fail in before it is dropped and reported as `failed`. |
+| `onError` | warning | `onError(error, events)` receives every event that leaves the buffer unsent. |
+
+An option out of range throws `NozleValidationError` from `createEventBuffer()`.
+
+- **`track(event)`** takes a `trackBatch()` event and returns its `transactionId` at once, without a request: yours, or a generated UUIDv7. Every resend of the event carries that ID, so Engine records it once. It throws `NozleValidationError` only for an invalid event (a missing `customerId` or `event`, or a bad `timestamp`).
+- **When it sends.** A flush starts when `maxBatchSize` events are waiting, every `flushIntervalMs`, and on the process's `beforeExit`. The timer never keeps the process alive. Only one flush runs at a time; a trigger during a flush waits for it.
+- **`await buffer.flush()`** sends every event waiting now and resolves when done. It never rejects. A failed event stays queued for the next flush.
+- **`await buffer.close()`** stops the timer, removes the `beforeExit` hook, sends everything and refuses later events. It keeps flushing until the queue is empty, so a failed event is retried up to `maxAttempts` and then reported.
+- **`buffer.size`** is the number of events waiting, not counting a request in flight.
+- **Bounded memory.** When `maxQueueSize` events are held, `track()` drops the new event and reports it as `buffer_full`. It does not throw.
+- **Backoff.** After a flush in which any event failed, the size, timer and `beforeExit` flushes pause for 1 second. The pause doubles after each further flush with failures, up to 60 seconds. A flush without failures ends it. Events keep queueing meanwhile, up to `maxQueueSize`, so a short outage does not use up `maxAttempts`. An explicit `flush()` or `close()` does not wait for the pause.
+
+### Errors
+
+No event leaves the buffer silently. `onError` gets an `EventBufferError` with a `code`:
+
+| `code` | Meaning |
+|---|---|
+| `buffer_full` | The queue held `maxQueueSize` events. The new event was dropped. |
+| `rejected` | Engine refused the event. `error.errors` maps a field to codes, for example `{ code: ['value_is_mandatory'] }`. It is not retried. |
+| `failed` | Its requests failed in `maxAttempts` flushes, after the retries of each `trackBatch()` request. Until then a failed event goes back to the front of the queue with the same `transactionId`. `error.cause` is the last error. |
+| `closed` | `track()` was called after `close()`. The event was dropped. |
+
+Without `onError`, each one is emitted as a `NozleTrackingWarning` process warning (`console.warn` on runtimes without process warnings). `onError` must not throw; if it does, the buffer emits the warning instead.
+
+### Exit and serverless
+
+On AWS Lambda, Vercel, Cloudflare and similar platforms, the process may be frozen or ended as soon as the handler returns. Neither the timer nor `beforeExit` runs then. Always `await buffer.flush()` (buffer kept between invocations) or `await buffer.close()` (buffer per invocation) before you return, or the waiting events are lost.
+
+Only `close()` retries a failed event to `maxAttempts` and reports it. Short-lived processes and scripts should end with `await buffer.close()`.
+
+The queue lives in memory only. Events still waiting are lost when the process is killed (for example `SIGKILL`) or calls `process.exit()`, which skips `beforeExit`. During a backoff, `beforeExit` only sets a timer that does not keep the process alive. A process whose Nozle endpoint stays unreachable therefore still exits, and its waiting events are lost without a report unless it called `close()`.
+
+`wrapOpenAI`, `wrapAnthropic` and `captureFetch` do not use the buffer yet. They still send one request per call.
 
 ## Operational guidance
 
 - Await `track()` when the request must know whether ingestion succeeded.
-- For high-volume workloads, publish through your own durable queue and call `trackBatch()` from a worker.
+- For high-volume workloads, publish through your own durable queue and call `trackBatch()` from a worker. An [event buffer](#event-buffer) batches events in the same process, but holds them in memory only.
 - Do not create a new random transaction ID on each retry.
 - Do not regenerate the timestamp when retrying an accepted business event.
 - Match property names to the Feature aggregation configuration exactly.

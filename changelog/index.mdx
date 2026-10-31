@@ -5,6 +5,16 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Event buffer in the SDKs (Node 0.28.0, Python 0.26.0, Go v0.25.0)
+
+_October 31, 2026_
+
+- **Batch events as they happen.** `createEventBuffer()` (Node), `event_buffer()` (Python, `Nozle` only) and `NewEventBuffer` (Go) queue events in memory and send them through the batch call in the background. `track` returns the event's transaction ID at once, without a request, and every resend keeps that ID, so each event is billed once.
+- **When it sends.** When 500 events are waiting (`maxBatchSize`, 1 to 5000), every 5 seconds, on `flush` and on `close`. Node also flushes on `beforeExit`, and Python in an `atexit` handler with a 5 second timeout. Go has no exit hook: call `defer buf.Close(ctx)`.
+- **Bounded and never silent.** The queue holds at most 10,000 events. Every event that leaves it unsent goes to the error callback with a code: `buffer_full`, `rejected`, `failed` (after 3 flushes) or `closed`. Without a callback, Node and Python emit a `NozleTrackingWarning` and Go logs through the standard `log` package.
+- **Backoff.** After a flush with failed events, automatic flushes pause for 1 second, doubling up to 60 seconds. An explicit `flush` or `close` does not wait.
+- **Serverless.** Flush or close the buffer before your handler returns. See [Node.js](/sdks/node/tracking-events#event-buffer), [Python](/sdks/python/tracking-events#event-buffer) and [Go](/sdks/go/tracking-events#event-buffer).
+
 ### Event batches of 5000 with partial acceptance (Engine 2.28.0, Go v0.23.0, Node 0.26.0, Python 0.24.0)
 
 _October 31, 2026_
