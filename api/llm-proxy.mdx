@@ -37,7 +37,7 @@ Proxies all requests to `https://api.openai.com/v1/*`. Usage is recorded for cha
 | `X-Nozle-Subscription` | External subscription ID to bill. It must be an active subscription of that customer. Needed when the customer has several active subscriptions. |
 | `X-Nozle-Feature-Code` | Code of the usage event. Default `llm_tokens`. Must match a metered Feature to bill. |
 | `X-Nozle-Feature` | Stored as the `feature` property of the event. |
-| `X-Nozle-Credit-Hold` | Metric amount to reserve in credits before the provider is called, for example the most tokens the call can use. Engine 2.30.0. See [Credit holds](#credit-holds). |
+| `X-Nozle-Credit-Hold` | Metric amount to reserve in credits before the provider is called, for example the most tokens the call can use. Engine 2.33.0. See [Credit holds](#credit-holds). |
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/openai/v1/chat/completions \
@@ -75,7 +75,7 @@ Proxies all requests to `https://api.anthropic.com/v1/*`.
 | `X-Nozle-Subscription` | External subscription ID to bill. It must be an active subscription of that customer. Needed when the customer has several active subscriptions. |
 | `X-Nozle-Feature-Code` | Code of the usage event. Default `llm_tokens`. Must match a metered Feature to bill. |
 | `X-Nozle-Feature` | Stored as the `feature` property of the event. |
-| `X-Nozle-Credit-Hold` | Metric amount to reserve in credits before the provider is called, for example the most tokens the call can use. Engine 2.30.0. See [Credit holds](#credit-holds). |
+| `X-Nozle-Credit-Hold` | Metric amount to reserve in credits before the provider is called, for example the most tokens the call can use. Engine 2.33.0. See [Credit holds](#credit-holds). |
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/anthropic/v1/messages \
@@ -120,7 +120,7 @@ Engine finds the subscription to bill before it calls the provider. Without `X-N
 
 ## Credit holds
 
-From Engine 2.30.0, a call can reserve the customer's credits before it reaches the provider, so concurrent calls cannot spend the same credits. Holds are opt-in per request: without `X-Nozle-Credit-Hold`, the proxy works as described above. See [Create a Credit Hold](/api/create-usage-hold) for how holds reserve credits.
+From Engine 2.33.0, a call can reserve the customer's credits before it reaches the provider, so concurrent calls cannot spend the same credits. Holds are opt-in per request: without `X-Nozle-Credit-Hold`, the proxy works as described above. See [Create a Credit Hold](/api/create-usage-hold) for how holds reserve credits.
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/openai/v1/chat/completions \
@@ -139,11 +139,11 @@ curl -X POST https://api.nozle.app/engine/api/v1/proxy/openai/v1/chat/completion
 - **No usage, no charge.** A provider error, a response the proxy cannot read, or a stream cut before its usage releases the hold.
 - **Usage above the hold and the free balance.** For a Feature whose metric sums a property (such as tokens), the proxy pays the largest metric amount the hold plus the free balance covers, at the hold's rate. The balance ends at 0 and never goes below; at a rate whose price does not end within 12 decimals it can keep less than one 12-decimal step (under `0.000000000001`). The unpaid rest of the metric is sent as a usage event whose metric property holds only that rest, with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id` (the credit operation that paid the covered part). The call is counted once: the covered part through the credit spend, the rest through this event. For a metric that counts events, the hold is released and the whole usage is sent as a plain usage event instead.
 - **Fallback.** If the finalize fails, the hold is released and the usage is sent as a plain usage event, as without a hold. If Nozle cannot confirm that the hold was not finalized, nothing is sent and the miss is logged: the hold expires on its own, and the call is not charged twice. A finalize of 0 tokens also sends the plain event.
-- **When no hold is taken.** For a Feature with no credit rate, a Feature the plan bills in money, or a Feature that is not consumable, the call goes ahead without a hold. From Engine 2.31.0, a Feature billed in money under a hard spend limit takes a budget hold instead: see [Spend limits](#spend-limits). If holds are unavailable, the call is not refused (fail open, as the usage limit check does).
+- **When no hold is taken.** For a Feature with no credit rate, a Feature the plan bills in money, or a Feature that is not consumable, the call goes ahead without a hold. From Engine 2.34.0, a Feature billed in money under a hard spend limit takes a budget hold instead: see [Spend limits](#spend-limits). If holds are unavailable, the call is not refused (fail open, as the usage limit check does).
 
 ## Spend limits
 
-From Engine 2.31.0 the proxy enforces the customer's [spend limits](/guides/entitlements/spend-limits) before the provider is called, after the usage limit check and with the same decision as [`/can`](/api/check-entitlement#spend-limits). When a hard spend limit covering the `X-Nozle-Feature-Code` Feature is used up, the proxy answers `402 budget_exceeded` and adds the limit as a top-level `budget` next to the provider-shaped error:
+From Engine 2.34.0 the proxy enforces the customer's [spend limits](/guides/entitlements/spend-limits) before the provider is called, after the usage limit check and with the same decision as [`/can`](/api/check-entitlement#spend-limits). When a hard spend limit covering the `X-Nozle-Feature-Code` Feature is used up, the proxy answers `402 budget_exceeded` and adds the limit as a top-level `budget` next to the provider-shaped error:
 
 ```json
 {
@@ -173,7 +173,7 @@ From Engine 2.31.0 the proxy enforces the customer's [spend limits](/guides/enti
 - `budget_exceeded` is `402`, like `insufficient_credits`. A hard usage limit in units stays `429 usage_limit_exceeded`.
 - Without `X-Nozle-Credit-Hold` the check is check-then-call: calls already in flight can take the spend past the limit before the next call is refused.
 - **Exact caps.** With `X-Nozle-Credit-Hold: <metric amount>` on a Feature billed in money under a hard spend limit, the proxy takes a budget hold for the call's estimated spend (the charge's price of that amount). When it does not fit, the answer is `402 budget_exceeded` with the message `the customer's hard spend limit does not cover the requested hold`, and the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`, and the call's usage is sent as the hold's event, so the spend is counted once.
-- If the spend limits or the hold cannot be read, the call is not refused (fail open, as for the usage limit check).
+- If the spend limits or the hold cannot be read, a customer this proxy instance last saw over a hard limit stays refused: the last `budget_exceeded` or `usage_limit_exceeded` refusal is kept until its `period_end` (10 minutes when it has none) and answered again with the same body and `budget` block. Any other call goes ahead with the response header `X-Nozle-Budget-Unverified: true` (from Engine 2.34.0).
 
 ## Errors
 
@@ -214,14 +214,14 @@ Anthropic routes:
 |--------|--------|---------|---------|
 | `400` | `invalid_request` | `missing X-Nozle-Customer-Id header` | `X-Nozle-Customer-Id` is missing. |
 | `400` | `invalid_request` | `request body could not be read` | The request body could not be read. |
-| `400` | `invalid_request` | `X-Nozle-Credit-Hold must be a positive decimal metric amount` | Engine 2.30.0. `X-Nozle-Credit-Hold` is not a positive decimal. The provider is not called. |
+| `400` | `invalid_request` | `X-Nozle-Credit-Hold must be a positive decimal metric amount` | Engine 2.33.0. `X-Nozle-Credit-Hold` is not a positive decimal. The provider is not called. |
 | `401` | `unauthorized` | `missing X-Nozle-Key header` | `X-Nozle-Key` is missing. |
 | `401` | `unauthorized` | `invalid nozle key` | The key is unknown. |
 | `402` | `workspace_suspended` or `card_required` | | Your workspace is blocked by Nozle. See [Workspace billing errors](/api/errors#workspace-billing-errors). |
-| `402` | `insufficient_credits` | `the customer's credit balance does not cover the requested hold` | Engine 2.30.0. The `X-Nozle-Credit-Hold` amount is not covered by the customer's free credits. The provider is not called. |
+| `402` | `insufficient_credits` | `the customer's credit balance does not cover the requested hold` | Engine 2.33.0. The `X-Nozle-Credit-Hold` amount is not covered by the customer's free credits. The provider is not called. |
 | `402` | `customer_payment_overdue` | `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` | _Unreleased (Engine 2.22.0)._ The customer is blocked by your [dunning policy](/guides/billing/dunning). The provider is not called. |
-| `402` | `budget_exceeded` | `the customer's hard spend limit is reached` | Engine 2.31.0. A hard [spend limit](#spend-limits) covering the Feature is used up. The body adds `budget`. The provider is not called. |
-| `402` | `budget_exceeded` | `the customer's hard spend limit does not cover the requested hold` | Engine 2.31.0. The `X-Nozle-Credit-Hold` estimate does not fit in a hard spend limit. The body adds `budget`. The provider is not called. |
+| `402` | `budget_exceeded` | `the customer's hard spend limit is reached` | Engine 2.34.0. A hard [spend limit](#spend-limits) covering the Feature is used up. The body adds `budget`. The provider is not called. |
+| `402` | `budget_exceeded` | `the customer's hard spend limit does not cover the requested hold` | Engine 2.34.0. The `X-Nozle-Credit-Hold` estimate does not fit in a hard spend limit. The body adds `budget`. The provider is not called. |
 | `403` | `economic_policy_denied` | `the customer's margin policy denies this call` | A margin policy in `deny` mode refused the call. The provider is not called. |
 | `403` | `publishable_key_not_allowed` | `publishable keys are limited to GET /api/v1/plans` | A publishable key was used. |
 | `403` | `permission_denied` | `API key requires event:write permission` | The key cannot write events, so the call is refused before it reaches the provider. |

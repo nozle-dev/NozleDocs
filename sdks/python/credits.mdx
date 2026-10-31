@@ -31,7 +31,7 @@ print(balance["sources"])
 all_balances = nozle.credits.list_balances("workspace_123")
 ```
 
-`available` already leaves out credits reserved by open [credit holds](#credit-holds). From Engine 2.30.0, `held` reports them on the balance and on each source; Entity balances add `entity_held`, `shared_held` and `held`. An older Engine does not send these keys, so read them with `.get()`.
+`available` already leaves out credits reserved by open [credit holds](#credit-holds). From Engine 2.33.0, `held` reports them on the balance and on each source; Entity balances add `entity_held`, `shared_held` and `held`. An older Engine does not send these keys, so read them with `.get()`.
 
 ## Customer operation history
 
@@ -167,7 +167,7 @@ if not result["allowed"]:
 
 ## Credit holds
 
-Available from `nozle-sdk` 0.27.0 on `Nozle` and `AsyncNozle`, with Engine 2.30.0. When the cost is known only after the work, reserve credits first, then finalize with the actual usage or release them. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits).
+Available from `nozle-sdk` 0.27.0 on `Nozle` and `AsyncNozle`, with Engine 2.33.0. When the cost is known only after the work, reserve credits first, then finalize with the actual usage or release them. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits).
 
 ```python
 hold = nozle.usage.holds.create(
@@ -211,7 +211,7 @@ nozle.usage.holds.list("workspace_123", status="held")
 
 ### Budget holds
 
-Available from 0.28.0 with Engine 2.31.0. On a Feature billed in money under a hard [spend limit](/guides/entitlements/spend-limits), `usage.holds.create()` takes a [budget hold](/api/create-usage-hold#budget-holds): it reserves the call's estimated spend, so concurrent calls cannot overrun the limit.
+Available from 0.28.0 with Engine 2.34.0. On a Feature billed in money under a hard [spend limit](/guides/entitlements/spend-limits), `usage.holds.create()` takes a [budget hold](/api/create-usage-hold#budget-holds): it reserves the call's estimated spend, so concurrent calls cannot overrun the limit.
 
 ```python
 hold = nozle.usage.holds.create(

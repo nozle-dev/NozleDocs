@@ -4,13 +4,13 @@ api: "POST https://api.nozle.app/engine/api/v1/usage/holds"
 description: Reserve credits before work whose final amount is known only afterwards
 ---
 
-Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.30.0.
+Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.33.0.
 
 **Auth:** secret key only. The customer, Feature, and optional Credit System must belong to the authenticated organization. When your organization has API key permissions, the key requires `credit_system:write`; a key without it returns `403 permission_denied`.
 
 A hold reserves the credits a usage would cost, on the same sources [`POST /usage/track`](/api/usage-track) would spend, in the same order and under the same pool policy. It does not change the balance and sends nothing to billing. Until it is finalized, released or expired, other callers cannot spend the held credits: [`/usage/check`](/api/usage-check), [`/usage/track`](/api/usage-track), other holds, the balance endpoints and Entity transfers all subtract it. Settle the hold with [Finalize a Credit Hold](/api/finalize-usage-hold) once the actual usage is known, or free it with [Release a Credit Hold](/api/release-usage-hold).
 
-From Engine 2.31.0 the same endpoint takes a [budget hold](#budget-holds) on a Feature the plan bills in money, when a hard spend limit covers it.
+From Engine 2.34.0 the same endpoint takes a [budget hold](#budget-holds) on a Feature the plan bills in money, when a hard spend limit covers it.
 
 Use a hold when several workers spend from one balance at the same time and each needs to know before it starts that the credits are there, for example concurrent agent runs or LLM calls. For a cost known in advance, call `/usage/track` directly. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits).
 
@@ -81,7 +81,7 @@ A short balance answers `200` with `allowed: false`, `status: "denied"` and `rea
 
 ## Budget holds
 
-From Engine 2.31.0, a hold on a Feature the plan bills in money (a priced usage charge, no credits) is a budget hold when a hard [spend limit](/guides/entitlements/spend-limits) covers the Feature. It makes the cap exact for concurrent calls: it reserves the call's estimated spend against every hard limit covering the Feature, under a row lock, so two calls cannot both take the last of a limit.
+From Engine 2.34.0, a hold on a Feature the plan bills in money (a priced usage charge, no credits) is a budget hold when a hard [spend limit](/guides/entitlements/spend-limits) covers the Feature. It makes the cap exact for concurrent calls: it reserves the call's estimated spend against every hard limit covering the Feature, under a row lock, so two calls cannot both take the last of a limit.
 
 - **The estimate** is the charge's price of the metric amount in `properties`, on top of the period's usage so far, in the plan's currency. Send the most the call can use.
 - **Refused** when the estimate does not fit, or a limit is already used up: `200` with `allowed: false`, `status: "denied"`, `reason: "budget_exceeded"` and the limit in `budget`. Nothing is reserved.
@@ -139,7 +139,7 @@ Known limits:
 | `403` | `permission_denied` | The key lacks `credit_system:write`. |
 | `404` | `customer_not_found`, `active_subscription_not_found`, `feature_not_found`, `entity_not_found` | As on `/usage/track`. |
 | `409` | `idempotency_key_reused` | The key was used with a different body. |
-| `409` | `feature_billed_in_money` | See [Credits or money, not both](/api/usage-track#credits-or-money-not-both). From Engine 2.31.0 a hard spend limit covering the Feature makes it a [budget hold](#budget-holds) instead. |
+| `409` | `feature_billed_in_money` | See [Credits or money, not both](/api/usage-track#credits-or-money-not-both). From Engine 2.34.0 a hard spend limit covering the Feature makes it a [budget hold](#budget-holds) instead. |
 | `422` | `active_subscription_ambiguous`, `feature_not_consumable`, `entity_inactive`, `credit_pool_policy_not_configured`, `credit_usage_configuration_invalid` | As on `/usage/track`. |
 | `503` | `credit_usage_contention`, `credit_usage_temporarily_unavailable` | Retry after `Retry-After` with the same key and body. |
 

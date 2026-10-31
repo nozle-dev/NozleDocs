@@ -4,7 +4,7 @@ api: "POST https://api.nozle.app/engine/api/v1/usage/holds/{hold_id}/finalize"
 description: Spend the actual usage of a held call and release the rest
 ---
 
-Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.30.0.
+Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.33.0.
 
 **Auth:** secret key only. When your organization has API key permissions, the key requires `credit_system:write`.
 
@@ -34,7 +34,7 @@ Content-Type: application/json
 
 ## Budget holds
 
-From Engine 2.31.0, finalizing a [budget hold](/api/create-usage-hold#budget-holds) (`kind: "budget"`) sends the usage in `properties` to billing as one event with `transaction_id` `hold:<hold_id>`, and returns the hold with `status: "finalized"`. There is no credit spend and no `allowed` field.
+From Engine 2.34.0, finalizing a [budget hold](/api/create-usage-hold#budget-holds) (`kind: "budget"`) sends the usage in `properties` to billing as one event with `transaction_id` `hold:<hold_id>`, and returns the hold with `status: "finalized"`. There is no credit spend and no `allowed` field.
 
 - Any amount is accepted, including more than the estimate. The spend of the event is counted once, when the event is booked; until then the hold keeps counting against the limit, at least 10 minutes after the finalize. The hold's `status` then turns `booked`.
 - A repeat returns the hold unchanged. A released or denied budget hold answers `409 hold_already_resolved`.

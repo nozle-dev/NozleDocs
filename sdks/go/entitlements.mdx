@@ -50,13 +50,13 @@ Without a selector, `Can` evaluates the customer's only subscription. When the c
 | `Used`, `Overage` | Usage so far, and whether a soft limit is reached. `Overage` never denies by itself: the usage is billed as overage. Deny only on `Allowed == false`. |
 | `Limit`, `Remaining` | `*int`. `nil` when the feature is unlimited (the API sends `null`), never `0`: a `0` allowance means none left. Check `Limit != nil` before reading either. |
 | `Economics` | Optional point-in-time estimate with exact `nozle.Decimal` values, Cost Rule versions, and exclusions. |
-| `Budget` | `*Budget`, v0.27.0 with Engine 2.31.0. The spend limit that refused the call (`Reason` `budget_exceeded`), else the tightest one covering the feature. `nil` when none applies. |
+| `Budget` | `*Budget`, v0.27.0 with Engine 2.34.0. The spend limit that refused the call (`Reason` `budget_exceeded`), else the tightest one covering the feature. `nil` when none applies. |
 
 Check immediately before protected server work. React gates are not an authorization boundary. `Can` does not reserve product credits.
 
 ## Spend limits
 
-Available from `nozle-go` v0.27.0 with Engine 2.31.0. When a hard [spend limit](/guides/entitlements/spend-limits) covering the feature is used up, `Can` returns `Allowed == false` with `Reason` `budget_exceeded` and the limit in `Budget`. It is a result, not an error. Compare `Reason` with the `RefusalReason...` constants, never with message text:
+Available from `nozle-go` v0.27.0 with Engine 2.34.0. When a hard [spend limit](/guides/entitlements/spend-limits) covering the feature is used up, `Can` returns `Allowed == false` with `Reason` `budget_exceeded` and the limit in `Budget`. It is a result, not an error. Compare `Reason` with the `RefusalReason...` constants, never with message text:
 
 ```go
 result, err := client.Can(ctx, "workspace_123", "llm_tokens")

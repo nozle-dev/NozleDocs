@@ -61,13 +61,13 @@ is changed. Another request can spend credits before a later track call, so
 this endpoint is not authorization to perform irreversible work. To reserve
 the credits before the work, [create a credit hold](/api/create-usage-hold).
 
-From Engine 2.30.0, `available` excludes credits reserved by other callers'
+From Engine 2.33.0, `available` excludes credits reserved by other callers'
 open [credit holds](/api/create-usage-hold), so a check is allowed only when
 the credits are free now.
 
 ## Spend limits
 
-From Engine 2.31.0, when the plan of the paying subscription has a usage charge on the Feature and a hard [spend limit](/guides/entitlements/spend-limits) covering it is used up, the check answers `200` with `allowed: false`, `reason: "budget_exceeded"` and the limit in `budget`, before credits are looked at. The body then has only these three fields:
+From Engine 2.34.0, when the plan of the paying subscription has a usage charge on the Feature and a hard [spend limit](/guides/entitlements/spend-limits) covering it is used up, the check answers `200` with `allowed: false`, `reason: "budget_exceeded"` and the limit in `budget`, before credits are looked at. The body then has only these three fields:
 
 ```json
 {

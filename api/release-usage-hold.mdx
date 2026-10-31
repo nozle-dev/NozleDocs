@@ -4,7 +4,7 @@ api: "POST https://api.nozle.app/engine/api/v1/usage/holds/{hold_id}/release"
 description: Free a hold's reserved credits without spending them
 ---
 
-Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.30.0.
+Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.33.0.
 
 **Auth:** secret key only. When your organization has API key permissions, the key requires `credit_system:write`.
 
@@ -17,7 +17,7 @@ Authorization: Bearer sk_nozle_...
 
 Release is idempotent: releasing a released, denied or expired hold answers `200` with the hold unchanged. An open hold past its expiry is marked `expired` rather than `released`. A finalized hold cannot be released and answers `409 hold_already_resolved`.
 
-A [budget hold](/api/create-usage-hold#budget-holds) (Engine 2.31.0) is released the same way: its reserved spend stops counting against the spend limit at once. A finalized or `booked` budget hold answers `409 hold_already_resolved`.
+A [budget hold](/api/create-usage-hold#budget-holds) (Engine 2.34.0) is released the same way: its reserved spend stops counting against the spend limit at once. A finalized or `booked` budget hold answers `409 hold_already_resolved`.
 
 The response is the [hold](/api/get-usage-hold#response):
 

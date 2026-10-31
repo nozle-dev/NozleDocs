@@ -5,7 +5,7 @@ description: Cap what a customer's metered usage may cost per period, warn befor
 
 A spend limit caps the money a subscription's metered usage may cost in a period, for example "at most $500 of usage charges per billing period" or "at most $200 a month on `llm_tokens`". Nozle counts the spend as usage arrives, warns you and your customer at 50, 80, 90 and 100 %, and, for a hard limit, refuses further metered calls once the limit is used up. A limit's standing in the current period is its budget.
 
-Available from Core 11.23.0 and Engine 2.31.0. Usage limits in units (an entitlement's `usage_limit`) are a separate control: see [Usage limit warnings](#usage-limit-warnings).
+Available from Core 11.23.0 and Engine 2.34.0. Usage limits in units (an entitlement's `usage_limit`) are a separate control: see [Usage limit warnings](#usage-limit-warnings).
 
 ## How a limit applies
 
@@ -201,7 +201,7 @@ A hard usage limit in units (an entitlement `usage_limit` with a hard limit) sen
 - **A new limit counts from when it is set.** Usage processed before a limit existed is not counted, so a limit set mid-period starts at 0 for that period, and so does a limit whose `period` you change. The Engine also reloads which subscriptions have limits every minute, so a new limit refuses calls within a minute; the spend after it is set is counted at once.
 - **Per subscription only.** A limit caps one subscription. There is no limit across a customer's subscriptions, and no currency conversion.
 - **Usage events are never refused.** Usage sent with `POST /events` is billed even past a hard limit. Only the calls that check (`/can`, the proxy, `/usage/check`, `/usage/track`, holds) are refused.
-- **The LLM proxy fails open.** When the spend limits or a budget hold cannot be read, the proxy lets the call through rather than refuse it. `/can`, `/usage/check` and `/usage/track` answer `503 budget_unavailable` instead.
+- **The LLM proxy fails open, except for customers it knows are over.** When the spend limits or a budget hold cannot be read, a customer the proxy instance last refused for a hard limit stays refused until that limit's period ends (10 minutes for unit limits); every other call goes ahead with the response header `X-Nozle-Budget-Unverified: true`. The memory is per proxy instance, so a customer who reached a limit since that instance last decided, or whose refusal another instance saw, goes ahead during an outage. `/can`, `/usage/check` and `/usage/track` answer `503 budget_unavailable` instead.
 - **Budget hold estimates are approximate for some charges.** A charge with filters, pricing groups or percentage free units is estimated on the Feature's total usage, and a dynamic charge at 0.
 - **A finalized budget hold keeps counting** until its usage event is counted, at least 10 minutes after the finalize. Budget holds resolved more than 7 days ago are deleted, and a retry of their key then creates a new hold.
 - **Charges that cannot be priced are not counted.** Nozle refuses limits on them and refuses to change a covered charge into one. If an event under a limit still cannot be priced, it is logged and its spend is not counted.

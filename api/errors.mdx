@@ -74,8 +74,8 @@ Match on the status and `code`, not on the message text.
 | `422` `invoice_carried_forward` in `error_details.base` (pay link, invoice checkout, Core 11.16.0) | The amount due is below the payment provider's minimum charge, so it was carried to the customer's next invoice. The invoice is settled. | Nothing to pay now. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum). |
 | `422` `invoices_carried_forward` (`POST /payment_requests`, Core 11.16.0) | Every invoice of the payment request is below the payment provider's minimum charge and was carried to the next invoice. Nothing is created. | Nothing to collect now. |
 | `503` `credit_usage_contention` (`Retry-After: 1`), `credit_usage_temporarily_unavailable` (`Retry-After: 1`), `credit_usage_publication_backlog` (`Retry-After: 30`) | The credit balance is busy, or publication is delayed: 1,000 or more usage events are still being retried, or the oldest is older than 5 minutes. A dead-lettered event no longer blocks usage. | Retry the same request with the same `Idempotency-Key` after the `Retry-After` seconds. |
-| `503` `usage_unavailable` from `can()` | The usage lookup failed, or (Engine 2.31.0) lost usage counters are being rebuilt and the feature has a hard usage limit. The body carries a `request_id`. | Treat it as an unavailable decision, not a denial, and retry after a second. Quote the `request_id` if it persists. |
-| `503` `budget_unavailable` (Engine 2.31.0) | `/can`, `/usage/check`, `/usage/track` or the budgets list could not read the spend limits while a hard one may apply. | Retry after `Retry-After` (1 second). It is not a denial. |
+| `503` `usage_unavailable` from `can()` | The usage lookup failed, or (Engine 2.34.0) lost usage counters are being rebuilt and the feature has a hard usage limit. The body carries a `request_id`. | Treat it as an unavailable decision, not a denial, and retry after a second. Quote the `request_id` if it persists. |
+| `503` `budget_unavailable` (Engine 2.34.0) | `/can`, `/usage/check`, `/usage/track` or the budgets list could not read the spend limits while a hard one may apply. | Retry after `Retry-After` (1 second). It is not a denial. |
 | `422` `spend_limit_unrateable_charges` (Core 11.23.0) | A spend limit covers a usage charge the Engine cannot rate per event. `charges` lists them. | Change the charge model or the Feature's aggregation, or limit another Feature. See [what can be limited](/guides/entitlements/spend-limits#what-can-be-limited). |
 
 An event that was accepted but never counted usually means the event name does not equal the feature code, or processing has not finished: events are processed asynchronously, so read usage again after a few seconds.
@@ -166,7 +166,7 @@ The text is `This customer's invoices are unpaid past their grace period. Usage 
 
 ## Spend and usage limits
 
-_Engine 2.31.0, Core 11.23.0._ A customer that used up a hard [spend limit](/guides/entitlements/spend-limits) is refused with `budget_exceeded`; a hard usage limit in units refuses with `usage_limit_exceeded`. Both are about that customer, not your workspace, and retrying does not help until the period ends or the limit is raised.
+_Engine 2.34.0, Core 11.23.0._ A customer that used up a hard [spend limit](/guides/entitlements/spend-limits) is refused with `budget_exceeded`; a hard usage limit in units refuses with `usage_limit_exceeded`. Both are about that customer, not your workspace, and retrying does not help until the period ends or the limit is raised.
 
 | Surface | Answer |
 |---|---|

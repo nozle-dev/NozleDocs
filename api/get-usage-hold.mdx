@@ -4,7 +4,7 @@ api: "GET https://api.nozle.app/engine/api/v1/usage/holds/{hold_id}"
 description: Read one credit hold and its status
 ---
 
-Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.30.0.
+Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.33.0.
 
 **Auth:** secret key only. When your organization has API key permissions, the key requires `credit_system:read`.
 
@@ -56,7 +56,7 @@ All amounts are decimal strings.
 
 ## Budget holds
 
-From Engine 2.31.0 a [budget hold](/api/create-usage-hold#budget-holds) is read here too. It has `kind: "budget"`, `subscription_id`, `metric_amount`, `amount_held` (the estimated spend reserved; `"0"` once it no longer reserves) and `currency` in place of the credit fields. Its `status` is `held`, `denied`, `finalized`, `booked` (the finalized usage's spend is counted, so the hold no longer is), `released` or `expired`. Budget holds resolved more than 7 days ago are deleted and answer `404 hold_not_found`.
+From Engine 2.34.0 a [budget hold](/api/create-usage-hold#budget-holds) is read here too. It has `kind: "budget"`, `subscription_id`, `metric_amount`, `amount_held` (the estimated spend reserved; `"0"` once it no longer reserves) and `currency` in place of the credit fields. Its `status` is `held`, `denied`, `finalized`, `booked` (the finalized usage's spend is counted, so the hold no longer is), `released` or `expired`. Budget holds resolved more than 7 days ago are deleted and answer `404 hold_not_found`.
 
 ## Errors
 

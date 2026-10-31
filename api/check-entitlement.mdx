@@ -38,7 +38,7 @@ Without `subscription_id` or `entity_id`, `/can` evaluates the customer's only c
 </ResponseField>
 
 <ResponseField name="reason" type="string">
-  Present only when access is denied; omitted when `allowed` is `true`. One of `feature_not_found`, `no_subscription`, `subscription_required`, `no_entitlement`, `usage_limit_exceeded`, `economic_policy_denied`, or `budget_exceeded` (Engine 2.31.0).
+  Present only when access is denied; omitted when `allowed` is `true`. One of `feature_not_found`, `no_subscription`, `subscription_required`, `no_entitlement`, `usage_limit_exceeded`, `economic_policy_denied`, or `budget_exceeded` (Engine 2.34.0).
 </ResponseField>
 
 <ResponseField name="feature_type" type="string">
@@ -70,7 +70,7 @@ Without `subscription_id` or `entity_id`, `/can` evaluates the customer's only c
 </ResponseField>
 
 <ResponseField name="budget" type="object">
-  Engine 2.31.0. The spend limit that refused the call (`budget_exceeded`), else the tightest spend limit covering the feature. Only for a feature the plan prices with a usage charge, on a subscription a spend limit applies to. Amounts are decimal strings in major units of `currency`. See [Spend limits](#spend-limits).
+  Engine 2.34.0. The spend limit that refused the call (`budget_exceeded`), else the tightest spend limit covering the feature. Only for a feature the plan prices with a usage charge, on a subscription a spend limit applies to. Amounts are decimal strings in major units of `currency`. See [Spend limits](#spend-limits).
 </ResponseField>
 
 The `economics.status` value is `estimated`, `not_configured`, `unavailable`, or `stale`. `includes` identifies what was calculated and `excludes` explains costs that cannot be known before the operation runs. When a margin policy applies, the separate `policy` object reports its version, thresholds, stale-data fallback, decision, and reason. Estimated revenue is the unit price × the units of this call: 1 for a count Feature, the `field_name` value in `metadata` for a sum Feature. Other aggregations, or a sum call without that value, make the estimate `unavailable`, and the policy's `on_unavailable` decides. See [economics](/guides/entitlements/can-endpoint).
@@ -85,13 +85,13 @@ The `economics.status` value is `estimated`, `not_configured`, `unavailable`, or
 | `no_entitlement` | The customer's plan does not include the feature. |
 | `usage_limit_exceeded` | A hard limit is reached. A soft limit never denies; it sets `overage` to `true`. |
 | `economic_policy_denied` | A margin policy in `deny` mode rejected the estimated cost or margin. The `policy` object has the detail. |
-| `budget_exceeded` | Engine 2.31.0. A hard spend limit covering the feature is used up: the period's spend plus open budget holds reached the limit. The `budget` object is that limit. |
+| `budget_exceeded` | Engine 2.34.0. A hard spend limit covering the feature is used up: the period's spend plus open budget holds reached the limit. The `budget` object is that limit. |
 
 A denial is an HTTP `200` response with `allowed: false`. The order is: the usage limit, then spend limits, then the margin policy.
 
 ## Spend limits
 
-From Engine 2.31.0, `/can` also checks the [spend limits](/guides/entitlements/spend-limits) of the subscription for a feature the plan prices with a usage charge. The response then carries `budget`:
+From Engine 2.34.0, `/can` also checks the [spend limits](/guides/entitlements/spend-limits) of the subscription for a feature the plan prices with a usage charge. The response then carries `budget`:
 
 ```json
 {
@@ -131,8 +131,8 @@ From Engine 2.31.0, `/can` also checks the [spend limits](/guides/entitlements/s
 | `400` | `{"error": "metadata must be a JSON object"}` | `metadata` is not a JSON object. |
 | `401` | `{"error": "..."}` | The `Authorization` header is missing or malformed, or the key is unknown. |
 | `403` | `{"error": "..."}` | A publishable key, or a secret key without `customer_usage:read`. |
-| `503` | `{"error": "usage lookup failed", "code": "usage_unavailable", "request_id": "..."}` | The usage counter could not be read. From Engine 2.31.0 also for a feature with a hard usage limit while lost usage counters are being rebuilt. The response has `Retry-After: 1`. Retry after that many seconds, and quote `request_id` to support. |
-| `503` | `{"code": "budget_unavailable", "error": "budget lookup failed"}` | Engine 2.31.0. The spend limits could not be read while a hard one may apply. The response has `Retry-After: 1`. |
+| `503` | `{"error": "usage lookup failed", "code": "usage_unavailable", "request_id": "..."}` | The usage counter could not be read. From Engine 2.34.0 also for a feature with a hard usage limit while lost usage counters are being rebuilt. The response has `Retry-After: 1`. Retry after that many seconds, and quote `request_id` to support. |
+| `503` | `{"code": "budget_unavailable", "error": "budget lookup failed"}` | Engine 2.34.0. The spend limits could not be read while a hard one may apply. The response has `Retry-After: 1`. |
 | `503` | `{"error": "subscription access unavailable"}` | The customer's subscription could not be read. Retry later. |
 | `503` | `{"error": "API key verification is unavailable"}` | The key could not be verified. Retry later. |
 
