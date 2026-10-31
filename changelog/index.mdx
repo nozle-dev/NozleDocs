@@ -3,6 +3,22 @@ title: Changelog
 description: Product and developer-platform updates from Nozle
 ---
 
+## November 2026
+
+### Spend limits and budgets (Core 11.23.0 and 11.23.1, Engine 2.31.0, Node 0.30.0, Python 0.28.0, Go v0.27.0)
+
+_November 1, 2026_
+
+- **Cap what usage may cost.** A spend limit caps the gross metered usage charges of a subscription per period (before tax, coupons, wallet credits and credits; no subscription fee). Set it on a plan, as the default of its subscriptions, or on one subscription as an override (`amount_cents: null` turns the plan's limit off). It covers the total or one Feature, per `billing_period`, `calendar_month` or `lifetime`, in `hard` or `soft` mode, with thresholds (default 50, 80, 90, 100). Core `POST`, `GET /spend_limits` and `GET`, `PUT`, `DELETE /spend_limits/{id}`, the plan's **Spend limits** panel and the subscription's **Budget** tab in the dashboard. See [Spend limits and budgets](/guides/entitlements/spend-limits).
+- **Only charges the Engine can price per event.** `standard`, `package`, `graduated`, `volume`, `dynamic` and `percentage` without per-transaction bounds, on `count_agg`, `sum_agg`, `max_agg`, `latest_agg` or `unique_count_agg` Features that are not recurring. A limit covering another charge fails with `422 spend_limit_unrateable_charges`, listing the charges, and saving a covered charge as one fails with `422 validation_errors` (`spend_limit_unrateable_charges`).
+- **Live spend.** The Engine prices each event as it arrives and counts it once, a few seconds after the usage. `GET /customers/{customer_id}/budgets` lists each limit's `limit`, `spent`, `held`, `remaining`, period, `status` (`ok`, `warning`, `exceeded`) and `as_of`. See [List Customer Budgets](/api/list-customer-budgets).
+- **Hard limits refuse.** `/can` answers `allowed: false`, `reason: "budget_exceeded"` with the limit in `budget` (and `budget` on allowed answers too); `/usage/check` and `/usage/track` answer the same way; the LLM proxy answers `402 budget_exceeded` with `budget`, while unit limits stay `429 usage_limit_exceeded`. `POST /events` is never refused. `503 budget_unavailable` when budgets cannot be read and a hard limit may apply.
+- **Exact caps with budget holds.** On a Feature billed in money under a hard limit, `POST /usage/holds` (or `X-Nozle-Credit-Hold` on the proxy) reserves the call's estimated spend under a row lock; `budget_exceeded` when it does not fit. Finalize sends the usage as one event, counted once. See [Budget holds](/api/create-usage-hold#budget-holds).
+- **Notifications.** Webhooks `budget.threshold_reached`, `budget.exceeded` and `usage_limit.threshold_reached` (hard unit limits at fixed 50, 80, 90, 100 %), once per limit, period and threshold, highest crossed only. Team notifications, and customer emails on by default: new billing entities from 11.23.0, existing ones from 11.23.1. Turn them off under **Settings > Customer emails**. See [Webhook events](/api/webhook-events#spend-limit-and-usage-limit-events).
+- **Usage counter safety.** Lost Redis usage counters are detected and rebuilt; meanwhile `/can` answers `503 usage_unavailable` for a Feature with a hard usage limit instead of reading zero.
+- **SDKs.** `budgets.list` (Node, Python) and `ListBudgets` (Go); `budget` on `can`, usage check and track results; `RefusalReason` values; `BudgetExceededError` (402) and `UsageLimitExceededError` (429), which is no longer retried; budget holds on the holds methods. See [Node.js](/sdks/node/entitlements#spend-limits), [Python](/sdks/python/entitlements#spend-limits) and [Go](/sdks/go/entitlements#spend-limits).
+- **Known limits.** A plain `/can` can be overrun by calls in flight; a new limit counts spend from when it is set and refuses within a minute; limits are per subscription with no currency conversion; the LLM proxy lets calls through when budgets cannot be read. See [Known limits](/guides/entitlements/spend-limits#known-limits).
+
 ## October 2026
 
 ### Credit balance holds (Engine 2.30.0, Node 0.29.0, Python 0.27.0, Go v0.26.0)

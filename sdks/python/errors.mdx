@@ -67,6 +67,28 @@ except NozleAPIError as error:
         ...  # tell your team to fix billing; neither allowed nor denied
 ```
 
+## Spend and usage limits
+
+Available from 0.28.0 with Engine 2.31.0. `can()`, `usage.check()`, `usage.track()` and `usage.holds.create()` return a used-up hard [spend limit](/guides/entitlements/spend-limits) as a result (`allowed: False`, `reason` `budget_exceeded`, `budget`); they do not raise. Where a failed response raises, two refusals have their own subclasses of `NozleAPIError`, chosen by the status and the exact `code`:
+
+| Exception | Response | Extra |
+|---|---|---|
+| `BudgetExceededError` | `402` `budget_exceeded`: a hard spend limit is used up. | `.budget`, when the response carries it. |
+| `UsageLimitExceededError` | `429` `usage_limit_exceeded`: a hard usage limit in units is reached. | |
+
+A `429` whose code is exactly `usage_limit_exceeded` is a refusal, not a rate limit, so the SDK does not retry it (sync and async); other `429`s still follow `max_retries`. A `402` is never retried. Through the [LLM proxy](/api/llm-proxy#spend-limits), the provider SDK's own error carries the same `code`.
+
+```python
+from nozle import BudgetExceededError, UsageLimitExceededError
+
+try:
+    run_billed_call()
+except BudgetExceededError as error:
+    budget = error.budget  # limit, spent, period_end, ... or None
+except UsageLimitExceededError:
+    ...  # ask the customer to upgrade; do not retry
+```
+
 ## Retry behavior
 
 By default the SDK does not retry, so a mutation is never replayed without application context. Set `max_retries` (and optionally `retry_delay`) to retry network errors, timeouts, `429` and `5xx` with backoff, or after `NozleAPIError.retry_after` seconds when the service sent `Retry-After`. Only requests that are safe to repeat are retried: reads, calls that carry an idempotency key (such as `usage.track`), event, cost event and customer writes, and the read-only usage check and transition preview. `subscribe`, `checkout` and other writes without a key are never retried.

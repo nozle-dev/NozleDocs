@@ -83,6 +83,35 @@ To fix it, choose one: make the charge $0 so credits pay for the Feature, or rem
 
 When credits run out on a Feature without a priced charge, `/usage/track` answers `200` with `allowed: false` and `reason: insufficient_credits`, and records nothing. Nozle does not move that usage to money by itself. To bill usage in money after the credits end, send it as a usage event with [`POST /events`](/api/events) against a plan whose charge on that Feature is priced and has no credits behind it.
 
+## Spend limits
+
+From Engine 2.31.0, when the plan of the paying subscription has a usage charge on the Feature and a hard [spend limit](/guides/entitlements/spend-limits) covering it is used up, `/usage/track` answers `200` with `allowed: false`, `reason: "budget_exceeded"` and the limit in `budget`. Nothing is consumed and no event is sent. The body then has only these three fields:
+
+```json
+{
+  "allowed": false,
+  "reason": "budget_exceeded",
+  "budget": {
+    "feature_code": null,
+    "limit": "500",
+    "spent": "500.04",
+    "held": "0",
+    "remaining": "0",
+    "currency": "USD",
+    "period": "billing_period",
+    "period_start": "2026-11-01T00:00:00Z",
+    "period_end": "2026-12-01T00:00:00Z",
+    "mode": "hard",
+    "status": "exceeded",
+    "as_of": "2026-11-14T09:29:58.104Z"
+  }
+}
+```
+
+- The check runs before the `Idempotency-Key` replay. A retry of a track that was accepted before the limit ran out gets this refusal too, although the first request's usage is recorded. Store the first answer if a retry must see it.
+- When the spend limits cannot be read and a hard one may apply, the answer is `503 budget_unavailable` with `Retry-After: 1`.
+- [`POST /events`](/api/events) is never refused by a spend limit: usage that already happened is always billed.
+
 ## Amount rounding and Features
 
 A consumed amount that does not end within 12 decimals is rounded up to the 12th decimal, so usage is never under-charged: 1 event at 1 credit per 3 events consumes `0.333333333334`, and 7 seconds at 1 credit per 60 seconds consumes `0.116666666667`. Exact amounts are unchanged. Before, such rates answered `422 credit_usage_configuration_invalid`. A boolean or config Feature code answers `422 feature_not_consumable`, not a server error.

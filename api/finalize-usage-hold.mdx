@@ -32,6 +32,14 @@ Content-Type: application/json
 - **More than held:** allowed when the hold plus the free balance covers it. Otherwise the answer is `allowed: false` with `reason: "insufficient_credits"`, nothing is charged (no partial charge, the balance never goes negative) and the hold stays open, so you can retry or release it.
 - **After expiry:** the hold no longer reserves anything, so the finalize runs as a plain track against the free balance and answers `hold_expired: true`. If the free balance is short it answers `allowed: false`.
 
+## Budget holds
+
+From Engine 2.31.0, finalizing a [budget hold](/api/create-usage-hold#budget-holds) (`kind: "budget"`) sends the usage in `properties` to billing as one event with `transaction_id` `hold:<hold_id>`, and returns the hold with `status: "finalized"`. There is no credit spend and no `allowed` field.
+
+- Any amount is accepted, including more than the estimate. The spend of the event is counted once, when the event is booked; until then the hold keeps counting against the limit, at least 10 minutes after the finalize. The hold's `status` then turns `booked`.
+- A repeat returns the hold unchanged. A released or denied budget hold answers `409 hold_already_resolved`.
+- After expiry, a finalize still sends the usage, because it happened.
+
 ## Retries
 
 A repeated finalize with the same body returns the first answer and spends nothing again; that includes a zero-usage finalize that released the hold. Sending other usage to a finalized hold returns `409 hold_already_resolved`, and so does finalizing a released or denied hold. Keep the `timestamp` fixed across retries; the SDKs reuse a timestamp they filled in for the same hold on the same client.

@@ -13,7 +13,7 @@ GET /customers/customer_123/credit-holds?status=held
 Authorization: Bearer sk_nozle_...
 ```
 
-Returns the customer's newest 100 holds, newest first, including the holds of its Entities. `status` is optional and is one of `held`, `denied`, `finalized`, `released` or `expired`; any other value returns `400 invalid_request`. `held` lists the holds that reserve credits now; `expired` also lists open holds past their expiry that the sweep has not marked yet.
+Returns the customer's newest 100 credit holds, newest first, including the holds of its Entities. [Budget holds](/api/create-usage-hold#budget-holds) (Engine 2.31.0) are not listed; read one by ID with [Get a Credit Hold](/api/get-usage-hold). `status` is optional and is one of `held`, `denied`, `finalized`, `released` or `expired`; any other value returns `400 invalid_request`. `held` lists the holds that reserve credits now; `expired` also lists open holds past their expiry that the sweep has not marked yet.
 
 ```json
 {

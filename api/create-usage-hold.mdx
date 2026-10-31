@@ -10,6 +10,8 @@ Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.30.0.
 
 A hold reserves the credits a usage would cost, on the same sources [`POST /usage/track`](/api/usage-track) would spend, in the same order and under the same pool policy. It does not change the balance and sends nothing to billing. Until it is finalized, released or expired, other callers cannot spend the held credits: [`/usage/check`](/api/usage-check), [`/usage/track`](/api/usage-track), other holds, the balance endpoints and Entity transfers all subtract it. Settle the hold with [Finalize a Credit Hold](/api/finalize-usage-hold) once the actual usage is known, or free it with [Release a Credit Hold](/api/release-usage-hold).
 
+From Engine 2.31.0 the same endpoint takes a [budget hold](#budget-holds) on a Feature the plan bills in money, when a hard spend limit covers it.
+
 Use a hold when several workers spend from one balance at the same time and each needs to know before it starts that the credits are there, for example concurrent agent runs or LLM calls. For a cost known in advance, call `/usage/track` directly. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits).
 
 ```http
@@ -77,6 +79,56 @@ The body is the [`/usage/track`](/api/usage-track) body plus `ttl_seconds`. `cus
 
 A short balance answers `200` with `allowed: false`, `status: "denied"` and `reason: "insufficient_credits"`. The denial is stored under the key, so a retry gets the same answer; use a new key after adding credits.
 
+## Budget holds
+
+From Engine 2.31.0, a hold on a Feature the plan bills in money (a priced usage charge, no credits) is a budget hold when a hard [spend limit](/guides/entitlements/spend-limits) covers the Feature. It makes the cap exact for concurrent calls: it reserves the call's estimated spend against every hard limit covering the Feature, under a row lock, so two calls cannot both take the last of a limit.
+
+- **The estimate** is the charge's price of the metric amount in `properties`, on top of the period's usage so far, in the plan's currency. Send the most the call can use.
+- **Refused** when the estimate does not fit, or a limit is already used up: `200` with `allowed: false`, `status: "denied"`, `reason: "budget_exceeded"` and the limit in `budget`. Nothing is reserved.
+- **Allowed:** `status: "held"`, `amount_held` is the estimate and `budget` is the tightest limit as it stood just before this hold (this hold is not in its `held`).
+- **Settle it** with [Finalize](/api/finalize-usage-hold#budget-holds) (the usage is sent as one event and its spend is counted once) or [Release](/api/release-usage-hold). `ttl_seconds`, expiry and the sweep work as for credit holds.
+- Without a hard spend limit covering the Feature, a Feature billed in money still answers `409 feature_billed_in_money`.
+
+```json
+{
+  "hold_id": "0b7a4c2e-3d1f-4f6a-9c8b-1e2d3c4b5a69",
+  "kind": "budget",
+  "status": "held",
+  "customer_id": "customer_123",
+  "subscription_id": "sub_pro_123",
+  "feature_code": "llm_tokens",
+  "metric_amount": "4000",
+  "amount_held": "0.08",
+  "currency": "USD",
+  "expires_at": "2026-11-14T09:45:00.512Z",
+  "created_at": "2026-11-14T09:30:00.512Z",
+  "resolved_at": null,
+  "allowed": true,
+  "budget": {
+    "feature_code": null,
+    "limit": "500",
+    "spent": "412.5",
+    "held": "7.5",
+    "remaining": "80",
+    "currency": "USD",
+    "period": "billing_period",
+    "period_start": "2026-11-01T00:00:00Z",
+    "period_end": "2026-12-01T00:00:00Z",
+    "mode": "hard",
+    "status": "warning",
+    "as_of": "2026-11-14T09:30:12.418Z"
+  }
+}
+```
+
+A budget hold has `kind: "budget"`, `subscription_id`, `amount_held` and `currency` in place of the credit fields, and no `available`. Amounts are decimal strings in major units of `currency`.
+
+Known limits:
+
+- A charge with filters, pricing groups or percentage free units is estimated on the Feature's total usage, not its own, and a dynamic charge (priced by its events) is estimated at 0. The spend booked from the finalized usage is exact.
+- The estimate is part of the request's fingerprint. On a tiered charge it can change as the period's usage grows, so a retry with the same key after other usage was counted can answer `409 idempotency_key_reused`.
+- Budget holds resolved more than 7 days ago are deleted; a retry of their `Idempotency-Key` after that creates a new hold.
+
 ## Errors
 
 | Status | `code` | Meaning |
@@ -87,7 +139,7 @@ A short balance answers `200` with `allowed: false`, `status: "denied"` and `rea
 | `403` | `permission_denied` | The key lacks `credit_system:write`. |
 | `404` | `customer_not_found`, `active_subscription_not_found`, `feature_not_found`, `entity_not_found` | As on `/usage/track`. |
 | `409` | `idempotency_key_reused` | The key was used with a different body. |
-| `409` | `feature_billed_in_money` | See [Credits or money, not both](/api/usage-track#credits-or-money-not-both). |
+| `409` | `feature_billed_in_money` | See [Credits or money, not both](/api/usage-track#credits-or-money-not-both). From Engine 2.31.0 a hard spend limit covering the Feature makes it a [budget hold](#budget-holds) instead. |
 | `422` | `active_subscription_ambiguous`, `feature_not_consumable`, `entity_inactive`, `credit_pool_policy_not_configured`, `credit_usage_configuration_invalid` | As on `/usage/track`. |
 | `503` | `credit_usage_contention`, `credit_usage_temporarily_unavailable` | Retry after `Retry-After` with the same key and body. |
 

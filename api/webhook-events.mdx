@@ -3,7 +3,7 @@ title: "Webhook events"
 description: "Every event type Nozle sends to your webhook endpoints: when it fires, what the payload holds, and which events are new"
 ---
 
-Nozle sends one JSON `POST` per event to every endpoint of your organization that subscribes to the event type. There are 74 types. This page lists them all. Registering an endpoint, verifying the signature and the retry rules are in [Receive Nozle webhooks](/api/receive-webhooks).
+Nozle sends one JSON `POST` per event to every endpoint of your organization that subscribes to the event type. There are 81 types. This page lists them all. Registering an endpoint, verifying the signature and the retry rules are in [Receive Nozle webhooks](/api/receive-webhooks).
 
 Each event has its own page in the API reference under **Webhook Events**, with the payload schema and an example captured from Core.
 
@@ -64,6 +64,9 @@ An endpoint with no `event_types` receives every type, and gets every type Nozle
 | Event | Object key | When it fires |
 |---|---|---|
 | `alert.triggered` | `triggered_alert` | A usage alert on a subscription (or a wallet balance alert) crosses one of its thresholds. |
+| `budget.threshold_reached` | `budget` | A subscription's spend reached a threshold of a [spend limit](/guides/entitlements/spend-limits). Engine 2.31.0. |
+| `budget.exceeded` | `budget` | A subscription used up a hard spend limit; its metered usage is refused until the period ends or the limit is raised. Engine 2.31.0. |
+| `usage_limit.threshold_reached` | `usage_limit` | A subscription's usage reached 50, 80, 90 or 100 % of a Feature's hard usage limit. Engine 2.31.0. |
 
 ### Customers
 
@@ -296,6 +299,38 @@ Sent once per [paid top-up](/guides/credits/top-ups) purchase, when the credits 
   }
 }
 ```
+
+### Spend limit and usage limit events
+
+_Engine 2.31.0, Core 11.23.0._ `budget.threshold_reached`, `budget.exceeded` and `usage_limit.threshold_reached` come from the Engine, which counts spend and usage as events arrive. The object is the Engine's payload, not a REST resource. See [Spend limits and budgets](/guides/entitlements/spend-limits#notifications).
+
+```json
+{
+  "webhook_type": "budget.threshold_reached",
+  "object_type": "budget",
+  "organization_id": "00000000-0000-4000-8000-000000000001",
+  "livemode": true,
+  "budget": {
+    "subscription_external_id": "sub_pro_123",
+    "external_customer_id": "customer_123",
+    "feature_code": null,
+    "threshold": 80,
+    "spent": "401.2",
+    "limit": "500",
+    "currency": "USD",
+    "period": "billing_period",
+    "period_start": "2026-11-01T00:00:00Z",
+    "period_end": "2026-12-01T00:00:00Z",
+    "mode": "hard"
+  }
+}
+```
+
+- `feature_code` is `null` for a limit on the total of the usage charges. `spent` and `limit` are decimal strings in major units of `currency`. `period_end` is `null` for a `lifetime` limit.
+- Each threshold is sent once per limit and period, and only the highest one crossed: a jump from 40 % to 95 % sends 90. Raising a limit does not send a threshold again.
+- `budget.exceeded` has the same object with `threshold: 100`. It is sent once per period when a hard limit is used up, in place of `budget.threshold_reached` for 100. A soft limit sends `budget.threshold_reached` at 100.
+- `usage_limit.threshold_reached` has `usage` (units, a decimal string) and `limit` (units, an integer) instead of `spent`, `limit` and `currency`, and `mode: "hard"`. Its thresholds are fixed at 50, 80, 90 and 100 %.
+- No event is sent when a period resets or a limit is raised back below a threshold.
 
 ### `dunning.step`
 

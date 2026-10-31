@@ -95,6 +95,7 @@
             "pages": [
               "guides/entitlements/overview",
               "guides/entitlements/can-endpoint",
+              "guides/entitlements/spend-limits",
               "guides/entitlements/real-time"
             ]
           },
@@ -175,7 +176,8 @@
               {
                 "group": "Entitlements",
                 "pages": [
-                  "api/check-entitlement"
+                  "api/check-entitlement",
+                  "api/list-customer-budgets"
                 ]
               },
               {
@@ -275,6 +277,18 @@
                   "DELETE /subscriptions/{external_id}/charges/{charge_code}/filters/{filter_id}",
                   "GET /subscriptions/{external_id}/fixed_charges/{fixed_charge_code}",
                   "PUT /subscriptions/{external_id}/fixed_charges/{fixed_charge_code}"
+                ]
+              },
+              {
+                "group": "Spend Limits",
+                "openapi": "nozle-openapi.yaml",
+                "expanded": false,
+                "pages": [
+                  "POST /spend_limits",
+                  "GET /spend_limits",
+                  "GET /spend_limits/{id}",
+                  "PUT /spend_limits/{id}",
+                  "DELETE /spend_limits/{id}"
                 ]
               },
               {
@@ -565,7 +579,10 @@
                     "openapi": "nozle-openapi.yaml",
                     "expanded": false,
                     "pages": [
-                      "webhook alert_triggered"
+                      "webhook alert_triggered",
+                      "webhook budget_threshold_reached",
+                      "webhook budget_exceeded",
+                      "webhook usage_limit_threshold_reached"
                     ]
                   },
                   {

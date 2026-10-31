@@ -1,0 +1,111 @@
+---
+title: List Customer Budgets
+api: "GET https://api.nozle.app/engine/api/v1/customers/{customer_id}/budgets"
+description: Read the spend limits of a customer's subscription with what is spent, held and left this period
+---
+
+Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.31.0.
+
+**Auth:** secret key only. When your organization has API key permissions, the key requires `subscription:read`.
+
+Returns every [spend limit](/guides/entitlements/spend-limits) that applies to one subscription of the customer: the plan's limits and the subscription's own overrides, each with the spend booked this period, the spend reserved by open [budget holds](/guides/entitlements/spend-limits#exact-caps-with-budget-holds) and the status. Use it for a usage page or a "you are close to your limit" banner. To set limits, use the [Spend Limits](/guides/entitlements/spend-limits#set-a-limit) endpoints of Core.
+
+```http
+GET /customers/customer_123/budgets?subscription_id=sub_pro_123
+Authorization: Bearer sk_nozle_...
+```
+
+<ParamField path="customer_id" type="string" required>
+  External customer ID.
+</ParamField>
+
+<ParamField query="subscription_id" type="string">
+  External ID of a current subscription of the customer. Without it, the subscription is chosen as on [`/usage/track`](/api/usage-track#which-subscription-pays): the Entity's own subscription with `entity_id`, else the customer's one current subscription.
+</ParamField>
+
+<ParamField query="entity_id" type="string">
+  External Entity ID. Its own subscription is read, else the customer's own one.
+</ParamField>
+
+## Response
+
+```json
+{
+  "customer_id": "customer_123",
+  "subscription_id": "sub_pro_123",
+  "budgets": [
+    {
+      "feature_code": "llm_tokens",
+      "limit": "200",
+      "spent": "184.2",
+      "held": "1.3",
+      "remaining": "14.5",
+      "currency": "USD",
+      "period": "billing_period",
+      "period_start": "2026-11-01T00:00:00Z",
+      "period_end": "2026-12-01T00:00:00Z",
+      "mode": "hard",
+      "status": "warning",
+      "as_of": "2026-11-14T09:30:12.418Z"
+    },
+    {
+      "feature_code": null,
+      "limit": "500",
+      "spent": "212.75",
+      "held": "1.3",
+      "remaining": "285.95",
+      "currency": "USD",
+      "period": "billing_period",
+      "period_start": "2026-11-01T00:00:00Z",
+      "period_end": "2026-12-01T00:00:00Z",
+      "mode": "hard",
+      "status": "ok",
+      "as_of": "2026-11-14T09:30:12.418Z"
+    }
+  ]
+}
+```
+
+Budgets come tightest first (least `remaining`). `budgets` is empty when no spend limit applies. Amounts are decimal strings in major units of `currency` (dollars, not cents).
+
+| Field | Description |
+|-------|-------------|
+| `feature_code` | The Feature the limit covers. `null` for the limit on the total of the usage charges. |
+| `limit` | The limit. |
+| `spent` | Gross usage charges booked this period: before tax, coupons, wallet credits and credits, without the subscription fee. |
+| `held` | Estimated spend reserved by open budget holds. |
+| `remaining` | `limit` minus `spent` and `held`, never below 0. |
+| `currency` | The plan's currency. |
+| `period` | `billing_period`, `calendar_month` or `lifetime`. |
+| `period_start`, `period_end` | The current period. A `lifetime` limit starts at `1970-01-01T00:00:00Z` and has `period_end: null`. |
+| `mode` | `hard` refuses metered calls once used up; `soft` only notifies. |
+| `status` | `exceeded` when `spent` plus `held` reaches the limit (a soft limit too, though it never refuses), `warning` once they reach a threshold of the limit below 100, else `ok`. |
+| `as_of` | Time of the latest event booked into `spent`; `null` before the first one. Usage reaches the Engine a few seconds after it happens. |
+
+## Errors
+
+| Status | `code` | Meaning |
+|--------|--------|---------|
+| `400` | `invalid_request` | Empty or invalid customer ID. |
+| `403` | `permission_denied` | The key lacks `subscription:read`. |
+| `404` | `active_subscription_not_found` | The customer has no current subscription, or `subscription_id` names none of its current subscriptions. |
+| `422` | `active_subscription_ambiguous` | Several current subscriptions and neither `subscription_id` nor `entity_id` picks one. |
+| `503` | `budget_unavailable` | The subscription or its budgets could not be read. Retry after `Retry-After` (1 second). |
+
+## SDKs
+
+<CodeGroup>
+
+```ts Node.js
+const { budgets } = await nozle.budgets.list('customer_123', { subscriptionId: 'sub_pro_123' })
+```
+
+```python Python
+budgets = nozle.budgets.list("customer_123", subscription_id="sub_pro_123")["budgets"]
+```
+
+```go Go
+list, err := client.ListBudgets(ctx, "customer_123", "sub_pro_123")
+```
+
+</CodeGroup>

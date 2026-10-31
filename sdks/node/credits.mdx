@@ -221,6 +221,25 @@ Engine errors arrive as `NozleApiError` with `code` `hold_not_found` (404), `hol
 
 Types: `UsageHold`, `UsageHoldStatus`, `UsageHoldCreateParams`, `UsageHoldCreateResult`, `UsageHoldFinalizeParams`, `UsageHoldFinalizeResult`, `UsageHoldListOptions`, `UsageHoldList`.
 
+### Budget holds
+
+Available from 0.30.0 with Engine 2.31.0. On a Feature billed in money under a hard [spend limit](/guides/entitlements/spend-limits), `usage.holds.create()` takes a [budget hold](/api/create-usage-hold#budget-holds): it reserves the call's estimated spend, so concurrent calls cannot overrun the limit.
+
+```ts
+const hold = await nozle.usage.holds.create(
+  { customerId: 'workspace_123', featureCode: 'llm_tokens', properties: { tokens: 4000 } },
+  { idempotencyKey: `hold-${runId}` },
+)
+if (hold.kind === 'budget' && !hold.allowed) {
+  // hold.reason === 'budget_exceeded'; hold.budget is the limit
+}
+```
+
+- `UsageHold` is `CreditUsageHold | BudgetUsageHold`. A budget hold has `kind: 'budget'`, `amount_held` and `currency` instead of the credit fields, and its create result carries `budget`.
+- `finalize()` of a budget hold sends the usage and returns the hold. Its spend is counted when the usage event is booked.
+- `release()` and `get()` work as for credit holds. `list()` returns credit holds only.
+- Types: `CreditUsageHold`, `BudgetUsageHold`, `CreditUsageHoldCreateResult`, `BudgetUsageHoldCreateResult`, `CreditUsageHoldFinalizeResult`.
+
 ## Legacy wallet adapter
 
 `nozle.checkAndDeduct({ customerId, credits })` is deprecated and remains available for the legacy wallet path. It is not idempotent: a retry after a timeout can deduct again, so the SDK never retries it. The `feature` field is deprecated: it is still accepted but is not sent and has no effect. Use `usage.check()` and `usage.track()` with a credit system instead.

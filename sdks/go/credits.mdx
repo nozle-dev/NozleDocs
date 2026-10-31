@@ -111,6 +111,26 @@ _ = one
 - Errors come back as `*nozle.APIError` with `Code()` `CodeHoldNotFound` (404), `CodeHoldAlreadyResolved` (409: releasing a finalized hold, or finalizing a resolved hold with other usage) or `CodeHoldTTLInvalid` (400).
 - A missing `Timestamp` is filled in once per idempotency key (create) or hold ID (finalize) and reused, so a repeat replays the first answer. Create, finalize and release are retried under `WithMaxRetries`.
 
+### Budget holds
+
+Available from v0.27.0 with Engine 2.31.0. On a Feature billed in money under a hard [spend limit](/guides/entitlements/spend-limits), `CreateCreditHold` takes a [budget hold](/api/create-usage-hold#budget-holds): it reserves the call's estimated spend, so concurrent calls cannot overrun the limit.
+
+```go
+hold, err := client.CreateCreditHold(ctx, nozle.CreditHoldParams{
+  CustomerID: "workspace_123", FeatureCode: "llm_tokens", Properties: map[string]any{"tokens": 4000},
+}, "hold-"+runID)
+if err != nil {
+  return err
+}
+if hold.Kind == nozle.HoldKindBudget && !hold.Allowed {
+  return fmt.Errorf("spend limit reached: %s of %s", hold.Budget.Spent, hold.Budget.Limit)
+}
+```
+
+- `CreditHold.Kind` is `nozle.HoldKindBudget` for a budget hold (empty for a credit hold), with `AmountHeld` and `Currency` instead of the credit fields. `CreditHoldResult.Budget` is the limit.
+- `FinalizeCreditHold` of a budget hold sends the usage and answers the hold: `Kind`, `Status`, `AmountHeld` and `Currency` on `CreditHoldFinalizeResult`.
+- `ReleaseCreditHold` and `GetCreditHold` work as for credit holds. `ListCreditHolds` returns credit holds only.
+
 ## Legacy wallet adapter
 
 For applications still using the legacy wallet, `CheckAndDeduct` calls Engine's legacy wallet adapter with a customer ID and a numeric credit amount. `CheckAndDeductParams.Feature` is deprecated: it is ignored, not validated and not sent. This endpoint has no idempotency key. Use `CheckUsage` and `TrackUsage` for product credits, which preserve exact decimal values.

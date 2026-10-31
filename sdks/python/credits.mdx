@@ -209,6 +209,21 @@ nozle.usage.holds.list("workspace_123", status="held")
 - A `timestamp` the SDK fills in is reused for the same idempotency key (create) and the same hold (finalize) on this client, so retries replay. Pass `timestamp` when a retry may come from another process.
 - Types: `CreditHold`, `CreditHoldResult`, `CreditHoldFinalizeResult`, `CreditHoldList`, `CreditHoldStatus`.
 
+### Budget holds
+
+Available from 0.28.0 with Engine 2.31.0. On a Feature billed in money under a hard [spend limit](/guides/entitlements/spend-limits), `usage.holds.create()` takes a [budget hold](/api/create-usage-hold#budget-holds): it reserves the call's estimated spend, so concurrent calls cannot overrun the limit.
+
+```python
+hold = nozle.usage.holds.create(
+    "workspace_123", "llm_tokens", properties={"tokens": 4000}, idempotency_key=f"hold-{run_id}"
+)
+if hold.get("kind") == "budget" and not hold["allowed"]:
+    print(hold["reason"], hold["budget"])  # "budget_exceeded" and the limit
+```
+
+- `BudgetHold` has `kind: "budget"`, `amount_held` and `currency` instead of the credit fields; `BudgetHoldResult` adds `allowed`, `reason` and `budget`.
+- `create()` returns `HoldResult`, `finalize()` `HoldFinalizeResult` (a budget hold's finalize sends the usage and returns the hold), and `release()` and `get()` `Hold`: unions of the credit and budget shapes. `list()` returns credit holds only.
+
 ## Legacy wallet adapter
 
 `nozle.check_and_deduct(customer_id, credits=5)` remains available for the legacy wallet path. It is not idempotent: a retry after a timeout can deduct again, so the SDK never retries it. The old `check_and_deduct(customer_id, feature, credits)` form still works: `feature` is deprecated, ignored and never sent. A missing `credits` raises `NozleValidationError`. New product-credit integrations should use `usage.check()` and `usage.track()`.
