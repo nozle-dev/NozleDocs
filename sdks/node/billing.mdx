@@ -408,6 +408,49 @@ const result = await nozle.checkoutInvoice(invoiceId, {
 
 A PDF is generated the first time it is asked for, so the download call returns no URL until it exists; ask again a few seconds later, or wait for the `invoice.generated` webhook.
 
+## Credit notes and refunds
+
+Requires `@nozle-js/node` `0.27.0`. Needs a secret key and a workspace with credit notes enabled; otherwise the call fails with `403` `feature_unavailable`. A credit note lowers a finalized invoice. Its total is settled by crediting the customer's balance, refunding the original payment method (Stripe or Razorpay, started by Nozle), offsetting what the customer still owes on the invoice, or a mix. Nozle stores only the provider's refund id and status, never card or bank details.
+
+```ts
+const items = [{ feeId: 'fee_123', amountCents: 500 }]   // feeId: fees[].nozle_id of the invoice
+
+// Preview first: nothing is created. Taxes and coupons are applied.
+const preview = await nozle.creditNotes.preview({ invoiceId: 'inv_123', items })
+preview.max_creditable_amount_cents   // the credit note's total
+preview.max_refundable_amount_cents   // what was paid and not refunded yet
+
+// Refund the items to the original payment method. A partial refund is fewer or smaller items.
+const note = await nozle.creditNotes.refund({ invoiceId: 'inv_123', items, reason: 'duplicated_charge', metadata: { ticket: 'T-42' } })
+note.refund_status   // 'pending', then 'succeeded' or 'failed'
+
+// Or choose the split yourself. The three amounts add up to max_creditable_amount_cents.
+await nozle.creditNotes.create({ invoiceId: 'inv_123', items, refundAmountCents: 300, creditAmountCents: 200, reason: 'order_change' })
+
+await nozle.creditNotes.list({ customerId: 'cus_123', refundStatus: 'failed' })
+await nozle.creditNotes.get(note.nozle_id)
+await nozle.creditNotes.void(note.nozle_id)   // voids the unused credit; never undoes a paid refund or an offset
+```
+
+`reason` is `duplicated_charge`, `product_unsatisfactory`, `order_change`, `order_cancellation`, `fraudulent_charge` or `other` (the default). `refund()` is a preview followed by a `create()` whose `refundAmountCents` is the previewed total. When less was paid than the items are worth it throws `refund_exceeds_paid_amount` and creates nothing; pass `creditRemainder: true` to refund what was paid and credit the rest. `create()` takes `creditAmountCents`, `refundAmountCents`, `offsetAmountCents`, `reason`, `description` (printed on the PDF) and `metadata`. `list()` filters by `customerId`, `invoiceNumber`, `reason`, `creditStatus` (`available`, `consumed`, `voided`), `refundStatus` (`pending`, `succeeded`, `failed`), `currency`, `issuingDateFrom`, `issuingDateTo`, `amountFrom`, `amountTo`, `page` and `perPage`.
+
+A refund is started with the payment provider after the call returns. Follow `refund_status` with `get()` or the `credit_note.refund_failure` webhook.
+
+The SDK sends no `Idempotency-Key` with credit note requests yet (Core 11.22.0 accepts one on create), so it never retries the calls that create or change a credit note, whatever the retry setting says. Preview and reads are retried. After a network error or a `5xx` on a create, list the customer's credit notes by invoice number before trying again.
+
+Errors are `NozleApiError`. Test them with `error.hasCode(CREDIT_NOTE_ERROR_CODES.cannotRefundUnpaidInvoice)`; the constants are `invalidTypeOrStatus`, `cannotRefundUnpaidInvoice`, `higherThanRemainingInvoiceAmount`, `higherThanRemainingFeeAmount`, `doesNotMatchItemAmounts`, `noVoidableAmount` and `refundExceedsPaidAmount`.
+
+| Status and code | Meaning |
+|---|---|
+| `422` `invalid_type_or_status` | The invoice is a draft, or a prepaid-credit invoice that cannot be credited. |
+| `422` `validation_errors`, `refund_amount_cents`: `cannot_refund_unpaid_invoice` | Nothing was paid on the invoice. |
+| `422` `validation_errors`, `higher_than_remaining_invoice_amount` | A credit, refund or offset is above what is left on the invoice (paid and not refunded, for a refund). |
+| `422` `validation_errors`, `amount_cents`: `higher_than_remaining_fee_amount` | An item is above what is left of its fee. |
+| `422` `validation_errors`, `does_not_match_item_amounts` | Credit, refund and offset do not add up to the items with taxes. |
+| `422` `no_voidable_amount` | `void` on a credit note with no credit balance left. |
+| `404` `credit_note_not_found`, `invoice_not_found`, `fee_not_found` | The id does not exist in this workspace. |
+| `422` `refund_exceeds_paid_amount` | Raised by the SDK's refund helper before any credit note is created: less was paid than the items are worth. |
+
 ## Alerts
 
 Requires `@nozle-js/node` `0.13.0`.
