@@ -76,7 +76,7 @@ Events refused while the customer is blocked are not queued. Your app decides wh
 
 An events batch is not refused as a whole because one customer is blocked.
 
-- First, every event is validated. Any invalid event fails the whole batch with `422` `validation_errors`, as before.
+- Invalid events are refused one by one too (Engine 2.28.0), with their own codes in `error_details`. Before Engine 2.28.0 one invalid event failed the whole batch with `422` `validation_errors`.
 - Then the events of blocked customers are set aside. The other events are stored and returned in `events` with `200`. The refused ones are listed by their position in the request under `error_details`:
 
 ```json
@@ -88,7 +88,7 @@ An events batch is not refused as a whole because one customer is blocked.
 }
 ```
 
-- When every event of the batch is refused, the answer is `402` with `code` `customer_payment_overdue` and the same `error_details`, and nothing is stored.
+- When every event of the batch is refused for a blocked customer, the answer is `402` with `code` `customer_payment_overdue` and the same `error_details`, and nothing is stored. When nothing is stored and some refusals have another reason, the answer is `422` `validation_errors`.
 
 ### Where the policy stands
 

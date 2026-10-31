@@ -5,6 +5,16 @@ description: Product and developer-platform updates from Nozle
 
 ## October 2026
 
+### Event batches of 5000 with partial acceptance (Engine 2.28.0, Go v0.23.0, Node 0.26.0, Python 0.24.0)
+
+_October 31, 2026_
+
+- **5000 events per batch.** `POST /events/batch` takes 1 to 5000 events (100 before) and accepts gzip bodies (`Content-Encoding: gzip`, 16 MiB once decoded). See [events](/api/events#responses-and-limits).
+- **Partial acceptance.** One bad event no longer refuses the batch: the valid events are stored, and the refused ones come back by position in `error_details` on a `200`. A batch with no stored event is still a `422`, or a `402` when every customer is blocked.
+- **Resend rule.** After a network error, a timeout or a `5xx`, resend the batch with the same transaction ids; each id is billed once. After a `200`, fix and resend only the listed events.
+- **SDK batch calls.** `TrackBatch` (Go), `trackBatch()` (Node) and `track_batch()` (Python) send gzipped requests of up to 5000 events and return one result per event: accepted, rejected or failed. See [Go](/sdks/go/tracking-events#batching-events), [Node.js](/sdks/node/tracking-events#batching-events) and [Python](/sdks/python/tracking-events#batching-events).
+- **Throughput.** In production, ingress accepted 175,000 events per second with no failures, and every test event was billed once.
+
 ### Credit notes and refunds in the SDKs (Node 0.27.0, Python 0.25.0, Go v0.24.0)
 
 _October 31, 2026_

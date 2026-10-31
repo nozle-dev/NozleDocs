@@ -12,6 +12,7 @@ description: HTTP errors, validation failures, and retry guidance
 | `401` | Missing or invalid credential. |
 | `403` | Credential lacks permission or a publishable key attempted a protected operation. |
 | `404` | Resource was not found within the authenticated organization. |
+| `413` | The request body is too large: `payload_too_large`. An events batch is limited to 16 MiB, decoded. |
 | `402` | Payment required. `workspace_suspended` (or `card_required`): your workspace is blocked by Nozle, see [Workspace billing errors](#workspace-billing-errors). `customer_payment_overdue`: one of your customers is blocked by your dunning policy, see [Customer payment overdue](#customer-payment-overdue). |
 | `409` | Idempotency key or resource-state conflict, such as another checkout in progress. Reload the state, then retry. |
 | `422` | Request is syntactically valid but violates a product rule, or the resource's current state refuses it (for example a voided invoice). |
@@ -61,6 +62,8 @@ Match on the status and `code`, not on the message text.
 | `409` `feature_billed_in_money` | `usage.check` or `usage.track` for a Feature that credits pay for and the plan also bills with a priced charge, which would bill the usage twice. | Set the charge to $0 so credits pay, or remove the credits so the charge bills. See [credits or money](/api/usage-track#credits-or-money-not-both). |
 | `422` `feature_not_consumable` | The Feature is boolean or config, so there is no usage to consume. | Use a metered Feature. |
 | `422` `credit_usage_configuration_invalid` (`no effective credit rate`) | The event time is before the credit rate became effective. | Use a later time, or fix the rate. |
+| `200` with `error_details` from `POST /events/batch` (Engine 2.28.0) | Some events of the batch were refused, keyed by their position. The other events were stored. | Fix and resend only the listed events. Do not resend the whole batch. |
+| `422` `validation_errors` with `events: ["too_many_events"]` | The batch has more than 5000 events (`no_events` when it is empty). Nothing is stored. | Send at most 5000 events per request. The SDK batch calls split for you. |
 | `400` `invalid_request` | A field is missing or malformed, for example a `timestamp` that is a date only. | Read the message and fix the field. |
 | `400` `invalid_return_url` | Core refused the checkout `return_url`: its origin is neither Nozle's nor one of your organization's `checkout_return_origins`. | Add the origin in the dashboard under **Developers > Checkout return**, or send a `return_url` on an allowed origin. Core's own checkout routes answer `422` `return_url: invalid_or_untrusted` for the same case. See [return URLs](/guides/billing/checkout#return-urls-and-your-organizations-origins) and [create checkout](/api/create-checkout). |
 | `422` `customer_currency_mismatch` on `currency` (Core 11.9.0) | A subscription, invoice, wallet, top-up or fixed coupon is in another currency than the customer's. | Use the customer's currency, or allow several currencies per customer. See [customer currency](/api/create-customer#customer-currency). |
@@ -155,6 +158,6 @@ _Unreleased (Engine 2.22.0, Core 11.16.0)._ The Engine answers `402` `customer_p
 | LLM proxy, Anthropic routes | `{"type": "error", "error": {"type": "billing_error", "message": "<text>", "code": "customer_payment_overdue"}, "code": "customer_payment_overdue"}` |
 | `POST /events` | `{"status": 402, "error": "<text>", "code": "customer_payment_overdue"}` |
 | `POST /events/batch`, every event refused | `{"status": 402, "error": "<text>", "code": "customer_payment_overdue", "error_details": {"<index>": {"external_customer_id": ["customer_payment_overdue"]}}}` |
-| `POST /events/batch`, some events refused | `200` with the stored `events` and the refused ones in `error_details`, keyed by index. |
+| `POST /events/batch`, some events refused | `200` with the stored `events` and the refused ones in `error_details`, keyed by index. From Engine 2.28.0 invalid events are refused the same way, so a batch is no longer all or nothing. |
 
 The text is `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` Do not retry: the block lifts on the next request after the invoices are paid, voided or credited. Refused events are not queued.

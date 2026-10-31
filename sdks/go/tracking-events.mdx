@@ -19,7 +19,9 @@ err := client.Track(ctx, nozle.TrackParams{
 _ = err
 ```
 
-`Track` posts `{ "event": { ... } }` to Engine `/api/v1/events`. Reuse the same transaction ID and timestamp when retrying a logical event. `Meter` posts a batch of 1–100 events to Engine `/api/v1/events/batch`; each batch event needs an explicit subscription ID. A batch of 0 or more than 100 events returns the plain error `nozle: batch size must be 1-100` before any request.
+`Meter` sends 1 to 100 events in one request. From `v0.23.0`, `MeterWithResult` returns the stored events and, in `ErrorDetails`, the refused ones by position: Engine 2.28.0 stores the valid events of a batch. A batch with no valid event is a `422` `*APIError` whose `BatchErrors()` lists them.
+
+`Track` posts `{ "event": { ... } }` to Engine `/api/v1/events`. Reuse the same transaction ID and timestamp when retrying a logical event. `Meter` posts a batch of 1–100 events to Engine `/api/v1/events/batch`; each batch event needs an explicit subscription ID. A batch of 0 or more than 100 events returns the plain error `nozle: batch size must be 1-100` before any request. For more events per call, use [`TrackBatch`](#batching-events).
 
 `TrackParams` contains `CustomerID`, `Event`, optional JSON `Metadata`, `SubscriptionID`, `TransactionID`, and `Timestamp`.
 
@@ -49,7 +51,34 @@ When `SubscriptionID` is empty, the SDK requests the customer's active subscript
 
 `TrackParams.Timestamp` is a string: RFC 3339 with an offset (`2026-07-01T12:00:00Z`) or Unix seconds (`1782907200`). The SDK sends Unix seconds with millisecond precision. A date only or an RFC 3339 value without an offset returns `nozle: event: timestamp must be RFC3339 or Unix seconds`.
 
-## Batch and cost events
+## Batching events
+
+From `v0.23.0`, `TrackBatch` sends many events through Engine's `/events/batch`. It splits them into gzipped requests of up to 5000 events, sends several at once and returns one result per event. It needs Engine 2.28.0, which accepts gzip and 5000 events per request.
+
+```go
+res, err := client.TrackBatch(ctx, []nozle.TrackParams{
+  {CustomerID: "workspace_123", Event: "api_calls", Metadata: map[string]any{"tokens": 100}},
+  {CustomerID: "workspace_456", Event: "api_calls", Timestamp: "2026-10-29T09:30:00Z"},
+}) // nozle.WithBatchChunkSize(1000), nozle.WithBatchConcurrency(8)
+if err != nil { return err } // invalid arguments only
+for _, r := range res.Results {
+  switch r.Status {
+  case nozle.BatchEventRejected:
+    log.Println(r.Index, r.Errors) // map[code:[value_is_mandatory]]
+  case nozle.BatchEventFailed:
+    log.Println(r.Index, r.TransactionID, r.Err) // resend with this TransactionID
+  }
+}
+```
+
+- **Size.** `WithBatchChunkSize` is 1 to 5000 (default 5000) events per request, and `WithBatchConcurrency` is 1 to 64 (default 4) requests in flight. An Engine with a lower limit answers `too_many_events`; `TrackBatch` then splits that request in two and resends each half.
+- **Result.** `Results[i]` belongs to `events[i]`: `BatchEventAccepted` (stored), `BatchEventRejected` (Engine refused this event; `Errors` maps a field to codes, and resending it unchanged fails again) or `BatchEventFailed` (its request failed, so the event may or may not be stored). `Total`, `Accepted`, `Rejected` and `Failed` count them. `TrackBatch` returns an error only for invalid arguments.
+- **Partial batches.** Engine stores the valid events of a request and names the refused ones by position. An Engine before 2.28.0 refuses a whole request for one invalid event; `TrackBatch` then rejects the named events and resends the rest.
+- **Idempotency.** Every event has a transaction ID, yours or a generated one returned in `Results[i].TransactionID`. A request retried after a network error, a timeout, a `429` or a `5xx` (`WithMaxRetries`) records each event once. IDs must be unique in one call.
+
+`TrackBatch` records events like `Track`; it does not deduct credits. There is no client-side buffer yet: collect events and call `TrackBatch`.
+
+## Meter and cost events
 
 ```go
 err := client.Meter(ctx, []nozle.MeterEvent{{
@@ -63,4 +92,4 @@ _ = err
 
 `nozle.CreateTransactionID()` and `nozle.CreateCostEventID()` create UUIDv7 identifiers for those two fields. Create an ID once per logical event and keep it for retries.
 
-For high-volume workloads, enqueue the business event and call `Track` from a durable worker. Use `TrackUsage` when an operation must atomically enforce product credits.
+For high-volume workloads, enqueue the business event and call `TrackBatch` from a durable worker. Use `TrackUsage` when an operation must atomically enforce product credits.
