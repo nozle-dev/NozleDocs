@@ -31,7 +31,7 @@ console.log(balance.sources)
 const allBalances = await nozle.credits.listBalances('workspace_123')
 ```
 
-`CreditBalance` includes credit-system metadata, `available`, `held`, an `as_of` timestamp, and ordered balance sources. `available` already leaves out credits reserved by open [credit holds](#credit-holds); `held` (Engine 2.33.0, optional in the type because older Engines omit it) reports them, and each source has its own `held`. Sources identify their type, initial and remaining amounts, validity window, priority, scope, and transfer flags.
+`CreditBalance` includes credit-system metadata, `available`, `held`, an `as_of` timestamp, and ordered balance sources. `available` already leaves out credits reserved by open [credit holds](#credit-holds); `held` (Engine 2.34.0, optional in the type because older Engines omit it) reports them, and each source has its own `held`. Sources identify their type, initial and remaining amounts, validity window, priority, scope, and transfer flags.
 
 ## Customer operation history
 
@@ -72,7 +72,7 @@ const allBalances = await nozle.credits.listEntityBalances(
 )
 ```
 
-`pool_policy` is `entity_only`, `entity_then_customer`, `customer_only`, or `null` when no policy applies. From Engine 2.33.0, `entity_held`, `shared_held` and `held` report credits reserved by open holds on the Entity's sources, the shared pool and the pool the Entity spends from; the `*_available` amounts already leave them out.
+`pool_policy` is `entity_only`, `entity_then_customer`, `customer_only`, or `null` when no policy applies. From Engine 2.34.0, `entity_held`, `shared_held` and `held` report credits reserved by open holds on the Entity's sources, the shared pool and the pool the Entity spends from; the `*_available` amounts already leave them out.
 
 ## Entity operation history
 
@@ -178,7 +178,7 @@ if (!result.allowed) {
 
 ## Credit holds
 
-Available from `@nozle-js/node` 0.29.0 with Engine 2.33.0. When the amount is known only after the work, reserve credits first, then finalize with the actual usage or release them. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits).
+Available from `@nozle-js/node` 0.30.0 with Engine 2.34.0. When the amount is known only after the work, reserve credits first, then finalize with the actual usage or release them. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits).
 
 ```ts
 const hold = await nozle.usage.holds.create(

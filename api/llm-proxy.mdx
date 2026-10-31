@@ -37,7 +37,7 @@ Proxies all requests to `https://api.openai.com/v1/*`. Usage is recorded for cha
 | `X-Nozle-Subscription` | External subscription ID to bill. It must be an active subscription of that customer. Needed when the customer has several active subscriptions. |
 | `X-Nozle-Feature-Code` | Code of the usage event. Default `llm_tokens`. Must match a metered Feature to bill. |
 | `X-Nozle-Feature` | Stored as the `feature` property of the event. |
-| `X-Nozle-Credit-Hold` | Metric amount to reserve in credits before the provider is called, for example the most tokens the call can use. Engine 2.33.0. See [Credit holds](#credit-holds). |
+| `X-Nozle-Credit-Hold` | Metric amount to reserve in credits before the provider is called, for example the most tokens the call can use. Engine 2.34.0. See [Credit holds](#credit-holds). |
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/openai/v1/chat/completions \
@@ -75,7 +75,7 @@ Proxies all requests to `https://api.anthropic.com/v1/*`.
 | `X-Nozle-Subscription` | External subscription ID to bill. It must be an active subscription of that customer. Needed when the customer has several active subscriptions. |
 | `X-Nozle-Feature-Code` | Code of the usage event. Default `llm_tokens`. Must match a metered Feature to bill. |
 | `X-Nozle-Feature` | Stored as the `feature` property of the event. |
-| `X-Nozle-Credit-Hold` | Metric amount to reserve in credits before the provider is called, for example the most tokens the call can use. Engine 2.33.0. See [Credit holds](#credit-holds). |
+| `X-Nozle-Credit-Hold` | Metric amount to reserve in credits before the provider is called, for example the most tokens the call can use. Engine 2.34.0. See [Credit holds](#credit-holds). |
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/anthropic/v1/messages \
@@ -120,7 +120,7 @@ Engine finds the subscription to bill before it calls the provider. Without `X-N
 
 ## Credit holds
 
-From Engine 2.33.0, a call can reserve the customer's credits before it reaches the provider, so concurrent calls cannot spend the same credits. Holds are opt-in per request: without `X-Nozle-Credit-Hold`, the proxy works as described above. See [Create a Credit Hold](/api/create-usage-hold) for how holds reserve credits.
+From Engine 2.34.0, a call can reserve the customer's credits before it reaches the provider, so concurrent calls cannot spend the same credits. Holds are opt-in per request: without `X-Nozle-Credit-Hold`, the proxy works as described above. See [Create a Credit Hold](/api/create-usage-hold) for how holds reserve credits.
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/openai/v1/chat/completions \
@@ -214,11 +214,11 @@ Anthropic routes:
 |--------|--------|---------|---------|
 | `400` | `invalid_request` | `missing X-Nozle-Customer-Id header` | `X-Nozle-Customer-Id` is missing. |
 | `400` | `invalid_request` | `request body could not be read` | The request body could not be read. |
-| `400` | `invalid_request` | `X-Nozle-Credit-Hold must be a positive decimal metric amount` | Engine 2.33.0. `X-Nozle-Credit-Hold` is not a positive decimal. The provider is not called. |
+| `400` | `invalid_request` | `X-Nozle-Credit-Hold must be a positive decimal metric amount` | Engine 2.34.0. `X-Nozle-Credit-Hold` is not a positive decimal. The provider is not called. |
 | `401` | `unauthorized` | `missing X-Nozle-Key header` | `X-Nozle-Key` is missing. |
 | `401` | `unauthorized` | `invalid nozle key` | The key is unknown. |
 | `402` | `workspace_suspended` or `card_required` | | Your workspace is blocked by Nozle. See [Workspace billing errors](/api/errors#workspace-billing-errors). |
-| `402` | `insufficient_credits` | `the customer's credit balance does not cover the requested hold` | Engine 2.33.0. The `X-Nozle-Credit-Hold` amount is not covered by the customer's free credits. The provider is not called. |
+| `402` | `insufficient_credits` | `the customer's credit balance does not cover the requested hold` | Engine 2.34.0. The `X-Nozle-Credit-Hold` amount is not covered by the customer's free credits. The provider is not called. |
 | `402` | `customer_payment_overdue` | `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` | _Unreleased (Engine 2.22.0)._ The customer is blocked by your [dunning policy](/guides/billing/dunning). The provider is not called. |
 | `402` | `budget_exceeded` | `the customer's hard spend limit is reached` | Engine 2.34.0. A hard [spend limit](#spend-limits) covering the Feature is used up. The body adds `budget`. The provider is not called. |
 | `402` | `budget_exceeded` | `the customer's hard spend limit does not cover the requested hold` | Engine 2.34.0. The `X-Nozle-Credit-Hold` estimate does not fit in a hard spend limit. The body adds `budget`. The provider is not called. |
