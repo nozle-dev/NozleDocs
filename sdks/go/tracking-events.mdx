@@ -76,7 +76,68 @@ for _, r := range res.Results {
 - **Partial batches.** Engine stores the valid events of a request and names the refused ones by position. An Engine before 2.28.0 refuses a whole request for one invalid event; `TrackBatch` then rejects the named events and resends the rest.
 - **Idempotency.** Every event has a transaction ID, yours or a generated one returned in `Results[i].TransactionID`. A request retried after a network error, a timeout, a `429` or a `5xx` (`WithMaxRetries`) records each event once. IDs must be unique in one call.
 
-`TrackBatch` records events like `Track`; it does not deduct credits. There is no client-side buffer yet: collect events and call `TrackBatch`.
+`TrackBatch` records events like `Track`; it does not deduct credits. To batch events as they happen, use an [event buffer](#event-buffer).
+
+## Event buffer
+
+From `v0.25.0`, `NewEventBuffer` queues events in memory and sends them with `TrackBatch` from one background goroutine. `Track` returns at once, with no network call. Its methods are safe for concurrent use.
+
+```go
+buf := client.NewEventBuffer(nozle.EventBufferOptions{
+  // MaxBatchSize: 500, FlushInterval: 5 * time.Second, MaxQueueSize: 10_000, MaxAttempts: 3
+  OnError: func(err error, events []nozle.TrackParams) {
+    var e *nozle.EventBufferError
+    if errors.As(err, &e) {
+      log.Println(e.Code, len(events), err) // buffer_full, rejected, failed or closed
+    }
+  },
+})
+defer buf.Close(ctx) // Go has no exit hook: without Close, events still queued are lost
+
+id, err := buf.TrackWithID(nozle.TrackParams{CustomerID: "workspace_123", Event: "api_calls", Metadata: map[string]any{"tokens": 100}})
+if errors.Is(err, nozle.ErrBufferFull) {
+  // the queue is full: this event was dropped and reported to OnError
+}
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `MaxBatchSize` | `500` | 1 to 5000. A flush starts as soon as this many events are waiting. Each request holds at most this many events. |
+| `FlushInterval` | `5 * time.Second` | Flushes whatever is waiting this often. A negative value turns the timer off. |
+| `MaxQueueSize` | `10_000` | Most events held at once, waiting or in a request in flight. |
+| `MaxAttempts` | `3` | Flushes an event may fail in before it is dropped and reported as `failed`. |
+| `OnError` | log | `OnError(err, events)` receives every event the buffer does not deliver. |
+
+A zero field takes its default. For `FlushInterval` this means `0` is 5 seconds, not "off": Go cannot tell an unset field from `0`, so use a negative value, such as `-1`, to turn the timer off. `NewEventBuffer` panics when an option is out of range, as `New` does for a missing key.
+
+- **`Track(p) error` and `TrackWithID(p) (string, error)`** queue an event. The transaction ID is `p.TransactionID`, or a generated UUIDv7 that `TrackWithID` returns. Every retry and resend carries it, so Engine records the event once. Do not change `p.Metadata` after the call.
+- **Errors from `Track`.** A `*ValidationError` for an event `TrackBatch` would refuse (no `CustomerID` or `Event`, a bad `Timestamp`), and an `*AuthenticationError` without a secret `sk_` key. `ErrBufferFull` when the queue is full and `ErrBufferClosed` after `Close`; those two events are dropped and also reported to `OnError`.
+- **When it sends.** A flush starts when `MaxBatchSize` events are waiting, every `FlushInterval`, and on `Flush(ctx)` and `Close(ctx)`. One flush runs at a time; a trigger during a flush waits for it. A flush sends everything waiting in one `TrackBatch` call. An ID tracked twice waits for the next flush, because `TrackBatch` refuses a repeated ID in one call.
+- **`Flush(ctx)`** sends every event waiting now and returns `nil` when done. When `ctx` ends first it returns `ctx.Err()`, and the flush continues in the background. A failed event stays queued for the next flush. Undelivered events go to `OnError`, not to the return value.
+- **`Close(ctx)`** stops the timer, refuses later `Track` calls and flushes until every event is delivered or reported, so a failed event is retried up to `MaxAttempts`. It then stops the goroutine. When `ctx` ends first, `Close` cancels the request in flight, reports the events left as `failed` with the context error and returns `ctx.Err()`. Closing twice is safe.
+- **`Len()`** is the number of events waiting, not counting a request in flight.
+- **Backoff.** After a flush with a failed event, size and timer flushes pause for 1 second. The pause doubles after each further flush with failures, up to 60 seconds. A flush without failures ends it. Events keep queueing during the pause, up to `MaxQueueSize`, so the buffer rides out an outage instead of spending every attempt in seconds. `Flush` and `Close` do not wait for the pause.
+
+### Errors
+
+Every event that is not delivered goes to `OnError` with an `*EventBufferError`:
+
+| `Code` | Meaning |
+|---|---|
+| `buffer_full` | The queue held `MaxQueueSize` events. The new event was dropped; `Track` returned `ErrBufferFull`. |
+| `rejected` | Engine refused the event. `Errors` maps a field to codes. It is not retried. |
+| `failed` | Its requests failed in `MaxAttempts` flushes. Until then a failed event goes back to the front of the queue with the same transaction ID. `Err` is the last request error, or the context error when `Close` ran out of time. |
+| `closed` | `Track` was called after `Close`. The event was dropped; `Track` returned `ErrBufferClosed`. |
+
+`EventBufferError` unwraps to `Err`, so `errors.Is` finds `ErrBufferFull`, `ErrBufferClosed` or the request error. Without `OnError`, the buffer logs each one through the standard `log` package. `OnError` runs on the caller's goroutine for `buffer_full` and `closed`, and on the buffer's goroutine otherwise.
+
+### Exit and serverless
+
+Go has no exit hook. Call `Close` before the program returns, for example `defer buf.Close(ctx)`. Events still queued when the process ends are lost.
+
+A serverless function may be frozen or stopped as soon as it returns. Call `buf.Flush(ctx)` (buffer kept between invocations) or `buf.Close(ctx)` (buffer per invocation) before you return from each invocation.
+
+The queue lives in memory only. The OpenAI and Anthropic usage capture does not use the buffer yet.
 
 ## Meter and cost events
 
@@ -92,4 +153,4 @@ _ = err
 
 `nozle.CreateTransactionID()` and `nozle.CreateCostEventID()` create UUIDv7 identifiers for those two fields. Create an ID once per logical event and keep it for retries.
 
-For high-volume workloads, enqueue the business event and call `TrackBatch` from a durable worker. Use `TrackUsage` when an operation must atomically enforce product credits.
+For high-volume workloads, enqueue the business event and call `TrackBatch` from a durable worker. An [event buffer](#event-buffer) batches events in the same process, but holds them in memory only. Use `TrackUsage` when an operation must atomically enforce product credits.

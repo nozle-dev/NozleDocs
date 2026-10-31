@@ -32,6 +32,15 @@ _October 31, 2026_
 - **LLM proxy holds, opt-in.** Send `X-Nozle-Credit-Hold: <metric amount>` to reserve credits before the provider is called. A short balance answers `402 insufficient_credits`, the response carries `X-Nozle-Credit-Hold-Id`, and the call is paid from the hold with the usage the proxy reads, in place of its usage event. Usage above the hold and the free balance is paid as far as the credit covers it (the balance never goes negative), and the unpaid rest is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id` (sum metrics; a count metric sends the whole usage as a plain event). See [LLM proxy credit holds](/api/llm-proxy#credit-holds).
 - **`/check-and-deduct` accepts an optional `Idempotency-Key`.** A retry with the same key, customer and credits replays the first answer instead of deducting again; another request with the key answers `409 idempotency_key_reused`. Keys are kept 7 days. See [Check & Deduct Credits](/api/check-and-deduct#idempotency-key).
 - **SDKs.** `nozle.usage.holds.create/finalize/release/get/list` (Node 0.29.0), `client.usage.holds.*` (Python 0.27.0, sync and async) and `CreateCreditHold`, `FinalizeCreditHold`, `ReleaseCreditHold`, `GetCreditHold`, `ListCreditHolds` (Go v0.26.0), plus the `held` balance fields. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits) and the SDK credits pages: [Node.js](/sdks/node/credits#credit-holds), [Python](/sdks/python/credits#credit-holds), [Go](/sdks/go/credits#credit-holds).
+### Event buffer in the SDKs (Node 0.28.0, Python 0.26.0, Go v0.25.0)
+
+_October 31, 2026_
+
+- **Batch events as they happen.** `createEventBuffer()` (Node), `event_buffer()` (Python, `Nozle` only) and `NewEventBuffer` (Go) queue events in memory and send them through the batch call in the background. `track` returns the event's transaction ID at once, without a request, and every resend keeps that ID, so each event is billed once.
+- **When it sends.** When 500 events are waiting (`maxBatchSize`, 1 to 5000), every 5 seconds, on `flush` and on `close`. Node also flushes on `beforeExit`, and Python in an `atexit` handler with a 5 second timeout. Go has no exit hook: call `defer buf.Close(ctx)`.
+- **Bounded and never silent.** The queue holds at most 10,000 events. Every event that leaves it unsent goes to the error callback with a code: `buffer_full`, `rejected`, `failed` (after 3 flushes) or `closed`. Without a callback, Node and Python emit a `NozleTrackingWarning` and Go logs through the standard `log` package.
+- **Backoff.** After a flush with failed events, automatic flushes pause for 1 second, doubling up to 60 seconds. An explicit `flush` or `close` does not wait.
+- **Serverless.** Flush or close the buffer before your handler returns. See [Node.js](/sdks/node/tracking-events#event-buffer), [Python](/sdks/python/tracking-events#event-buffer) and [Go](/sdks/go/tracking-events#event-buffer).
 
 ### Event batches of 5000 with partial acceptance (Engine 2.28.0, Go v0.23.0, Node 0.26.0, Python 0.24.0)
 
