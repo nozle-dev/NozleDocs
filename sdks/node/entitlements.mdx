@@ -62,6 +62,7 @@ Without a selector, `can()` evaluates the customer's only subscription. When the
 | `policy` | `object?` | Configured policy. Present only when configured. |
 | `configuration` | `Record<string, string>?` | Feature configuration. Present only when configured. |
 | `economics` | `object?` | Point-in-time Cost Sheet estimate with exact decimal strings, Cost Rule version identifiers, and explicit exclusions. |
+| `budget` | `Budget?` | 0.30.0, Engine 2.34.0. The spend limit that refused the call (`reason: 'budget_exceeded'`), else the tightest one covering the feature. See [Spend limits](#spend-limits). |
 
 `economics` contains:
 
@@ -73,6 +74,37 @@ Without a selector, `can()` evaluates the customer's only subscription. When the
 | `excludes` | What the estimate excludes. |
 | `reason` | Why the estimate has its status, for example `missing_cost_composition`. |
 | `calculated_at` | When the estimate was calculated. |
+
+## Spend limits
+
+Available from `@nozle-js/node` 0.30.0 with Engine 2.34.0. When a hard [spend limit](/guides/entitlements/spend-limits) covering the feature is used up, `can()` returns `allowed: false` with `reason: 'budget_exceeded'` and the limit in `budget`. It does not throw. Compare `reason` with the exported `RefusalReason` values, never with message text:
+
+```ts
+import { RefusalReason } from '@nozle-js/node'
+
+const check = await nozle.can('workspace_123', 'llm_tokens')
+if (!check.allowed && check.reason === RefusalReason.BudgetExceeded) {
+  const { limit, spent, currency, period_end } = check.budget!
+  // "You reached your $500 limit; it resets on period_end."
+}
+```
+
+`RefusalReason` has `FeatureNotFound`, `NoSubscription`, `SubscriptionRequired`, `NoEntitlement`, `UsageLimitExceeded`, `EconomicPolicyDenied`, `CustomerPaymentOverdue`, `InsufficientCredits` and `BudgetExceeded`. `reason` is typed `RefusalReason | string`, so a reason a newer Engine adds still arrives as its string.
+
+`usage.check()` and `usage.track()` answer the same way, with `budget` on `UsageCheckResult` and `UsageTrackResult`. A soft limit never refuses.
+
+### Read budgets
+
+```ts
+const { subscription_id, budgets } = await nozle.budgets.list('workspace_123', { subscriptionId: 'sub_pro_123' })
+for (const budget of budgets) {
+  console.log(budget.feature_code ?? 'total', budget.spent, '/', budget.limit, budget.currency, budget.status)
+}
+```
+
+`budgets.list(customerId, { subscriptionId })` calls [`GET /customers/{customer_id}/budgets`](/api/list-customer-budgets) and returns `BudgetList`: `customer_id`, `subscription_id` and `budgets`. Each `Budget` has `feature_code` (`null` for the total limit), `limit`, `spent`, `held`, `remaining` (decimal strings in major units), `currency`, `period`, `period_start`, `period_end`, `mode`, `status` (`ok`, `warning`, `exceeded`) and `as_of`. Types: `Budget`, `BudgetList`, `BudgetListOptions`.
+
+For an exact cap under concurrent calls, take a [budget hold](/sdks/node/credits#budget-holds) instead of a plain `can()`.
 
 ## HTTP handler pattern
 

@@ -44,6 +44,28 @@ if errors.As(err, &apiErr) && apiErr.StatusCode == 402 {
 }
 ```
 
+## Spend and usage limits
+
+Available from v0.27.0 with Engine 2.34.0. `Can`, `CheckUsage`, `TrackUsage` and `CreateCreditHold` return a used-up hard [spend limit](/guides/entitlements/spend-limits) as a result (`Allowed=false`, `Reason` `budget_exceeded`, `Budget`), not an error. Where a failed response returns an error, two refusals have their own types, chosen by the status and the exact code:
+
+| Type | Response | Extra |
+|---|---|---|
+| `*nozle.BudgetExceededError` | `402` `budget_exceeded`: a hard spend limit is used up. | `Budget`, when the response carries it. |
+| `*nozle.UsageLimitExceededError` | `429` `usage_limit_exceeded`: a hard usage limit in units is reached. | |
+
+Both embed and unwrap to the `*nozle.APIError`, so `errors.As(err, &apiErr)` keeps matching; code that type-asserts `err.(*nozle.APIError)` does not see these two. A `429` whose code is exactly `usage_limit_exceeded` is a refusal, not a rate limit, so `WithMaxRetries` does not retry it; other `429`s still do. A `402` is never retried. Through the [LLM proxy](/api/llm-proxy#spend-limits), the provider SDK's own error carries the same `code`.
+
+```go
+var budgetErr *nozle.BudgetExceededError
+var limitErr *nozle.UsageLimitExceededError
+switch {
+case errors.As(err, &budgetErr):
+  // budgetErr.Budget may be nil
+case errors.As(err, &limitErr):
+  // Ask the customer to upgrade; do not retry.
+}
+```
+
 ## Retry behavior
 
 By default the SDK does not retry. Pass `WithMaxRetries(n)` (and optionally `WithRetryDelay(d)`) to retry network errors, timeouts, `429` and `5xx` with backoff, or after `APIError.RetryAfter` (at most 30 seconds) when the service sent `Retry-After`. Only requests that are safe to repeat are retried: reads, calls that carry an idempotency key (such as `TrackUsage`), `Track`, `Meter`, `TrackCostEvent`, `UpsertCustomer`, `InvoiceDownloadURL`, the credit note reads (`GetCreditNote`, `ListCreditNotes`) and `PreviewCreditNote`, and the read-only `CheckUsage`, `PreviewSubscriptionChange` and `PreviewSubscriptionTransition`. `Subscribe`, `Checkout`, `CreateCreditNote`, `RefundCreditNote`, `VoidCreditNote` and other writes without a key are never retried. You can still inject a retrying `*http.Client` with `WithHTTPClient` (see [Installation](/sdks/go/installation)). Reuse the same event transaction ID or mutation idempotency key and payload after an uncertain outcome. Decide whether to retry reads within your request budget. Automatic LLM capture preserves the provider result and reports telemetry failures through `OnError`; manual capture returns them. Queue failed telemetry when durable delivery matters.

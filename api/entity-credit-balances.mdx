@@ -35,6 +35,9 @@ Authorization: Bearer sk_nozle_...
   "entity_available": "480.000000000001",
   "shared_available": "250",
   "effective_available": "730.000000000001",
+  "entity_held": "20",
+  "shared_held": "5",
+  "held": "25",
   "consumed": "42",
   "pool_policy": "entity_then_customer",
   "as_of": "2026-07-22T12:00:00.750Z",
@@ -51,6 +54,7 @@ Authorization: Bearer sk_nozle_...
       "subscription_id": null,
       "initial": "100",
       "remaining": "100",
+      "held": "20",
       "valid_from": "2026-07-21T09:00:00Z",
       "expires_at": null,
       "priority": 100,
@@ -66,5 +70,15 @@ The list endpoint returns `{ "customer_id", "entity_id", "entity_status", "as_of
 An unknown customer returns `404 customer_not_found`, an unknown Entity returns `404 entity_not_found`, and an unknown Credit System code returns `404 credit_system_not_found`. A retryable read failure returns `503 credit_read_temporarily_unavailable` with `Retry-After`.
 
 All amounts are strings. `entity_available` and `shared_available` expose separate source pools. `effective_available` applies the current plan policy and becomes zero when the Entity is inactive or no unambiguous policy exists.
+
+From Engine 2.34.0, open [credit holds](/api/create-usage-hold) are left out of every `*_available` amount and reported separately:
+
+| Field | Description |
+|-------|-------------|
+| `entity_held` | Credits reserved on the Entity's own sources, already subtracted from `entity_available`. |
+| `shared_held` | Credits reserved on the shared customer pool, already subtracted from `shared_available`. These holds can belong to other Entities or to customer-level usage. |
+| `held` | Held part of the pool the Entity spends from under its pool policy: `entity_held` for `entity_only`, `entity_held` + `shared_held` for `entity_then_customer`, `shared_held` for `customer_only`. `"0"` when the Entity is inactive or no policy applies. |
+
+Each source also has `held`, the part of its `remaining` that open holds reserve.
 
 The source list contains active or scheduled, non-exhausted sources. Expired and exhausted sources remain in immutable history but are not returned by this balance endpoint.

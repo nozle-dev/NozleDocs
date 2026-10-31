@@ -36,6 +36,69 @@ Insufficient credits return a product decision with `allowed=false`; they are no
 
 Nozle locks eligible sources in deterministic expiry order, rechecks validity using database time, writes allocations, and inserts the billing-event outbox row in one transaction. A successful debit remains committed when downstream publication is temporarily unavailable.
 
+## When to hold credits
+
+`/usage/track` spends once the cost is known. When the cost is known only after the work (an LLM call, an agent run, a long job), and several workers spend from one balance at the same time, a check before the work is not enough: two workers can both pass the check and then overspend. A [credit hold](/api/create-usage-hold) reserves the credits before the work starts, and settles them afterwards. Holds need Engine 2.34.0.
+
+| Situation | Use |
+|-----------|-----|
+| The cost is known before or right after the work, and a denied track is acceptable | `usage.track()` |
+| The cost is known only afterwards, and the work must not start unless it can be paid | `usage.holds.create()`, then `finalize()` or `release()` |
+| Calls through the [LLM proxy](/api/llm-proxy) | The `X-Nozle-Credit-Hold` header |
+| A screen that shows the balance | `usage.check()` or the balance reads; both leave out held credits |
+
+A hold reserves the credits that its `properties` cost, on the sources a track would spend, in the same order and under the same pool policy. Other callers' checks, tracks, holds and Entity transfers cannot spend them, and balances report them as `held`. A hold lasts `ttl_seconds` (default 15 minutes, at most 24 hours), and an expired hold stops reserving at once, so a crashed worker does not lock credits for long.
+
+### Concurrent agents
+
+Each run holds the most it can use, works only when the hold is allowed, and finalizes with what it used:
+
+```ts
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
+async function runAgent(customerId: string, entityId: string, runId: string, task: string) {
+  const hold = await nozle.usage.holds.create(
+    {
+      customerId,
+      entityId,
+      featureCode: 'agent_tokens',
+      properties: { tokens: 20000 }, // the most one run may use
+      ttlSeconds: 600,
+    },
+    { idempotencyKey: `hold-${runId}` },
+  )
+  if (!hold.allowed) {
+    return { status: 'out_of_credits' as const, available: hold.available }
+  }
+
+  try {
+    const { output, tokensUsed } = await agent.run(task, { maxTokens: 20000 }) // your agent runner
+    const spent = await nozle.usage.holds.finalize(hold.hold_id, {
+      properties: { tokens: tokensUsed },
+    })
+    return { status: 'done' as const, output, credits: spent.credits_consumed }
+  } catch (error) {
+    await nozle.usage.holds.release(hold.hold_id)
+    throw error
+  }
+}
+
+// Ten runs share one balance; only the runs the balance covers start.
+const results = await Promise.allSettled(
+  tasks.map((task, i) => runAgent('workspace_123', 'user_42', `run-${i}`, task)),
+)
+```
+
+- **Denied is a result.** A short balance returns `allowed: false` with `reason: "insufficient_credits"`, not an error. The denial is stored under the idempotency key; use a new key after credits are added.
+- **Finalize above the hold** passes when the hold plus the free balance covers it. Otherwise it answers `allowed: false`, charges nothing and keeps the hold open, so you can release it or retry after a top-up.
+- **Finalize below the hold** spends the actual amount and releases the rest. A finalize with zero usage releases the whole hold.
+- **After expiry,** a finalize runs as a plain track against the free balance and answers `hold_expired: true`.
+- **Retries.** Retry `create()` with the same idempotency key and `finalize()` with the same usage: both replay their first answer. `release()` is idempotent. Pass a fixed `timestamp` when a retry may come from another process.
+
+The hold's rate is pinned when it is created, so a rate change during the run does not change the price of that run.
+
 ## Shadow and canary
 
 Advisory responses include `projected_remaining` and ordered `projected_deductions` without mutation. Compare those fields against reviewed fixtures before enabling a workflow for a small test cohort. Follow the [rollout and acceptance runbook](/guides/credits/rollout).

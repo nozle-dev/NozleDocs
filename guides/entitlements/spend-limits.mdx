@@ -1,0 +1,209 @@
+---
+title: Spend limits and budgets
+description: Cap what a customer's metered usage may cost per period, warn before the cap, and stop calls at it.
+---
+
+A spend limit caps the money a subscription's metered usage may cost in a period, for example "at most $500 of usage charges per billing period" or "at most $200 a month on `llm_tokens`". Nozle counts the spend as usage arrives, warns you and your customer at 50, 80, 90 and 100 %, and, for a hard limit, refuses further metered calls once the limit is used up. A limit's standing in the current period is its budget.
+
+Available from Core 11.23.0 and Engine 2.34.0. Usage limits in units (an entitlement's `usage_limit`) are a separate control: see [Usage limit warnings](#usage-limit-warnings).
+
+## How a limit applies
+
+| Choice | Options |
+|---|---|
+| **Where it is set** | On a plan, as the default of every subscription of that plan. On one subscription, as an override of the plan's limit for the same Feature (or the total). An override without an amount turns the plan's limit off for that subscription. |
+| **What it covers** | The total of the subscription's usage charges, or the usage charges of one Feature. A Feature limit and a total limit both apply; whichever is used up first refuses. |
+| **Period** | `billing_period` (default): the subscription's usage billing period. `calendar_month`: the calendar month in the customer's time zone. `lifetime`: never resets. |
+| **Mode** | `hard` (default): metered calls are refused once the limit is used up. `soft`: notifications only, nothing is refused. |
+| **Thresholds** | The percentages that notify, each once per period. Default 50, 80, 90 and 100. |
+
+- A plan's limits are read from the current version of the plan, whatever version a subscription is on. A limit is a safety policy, not pricing, so an edit reaches every subscriber at once and never creates a plan version. A new plan version copies the limits.
+- A subscription on a per-customer override plan (a negotiated price, a quote) gets the limits of the catalog plan it was made from. Set a subscription override to give it its own.
+- A subscription's overrides follow it through a plan change until you remove them.
+- The amount is in the plan's currency. Each currency variant of a plan has its own limit, and nothing is converted.
+
+## What counts as spend
+
+Spend is the gross metered usage charges of the subscription in the period: what its usage charges price, before tax, coupons, wallet credits and credits. The subscription fee and fixed charges are not counted. The limit protects against runaway usage whoever ends up paying for it.
+
+- A Feature paid with Nozle credits through a $0 charge adds no spend. Its balance is already a hard cap (`insufficient_credits`).
+- An invoice paid in arrears is not changed: the limit stops the usage, it does not cap the invoice after the fact.
+
+## What can be limited
+
+The Engine prices each event as it arrives, as the invoice would: the price of the new period total minus the price of the old one. A limit can only cover charges it can price that way:
+
+- **Charge models:** `standard`, `package`, `graduated`, `volume`, `dynamic`, and `percentage` without a per-transaction minimum or maximum (in the charge or in its filters). Charge filters, pricing groups and pricing units are supported.
+- **Aggregations:** `count_agg`, `sum_agg`, `max_agg`, `latest_agg` and `unique_count_agg`, on a Feature that is not recurring.
+
+Any other charge model (for example `custom` or `graduated_percentage`), a `weighted_sum_agg` or `custom_agg` Feature, or a recurring Feature cannot be limited. Setting a limit with an amount that covers one fails with `422 spend_limit_unrateable_charges` and the charges listed:
+
+```json
+{
+  "status": 422,
+  "error": "Unprocessable Entity",
+  "code": "spend_limit_unrateable_charges",
+  "charges": [{ "code": "storage_gb", "charge_model": "custom" }]
+}
+```
+
+The rule holds afterwards too. While a limit covers a charge, saving that charge or one of its filters with a model the Engine cannot rate fails with `422 validation_errors`, `charge_model` (or `properties`): `spend_limit_unrateable_charges`. That covers plan updates, the charge and filter endpoints, subscription charge overrides and plan versions.
+
+## Set a limit
+
+In the dashboard, open a plan and use **Spend limits**, or open a subscription and use its **Budget** tab for overrides. Through the API, use the [Spend Limits](/api-reference/spend-limits/create-a-spend-limit) endpoints of Core (`https://api.nozle.app/core/api/v1`), with a secret key that has `plan:write` for a plan limit or `subscription:write` for an override.
+
+A plan default on the total, $500 per billing period:
+
+```bash
+curl -X POST https://api.nozle.app/core/api/v1/spend_limits \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"spend_limit": {"plan_code": "pro", "amount_cents": 50000, "period": "billing_period", "mode": "hard"}}'
+```
+
+A higher limit on one Feature for one subscription, with fewer warnings:
+
+```bash
+curl -X POST https://api.nozle.app/core/api/v1/spend_limits \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"spend_limit": {"external_subscription_id": "sub_pro_123", "feature_code": "llm_tokens", "amount_cents": 20000, "thresholds": [75, 100]}}'
+```
+
+The plan's total limit turned off for one subscription:
+
+```bash
+curl -X POST https://api.nozle.app/core/api/v1/spend_limits \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"spend_limit": {"external_subscription_id": "sub_pro_123", "amount_cents": null}}'
+```
+
+- `GET /spend_limits?plan_code=pro` or `?external_subscription_id=sub_pro_123` lists limits. `GET`, `PUT` and `DELETE /spend_limits/{id}` read, change and remove one.
+- An update changes `amount_cents`, `period`, `mode` or `thresholds`. The period's spend is kept (it belongs to the subscription, Feature and period, not to the limit), so raising a limit mid-period lets the customer continue at once, and a threshold already sent this period is not sent again. Changing `period` starts a new count.
+- Deleting an override brings the plan's limit back. Deleting a plan or a Feature removes its limits.
+- One limit per plan or subscription and Feature: a second answers `422` with `feature_id: value_already_exist`.
+
+The responses carry `nozle_id`, `plan_code`, `external_subscription_id`, `feature_code` (`null` for the total), `amount_cents`, `currency`, `period`, `mode` and `thresholds`.
+
+## How spend is measured
+
+Spend is counted live by the Engine, from the same usage events that are billed. An event reaches the count a few seconds after it happens, once it is processed; `as_of` in a budget is the time of the latest event counted. Each event is counted exactly once, even when it is retried or processed again.
+
+Read a subscription's budgets with [List Customer Budgets](/api/list-customer-budgets):
+
+```json
+{
+  "feature_code": null,
+  "limit": "500",
+  "spent": "412.5",
+  "held": "7.5",
+  "remaining": "80",
+  "currency": "USD",
+  "period": "billing_period",
+  "period_start": "2026-11-01T00:00:00Z",
+  "period_end": "2026-12-01T00:00:00Z",
+  "mode": "hard",
+  "status": "warning",
+  "as_of": "2026-11-14T09:30:12.418Z"
+}
+```
+
+Amounts are decimal strings in major units of `currency` (dollars, not cents). `held` is spend reserved by open [budget holds](#exact-caps-with-budget-holds), and `remaining` is `limit` minus `spent` and `held`. `status` is `ok`, `warning` once a threshold below 100 is reached, or `exceeded` once `spent` plus `held` reaches the limit.
+
+## Where a hard limit refuses
+
+A hard limit refuses once `spent` plus `held` reaches the limit, on every call that would add spend to it:
+
+| Surface | Answer |
+|---|---|
+| [`GET /can`](/api/check-entitlement#spend-limits) | `200` with `allowed: false`, `reason: "budget_exceeded"` and the limit in `budget`. An allowed answer carries the tightest limit in `budget`, so you can warn before the cap. |
+| [LLM proxy](/api/llm-proxy#spend-limits) | `402 budget_exceeded` before the provider is called, with `budget`. A unit usage limit stays `429 usage_limit_exceeded`. |
+| [`/usage/check`](/api/usage-check#spend-limits) and [`/usage/track`](/api/usage-track#spend-limits) | `200` with `allowed: false`, `reason: "budget_exceeded"` and `budget`. |
+| [`POST /usage/holds`](/api/create-usage-hold#budget-holds) | A budget hold with `allowed: false` and `reason: "budget_exceeded"`. |
+| `POST /events` | Never refused. The usage already happened, and dropping it would lose billing data. |
+
+The check applies to a Feature the subscription's plan prices with a usage charge. The SDKs give the reason as an exact value (`budget_exceeded`); compare it exactly, never by reading the message text.
+
+```ts
+import { RefusalReason } from '@nozle-js/node'
+
+const decision = await nozle.can('customer_123', 'llm_tokens')
+if (!decision.allowed && decision.reason === RefusalReason.BudgetExceeded) {
+  // decision.budget.limit, .spent, .period_end: show "limit reached, resets on ..."
+}
+```
+
+A soft limit never refuses. It still notifies, and its `status` turns `exceeded`.
+
+## Exact caps with budget holds
+
+A plain `/can` is check-then-call: calls already in flight, and the seconds before their usage is counted, can take the spend past a hard limit. For concurrent calls (agents, parallel LLM requests), reserve each call's spend first with a budget hold:
+
+1. `POST /usage/holds` with the Feature and the most the call can use in `properties` (or `X-Nozle-Credit-Hold` on the LLM proxy). On a Feature billed in money under a hard limit, the hold reserves the call's estimated spend under a row lock, so two calls cannot both take the last of a limit. When it does not fit, the hold is denied with `budget_exceeded` and nothing is reserved.
+2. Run the call.
+3. [Finalize](/api/finalize-usage-hold#budget-holds) the hold with the actual usage. It is sent as one usage event (`transaction_id` `hold:<hold_id>`), and the hold keeps counting until that event's spend is counted instead, so the spend is never counted twice or dropped in between. [Release](/api/release-usage-hold) the hold if the call failed.
+
+```ts
+const hold = await nozle.usage.holds.create(
+  { customerId: 'customer_123', featureCode: 'llm_tokens', properties: { tokens: 4000 } },
+  { idempotencyKey: `hold-${runId}` },
+)
+if (!hold.allowed) return showLimitReached(hold.budget)
+
+try {
+  const answer = await runAgent()
+  await nozle.usage.holds.finalize(hold.hold_id, { properties: { tokens: answer.tokens } })
+} catch (error) {
+  await nozle.usage.holds.release(hold.hold_id)
+  throw error
+}
+```
+
+The estimate is the charge's price of the held amount on top of the period's usage. The spend counted from the finalized usage is exact.
+
+Retries are safe. A `/usage/track` retry with the same `Idempotency-Key` replays its first answer before any spend limit or overdue-payment refusal, so a call accepted before the limit ran out is never answered `budget_exceeded` on retry. A budget hold's key covers only the request you sent (body, amount to hold, TTL), never the estimate, so a same-body retry replays even after usage moved the charge to another tier. See [Create a Credit Hold](/api/create-usage-hold#budget-holds) for the response and the hold's limits.
+
+## Notifications
+
+When a limit's spend crosses one of its thresholds, Nozle notifies once per limit, period and threshold. Only the highest threshold crossed is sent: a jump from 40 % to 95 % sends 90. Raising a limit never sends a threshold again, and thresholds re-arm in the next period.
+
+| Event | When |
+|---|---|
+| `budget.threshold_reached` | Spend reached a threshold of a hard or soft limit. |
+| `budget.exceeded` | A hard limit is used up (100 %): refusals start. Sent once per period in place of the 100 % threshold. |
+| `usage_limit.threshold_reached` | Usage reached 50, 80, 90 or 100 % of a hard usage limit in units. See [Usage limit warnings](#usage-limit-warnings). |
+
+Each event goes three ways:
+
+- **Webhook** to your endpoints that subscribe to it. The payload is in [Webhook events](/api/webhook-events#spend-limit-and-usage-limit-events).
+- **Team notification**: email and in-app for admins, in-app for members who can update subscriptions. At most one email per subscription per hour.
+- **Email to your customer**, in your brand, on by default.
+
+### Customer emails are on by default
+
+The three customer emails, **Spending limit almost reached**, **Spending limit reached** and **Usage limit almost reached**, are on for every billing entity:
+
+- A new billing entity starts with them, unless its creation sets `email_settings`.
+- Existing billing entities get them with Core 11.23.1.
+- A sandbox billing entity starts with no email, and sandbox organizations never email customers.
+
+To turn them off, open **Settings**, then **Customer emails**, and switch them off for the billing entity. Through the API, remove `budget.threshold_reached`, `budget.exceeded` and `usage_limit.threshold_reached` from the billing entity's `email_settings` with `PUT /billing_entities/{code}`. The usual rules of [Customer emails](/guides/settings/customer-emails) apply: nothing is sent without a billing email on the entity, and the button needs your customer billing page.
+
+## Usage limit warnings
+
+A hard usage limit in units (an entitlement `usage_limit` with a hard limit) sends `usage_limit.threshold_reached` at 50, 80, 90 and 100 % of the limit in the billing period, with the same webhook, team notification and customer email. These thresholds are fixed and cannot be changed. The refusal itself is unchanged: `usage_limit_exceeded`.
+
+## Known limits
+
+- **A plain `/can` can overrun a hard limit.** Calls in flight and the few seconds before usage is counted can take the spend past the limit before the next call is refused. Use budget holds for an exact cap.
+- **A new limit counts from when it is set.** Usage processed before a limit existed is not counted, so a limit set mid-period starts at 0 for that period, and so does a limit whose `period` you change. The Engine also reloads which subscriptions have limits every minute, so a new limit refuses calls within a minute; the spend after it is set is counted at once.
+- **Per subscription only.** A limit caps one subscription. There is no limit across a customer's subscriptions, and no currency conversion.
+- **Usage events are never refused.** Usage sent with `POST /events` is billed even past a hard limit. Only the calls that check (`/can`, the proxy, `/usage/check`, `/usage/track`, holds) are refused.
+- **The LLM proxy fails open, except for customers it knows are over.** When the spend limits or a budget hold cannot be read, a customer the proxy instance last refused for a hard limit stays refused until that limit's period ends (10 minutes for unit limits); every other call goes ahead with the response header `X-Nozle-Budget-Unverified: true`. The memory is per proxy instance, so a customer who reached a limit since that instance last decided, or whose refusal another instance saw, goes ahead during an outage. `/can`, `/usage/check` and `/usage/track` answer `503 budget_unavailable` instead.
+- **Budget hold estimates are approximate for some charges.** A charge with filters, pricing groups or percentage free units is estimated on the Feature's total usage, and a dynamic charge at 0.
+- **A finalized budget hold keeps counting** until its usage event is counted, at least 10 minutes after the finalize. Budget holds resolved more than 7 days ago are deleted, and a retry of their key then creates a new hold.
+- **Charges that cannot be priced are not counted.** Nozle refuses limits on them and refuses to change a covered charge into one. If an event under a limit still cannot be priced, it is logged and its spend is not counted.
+- **After a usage counter rebuild, late events of an ended period are not counted.** While lost usage counters are being rebuilt, `/can` answers `503 usage_unavailable` for a Feature with a hard usage limit instead of reading zero usage.
+- **No reset or recovery events.** Nothing is sent when a period resets, when a limit is raised, or when spend drops back below a threshold. A `lifetime` limit never resets.

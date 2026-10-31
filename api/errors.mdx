@@ -13,10 +13,10 @@ description: HTTP errors, validation failures, and retry guidance
 | `403` | Credential lacks permission or a publishable key attempted a protected operation. |
 | `404` | Resource was not found within the authenticated organization. |
 | `413` | The request body is too large: `payload_too_large`. An events batch is limited to 16 MiB, decoded. |
-| `402` | Payment required. `workspace_suspended` (or `card_required`): your workspace is blocked by Nozle, see [Workspace billing errors](#workspace-billing-errors). `customer_payment_overdue`: one of your customers is blocked by your dunning policy, see [Customer payment overdue](#customer-payment-overdue). |
+| `402` | Payment required. `workspace_suspended` (or `card_required`): your workspace is blocked by Nozle, see [Workspace billing errors](#workspace-billing-errors). `customer_payment_overdue`: one of your customers is blocked by your dunning policy, see [Customer payment overdue](#customer-payment-overdue). `budget_exceeded` from the LLM proxy: a customer's hard spend limit is used up, see [Spend and usage limits](#spend-and-usage-limits). |
 | `409` | Idempotency key or resource-state conflict, such as another checkout in progress. Reload the state, then retry. |
 | `422` | Request is syntactically valid but violates a product rule, or the resource's current state refuses it (for example a voided invoice). |
-| `429` | Request was rate limited. |
+| `429` | Request was rate limited, or (LLM proxy) `usage_limit_exceeded`: a customer's hard usage limit is reached, which is a refusal, not a rate limit. |
 | `500` | Unexpected server error. The body is still JSON with a `code`. |
 | `502` | A service Nozle depends on did not answer: `upstream_unavailable`. Safe to retry. |
 | `503` | Temporary dependency, lock, or service failure. |
@@ -74,7 +74,9 @@ Match on the status and `code`, not on the message text.
 | `422` `invoice_carried_forward` in `error_details.base` (pay link, invoice checkout, Core 11.16.0) | The amount due is below the payment provider's minimum charge, so it was carried to the customer's next invoice. The invoice is settled. | Nothing to pay now. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum). |
 | `422` `invoices_carried_forward` (`POST /payment_requests`, Core 11.16.0) | Every invoice of the payment request is below the payment provider's minimum charge and was carried to the next invoice. Nothing is created. | Nothing to collect now. |
 | `503` `credit_usage_contention` (`Retry-After: 1`), `credit_usage_temporarily_unavailable` (`Retry-After: 1`), `credit_usage_publication_backlog` (`Retry-After: 30`) | The credit balance is busy, or publication is delayed: 1,000 or more usage events are still being retried, or the oldest is older than 5 minutes. A dead-lettered event no longer blocks usage. | Retry the same request with the same `Idempotency-Key` after the `Retry-After` seconds. |
-| `503` `usage_unavailable` from `can()` | The usage lookup failed. The body carries a `request_id`. | Treat it as an unavailable decision, not a denial, and retry after a second. Quote the `request_id` if it persists. |
+| `503` `usage_unavailable` from `can()` | The usage lookup failed, or (Engine 2.34.0) lost usage counters are being rebuilt and the feature has a hard usage limit. The body carries a `request_id`. | Treat it as an unavailable decision, not a denial, and retry after a second. Quote the `request_id` if it persists. |
+| `503` `budget_unavailable` (Engine 2.34.0) | `/can`, `/usage/check`, `/usage/track` or the budgets list could not read the spend limits while a hard one may apply. | Retry after `Retry-After` (1 second). It is not a denial. |
+| `422` `spend_limit_unrateable_charges` (Core 11.23.0) | A spend limit covers a usage charge the Engine cannot rate per event. `charges` lists them. | Change the charge model or the Feature's aggregation, or limit another Feature. See [what can be limited](/guides/entitlements/spend-limits#what-can-be-limited). |
 
 An event that was accepted but never counted usually means the event name does not equal the feature code, or processing has not finished: events are processed asynchronously, so read usage again after a few seconds.
 
@@ -161,3 +163,31 @@ _Unreleased (Engine 2.22.0, Core 11.16.0)._ The Engine answers `402` `customer_p
 | `POST /events/batch`, some events refused | `200` with the stored `events` and the refused ones in `error_details`, keyed by index. From Engine 2.28.0 invalid events are refused the same way, so a batch is no longer all or nothing. |
 
 The text is `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` Do not retry: the block lifts on the next request after the invoices are paid, voided or credited. Refused events are not queued.
+
+## Spend and usage limits
+
+_Engine 2.34.0, Core 11.23.0._ A customer that used up a hard [spend limit](/guides/entitlements/spend-limits) is refused with `budget_exceeded`; a hard usage limit in units refuses with `usage_limit_exceeded`. Both are about that customer, not your workspace, and retrying does not help until the period ends or the limit is raised.
+
+| Surface | Answer |
+|---|---|
+| `GET /can` | `200` `{"allowed": false, "reason": "budget_exceeded", ..., "budget": {...}}`; `usage_limit_exceeded` the same way, without `budget` |
+| `POST /usage/check`, `POST /usage/track` | `200` `{"allowed": false, "reason": "budget_exceeded", "budget": {...}}` |
+| `POST /usage/holds` | `200` budget hold with `allowed: false`, `status: "denied"`, `reason: "budget_exceeded"` and `budget` |
+| LLM proxy | `402` `budget_exceeded` with a top-level `budget`; `429` `usage_limit_exceeded`. Both in the provider's error shape. |
+| `POST /events`, `POST /events/batch` | Never refused by a limit: usage that happened is billed. |
+
+The SDKs return the `200` refusals as results. Where a call throws for an error response, a `402` `budget_exceeded` is a `BudgetExceededError` (with `budget`) and a `429` `usage_limit_exceeded` a `UsageLimitExceededError`, in [Node.js](/sdks/node/errors#spend-and-usage-limits), [Python](/sdks/python/errors#spend-and-usage-limits) and [Go](/sdks/go/errors#spend-and-usage-limits). They do not retry a `usage_limit_exceeded`.
+
+Setting a limit can fail with `422` `spend_limit_unrateable_charges`:
+
+```json
+{
+  "status": 422,
+  "error": "Unprocessable Entity",
+  "code": "spend_limit_unrateable_charges",
+  "charges": [{ "code": "storage_gb", "charge_model": "custom" }]
+}
+```
+
+Saving a charge or charge filter the Engine cannot rate, on a plan whose spend limit with an amount covers it, fails with `422` `validation_errors` and `charge_model` (or `properties` for a filter): `spend_limit_unrateable_charges`.
+

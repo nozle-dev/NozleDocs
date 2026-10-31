@@ -1,0 +1,65 @@
+---
+title: Release a Credit Hold
+api: "POST https://api.nozle.app/engine/api/v1/usage/holds/{hold_id}/release"
+description: Free a hold's reserved credits without spending them
+---
+
+Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.34.0.
+
+**Auth:** secret key only. When your organization has API key permissions, the key requires `credit_system:write`.
+
+Release a hold when the work it reserved for failed or was cancelled. The reserved credits become spendable again at once, and nothing is charged. No body is needed.
+
+```http
+POST /usage/holds/6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10/release
+Authorization: Bearer sk_nozle_...
+```
+
+Release is idempotent: releasing a released, denied or expired hold answers `200` with the hold unchanged. An open hold past its expiry is marked `expired` rather than `released`. A finalized hold cannot be released and answers `409 hold_already_resolved`.
+
+A [budget hold](/api/create-usage-hold#budget-holds) (Engine 2.34.0) is released the same way: its reserved spend stops counting against the spend limit at once. A finalized or `booked` budget hold answers `409 hold_already_resolved`.
+
+The response is the [hold](/api/get-usage-hold#response):
+
+```json
+{
+  "hold_id": "6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10",
+  "status": "released",
+  "customer_id": "customer_123",
+  "feature_code": "agent_execution",
+  "credit_system": "ai_credits",
+  "metric_amount": "8000",
+  "credits_required": "8",
+  "credits_held": "8",
+  "expires_at": "2026-10-31T12:10:00.912Z",
+  "created_at": "2026-10-31T12:00:00.912Z",
+  "resolved_at": "2026-10-31T12:01:40.105Z"
+}
+```
+
+## Errors
+
+| Status | `code` | Meaning |
+|--------|--------|---------|
+| `403` | `permission_denied` | The key lacks `credit_system:write`. |
+| `404` | `hold_not_found` | No hold with this ID in your organization. |
+| `409` | `hold_already_resolved` | The hold was finalized. |
+| `503` | `credit_usage_contention`, `credit_usage_temporarily_unavailable` | Retry after `Retry-After`. |
+
+## SDKs
+
+<CodeGroup>
+
+```ts Node.js
+await nozle.usage.holds.release(hold.hold_id)
+```
+
+```python Python
+nozle.usage.holds.release(hold["hold_id"])
+```
+
+```go Go
+released, err := client.ReleaseCreditHold(ctx, hold.HoldID)
+```
+
+</CodeGroup>

@@ -88,6 +88,33 @@ try {
 
 Other `402`s (`workspace_suspended`, `card_required`) still throw from `can()`.
 
+## Spend and usage limits
+
+Available from 0.30.0 with Engine 2.34.0. `can()`, `usage.check()`, `usage.track()` and `usage.holds.create()` return a used-up hard [spend limit](/guides/entitlements/spend-limits) as a result (`allowed: false`, `reason: 'budget_exceeded'`, `budget`); they do not throw. Where a call throws for an error response, two refusals have their own classes, chosen by the status and the exact `code`:
+
+| Class | Response | Extra |
+|---|---|---|
+| `BudgetExceededError` | `402` `budget_exceeded`: a hard spend limit is used up. | `budget`, when the response carries it. |
+| `UsageLimitExceededError` | `429` `usage_limit_exceeded`: a hard usage limit in units is reached. | |
+
+Both extend `NozleApiError`, so `instanceof NozleApiError` still matches. A `429` whose code is exactly `usage_limit_exceeded` is a refusal, not a rate limit, so the SDK does not retry it; other `429`s still follow `maxRetries`. A `402` is never retried. Through the [LLM proxy](/api/llm-proxy#spend-limits), the provider SDK's own error carries the same `code`, and the `402` body has `budget`.
+
+```ts
+import { BudgetExceededError, UsageLimitExceededError } from '@nozle-js/node'
+
+try {
+  await runBilledCall()
+} catch (error) {
+  if (error instanceof BudgetExceededError) {
+    // error.budget?.limit, error.budget?.period_end
+  } else if (error instanceof UsageLimitExceededError) {
+    // Ask the customer to upgrade; do not retry.
+  } else {
+    throw error
+  }
+}
+```
+
 ## Branch on the status
 
 `error.status` works on every call. Use `status` to separate a retryable failure from one that is not:

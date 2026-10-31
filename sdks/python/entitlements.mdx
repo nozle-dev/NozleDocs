@@ -51,6 +51,33 @@ Without a selector, `can()` evaluates the customer's only subscription. When the
 | `remaining` | `int`, optional | Remaining allowance. |
 | `overage` | `bool`, optional | `True` when usage has reached a soft limit; the usage is billed as overage. Never a denial by itself. |
 | `economics` | `dict`, optional | Point-in-time Cost Sheet estimate with exact decimal strings, Cost Rule version identifiers, and explicit exclusions. |
+| `budget` | `Budget`, optional | 0.28.0, Engine 2.34.0. The spend limit that refused the call (`reason` `budget_exceeded`), else the tightest one covering the feature. See [Spend limits](#spend-limits). |
+
+## Spend limits
+
+Available from `nozle-sdk` 0.28.0 on `Nozle` and `AsyncNozle`, with Engine 2.34.0. When a hard [spend limit](/guides/entitlements/spend-limits) covering the feature is used up, `can()` returns `allowed: False` with `reason` `budget_exceeded` and the limit in `budget`. It does not raise. Compare `reason` with `RefusalReason`, never with message text:
+
+```python
+from nozle import RefusalReason
+
+check = nozle.can("workspace_123", "llm_tokens")
+if not check["allowed"] and check["reason"] == RefusalReason.BUDGET_EXCEEDED:
+    budget = check["budget"]  # limit, spent, held, remaining, currency, period_end, status, ...
+```
+
+`RefusalReason` is a `str` enum with `FEATURE_NOT_FOUND`, `NO_SUBSCRIPTION`, `SUBSCRIPTION_REQUIRED`, `NO_ENTITLEMENT`, `USAGE_LIMIT_EXCEEDED`, `ECONOMIC_POLICY_DENIED`, `CUSTOMER_PAYMENT_OVERDUE`, `INSUFFICIENT_CREDITS` and `BUDGET_EXCEEDED`. Members equal their string, and results keep the plain string, so a reason a newer Engine adds passes through. `usage.check()` and `usage.track()` answer the same way, with `budget`. A soft limit never refuses.
+
+### Read budgets
+
+```python
+result = nozle.budgets.list("workspace_123", subscription_id="sub_pro_123")
+for budget in result["budgets"]:
+    print(budget["feature_code"] or "total", budget["spent"], budget["limit"], budget["status"])
+```
+
+`budgets.list(customer_id, *, subscription_id=None)` calls [`GET /customers/{customer_id}/budgets`](/api/list-customer-budgets) and returns `BudgetList`: `customer_id`, `subscription_id` and `budgets`. Each `Budget` has `feature_code` (`None` for the total limit), `limit`, `spent`, `held`, `remaining` (decimal strings in major units), `currency`, `period`, `period_start`, `period_end`, `mode`, `status` and `as_of`. On `AsyncNozle`, `await nozle.budgets.list(...)`. Types: `Budget`, `BudgetList`, `BudgetPeriod`, `BudgetMode`, `BudgetStatus`.
+
+For an exact cap under concurrent calls, take a [budget hold](/sdks/python/credits#budget-holds) instead of a plain `can()`.
 
 ## FastAPI pattern
 

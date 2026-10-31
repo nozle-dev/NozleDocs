@@ -34,7 +34,8 @@ This returns one balance object, for a system of any status. An unknown code ret
   "credit_system_name": "AI Credits",
   "unit_name": "credit",
   "system_status": "active",
-  "available": "625.5",
+  "available": "617.5",
+  "held": "8",
   "as_of": "2026-07-20T12:00:00.750Z",
   "sources": [
     {
@@ -49,6 +50,7 @@ This returns one balance object, for a system of any status. An unknown code ret
       "subscription_id": "b85038ab-8ef6-45a8-9643-43b24a891362",
       "initial": "625.5",
       "remaining": "625.5",
+      "held": "8",
       "valid_from": "2026-07-01T00:00:00Z",
       "expires_at": "2026-08-01T00:00:00Z",
       "priority": 100,
@@ -71,7 +73,8 @@ Decimal amounts are strings without trailing zeros: `"500"`, not `"500.000000000
 | `credit_system_name` | Display name. |
 | `unit_name` | Name of one credit unit. |
 | `system_status` | Status of the Credit System, for example `active`. |
-| `available` | Sum of `remaining` over sources whose `available` is `true`. |
+| `available` | What can be spent now: the sum of `remaining` minus `held` over sources whose `available` is `true`. |
+| `held` | Credits reserved by open [credit holds](/api/create-usage-hold) on those sources, already left out of `available`. `"0"` when nothing is held. Engine 2.34.0. |
 | `as_of` | Time the balance was read. Source validity is evaluated at this time. |
 | `sources` | Active or scheduled sources, ordered by earliest `expires_at` first (no expiry last), then `priority`. |
 
@@ -89,7 +92,8 @@ Decimal amounts are strings without trailing zeros: `"500"`, not `"500.000000000
 | `reference` | Stable reference for the grant or payment that created the source. Treat it as an opaque string. |
 | `subscription_id` | Subscription the source belongs to. `null` unless the source is a subscription grant. |
 | `initial` | Amount when the source was created. |
-| `remaining` | Amount not yet consumed. |
+| `remaining` | Amount not yet consumed. It includes `held`: a hold reserves credits but does not consume them. |
+| `held` | Part of `remaining` reserved by open credit holds, at most `remaining`. Engine 2.34.0. |
 | `valid_from` | Time the source becomes usable. |
 | `expires_at` | Time the source expires, or `null` if it never does. |
 | `priority` | Tie-breaker when sources expire at the same time (or none expires): the lower value is consumed first. Credits are consumed from the earliest `expires_at` first. |

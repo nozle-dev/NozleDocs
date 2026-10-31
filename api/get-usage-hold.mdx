@@ -1,0 +1,84 @@
+---
+title: Get a Credit Hold
+api: "GET https://api.nozle.app/engine/api/v1/usage/holds/{hold_id}"
+description: Read one credit hold and its status
+---
+
+Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.34.0.
+
+**Auth:** secret key only. When your organization has API key permissions, the key requires `credit_system:read`.
+
+```http
+GET /usage/holds/6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10
+Authorization: Bearer sk_nozle_...
+```
+
+## Response
+
+```json
+{
+  "hold_id": "6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10",
+  "status": "finalized",
+  "customer_id": "customer_123",
+  "entity_id": "user_42",
+  "feature_code": "agent_execution",
+  "credit_system": "ai_credits",
+  "pool_policy": "entity_then_customer",
+  "metric_amount": "8000",
+  "credits_required": "8",
+  "credits_held": "8",
+  "expires_at": "2026-10-31T12:10:00.912Z",
+  "created_at": "2026-10-31T12:00:00.912Z",
+  "resolved_at": "2026-10-31T12:03:12.204Z",
+  "operation_id": "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `hold_id` | Hold identifier. |
+| `status` | `held` (open, reserving credits), `denied` (the balance was short when it was created), `finalized`, `released` or `expired`. An open hold past `expires_at` reads as `expired` even before the sweep marks it. |
+| `customer_id` | External customer ID. |
+| `entity_id` | External Entity ID. Omitted for customer-level usage. |
+| `subscription_id` | External ID of the subscription that pays. Omitted when none does. |
+| `feature_code` | Feature code. |
+| `credit_system` | Credit System code. |
+| `pool_policy` | Pool policy the hold spends under. Omitted for customer-level usage. |
+| `metric_amount` | Metric amount the hold was created for. |
+| `credits_required` | Credits that amount costs at the pinned rate. |
+| `credits_held` | Credits reserved: `credits_required`, or `"0"` for a denied hold. |
+| `expires_at` | Time the hold stops reserving. |
+| `created_at` | Time the hold was created. |
+| `resolved_at` | Time the hold was denied, finalized, released or expired; `null` while it is open. |
+| `operation_id` | Credit operation that spent the usage. Only on a finalized hold. |
+
+All amounts are decimal strings.
+
+## Budget holds
+
+From Engine 2.34.0 a [budget hold](/api/create-usage-hold#budget-holds) is read here too. It has `kind: "budget"`, `subscription_id`, `metric_amount`, `amount_held` (the estimated spend reserved; `"0"` once it no longer reserves) and `currency` in place of the credit fields. Its `status` is `held`, `denied`, `finalized`, `booked` (the finalized usage's spend is counted, so the hold no longer is), `released` or `expired`. Budget holds resolved more than 7 days ago are deleted and answer `404 hold_not_found`.
+
+## Errors
+
+| Status | `code` | Meaning |
+|--------|--------|---------|
+| `403` | `permission_denied` | The key lacks `credit_system:read`. |
+| `404` | `hold_not_found` | No hold with this ID in your organization. |
+
+## SDKs
+
+<CodeGroup>
+
+```ts Node.js
+const hold = await nozle.usage.holds.get('6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10')
+```
+
+```python Python
+hold = nozle.usage.holds.get("6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10")
+```
+
+```go Go
+hold, err := client.GetCreditHold(ctx, "6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10")
+```
+
+</CodeGroup>

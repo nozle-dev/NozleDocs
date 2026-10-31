@@ -7,7 +7,7 @@ info:
     **Legacy key names, removed in Core 6.0.0.** REST responses, webhook payloads and CSV exports carry only the Nozle names: `nozle_id` and the plain `<key>` names such as `customer_id` and `invoice_id`. The former-prefix keys, the former EU tax codes, the former CSV id columns and the former webhook headers are gone. Webhook deliveries carry `webhook-id`, `webhook-timestamp` and `webhook-signature`. nozle-js and nozle-python older than 0.10.0 and nozle-go older than 0.9.1 cannot read a credit system id from Core 6.0.0.
 
     **Live and sandbox (unreleased).** Live and sandbox use the same servers. The API key decides the environment: live keys start with `sk_nozle_` or `pk_nozle_`, sandbox keys with `sk_nozle_test_` or `pk_nozle_test_`, and each only reaches its own organization's data. A key whose prefix does not match its organization's environment, or a key of a reset sandbox, is refused with `401`. Every response to an accepted key, Core and Engine, carries the header `X-Nozle-Livemode: true` (live) or `false` (sandbox); browsers can read it. Webhook payloads carry `livemode` the same way. See https://docs.nozle.dev/guides/getting-started/sandbox.
-  version: 1.50.0
+  version: 1.51.0
   license:
     name: AGPLv3
     url: https://github.com/nozle-dev/core/blob/main/LICENSE
@@ -56,6 +56,8 @@ tags:
     externalDocs:
       description: Find out more
       url: https://docs.nozle.dev/api-reference
+  - name: Spend Limits
+    description: Money budgets on the metered usage charges of a subscription, and their standing
   - name: Subscriptions
     description: Everything about Subscription collection
     externalDocs:
@@ -10436,7 +10438,8 @@ paths:
                     credit_system_name: AI Credits
                     unit_name: credit
                     system_status: active
-                    available: '625.5'
+                    available: '617.5'
+                    held: '8'
                     as_of: '2026-07-20T12:00:00.750Z'
                     sources:
                       - &id019
@@ -10451,6 +10454,7 @@ paths:
                         subscription_id: b85038ab-8ef6-45a8-9643-43b24a891362
                         initial: '625.5'
                         remaining: '625.5'
+                        held: '8'
                         valid_from: '2026-07-01T00:00:00Z'
                         expires_at: '2026-08-01T00:00:00Z'
                         priority: 100
@@ -10726,6 +10730,9 @@ paths:
                     entity_available: '480.000000000001'
                     shared_available: '250'
                     effective_available: '730.000000000001'
+                    entity_held: '0'
+                    shared_held: '0'
+                    held: '0'
                     consumed: '42'
                     pool_policy: entity_then_customer
                     as_of: '2026-07-22T12:00:00.750Z'
@@ -11975,10 +11982,222 @@ paths:
                   value:
                     error: failed to fetch transactions
         '503': *id018
+  /spend_limits:
+    get:
+      tags:
+        - Spend Limits
+      summary: List spend limits
+      description: 'Core 11.23.0. Lists the spend limits of the organization, oldest first. Filter with `plan_code` (the limits of the current version of that plan: the defaults of its subscriptions) or `external_subscription_id` (the overrides of that active subscription). Without a filter, subscription overrides are listed only for a key that may read subscriptions; other keys get the plan limits. With API key permissions, the key needs `plan:read`, or `subscription:read` with `external_subscription_id`. See [Spend limits and budgets](/guides/entitlements/spend-limits).'
+      operationId: listSpendLimits
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: plan_code
+          in: query
+          required: false
+          description: Code of a plan. Only its limits are listed. An unknown code returns `404 plan_not_found`.
+          schema:
+            type: string
+          example: pro
+        - name: external_subscription_id
+          in: query
+          required: false
+          description: External ID of an active subscription. Only its overrides are listed. An unknown one returns `404 subscription_not_found`.
+          schema:
+            type: string
+          example: sub_pro_123
+      responses:
+        '200':
+          description: Spend limits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpendLimitsPaginated'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+        - Spend Limits
+      summary: Create a spend limit
+      description: |-
+        Core 11.23.0. Caps the gross metered usage charges of a subscription per period: usage charges before tax, coupons, wallet credits and credits. The subscription fee and fixed charges are not counted.
+
+        - Send `plan_code` to set the default of every subscription of that plan (its current version), or `external_subscription_id` to override the plan's limit for one active subscription. Exactly one of them.
+        - Without `feature_code` the limit covers the total of the usage charges; with it, the charges of that Feature. A Feature limit and a total limit both apply, and the tighter one refuses first.
+        - The amount is in the plan's currency, in cents. A `currency` that differs returns `422` with `currency: currencies_does_not_match`. Nothing is converted.
+        - On an override, `amount_cents: null` turns the plan's limit for that Feature (or the total) off for the subscription.
+        - A limit with an amount is refused with `422 spend_limit_unrateable_charges` when a usage charge it covers cannot be rated per event; the body lists them in `charges`. Rateable: the charge models `standard`, `package`, `graduated`, `volume`, `dynamic` and `percentage` (without a per-transaction minimum or maximum, in the charge or its filters), on a Feature that is not recurring and aggregates with `count_agg`, `sum_agg`, `max_agg`, `latest_agg` or `unique_count_agg`.
+
+        The Engine counts spend from the events it processes once the limit exists: usage before that is not counted, and a new limit refuses calls within a minute.
+
+        With API key permissions, the key needs `plan:write` for a plan limit and `subscription:write` for an override. Editing a limit never creates a plan version. See [Spend limits and budgets](/guides/entitlements/spend-limits).
+      operationId: createSpendLimit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpendLimitCreateInput'
+            examples:
+              plan_total:
+                summary: Plan default on the total
+                value:
+                  spend_limit:
+                    plan_code: pro
+                    amount_cents: 50000
+                    period: billing_period
+                    mode: hard
+              subscription_feature:
+                summary: Subscription override on one Feature
+                value:
+                  spend_limit:
+                    external_subscription_id: sub_pro_123
+                    feature_code: llm_tokens
+                    amount_cents: 20000
+                    thresholds:
+                      - 75
+                      - 100
+              subscription_off:
+                summary: Turn the plan's total limit off for one subscription
+                value:
+                  spend_limit:
+                    external_subscription_id: sub_pro_123
+                    amount_cents: null
+      responses:
+        '200':
+          description: Spend limit created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpendLimit'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: '`plan_not_found`, `subscription_not_found` (no active subscription with that external ID) or `feature_not_found`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorNotFound'
+        '422':
+          description: '`validation_errors` (for example `base: one_of_plan_or_subscription_required`, `currency: currencies_does_not_match`, `feature_id: value_already_exist` for a second limit on the same plan or subscription and Feature, `amount_cents: value_is_mandatory` on a plan limit, `thresholds: value_is_invalid`, or `period` or `mode: value_is_invalid`), `plan_is_an_override` (`plan_code` names a per-customer override plan), or `spend_limit_unrateable_charges` with the charges.'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+                  - $ref: '#/components/schemas/ApiErrorNotAllowed'
+                  - $ref: '#/components/schemas/SpendLimitUnrateableChargesError'
+              examples:
+                unrateable:
+                  summary: A covered charge cannot be rated
+                  value:
+                    status: 422
+                    error: Unprocessable Entity
+                    code: spend_limit_unrateable_charges
+                    charges:
+                      - code: storage_gb
+                        charge_model: custom
+  /spend_limits/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The spend limit's `nozle_id`.
+        schema:
+          type: string
+          format: uuid
+        example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+    get:
+      tags:
+        - Spend Limits
+      summary: Retrieve a spend limit
+      description: Core 11.23.0. Reads one spend limit of the organization. With API key permissions, the key needs `plan:read` for a plan limit and `subscription:read` for an override.
+      operationId: getSpendLimit
+      responses:
+        '200':
+          description: Spend limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpendLimit'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+        - Spend Limits
+      summary: Update a spend limit
+      description: 'Core 11.23.0. Changes `amount_cents`, `period`, `mode` or `thresholds`; the plan or subscription, Feature and currency stay. A key sent as `null` is ignored, except `amount_cents`, where `null` turns an override off (a plan limit needs an amount). The period''s spend is kept, because it does not belong to the limit, and the new amount is compared with it: a threshold already sent this period is not sent again. Changing `period` starts a new count. The charges are checked again as on create (`422 spend_limit_unrateable_charges`). With API key permissions, the key needs `plan:write` for a plan limit and `subscription:write` for an override.'
+      operationId: updateSpendLimit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpendLimitUpdateInput'
+            example:
+              spend_limit:
+                amount_cents: 90000
+                thresholds:
+                  - 80
+                  - 100
+      responses:
+        '200':
+          description: Spend limit updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpendLimit'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: '`validation_errors` (for example `currency: currencies_does_not_match`, `amount_cents: value_is_mandatory` on a plan limit, `thresholds: value_is_invalid`) or `spend_limit_unrateable_charges` with the charges.'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+                  - $ref: '#/components/schemas/SpendLimitUnrateableChargesError'
+    delete:
+      tags:
+        - Spend Limits
+      summary: Delete a spend limit
+      description: 'Core 11.23.0. Removes a spend limit and returns it. Removing a subscription override brings back the plan''s limit for that Feature (or the total); to turn the plan''s limit off for one subscription, create an override with `amount_cents: null` instead. Deleting a plan or a Feature removes its spend limits too. With API key permissions, the key needs `plan:write` for a plan limit and `subscription:write` for an override.'
+      operationId: deleteSpendLimit
+      responses:
+        '200':
+          description: Spend limit deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpendLimit'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /usage/check:
     post:
       summary: Check credit usage
-      description: Calculates an advisory credit decision without changing any source or ledger row. Projected deductions follow the same ordering as an authoritative consume, but another request can spend credits first, so this is not authorization for irreversible work. Requires an organization secret key or trusted internal authentication; publishable keys are rejected. With API key permissions, a secret key needs `credit_system:read`. The paying subscription is chosen as on `POST /usage/track`.
+      description: 'Calculates an advisory credit decision without changing any source or ledger row. Projected deductions follow the same ordering as an authoritative consume, but another request can spend credits first, so this is not authorization for irreversible work. Requires an organization secret key or trusted internal authentication; publishable keys are rejected. With API key permissions, a secret key needs `credit_system:read`. The paying subscription is chosen as on `POST /usage/track`. From Engine 2.34.0, when the plan of the paying subscription has a usage charge on the Feature and a hard spend limit covering it is used up, the answer is `200` with `allowed: false`, `reason: budget_exceeded` and the limit in `budget`. It is checked before credits.'
       operationId: engineCheckCreditUsage
       tags:
         - Usage
@@ -12030,7 +12249,7 @@ paths:
                     code: internal_error
                     error: credit usage request failed
         '503':
-          description: 'Service unavailable. Retry after `Retry-After`. API key verification failures return `{"error": "API key verification is unavailable"}` with no `code` and no `Retry-After`.'
+          description: 'Service unavailable. Retry after `Retry-After`. `budget_unavailable` (Engine 2.34.0): the spend limits could not be read while a hard one may apply. API key verification failures return `{"error": "API key verification is unavailable"}` with no `code` and no `Retry-After`.'
           headers:
             Retry-After:
               description: Seconds to wait before retrying. Sent with every coded 503 listed here; values are `1` for `credit_usage_temporarily_unavailable`.
@@ -12080,7 +12299,7 @@ paths:
   /usage/track:
     post:
       summary: Track and consume credits
-      description: 'Atomically consumes credits and queues the matching billing event in one transaction. Insufficient credits return `200` with `allowed: false` and nothing consumed. A replay with the same key and body returns the original result, including a denial. Requires an organization secret key or trusted internal authentication; publishable keys are rejected. With API key permissions, a secret key needs `credit_system:write`. The paying subscription is `subscription_id` when sent; with `entity_id`, the Entity''s own active subscription, else the customer''s own; otherwise the customer''s one active subscription. A customer with no active subscription still spends credits that do not need one (paid top-ups, opening balances, plan credits left after a cancellation), and that usage sends no billing event.'
+      description: 'Atomically consumes credits and queues the matching billing event in one transaction. Insufficient credits return `200` with `allowed: false` and nothing consumed. A replay with the same key and body returns the original result, including a denial. Requires an organization secret key or trusted internal authentication; publishable keys are rejected. With API key permissions, a secret key needs `credit_system:write`. The paying subscription is `subscription_id` when sent; with `entity_id`, the Entity''s own active subscription, else the customer''s own; otherwise the customer''s one active subscription. A customer with no active subscription still spends credits that do not need one (paid top-ups, opening balances, plan credits left after a cancellation), and that usage sends no billing event. From Engine 2.34.0, when the plan of the paying subscription has a usage charge on the Feature and a hard spend limit covering it is used up, the answer is `200` with `allowed: false`, `reason: budget_exceeded` and the limit in `budget`. It is checked before credits. A retry with an `Idempotency-Key` already used replays its stored answer first, before any spend limit or overdue-payment refusal, so a track accepted before the limit ran out is never answered `budget_exceeded` on retry.'
       operationId: engineTrackCreditUsage
       tags:
         - Usage
@@ -12090,7 +12309,7 @@ paths:
         - name: Idempotency-Key
           in: header
           required: true
-          description: Idempotency key, at most 255 bytes. Required. Used exactly as sent (not trimmed); a value that is empty or only whitespace is rejected. A missing, blank or longer value returns `400 invalid_request` (`Idempotency-Key is required and must not exceed 255 bytes`). Retry an uncertain request with the same key and an identical body; the same key with a different request returns `409 idempotency_key_reused`.
+          description: Idempotency key, at most 255 bytes. Required. Used exactly as sent (not trimmed); a value that is empty or only whitespace is rejected. A missing, blank or longer value returns `400 invalid_request` (`Idempotency-Key is required and must not exceed 255 bytes`). From Engine 2.34.0, keys starting with `hold:` are reserved for finalized credit holds and return `400 invalid_request`. Retry an uncertain request with the same key and an identical body; the same key with a different request returns `409 idempotency_key_reused`.
           schema:
             type: string
             maxLength: 255
@@ -12144,7 +12363,7 @@ paths:
                     code: internal_error
                     error: credit usage request failed
         '503':
-          description: 'Service unavailable. Retry with the same `Idempotency-Key` and the same body, including the same `timestamp`. `credit_usage_contention`: the balance stayed locked through every attempt. `credit_usage_publication_backlog`: the organization''s usage-event outbox has 1,000 or more events still being retried, or its oldest one is older than 5 minutes, so new consumes are refused; it clears by itself once the events are accepted again. A dead-lettered event does not count. API key verification failures return `{"error": "API key verification is unavailable"}` with no `code` and no `Retry-After`.'
+          description: 'Service unavailable. Retry with the same `Idempotency-Key` and the same body, including the same `timestamp`. `credit_usage_contention`: the balance stayed locked through every attempt. `credit_usage_publication_backlog`: the organization''s usage-event outbox has 1,000 or more events still being retried, or its oldest one is older than 5 minutes, so new consumes are refused; it clears by itself once the events are accepted again. A dead-lettered event does not count. `budget_unavailable` (Engine 2.34.0, `Retry-After: 1`): the spend limits could not be read while a hard one may apply. API key verification failures return `{"error": "API key verification is unavailable"}` with no `code` and no `Retry-After`.'
           headers:
             Retry-After:
               description: Seconds to wait before retrying. Sent with every coded 503 listed here; values are `1` for `credit_usage_contention`, `30` for `credit_usage_publication_backlog`, `1` for `credit_usage_temporarily_unavailable`.
@@ -12205,16 +12424,441 @@ paths:
             	CreditSystemCode: "ai_credits",
             	Properties:       map[string]any{"model": "example-model"},
             }, "agent-execution-0183f")
+  /usage/holds:
+    post:
+      summary: Create a credit hold
+      description: 'Engine 2.34.0. Reserves the credits of one usage on the sources `POST /usage/track` would spend, in the same order and under the same pool policy, without changing the balance or sending anything to billing. Until it is finalized, released or expired, the held credits are left out of `available` for `/usage/check`, `/usage/track`, other holds, the balance endpoints and Entity transfers. The body is the `/usage/track` body plus `ttl_seconds`; send in `properties` the most the work can use. The rate is pinned on the hold for its finalize. A short balance returns `200` with `allowed: false`, `status: denied` and `reason: insufficient_credits`, stored under the key so a retry gets the same answer. Requires an organization secret key or trusted internal authentication; publishable keys are rejected. With API key permissions, a secret key needs `credit_system:write`. **Budget holds (Engine 2.34.0).** On a Feature the plan bills in money, under a hard spend limit, the hold is a budget hold (`kind: budget`): it reserves the call''s estimated spend (the charge''s price of the metric amount in `properties`, on top of the period''s usage) against every limit covering the Feature, under the limit''s row lock. Its `Idempotency-Key` covers only the request (body, amount to hold, `ttl_seconds`), never the estimate, so a same-body retry replays even after usage moved the charge to another tier. When it does not fit, or a limit is already used up, it answers `200` with `allowed: false`, `status: denied` and `reason: budget_exceeded`. Its finalize sends the usage as one event with `transaction_id` `hold:<id>`, and the hold keeps counting until that event''s spend is booked. Without a hard spend limit covering the Feature, a Feature billed in money still answers `409 feature_billed_in_money`. See [Spend limits and budgets](/guides/entitlements/spend-limits#exact-caps-with-budget-holds).'
+      operationId: engineCreateCreditHold
+      tags:
+        - Usage
+      servers: *id002
+      security: *id003
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Idempotency key, at most 255 bytes. Required. A missing, blank or longer value returns `400 invalid_request`. Keys starting with `hold:` are reserved and return `400 invalid_request`. A retry with the same key and body returns the first answer, including a denial, and reserves nothing again, even when a new hold would now be refused with `402 customer_payment_overdue`; the same key with a different body returns `409 idempotency_key_reused`.
+          schema:
+            type: string
+            maxLength: 255
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreditsUsageHoldCreateRequest'
+            example:
+              customer_id: customer_123
+              entity_id: user_42
+              feature_code: agent_execution
+              credit_system_code: ai_credits
+              properties:
+                tokens: 8000
+              timestamp: '2026-10-31T12:00:00.750Z'
+              ttl_seconds: 600
+      responses:
+        '200':
+          description: 'Hold result. Check `allowed`; `allowed: false` is a normal result.'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/CreditsUsageHoldCreateResponse'
+                  - $ref: '#/components/schemas/BudgetUsageHoldCreateResponse'
+        '400':
+          $ref: '#/components/responses/EngineBadRequest'
+          description: '`code: invalid_request`: invalid JSON, an unknown field, a body over 1 MiB, a missing `customer_id`, `feature_code` or `timestamp`, or a missing or invalid `Idempotency-Key` (including one starting with `hold:`). `code: hold_ttl_invalid`: `ttl_seconds` is not an integer from 1 to 86400.'
+        '401': *id006
+        '402':
+          $ref: '#/components/responses/EngineCustomerPaymentOverdue'
+        '403':
+          $ref: '#/components/responses/EngineForbidden'
+          description: 'A publishable key, `code: permission_denied` when API key permissions are enabled and the secret key lacks `credit_system:write`, or `code: customer_scope_mismatch` when internal authentication is scoped to another customer.'
+        '404':
+          $ref: '#/components/responses/EngineNotFound'
+          description: '`code` is `customer_not_found`, `active_subscription_not_found`, `feature_not_found` or `entity_not_found`, as on `POST /usage/track`.'
+        '409':
+          $ref: '#/components/responses/EngineConflict'
+          description: '`code: idempotency_key_reused`: the key was used with a different body. `code: feature_billed_in_money`: the plan bills the Feature with a priced charge as well as credits.'
+        '422':
+          $ref: '#/components/responses/EngineUnprocessable'
+          description: '`code` is `active_subscription_ambiguous`, `feature_not_consumable`, `entity_inactive`, `credit_pool_policy_not_configured` or `credit_usage_configuration_invalid`, as on `POST /usage/track`.'
+        '500':
+          description: 'Unexpected server error. The body has `code: internal_error`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+        '503':
+          description: 'Retry after `Retry-After` with the same `Idempotency-Key` and body. `credit_usage_contention`: the balance stayed locked through every attempt. `credit_usage_temporarily_unavailable`: the database could not be reached.'
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying; `1`.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const hold = await nozle.usage.holds.create(
+              { customerId: 'customer_123', featureCode: 'agent_execution', properties: { tokens: 8000 }, ttlSeconds: 600 },
+              { idempotencyKey: 'run_0183f' },
+            )
+        - lang: Python
+          label: Python
+          source: |-
+            hold = nozle.usage.holds.create(
+                "customer_123",
+                "agent_execution",
+                properties={"tokens": 8000},
+                ttl_seconds=600,
+                idempotency_key="run_0183f",
+            )
+        - lang: Go
+          label: Go
+          source: |-
+            hold, err := client.CreateCreditHold(ctx, nozle.CreditHoldParams{
+            	CustomerID: "customer_123", FeatureCode: "agent_execution",
+            	Properties: map[string]any{"tokens": 8000}, TTLSeconds: 600,
+            }, "run_0183f")
+  /usage/holds/{hold_id}/finalize:
+    post:
+      summary: Finalize a credit hold
+      description: 'Engine 2.34.0. Spends the actual usage of a held call as one ordinary consume operation, priced at the rate pinned on the hold, and releases the rest. The customer, Entity, subscription, Feature and Credit System come from the hold. Less than held releases the rest; zero releases the whole hold (`credits_consumed: "0"`, no `operation_id`). More than held passes when the hold plus the free balance covers it; otherwise it answers `200` with `allowed: false` and `reason: insufficient_credits`, charges nothing and leaves the hold open. After expiry it runs as a plain track (`hold_expired: true`). A repeated finalize with the same body replays the first answer, including a zero finalize that released the hold. Never refused for an overdue customer. With API key permissions, a secret key needs `credit_system:write`. A budget hold (Engine 2.34.0, `kind: budget`) sends the usage in `properties` as one event with `transaction_id` `hold:<id>` and returns the hold, `finalized`; whatever the amount, the event''s spend is booked when it is counted, and the hold keeps counting until then (at least 10 minutes after the finalize). A repeat returns the hold unchanged; a released or denied budget hold returns `409 hold_already_resolved`.'
+      operationId: engineFinalizeCreditHold
+      tags:
+        - Usage
+      servers: *id002
+      security: *id003
+      parameters:
+        - &id_hold_id
+          name: hold_id
+          in: path
+          required: true
+          description: Hold ID returned by `POST /usage/holds`.
+          schema:
+            type: string
+          example: 6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreditsUsageHoldFinalizeRequest'
+            example:
+              properties:
+                tokens: 5500
+              timestamp: '2026-10-31T12:03:12.000Z'
+      responses:
+        '200':
+          description: 'Finalize result. Check `allowed`.'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/CreditsUsageHoldFinalizeResponse'
+                  - $ref: '#/components/schemas/BudgetUsageHold'
+        '400':
+          $ref: '#/components/responses/EngineBadRequest'
+          description: '`code: invalid_request`: invalid JSON, an unknown field, or a missing or invalid `timestamp`.'
+        '401': *id006
+        '403':
+          $ref: '#/components/responses/EngineForbidden'
+          description: 'A publishable key, or `code: permission_denied` when the secret key lacks `credit_system:write`.'
+        '404':
+          $ref: '#/components/responses/EngineNotFound'
+          description: '`code: hold_not_found`: no hold with this ID in the organization (or, with customer-scoped internal authentication, for another customer).'
+        '409':
+          $ref: '#/components/responses/EngineConflict'
+          description: '`code: hold_already_resolved`: the hold was released or denied, or was finalized with other usage.'
+        '422':
+          $ref: '#/components/responses/EngineUnprocessable'
+          description: '`code` is `entity_inactive` or `credit_usage_configuration_invalid` (the actual usage cannot be priced, for example a missing metric value).'
+        '500':
+          description: 'Unexpected server error. The body has `code: internal_error`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+        '503':
+          description: 'Retry after `Retry-After` with the same body. `credit_usage_contention` (`1`), `credit_usage_publication_backlog` (`30`) or `credit_usage_temporarily_unavailable` (`1`), as on `POST /usage/track`.'
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const result = await nozle.usage.holds.finalize(hold.hold_id, { properties: { tokens: 5500 } })
+        - lang: Python
+          label: Python
+          source: |-
+            result = nozle.usage.holds.finalize(hold["hold_id"], properties={"tokens": 5500})
+        - lang: Go
+          label: Go
+          source: |-
+            result, err := client.FinalizeCreditHold(ctx, hold.HoldID, nozle.FinalizeCreditHoldParams{
+            	Properties: map[string]any{"tokens": 5500},
+            })
+  /usage/holds/{hold_id}/release:
+    post:
+      summary: Release a credit hold
+      description: 'Engine 2.34.0. Ends an open hold without spending; its credits become spendable at once. Idempotent: a released, denied or expired hold is returned unchanged, and an open hold past its expiry is marked `expired`. A finalized hold returns `409 hold_already_resolved`. No request body. With API key permissions, a secret key needs `credit_system:write`. Budget holds (Engine 2.34.0) are released the same way; a finalized or `booked` one returns `409 hold_already_resolved`.'
+      operationId: engineReleaseCreditHold
+      tags:
+        - Usage
+      servers: *id002
+      security: *id003
+      parameters:
+        - *id_hold_id
+      responses:
+        '200':
+          description: The hold after the release.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/CreditsUsageHold'
+                  - $ref: '#/components/schemas/BudgetUsageHold'
+        '401': *id006
+        '403':
+          $ref: '#/components/responses/EngineForbidden'
+          description: 'A publishable key, or `code: permission_denied` when the secret key lacks `credit_system:write`.'
+        '404':
+          $ref: '#/components/responses/EngineNotFound'
+          description: '`code: hold_not_found`.'
+        '409':
+          $ref: '#/components/responses/EngineConflict'
+          description: '`code: hold_already_resolved`: the hold was finalized.'
+        '503':
+          description: 'Retry after `Retry-After`: `credit_usage_contention` or `credit_usage_temporarily_unavailable`.'
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying; `1`.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            await nozle.usage.holds.release(hold.hold_id)
+        - lang: Python
+          label: Python
+          source: |-
+            nozle.usage.holds.release(hold["hold_id"])
+        - lang: Go
+          label: Go
+          source: |-
+            released, err := client.ReleaseCreditHold(ctx, hold.HoldID)
+  /usage/holds/{hold_id}:
+    get:
+      summary: Get a credit hold
+      description: 'Engine 2.34.0. Reads one hold. An open hold past its expiry reads as `expired` before the sweep marks it. From Engine 2.34.0 a budget hold (`kind: budget`) is read here too; budget holds resolved more than 7 days ago are deleted. With API key permissions, a secret key needs `credit_system:read`.'
+      operationId: engineGetCreditHold
+      tags:
+        - Usage
+      servers: *id002
+      security: *id003
+      parameters:
+        - *id_hold_id
+      responses:
+        '200':
+          description: The hold.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/CreditsUsageHold'
+                  - $ref: '#/components/schemas/BudgetUsageHold'
+        '401': *id006
+        '403':
+          $ref: '#/components/responses/EngineForbidden'
+          description: 'A publishable key, or `code: permission_denied` when the secret key lacks `credit_system:read`.'
+        '404':
+          $ref: '#/components/responses/EngineNotFound'
+          description: '`code: hold_not_found`.'
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const hold = await nozle.usage.holds.get('6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10')
+        - lang: Python
+          label: Python
+          source: |-
+            hold = nozle.usage.holds.get("6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10")
+        - lang: Go
+          label: Go
+          source: |-
+            hold, err := client.GetCreditHold(ctx, "6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10")
+  /customers/{customer_id}/credit-holds:
+    get:
+      summary: List customer credit holds
+      description: 'Engine 2.34.0. Lists the customer''s newest 100 credit holds, newest first, including its Entities'' holds. Budget holds (Engine 2.34.0) are not listed; read one with `GET /usage/holds/{hold_id}`. `status=held` lists the holds that reserve credits now; `status=expired` also lists open holds past their expiry. Requires an organization secret key or trusted internal authentication; a secret key needs `credit_system:read`. Publishable keys are rejected.'
+      operationId: engineListCustomerCreditHolds
+      tags:
+        - Credits
+      servers: *id002
+      security: *id003
+      parameters:
+        - *id004
+        - name: status
+          in: query
+          required: false
+          description: Only holds with this status. Any other value returns `400 invalid_request`.
+          schema:
+            type: string
+            enum:
+              - held
+              - denied
+              - finalized
+              - released
+              - expired
+      responses:
+        '200':
+          description: The customer's holds.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditsCustomerHoldList'
+        '400':
+          $ref: '#/components/responses/EngineBadRequest'
+          description: '`code: invalid_request`: an unknown `status` or an empty customer ID.'
+        '401': *id006
+        '403':
+          $ref: '#/components/responses/EngineForbidden'
+          description: 'A publishable key, `code: permission_denied` when the secret key lacks `credit_system:read`, or `code: customer_scope_mismatch`.'
+        '404':
+          $ref: '#/components/responses/EngineNotFound'
+          description: '`code: customer_not_found`.'
+        '503':
+          description: '`code: credit_read_temporarily_unavailable`. Retry after `Retry-After`.'
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying; `1`.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const { holds } = await nozle.usage.holds.list('customer_123', { status: 'held' })
+        - lang: Python
+          label: Python
+          source: |-
+            holds = nozle.usage.holds.list("customer_123", status="held")["holds"]
+        - lang: Go
+          label: Go
+          source: |-
+            list, err := client.ListCreditHolds(ctx, "customer_123", nozle.CreditHoldStatusHeld)
+  /customers/{customer_id}/budgets:
+    get:
+      summary: List customer budgets
+      description: 'Engine 2.34.0. Every spend limit that applies to one subscription of the customer, with its spend, open budget holds and status in the current period, tightest first (least `remaining`). The subscription is `subscription_id` when sent; with `entity_id`, the Entity''s own subscription, else the customer''s own; otherwise the customer''s one current subscription. Amounts are decimal strings in major units of `currency`. Spend reaches the Engine a few seconds after the usage; `as_of` is the time of the latest event booked. Requires an organization secret key or trusted internal authentication; with API key permissions, a secret key needs `subscription:read`. Publishable keys are rejected. See [Spend limits and budgets](/guides/entitlements/spend-limits).'
+      operationId: engineListCustomerBudgets
+      tags:
+        - Spend Limits
+      servers: *id002
+      security: *id003
+      parameters:
+        - *id004
+        - name: subscription_id
+          in: query
+          required: false
+          description: External ID of a current subscription of the customer. Required when the customer has several and `entity_id` does not pick one.
+          schema:
+            type: string
+          example: sub_pro_123
+        - name: entity_id
+          in: query
+          required: false
+          description: External Entity ID. Its own subscription is read, else the customer's own one.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The subscription's budgets. An empty `budgets` array when no spend limit applies.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerBudgetList'
+        '400':
+          $ref: '#/components/responses/EngineBadRequest'
+          description: '`code: invalid_request`: an empty or invalid customer ID.'
+        '401': *id006
+        '403':
+          $ref: '#/components/responses/EngineForbidden'
+          description: 'A publishable key, `code: permission_denied` when the secret key lacks `subscription:read`, or `code: customer_scope_mismatch`.'
+        '404':
+          $ref: '#/components/responses/EngineNotFound'
+          description: '`code: active_subscription_not_found`: the customer has no current subscription, or `subscription_id` names none of its current subscriptions.'
+        '422':
+          $ref: '#/components/responses/EngineUnprocessable'
+          description: '`code: active_subscription_ambiguous`: several current subscriptions and neither `subscription_id` nor `entity_id` picks one.'
+        '503':
+          description: '`code: budget_unavailable`: the subscription or its budgets could not be read. Retry after `Retry-After`.'
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying; `1`.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+              example:
+                code: budget_unavailable
+                error: budget lookup failed
+      x-codeSamples:
+        - lang: TypeScript
+          label: Node.js
+          source: |-
+            const { budgets } = await nozle.budgets.list('customer_123', { subscriptionId: 'sub_pro_123' })
+        - lang: Python
+          label: Python
+          source: |-
+            budgets = nozle.budgets.list("customer_123", subscription_id="sub_pro_123")["budgets"]
+        - lang: Go
+          label: Go
+          source: |-
+            list, err := client.ListBudgets(ctx, "customer_123", "sub_pro_123")
   /check-and-deduct:
     post:
       summary: Check and deduct legacy wallet credits
-      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet against concurrent check-and-deduct calls, and when its `credits_balance` covers `credits`, spends them through Core''s `POST /wallet_transactions` (`voided_credits`), which records a voided outbound wallet transaction, sends `wallet.updated` and `wallet_transaction.created` and runs wallet alerts. Not idempotent: an `Idempotency-Key` header is ignored and a retry deducts again; use `POST /usage/track` for retries. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; With API key permissions, the secret key needs `credit_system:write`, as on `POST /usage/track`, and `wallet_transaction:write`; without either the answer is `403` with `code: permission_denied` before any deduction.'
+      description: 'Deprecated legacy wallet adapter; use `POST /usage/track`. Locks the customer''s newest active wallet against concurrent check-and-deduct calls, and when its `credits_balance` covers `credits`, spends them through Core''s `POST /wallet_transactions` (`voided_credits`), which records a voided outbound wallet transaction, sends `wallet.updated` and `wallet_transaction.created` and runs wallet alerts. From Engine 2.34.0 it takes an optional `Idempotency-Key`: the first answer under a key (allowed or not) is stored with the deduction, and a retry with the same key, customer and credits replays it without deducting again; the key with another customer or amount returns `409 idempotency_key_reused`. Keys are kept 7 days. Without a key every retry deducts again, and a Core deduction whose Engine commit fails is not recorded, so its retry deducts again too; use `POST /usage/track` when exactly-once matters. The money amount is `credits` × the wallet''s rate, rounded to the wallet currency: `balance_cents` and the ongoing balance drop by it, the consumed credits and amount grow, and the wallet transaction records that amount. It does not apply Feature conversion rates or the product-credit source ledger. An insufficient balance returns `200` with `allowed: false`. Requires an organization secret key or trusted internal authentication; With API key permissions, the secret key needs `credit_system:write`, as on `POST /usage/track`, and `wallet_transaction:write`; without either the answer is `403` with `code: permission_denied` before any deduction.'
       operationId: engineCheckAndDeductCredits
       tags:
         - Credits
       servers: *id002
       security: *id003
       deprecated: true
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Engine 2.34.0. Optional idempotency key, at most 255 bytes. A retry with the same key, `customer_id` and `credits` replays the first answer. Keys are kept 7 days; a retry after that deducts again. A value that is only whitespace or longer than 255 bytes returns `400 invalid_request`.
+          schema:
+            type: string
+            maxLength: 255
+            minLength: 1
       requestBody:
         required: true
         content:
@@ -12252,7 +12896,7 @@ paths:
                     allowed: false
                     remaining: 2
         '400':
-          description: The body has `code` `bad_request`.
+          description: The body has `code` `bad_request`, or `invalid_request` for an invalid `Idempotency-Key`.
           content:
             application/json:
               schema: *id001
@@ -12265,6 +12909,10 @@ paths:
                   value:
                     code: bad_request
                     error: customer_id and positive credits are required
+                invalid_idempotency_key:
+                  value:
+                    code: invalid_request
+                    error: Idempotency-Key must not be blank or exceed 255 bytes
         '401': *id006
         '403':
           $ref: '#/components/responses/EngineForbidden'
@@ -12279,6 +12927,15 @@ paths:
                   value:
                     code: wallet_not_found
                     error: No active wallet found for this customer.
+        '409':
+          description: Engine 2.34.0. The `Idempotency-Key` was already used with another `customer_id` or `credits`. Nothing was deducted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineError'
+              example:
+                code: idempotency_key_reused
+                error: Idempotency-Key was already used with a different request
         '500':
           description: The deduction failed, for example Core refused the wallet transaction. Nothing was deducted.
           content:
@@ -13084,12 +13741,15 @@ paths:
         | `no_entitlement` | The plan neither grants the feature (entitlement) nor, for a metered feature, prices it (charge). |
         | `usage_limit_exceeded` | Usage reached a hard limit. A soft limit never denies; it sets `overage: true`. |
         | `economic_policy_denied` | A margin policy decided `deny`. The `policy` object has the detail. |
+        | `budget_exceeded` | Engine 2.34.0. A hard spend limit covering the feature is used up: spend plus open budget holds reached the limit. The `budget` object is that limit. |
+
+        **Spend limits (Engine 2.34.0).** For a feature the plan prices with a usage charge, the response adds `budget`: the limit that refused the call, else the tightest spend limit covering the feature. It is checked after the usage limit and before the margin policy. A soft limit never refuses; its `status` still turns `exceeded`. A plain `/can` is check-then-call: calls already in flight and the few seconds before usage is counted can take spend past a cap. For an exact cap, take a budget hold with `POST /usage/holds`. A new limit refuses calls within a minute. When budgets cannot be read and a hard limit may apply, the response is `503 budget_unavailable`. See [Spend limits and budgets](/guides/entitlements/spend-limits).
 
         A subscription on an override plan (a plan made from a catalog plan for one customer, for example a negotiated price or a subscription created from a quote) gets the entitlements and usage limits of the catalog plan it was made from. Its usage is still priced with the override plan's own charges.
 
         **Subscription.** Plan, entitlements, limits and usage come from one subscription that is current now (started, not ended). With `subscription_id`, that subscription is evaluated. With `entity_id`, the Entity's own subscription is evaluated, else the customer's own (not Entity-owned) one. Without either, the customer's only current subscription is evaluated; with several, the customer's own one when there is exactly one, otherwise the answer is `subscription_required`. The newest subscription is never picked.
 
-        Subscription access is read from the database on every call, so a cancellation applies at once. For a metered feature, `used` is read from the usage counter of the selected subscription for the current billing period: the period Nozle invoices the usage in, for every plan interval and in the customer's time zone. A recurring feature (seats, storage) keeps one running total across periods. A metered feature priced only by a charge, without an entitlement, reports its real `used` with `limit` and `remaining` null. If that read fails, the response is `503` with `code: usage_unavailable` and a `Retry-After` header; the failure is never treated as zero usage.
+        Subscription access is read from the database on every call, so a cancellation applies at once. For a metered feature, `used` is read from the usage counter of the selected subscription for the current billing period: the period Nozle invoices the usage in, for every plan interval and in the customer's time zone. A recurring feature (seats, storage) keeps one running total across periods. A metered feature priced only by a charge, without an entitlement, reports its real `used` with `limit` and `remaining` null. If that read fails, the response is `503` with `code: usage_unavailable` and a `Retry-After` header; the failure is never treated as zero usage. From Engine 2.34.0 the same `503 usage_unavailable` answers a feature with a hard usage limit while lost usage counters are being rebuilt.
 
         For an allowed metered feature the response adds `economics`, a point-in-time estimate from the published Cost Sheet, and `policy` when a margin policy applies. The estimate does not record usage or write a ledger entry. Monetary values are decimal strings in `economics.currency`, not cents.
 
@@ -13179,6 +13839,28 @@ paths:
                     used: 1000
                     limit: 1000
                     remaining: 0
+                budget_exceeded:
+                  summary: Hard spend limit used up (Engine 2.34.0)
+                  value:
+                    allowed: false
+                    reason: budget_exceeded
+                    feature_type: metered
+                    used: 48210
+                    limit: null
+                    remaining: null
+                    budget:
+                      feature_code: null
+                      limit: '500'
+                      spent: '500.04'
+                      held: '0'
+                      remaining: '0'
+                      currency: USD
+                      period: billing_period
+                      period_start: '2026-11-01T00:00:00Z'
+                      period_end: '2026-12-01T00:00:00Z'
+                      mode: hard
+                      status: exceeded
+                      as_of: '2026-11-14T09:29:58.104Z'
                 no_subscription:
                   summary: Customer has no current subscription
                   value:
@@ -13233,10 +13915,10 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
         '503':
-          description: 'A dependency is unavailable. With `code: usage_unavailable` the usage counter could not be read; retry after the `Retry-After` seconds and quote `request_id` to support. Subscription access and API key verification failures return an `error` without a `code`.'
+          description: 'A dependency is unavailable. With `code: usage_unavailable` the usage counter could not be read, or (Engine 2.34.0) lost usage counters are being rebuilt and the feature has a hard usage limit; retry after the `Retry-After` seconds and quote `request_id` to support. With `code: budget_unavailable` (Engine 2.34.0) the spend limits could not be read while a hard one may apply. Subscription access and API key verification failures return an `error` without a `code`.'
           headers:
             Retry-After:
-              description: Seconds to wait before retrying. Sent with `code` `usage_unavailable` (value `1`).
+              description: Seconds to wait before retrying. Sent with `code` `usage_unavailable` and `budget_unavailable` (value `1`).
               schema:
                 type: integer
           content:
@@ -13250,6 +13932,11 @@ paths:
                     error: usage lookup failed
                     code: usage_unavailable
                     request_id: host/AbCdEfGhIj-000001
+                budget_unavailable:
+                  summary: Spend limits could not be read
+                  value:
+                    code: budget_unavailable
+                    error: budget lookup failed
                 subscription_access_unavailable:
                   summary: Subscription access read failed
                   value:
@@ -13400,11 +14087,13 @@ paths:
       description: |-
         Forwards the request to `https://api.openai.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature`, `X-Nozle-Feature-Code` and `X-Nozle-Credit-Hold` before forwarding, and sets `Accept-Encoding: identity`.
 
         **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
 
         **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
+
+        **Credit holds (Engine 2.34.0, opt-in).** With `X-Nozle-Credit-Hold: <metric amount>`, Engine reserves the credits of that amount of the `X-Nozle-Feature-Code` Feature after the usage limit and margin checks, before the provider is called; it never estimates the amount from the body. A short balance returns `402 insufficient_credits`, and an amount that is not a positive decimal `400 invalid_request`; the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`. The call is paid from the hold with the token usage Engine reads, in place of the usage event. A call with no usage read releases the hold. For a sum metric, usage above the hold plus the free balance is paid as far as the credit covers it at the hold's rate (the balance never goes negative; it can keep less than `0.000000000001`), and the unpaid rest of the metric is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id`. For a count metric, or when the finalize fails, the hold is released and the whole usage is sent as the usage event. When Engine cannot confirm that the hold was not finalized, nothing is sent and the hold expires. No hold is taken for a Feature with no credit rate, billed in money or not consumable, and the call is not refused when holds are unavailable.
 
         Example: `POST /proxy/openai/v1/chat/completions` is sent to `https://api.openai.com/v1/chat/completions`.
       operationId: engineProxyOpenAIPost
@@ -13443,6 +14132,13 @@ paths:
           description: Code of the usage event. Default `llm_tokens`. It bills only when a metered Feature has this code.
           schema:
             type: string
+        - name: X-Nozle-Credit-Hold
+          in: header
+          required: false
+          description: Engine 2.34.0. Positive decimal metric amount of the Feature to reserve in credits before the provider is called, for example the most tokens the call can use. Not forwarded to the provider.
+          schema:
+            type: string
+          example: '4000'
         - name: Authorization
           in: header
           required: false
@@ -13464,6 +14160,11 @@ paths:
       responses:
         default:
           description: The provider's response, passed through unchanged with the provider's status code, headers and body (JSON, or `text/event-stream` when streaming). Provider errors keep the provider's own error shape.
+          headers:
+            X-Nozle-Credit-Hold-Id:
+              description: Engine 2.34.0. ID of the credit hold taken for this call when `X-Nozle-Credit-Hold` was sent.
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -13477,6 +14178,8 @@ paths:
           $ref: '#/components/responses/OpenAIProxyUnauthorized'
         '402':
           $ref: '#/components/responses/OpenAIProxyPaymentRequired'
+        '429':
+          $ref: '#/components/responses/OpenAIProxyUsageLimitExceeded'
         '403':
           $ref: '#/components/responses/OpenAIProxyForbidden'
         '422':
@@ -13495,11 +14198,13 @@ paths:
       description: |-
         Forwards the request to `https://api.openai.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. `Authorization` carries the customer's own OpenAI key and is forwarded to OpenAI. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature`, `X-Nozle-Feature-Code` and `X-Nozle-Credit-Hold` before forwarding, and sets `Accept-Encoding: identity`.
 
         **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
 
         **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
+
+        **Credit holds (Engine 2.34.0, opt-in).** With `X-Nozle-Credit-Hold: <metric amount>`, Engine reserves the credits of that amount of the `X-Nozle-Feature-Code` Feature after the usage limit and margin checks, before the provider is called; it never estimates the amount from the body. A short balance returns `402 insufficient_credits`, and an amount that is not a positive decimal `400 invalid_request`; the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`. The call is paid from the hold with the token usage Engine reads, in place of the usage event. A call with no usage read releases the hold. For a sum metric, usage above the hold plus the free balance is paid as far as the credit covers it at the hold's rate (the balance never goes negative; it can keep less than `0.000000000001`), and the unpaid rest of the metric is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id`. For a count metric, or when the finalize fails, the hold is released and the whole usage is sent as the usage event. When Engine cannot confirm that the hold was not finalized, nothing is sent and the hold expires. No hold is taken for a Feature with no credit rate, billed in money or not consumable, and the call is not refused when holds are unavailable.
 
         Example: `POST /proxy/openai/v1/chat/completions` is sent to `https://api.openai.com/v1/chat/completions`.
       operationId: engineProxyOpenAIGet
@@ -13538,6 +14243,13 @@ paths:
           description: Code of the usage event. Default `llm_tokens`. It bills only when a metered Feature has this code.
           schema:
             type: string
+        - name: X-Nozle-Credit-Hold
+          in: header
+          required: false
+          description: Engine 2.34.0. Positive decimal metric amount of the Feature to reserve in credits before the provider is called, for example the most tokens the call can use. Not forwarded to the provider.
+          schema:
+            type: string
+          example: '4000'
         - name: Authorization
           in: header
           required: false
@@ -13547,6 +14259,11 @@ paths:
       responses:
         default:
           description: The provider's response, passed through unchanged with the provider's status code, headers and body (JSON, or `text/event-stream` when streaming). Provider errors keep the provider's own error shape.
+          headers:
+            X-Nozle-Credit-Hold-Id:
+              description: Engine 2.34.0. ID of the credit hold taken for this call when `X-Nozle-Credit-Hold` was sent.
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -13560,6 +14277,8 @@ paths:
           $ref: '#/components/responses/OpenAIProxyUnauthorized'
         '402':
           $ref: '#/components/responses/OpenAIProxyPaymentRequired'
+        '429':
+          $ref: '#/components/responses/OpenAIProxyUsageLimitExceeded'
         '403':
           $ref: '#/components/responses/OpenAIProxyForbidden'
         '422':
@@ -13586,11 +14305,13 @@ paths:
       description: |-
         Forwards the request to `https://api.anthropic.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature`, `X-Nozle-Feature-Code` and `X-Nozle-Credit-Hold` before forwarding, and sets `Accept-Encoding: identity`.
 
         **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
 
         **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
+
+        **Credit holds (Engine 2.34.0, opt-in).** With `X-Nozle-Credit-Hold: <metric amount>`, Engine reserves the credits of that amount of the `X-Nozle-Feature-Code` Feature after the usage limit and margin checks, before the provider is called; it never estimates the amount from the body. A short balance returns `402 insufficient_credits`, and an amount that is not a positive decimal `400 invalid_request`; the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`. The call is paid from the hold with the token usage Engine reads, in place of the usage event. A call with no usage read releases the hold. For a sum metric, usage above the hold plus the free balance is paid as far as the credit covers it at the hold's rate (the balance never goes negative; it can keep less than `0.000000000001`), and the unpaid rest of the metric is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id`. For a count metric, or when the finalize fails, the hold is released and the whole usage is sent as the usage event. When Engine cannot confirm that the hold was not finalized, nothing is sent and the hold expires. No hold is taken for a Feature with no credit rate, billed in money or not consumable, and the call is not refused when holds are unavailable.
 
         Example: `POST /proxy/anthropic/v1/messages` is sent to `https://api.anthropic.com/v1/messages`.
       operationId: engineProxyAnthropicPost
@@ -13629,6 +14350,13 @@ paths:
           description: Code of the usage event. Default `llm_tokens`. It bills only when a metered Feature has this code.
           schema:
             type: string
+        - name: X-Nozle-Credit-Hold
+          in: header
+          required: false
+          description: Engine 2.34.0. Positive decimal metric amount of the Feature to reserve in credits before the provider is called, for example the most tokens the call can use. Not forwarded to the provider.
+          schema:
+            type: string
+          example: '4000'
         - name: x-api-key
           in: header
           required: false
@@ -13658,6 +14386,11 @@ paths:
       responses:
         default:
           description: The provider's response, passed through unchanged with the provider's status code, headers and body (JSON, or `text/event-stream` when streaming). Provider errors keep the provider's own error shape.
+          headers:
+            X-Nozle-Credit-Hold-Id:
+              description: Engine 2.34.0. ID of the credit hold taken for this call when `X-Nozle-Credit-Hold` was sent.
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -13671,6 +14404,8 @@ paths:
           $ref: '#/components/responses/AnthropicProxyUnauthorized'
         '402':
           $ref: '#/components/responses/AnthropicProxyPaymentRequired'
+        '429':
+          $ref: '#/components/responses/AnthropicProxyUsageLimitExceeded'
         '403':
           $ref: '#/components/responses/AnthropicProxyForbidden'
         '422':
@@ -13689,11 +14424,13 @@ paths:
       description: |-
         Forwards the request to `https://api.anthropic.com/{providerPath}` with the same method, query string, headers and body, and streams the provider response back unchanged. Every HTTP method is forwarded; POST and GET are listed here.
 
-        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature` and `X-Nozle-Feature-Code` before forwarding, and sets `Accept-Encoding: identity`.
+        **Auth.** Nozle authentication is the `X-Nozle-Key` header, not `Authorization`. The customer's Anthropic credentials (`x-api-key`, `anthropic-version` and any other provider headers) are forwarded unchanged. Only a secret key is accepted; a publishable `pk_` key returns `403`, and a key without `event:write` permission returns `403 permission_denied` before the provider is called. Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature`, `X-Nozle-Feature-Code` and `X-Nozle-Credit-Hold` before forwarding, and sets `Accept-Encoding: identity`.
 
         **Subscription.** Engine resolves the subscription to bill before the provider is called. Without `X-Nozle-Subscription` the customer must have exactly one active subscription; with it, that subscription must be an active subscription of the customer in the caller's organization. Otherwise the response is `422` (`active_subscription_not_found` or `active_subscription_ambiguous`), or `503 unavailable` when the lookup fails, and the provider is not called.
 
         **Tracking.** Usage is recorded in the caller's own organization: Engine sends the usage event to Core signed with the caller's `X-Nozle-Key`. Usage is recognised by the shape of the response (chat completions, the Responses API, Anthropic messages, including cached input and cache writes), for JSON responses and `text/event-stream` responses read as they pass. A chat completion stream is sent with `stream_options.include_usage: true`. For a successful response with more than zero tokens, Engine sends the event in the background with code `X-Nozle-Feature-Code` (default `llm_tokens`), `transaction_id` `llm-<format>-<response id>`, `external_customer_id` from `X-Nozle-Customer-Id`, `external_subscription_id` of the resolved subscription, and properties `provider`, `provider_host`, `model`, `input_tokens`, `output_tokens`, `latency_ms` and, when sent, `feature`. A recording failure is logged and does not change the response.
+
+        **Credit holds (Engine 2.34.0, opt-in).** With `X-Nozle-Credit-Hold: <metric amount>`, Engine reserves the credits of that amount of the `X-Nozle-Feature-Code` Feature after the usage limit and margin checks, before the provider is called; it never estimates the amount from the body. A short balance returns `402 insufficient_credits`, and an amount that is not a positive decimal `400 invalid_request`; the provider is not called. Otherwise the response carries `X-Nozle-Credit-Hold-Id`. The call is paid from the hold with the token usage Engine reads, in place of the usage event. A call with no usage read releases the hold. For a sum metric, usage above the hold plus the free balance is paid as far as the credit covers it at the hold's rate (the balance never goes negative; it can keep less than `0.000000000001`), and the unpaid rest of the metric is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id`. For a count metric, or when the finalize fails, the hold is released and the whole usage is sent as the usage event. When Engine cannot confirm that the hold was not finalized, nothing is sent and the hold expires. No hold is taken for a Feature with no credit rate, billed in money or not consumable, and the call is not refused when holds are unavailable.
 
         Example: `POST /proxy/anthropic/v1/messages` is sent to `https://api.anthropic.com/v1/messages`.
       operationId: engineProxyAnthropicGet
@@ -13732,6 +14469,13 @@ paths:
           description: Code of the usage event. Default `llm_tokens`. It bills only when a metered Feature has this code.
           schema:
             type: string
+        - name: X-Nozle-Credit-Hold
+          in: header
+          required: false
+          description: Engine 2.34.0. Positive decimal metric amount of the Feature to reserve in credits before the provider is called, for example the most tokens the call can use. Not forwarded to the provider.
+          schema:
+            type: string
+          example: '4000'
         - name: x-api-key
           in: header
           required: false
@@ -13748,6 +14492,11 @@ paths:
       responses:
         default:
           description: The provider's response, passed through unchanged with the provider's status code, headers and body (JSON, or `text/event-stream` when streaming). Provider errors keep the provider's own error shape.
+          headers:
+            X-Nozle-Credit-Hold-Id:
+              description: Engine 2.34.0. ID of the credit hold taken for this call when `X-Nozle-Credit-Hold` was sent.
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -13761,6 +14510,8 @@ paths:
           $ref: '#/components/responses/AnthropicProxyUnauthorized'
         '402':
           $ref: '#/components/responses/AnthropicProxyPaymentRequired'
+        '429':
+          $ref: '#/components/responses/AnthropicProxyUsageLimitExceeded'
         '403':
           $ref: '#/components/responses/AnthropicProxyForbidden'
         '422':
@@ -14087,6 +14838,187 @@ webhooks:
       responses:
         '200':
           description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
+  budget_threshold_reached:
+    post:
+      operationId: budgetThresholdReached
+      summary: A spend limit reached a threshold
+      description: 'Engine 2.34.0, Core 11.23.0. A subscription''s spend reached one of the thresholds of a spend limit, hard or soft. Sent once per limit, period and threshold, for the highest threshold crossed: a jump from 40 % to 95 % sends 90 only. Raising the limit does not send a threshold again. At 100 % of a hard limit `budget.exceeded` is sent instead. See [Spend limits and budgets](/guides/entitlements/spend-limits).'
+      parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
+        - $ref: '#/components/parameters/webhook_signature'
+      requestBody:
+        description: The Engine's payload of the event
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - livemode
+                - budget
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - budget.threshold_reached
+                object_type:
+                  type: string
+                  enum:
+                    - budget
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
+                budget:
+                  $ref: '#/components/schemas/BudgetWebhookObject'
+            example:
+              webhook_type: budget.threshold_reached
+              object_type: budget
+              organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
+              budget:
+                subscription_external_id: sub_pro_123
+                external_customer_id: customer_123
+                feature_code: null
+                threshold: 80
+                spent: '401.2'
+                limit: '500'
+                currency: USD
+                period: billing_period
+                period_start: '2026-11-01T00:00:00Z'
+                period_end: '2026-12-01T00:00:00Z'
+                mode: hard
+      responses:
+        '200':
+          description: Return a 2xx status within 10 seconds to acknowledge the delivery. See [Receive Nozle webhooks](/api/receive-webhooks) for the retry schedule.
+  budget_exceeded:
+    post:
+      operationId: budgetExceeded
+      summary: A hard spend limit was used up
+      description: 'Engine 2.34.0, Core 11.23.0. A subscription''s spend reached 100 % of a hard spend limit: the Engine now refuses its metered calls with `budget_exceeded` until the period ends or the limit is raised. Sent once per limit and period, with `threshold: 100`. See [Spend limits and budgets](/guides/entitlements/spend-limits).'
+      parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
+        - $ref: '#/components/parameters/webhook_signature'
+      requestBody:
+        description: The Engine's payload of the event
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - livemode
+                - budget
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - budget.exceeded
+                object_type:
+                  type: string
+                  enum:
+                    - budget
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
+                budget:
+                  $ref: '#/components/schemas/BudgetWebhookObject'
+            example:
+              webhook_type: budget.exceeded
+              object_type: budget
+              organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
+              budget:
+                subscription_external_id: sub_pro_123
+                external_customer_id: customer_123
+                feature_code: null
+                threshold: 100
+                spent: '500.04'
+                limit: '500'
+                currency: USD
+                period: billing_period
+                period_start: '2026-11-01T00:00:00Z'
+                period_end: '2026-12-01T00:00:00Z'
+                mode: hard
+      responses:
+        '200':
+          description: Return a 2xx status within 10 seconds to acknowledge the delivery. See [Receive Nozle webhooks](/api/receive-webhooks) for the retry schedule.
+  usage_limit_threshold_reached:
+    post:
+      operationId: usageLimitThresholdReached
+      summary: A usage limit reached a threshold
+      description: 'Engine 2.34.0, Core 11.23.0. A subscription''s usage of a Feature reached 50, 80, 90 or 100 % of the Feature''s hard usage limit (an entitlement `usage_limit` with a hard limit) in the billing period. Sent once per Feature, period and threshold, for the highest threshold crossed. The thresholds are fixed.'
+      parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
+        - $ref: '#/components/parameters/webhook_signature'
+      requestBody:
+        description: The Engine's payload of the event
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - livemode
+                - usage_limit
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - usage_limit.threshold_reached
+                object_type:
+                  type: string
+                  enum:
+                    - usage_limit
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
+                usage_limit:
+                  $ref: '#/components/schemas/UsageLimitWebhookObject'
+            example:
+              webhook_type: usage_limit.threshold_reached
+              object_type: usage_limit
+              organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
+              usage_limit:
+                subscription_external_id: sub_pro_123
+                external_customer_id: customer_123
+                feature_code: api_calls
+                threshold: 90
+                usage: '9012'
+                limit: 10000
+                period_start: '2026-11-01T00:00:00Z'
+                period_end: '2026-12-01T00:00:00Z'
+                mode: hard
+      responses:
+        '200':
+          description: Return a 2xx status within 10 seconds to acknowledge the delivery. See [Receive Nozle webhooks](/api/receive-webhooks) for the retry schedule.
   feature_created:
     post:
       operationId: featureCreated
@@ -36220,6 +37152,9 @@ components:
             type: string
             enum:
               - alert.triggered
+              - budget.threshold_reached
+              - budget.exceeded
+              - usage_limit.threshold_reached
               - customer.created
               - customer.updated
               - customer.accounting_provider_created
@@ -36429,6 +37364,9 @@ components:
                 type: string
                 enum:
                   - alert.triggered
+                  - budget.threshold_reached
+                  - budget.exceeded
+                  - usage_limit.threshold_reached
                   - customer.created
                   - customer.updated
                   - customer.accounting_provider_created
@@ -36545,6 +37483,9 @@ components:
                 type: string
                 enum:
                   - alert.triggered
+                  - budget.threshold_reached
+                  - budget.exceeded
+                  - usage_limit.threshold_reached
                   - customer.created
                   - customer.updated
                   - customer.accounting_provider_created
@@ -37499,6 +38440,10 @@ components:
         code:
           type: string
           description: The same code, kept at the top level.
+        budget:
+          allOf:
+            - $ref: '#/components/schemas/Budget'
+          description: Engine 2.34.0. The spend limit of a `budget_exceeded` refusal, when there is one.
     AnthropicProxyError:
       type: object
       description: 'Engine 2.22.0. A refusal of an Anthropic route of the LLM proxy, in Anthropic''s error shape so the Anthropic SDK surfaces it. The top-level `code` is the same code. Before Engine 2.22.0 the body was `{"code", "error"}` with `error` a string.'
@@ -37536,6 +38481,10 @@ components:
         code:
           type: string
           description: The same code, kept at the top level.
+        budget:
+          allOf:
+            - $ref: '#/components/schemas/Budget'
+          description: Engine 2.34.0. The spend limit of a `budget_exceeded` refusal, when there is one.
     BillingCoreError:
       type: object
       description: Error body produced by Core and forwarded unchanged by Engine. Checkout errors always carry `status`, `error` and `code`; some conflict responses of other routes carry only `code`. Validation failures carry `error_details`, an object whose keys are field names and whose values are arrays of error codes.
@@ -39412,7 +40361,10 @@ components:
           description: Amount when the source was created, as a decimal string without trailing zeros.
         remaining:
           type: string
-          description: Amount not yet consumed, as a decimal string.
+          description: Amount not yet consumed, as a decimal string. It includes `held`.
+        held:
+          type: string
+          description: Engine 2.34.0. Part of `remaining` reserved by open credit holds, at most `remaining`, as a decimal string.
         valid_from:
           type: string
           format: date-time
@@ -39444,6 +40396,7 @@ components:
         - unit_name
         - system_status
         - available
+        - held
         - as_of
         - sources
       properties:
@@ -39467,7 +40420,10 @@ components:
           description: Status of the Credit System, for example `active`.
         available:
           type: string
-          description: Sum of `remaining` over sources whose `available` is `true`, as a decimal string.
+          description: What can be spent now, as a decimal string. The sum of `remaining` minus `held` over sources whose `available` is `true`.
+        held:
+          type: string
+          description: Engine 2.34.0. Credits reserved by open credit holds on those sources, already left out of `available`, as a decimal string.
         as_of:
           type: string
           format: date-time
@@ -39510,6 +40466,9 @@ components:
         - entity_available
         - shared_available
         - effective_available
+        - entity_held
+        - shared_held
+        - held
         - consumed
         - pool_policy
         - as_of
@@ -39537,13 +40496,22 @@ components:
           type: string
         entity_available:
           type: string
-          description: Available amount in Entity-owned sources.
+          description: Available amount in Entity-owned sources, open holds left out.
         shared_available:
           type: string
-          description: Available amount in the shared customer pool.
+          description: Available amount in the shared customer pool, open holds left out.
         effective_available:
           type: string
           description: Amount the Entity can spend under the current pool policy. `0` when the Entity is inactive or no unambiguous policy exists.
+        entity_held:
+          type: string
+          description: Engine 2.34.0. Credits reserved by open holds on Entity-owned sources, already left out of `entity_available`.
+        shared_held:
+          type: string
+          description: Engine 2.34.0. Credits reserved by open holds on the shared customer pool (by any Entity or customer-level usage), already left out of `shared_available`.
+        held:
+          type: string
+          description: 'Engine 2.34.0. Held part of the pool the Entity spends from: `entity_held` for `entity_only`, both for `entity_then_customer`, `shared_held` for `customer_only`; `0` when the Entity is inactive or no policy applies.'
         consumed:
           type: string
           description: Amount consumed by this Entity.
@@ -40494,12 +41462,16 @@ components:
           description: Remaining credits after the projected deduction. Only when `allowed` is `true`.
         reason:
           type: string
-          description: Reason code when `allowed` is `false`, for example `insufficient_credits`.
+          description: Reason code when `allowed` is `false`, for example `insufficient_credits` or (Engine 2.34.0) `budget_exceeded`.
         projected_deductions:
           type: array
           items:
             $ref: '#/components/schemas/CreditsUsageDeduction'
           description: Projected source selection, in consume order. Only when `allowed` is `true` and not empty.
+        budget:
+          allOf:
+            - $ref: '#/components/schemas/Budget'
+          description: 'Engine 2.34.0. The used-up hard spend limit, with `reason: budget_exceeded`. The body then has only `allowed`, `reason` and `budget`.'
       example:
         advisory: true
         allowed: true
@@ -40551,11 +41523,15 @@ components:
           description: Spendable credits (denied result).
         reason:
           type: string
-          description: Reason code of a denial, for example `insufficient_credits`.
+          description: Reason code of a denial, for example `insufficient_credits` or (Engine 2.34.0) `budget_exceeded`.
         deductions:
           type: array
           items:
             $ref: '#/components/schemas/CreditsUsageDeduction'
+        budget:
+          allOf:
+            - $ref: '#/components/schemas/Budget'
+          description: 'Engine 2.34.0. The used-up hard spend limit, with `reason: budget_exceeded`. The body then has only `allowed`, `reason` and `budget`; nothing was consumed or recorded.'
       example:
         allowed: true
         operation_id: 8d3c2b1a-0f9e-4d8c-b7a6-5e4d3c2b1a09
@@ -40569,6 +41545,244 @@ components:
             source_scope: customer
             amount: '2'
             remaining: '623.5'
+    CreditsUsageHoldCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - customer_id
+        - feature_code
+        - timestamp
+      description: The `POST /usage/track` body plus `ttl_seconds`. Unknown fields are rejected. The body must be one JSON object of at most 1 MiB.
+      properties:
+        customer_id:
+          type: string
+          description: External customer ID (trimmed).
+        entity_id:
+          type: string
+          description: External Entity ID to attribute and pool the usage. Omit for customer-level usage.
+        subscription_id:
+          type: string
+          description: External ID of the active subscription of the customer that pays for the usage. Optional; chosen as on `POST /usage/track`.
+        feature_code:
+          type: string
+          description: Code of a consumable Feature.
+        credit_system_code:
+          type: string
+          description: Credit System to use. Omit when only one effective rate applies.
+        properties:
+          type: object
+          additionalProperties: true
+          description: Event properties of the most the work can use; the hold reserves the credits they cost. Omitted means `{}`.
+        timestamp:
+          allOf:
+            - $ref: '#/components/schemas/CreditsEventTime'
+          description: Required. Time of the usage. Send the same value on every retry.
+        ttl_seconds:
+          type: integer
+          minimum: 1
+          maximum: 86400
+          description: Seconds until the hold expires. Default 900. A value outside 1 to 86400 returns `400 hold_ttl_invalid`.
+    CreditsUsageHoldFinalizeRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - timestamp
+      description: The actual usage of the held call. Unknown fields are rejected.
+      properties:
+        properties:
+          type: object
+          additionalProperties: true
+          description: Event properties of the actual usage. Omitted means `{}`; a zero amount releases the hold.
+        timestamp:
+          allOf:
+            - $ref: '#/components/schemas/CreditsEventTime'
+          description: Required. Time of the usage. Send the same value on every retry; a finalized hold replays only the same body.
+    CreditsUsageHold:
+      type: object
+      description: A credit hold. Amounts are decimal strings. Empty optional fields are omitted.
+      required:
+        - hold_id
+        - status
+        - customer_id
+        - feature_code
+        - credit_system
+        - metric_amount
+        - credits_required
+        - credits_held
+        - expires_at
+        - created_at
+        - resolved_at
+      properties:
+        hold_id:
+          type: string
+          description: Hold identifier.
+        status:
+          type: string
+          enum:
+            - held
+            - denied
+            - finalized
+            - released
+            - expired
+          description: '`held` while it reserves credits; `denied` when the balance was short at creation. An open hold past `expires_at` reads as `expired`.'
+        customer_id:
+          type: string
+          description: External customer ID.
+        entity_id:
+          type: string
+          description: External Entity ID. Omitted for customer-level usage.
+        subscription_id:
+          type: string
+          description: External ID of the subscription that pays. Omitted when none does.
+        feature_code:
+          type: string
+        credit_system:
+          type: string
+          description: Credit System code.
+        pool_policy:
+          type: string
+          enum:
+            - entity_only
+            - entity_then_customer
+            - customer_only
+          description: Pool policy the hold spends under. Omitted for customer-level usage.
+        metric_amount:
+          type: string
+          description: Metric amount the hold was created for.
+        credits_required:
+          type: string
+          description: Credits that amount costs at the pinned rate.
+        credits_held:
+          type: string
+          description: Credits reserved; `0` for a denied hold.
+        expires_at:
+          type: string
+          format: date-time
+          description: Time the hold stops reserving.
+        created_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: Time the hold was denied, finalized, released or expired; `null` while it is open.
+        operation_id:
+          type: string
+          description: Credit operation that spent the usage. Only on a finalized hold.
+      example:
+        hold_id: 6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10
+        status: held
+        customer_id: customer_123
+        entity_id: user_42
+        feature_code: agent_execution
+        credit_system: ai_credits
+        pool_policy: entity_then_customer
+        metric_amount: '8000'
+        credits_required: '8'
+        credits_held: '8'
+        expires_at: '2026-10-31T12:10:00.912Z'
+        created_at: '2026-10-31T12:00:00.912Z'
+        resolved_at: null
+    CreditsUsageHoldCreateResponse:
+      description: 'The hold plus the decision. `allowed: false` (status `denied`, `reason: insufficient_credits`) reserves nothing.'
+      allOf:
+        - $ref: '#/components/schemas/CreditsUsageHold'
+        - type: object
+          required:
+            - allowed
+            - available
+          properties:
+            allowed:
+              type: boolean
+              description: Whether the credits were reserved.
+            reason:
+              type: string
+              description: Reason code when `allowed` is `false`, for example `insufficient_credits`.
+            available:
+              type: string
+              description: Spendable credits just before this hold, other callers' open holds already subtracted.
+      example:
+        hold_id: 6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10
+        status: held
+        customer_id: customer_123
+        entity_id: user_42
+        feature_code: agent_execution
+        credit_system: ai_credits
+        pool_policy: entity_then_customer
+        metric_amount: '8000'
+        credits_required: '8'
+        credits_held: '8'
+        expires_at: '2026-10-31T12:10:00.912Z'
+        created_at: '2026-10-31T12:00:00.912Z'
+        resolved_at: null
+        allowed: true
+        available: '625'
+    CreditsUsageHoldFinalizeResponse:
+      description: The `POST /usage/track` response of the actual usage plus the hold's outcome.
+      allOf:
+        - $ref: '#/components/schemas/CreditsUsageTrackResponse'
+        - type: object
+          required:
+            - hold_id
+            - hold_status
+            - credits_held
+            - credits_released
+            - hold_expired
+          properties:
+            hold_id:
+              type: string
+            hold_status:
+              type: string
+              enum:
+                - held
+                - finalized
+                - released
+                - expired
+              description: '`finalized` after a spend, `released` after a zero amount, `held` when a denied finalize left the hold open, `expired` when it had expired.'
+            credits_held:
+              type: string
+              description: Credits the hold reserved.
+            credits_released:
+              type: string
+              description: Reserved credits returned to the balance.
+            hold_expired:
+              type: boolean
+              description: '`true` when the hold had expired and the usage ran as a plain track.'
+      example:
+        allowed: true
+        operation_id: 1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f
+        entity_id: user_42
+        pool_policy: entity_then_customer
+        metric_amount: '5500'
+        credit_system: ai_credits
+        credits_consumed: '5.5'
+        remaining: '619.5'
+        deductions:
+          - balance_source_id: bf659149-0d70-4d2a-8a7b-a4569cc742eb
+            source_type: subscription_grant
+            source_scope: customer
+            amount: '5.5'
+            remaining: '619.5'
+        hold_id: 6f1d1c8e-5a43-4c0e-9d0b-2f1c9e7a4b10
+        hold_status: finalized
+        credits_held: '8'
+        credits_released: '2.5'
+        hold_expired: false
+    CreditsCustomerHoldList:
+      type: object
+      required:
+        - customer_id
+        - holds
+      properties:
+        customer_id:
+          type: string
+        holds:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreditsUsageHold'
+          description: Newest first, at most 100.
     CreditsCheckAndDeductRequest:
       type: object
       required:
@@ -40989,7 +42203,7 @@ components:
           description: Whether the customer may use the feature now.
         reason:
           type: string
-          description: Denial code. Present only when `allowed` is `false`. `customer_payment_overdue` (Engine 2.22.0) comes with HTTP `402`, every other reason with `200`.
+          description: Denial code. Present only when `allowed` is `false`. `customer_payment_overdue` (Engine 2.22.0) comes with HTTP `402`, every other reason with `200`. `budget_exceeded` is Engine 2.34.0.
           enum:
             - feature_not_found
             - no_subscription
@@ -40998,6 +42212,7 @@ components:
             - usage_limit_exceeded
             - economic_policy_denied
             - customer_payment_overdue
+            - budget_exceeded
         feature_type:
           type: string
           description: Feature type, such as `boolean`, `config` or `metered`. Absent when the feature or subscription is missing, and when a metered feature has neither an entitlement nor a charge.
@@ -41029,6 +42244,10 @@ components:
           $ref: '#/components/schemas/PlatformCanEconomics'
         policy:
           $ref: '#/components/schemas/PlatformCanPolicy'
+        budget:
+          allOf:
+            - $ref: '#/components/schemas/Budget'
+          description: Engine 2.34.0. The spend limit that refused the call (`budget_exceeded`), else the tightest one covering the feature. Only for a feature the plan prices with a usage charge and a subscription a spend limit applies to.
     PlatformCanEconomics:
       type: object
       description: Point-in-time estimate for the proposed call of an allowed metered feature. Monetary values are exact decimal strings in `currency`, not cents.
@@ -41814,6 +43033,579 @@ components:
           description: When the intent was last updated.
           format: date-time
           example: '2026-10-22T07:10:02Z'
+    SpendLimit:
+      type: object
+      required:
+        - spend_limit
+      properties:
+        spend_limit:
+          $ref: '#/components/schemas/SpendLimitObject'
+    SpendLimitsPaginated:
+      type: object
+      required:
+        - spend_limits
+        - meta
+      properties:
+        spend_limits:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpendLimitObject'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    SpendLimitObject:
+      type: object
+      description: 'Core 11.23.0. A money budget on the gross metered usage charges of a subscription per period. A plan limit (`plan_code`) is the default of the plan''s subscriptions; a subscription limit (`external_subscription_id`) overrides the plan''s limit for the same Feature, or for the total when `feature_code` is `null`.'
+      required:
+        - nozle_id
+        - plan_code
+        - plan_id
+        - external_subscription_id
+        - subscription_id
+        - feature_code
+        - amount_cents
+        - currency
+        - period
+        - mode
+        - thresholds
+        - created_at
+        - updated_at
+      properties:
+        nozle_id:
+          type: string
+          format: uuid
+          description: Unique identifier of the spend limit, created by Nozle.
+          example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+        plan_code:
+          type:
+            - string
+            - 'null'
+          description: Code of the plan whose subscriptions get this limit. `null` on a subscription override.
+          example: pro
+        plan_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: '`nozle_id` of that plan version. `null` on a subscription override.'
+        external_subscription_id:
+          type:
+            - string
+            - 'null'
+          description: External ID of the subscription this override applies to. `null` on a plan limit.
+          example: null
+        subscription_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+          description: '`nozle_id` of that subscription. `null` on a plan limit.'
+        feature_code:
+          type:
+            - string
+            - 'null'
+          description: Feature whose usage charges the limit covers. `null` for the total of the usage charges.
+          example: null
+        amount_cents:
+          type:
+            - integer
+            - 'null'
+          format: int64
+          description: The limit in cents of `currency`. `null` only on a subscription override, where it turns the plan's limit off.
+          example: 50000
+        currency:
+          type: string
+          description: The plan's currency.
+          example: USD
+        period:
+          type: string
+          enum:
+            - billing_period
+            - calendar_month
+            - lifetime
+          description: '`billing_period`: the subscription''s billing period. `calendar_month`: the month in the customer''s time zone. `lifetime`: never resets.'
+          example: billing_period
+        mode:
+          type: string
+          enum:
+            - hard
+            - soft
+          description: '`hard`: the Engine refuses metered usage once the limit is used up (`budget_exceeded`). `soft`: notifications only.'
+          example: hard
+        thresholds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Percentages of the limit that notify, each once per period. Default `[50, 80, 90, 100]`.
+          example:
+            - 50
+            - 80
+            - 90
+            - 100
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-10-31T12:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-10-31T12:00:00Z'
+    SpendLimitCreateInput:
+      type: object
+      required:
+        - spend_limit
+      properties:
+        spend_limit:
+          type: object
+          description: Send exactly one of `plan_code` and `external_subscription_id`.
+          properties:
+            plan_code:
+              type: string
+              description: Code of a plan. The limit goes on its current version and is the default of every subscription of the plan code, on any version. A per-customer override plan returns `422 plan_is_an_override`.
+              example: pro
+            external_subscription_id:
+              type: string
+              description: External ID of an active subscription. The limit overrides the plan's limit for the same Feature (or the total) on that subscription, and follows it through a plan change until it is removed.
+              example: sub_pro_123
+            feature_code:
+              type: string
+              description: Code of a Feature. Omit for a limit on the total of the usage charges.
+              example: llm_tokens
+            amount_cents:
+              type:
+                - integer
+                - 'null'
+              format: int64
+              minimum: 1
+              description: The limit in cents of the plan's currency, a positive integer. Required on a plan limit. `null` on a subscription override turns the plan's limit off for that subscription.
+              example: 50000
+            currency:
+              type: string
+              description: Optional. Must equal the plan's currency, or the request returns `422 currencies_does_not_match`.
+              example: USD
+            period:
+              type: string
+              enum:
+                - billing_period
+                - calendar_month
+                - lifetime
+              default: billing_period
+            mode:
+              type: string
+              enum:
+                - hard
+                - soft
+              default: hard
+            thresholds:
+              type: array
+              items:
+                type: integer
+                minimum: 1
+                maximum: 100
+              description: Percentages that notify, each from 1 to 100, without repeats. Default `[50, 80, 90, 100]`.
+    SpendLimitUpdateInput:
+      type: object
+      required:
+        - spend_limit
+      properties:
+        spend_limit:
+          type: object
+          description: Only these keys change. A key sent as `null` is ignored, except `amount_cents`.
+          properties:
+            amount_cents:
+              type:
+                - integer
+                - 'null'
+              format: int64
+              minimum: 1
+              description: The new limit in cents. `null` turns a subscription override off; a plan limit needs an amount.
+              example: 90000
+            currency:
+              type: string
+              description: Optional. Must equal the limit's currency.
+            period:
+              type: string
+              enum:
+                - billing_period
+                - calendar_month
+                - lifetime
+            mode:
+              type: string
+              enum:
+                - hard
+                - soft
+            thresholds:
+              type: array
+              items:
+                type: integer
+                minimum: 1
+                maximum: 100
+    SpendLimitUnrateableChargesError:
+      type: object
+      description: 'Core 11.23.0. A usage charge the limit covers cannot be rated per event by the Engine, so its spend could not be counted. Change the charge, or put the limit on a Feature whose charges can be rated.'
+      required:
+        - status
+        - error
+        - code
+        - charges
+      properties:
+        status:
+          type: integer
+          format: int32
+          example: 422
+        error:
+          type: string
+          example: Unprocessable Entity
+        code:
+          type: string
+          enum:
+            - spend_limit_unrateable_charges
+        charges:
+          type: array
+          items:
+            type: object
+            required:
+              - code
+              - charge_model
+            properties:
+              code:
+                type: string
+                description: The charge's code.
+              charge_model:
+                type: string
+                description: The charge's model.
+    Budget:
+      type: object
+      description: Engine 2.34.0. One spend limit and its standing in the current period. Amounts are decimal strings in major units of `currency`, not cents.
+      required:
+        - feature_code
+        - limit
+        - spent
+        - held
+        - remaining
+        - currency
+        - period
+        - period_start
+        - period_end
+        - mode
+        - status
+        - as_of
+      properties:
+        feature_code:
+          type:
+            - string
+            - 'null'
+          description: The Feature the limit covers; `null` for the subscription's total limit.
+        limit:
+          type: string
+          description: The limit.
+          example: '500'
+        spent:
+          type: string
+          description: Gross usage charges booked this period.
+          example: '412.5'
+        held:
+          type: string
+          description: Estimated spend reserved by open budget holds.
+          example: '7.5'
+        remaining:
+          type: string
+          description: '`limit` minus `spent` and `held`, never below 0.'
+          example: '80'
+        currency:
+          type: string
+          example: USD
+        period:
+          type: string
+          enum:
+            - billing_period
+            - calendar_month
+            - lifetime
+        period_start:
+          type: string
+          format: date-time
+          description: Start of the current period. `1970-01-01T00:00:00Z` for a `lifetime` limit.
+        period_end:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: End of the current period; `null` for a `lifetime` limit.
+        mode:
+          type: string
+          enum:
+            - hard
+            - soft
+        status:
+          type: string
+          enum:
+            - ok
+            - warning
+            - exceeded
+          description: '`exceeded` when `spent` plus `held` reaches `limit` (a soft limit too, though it never refuses); `warning` once it reaches a threshold of the limit below 100; else `ok`.'
+        as_of:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: Time of the latest event booked into `spent`; `null` before the first one.
+      example:
+        feature_code: null
+        limit: '500'
+        spent: '412.5'
+        held: '7.5'
+        remaining: '80'
+        currency: USD
+        period: billing_period
+        period_start: '2026-11-01T00:00:00Z'
+        period_end: '2026-12-01T00:00:00Z'
+        mode: hard
+        status: warning
+        as_of: '2026-11-14T09:30:12.418Z'
+    CustomerBudgetList:
+      type: object
+      required:
+        - customer_id
+        - subscription_id
+        - budgets
+      properties:
+        customer_id:
+          type: string
+          description: External customer ID.
+        subscription_id:
+          type: string
+          description: External ID of the subscription read.
+        budgets:
+          type: array
+          items:
+            $ref: '#/components/schemas/Budget'
+          description: Tightest first (least `remaining`).
+    BudgetUsageHold:
+      type: object
+      description: 'Engine 2.34.0. A budget hold: a reservation of a call''s estimated spend against the hard spend limits covering a Feature billed in money. Amounts are decimal strings in major units of `currency`.'
+      required:
+        - hold_id
+        - kind
+        - status
+        - customer_id
+        - subscription_id
+        - feature_code
+        - metric_amount
+        - amount_held
+        - currency
+        - expires_at
+        - created_at
+        - resolved_at
+      properties:
+        hold_id:
+          type: string
+        kind:
+          type: string
+          enum:
+            - budget
+          description: Always `budget`. A credit hold has no `kind`.
+        status:
+          type: string
+          enum:
+            - held
+            - denied
+            - finalized
+            - booked
+            - released
+            - expired
+          description: '`held` while it reserves; `denied` when the estimate did not fit; `finalized` once its usage is sent (it keeps counting until that event is booked); `booked` once the event''s spend is counted instead; `released`; `expired`.'
+        customer_id:
+          type: string
+        subscription_id:
+          type: string
+          description: External ID of the subscription whose limits the hold counts against.
+        feature_code:
+          type: string
+        metric_amount:
+          type: string
+          description: Metric amount the hold was created for.
+        amount_held:
+          type: string
+          description: Estimated spend reserved; `0` once the hold no longer reserves (denied, booked, released, expired).
+        currency:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+      example:
+        hold_id: 0b7a4c2e-3d1f-4f6a-9c8b-1e2d3c4b5a69
+        kind: budget
+        status: held
+        customer_id: customer_123
+        subscription_id: sub_pro_123
+        feature_code: llm_tokens
+        metric_amount: '4000'
+        amount_held: '0.08'
+        currency: USD
+        expires_at: '2026-11-14T09:45:00.512Z'
+        created_at: '2026-11-14T09:30:00.512Z'
+        resolved_at: null
+    BudgetUsageHoldCreateResponse:
+      description: 'The budget hold plus the decision. `allowed: false` (status `denied`, `reason: budget_exceeded`) reserves nothing.'
+      allOf:
+        - $ref: '#/components/schemas/BudgetUsageHold'
+        - type: object
+          required:
+            - allowed
+          properties:
+            allowed:
+              type: boolean
+              description: Whether the estimated spend was reserved.
+            reason:
+              type: string
+              enum:
+                - budget_exceeded
+              description: Present when `allowed` is `false`.
+            budget:
+              $ref: '#/components/schemas/Budget'
+      example:
+        hold_id: 0b7a4c2e-3d1f-4f6a-9c8b-1e2d3c4b5a69
+        kind: budget
+        status: denied
+        customer_id: customer_123
+        subscription_id: sub_pro_123
+        feature_code: llm_tokens
+        metric_amount: '4000'
+        amount_held: '0'
+        currency: USD
+        expires_at: '2026-11-14T09:45:00.512Z'
+        created_at: '2026-11-14T09:30:00.512Z'
+        resolved_at: '2026-11-14T09:30:00.512Z'
+        allowed: false
+        reason: budget_exceeded
+        budget:
+          feature_code: null
+          limit: '500'
+          spent: '499.95'
+          held: '0'
+          remaining: '0.05'
+          currency: USD
+          period: billing_period
+          period_start: '2026-11-01T00:00:00Z'
+          period_end: '2026-12-01T00:00:00Z'
+          mode: hard
+          status: warning
+          as_of: '2026-11-14T09:29:58.104Z'
+    BudgetWebhookObject:
+      type: object
+      description: Engine 2.34.0, Core 11.23.0. A spend limit that reached a threshold. Amounts are decimal strings in major units of `currency`.
+      required:
+        - subscription_external_id
+        - external_customer_id
+        - feature_code
+        - threshold
+        - spent
+        - limit
+        - currency
+        - period
+        - period_start
+        - period_end
+        - mode
+      properties:
+        subscription_external_id:
+          type: string
+        external_customer_id:
+          type: string
+        feature_code:
+          type:
+            - string
+            - 'null'
+          description: '`null` for a limit on the total.'
+        threshold:
+          type: integer
+          description: The highest threshold the spend crossed (`100` for `budget.exceeded`). Lower thresholds crossed by the same jump are not sent.
+        spent:
+          type: string
+          description: Spend booked this period when the threshold was crossed.
+        limit:
+          type: string
+        currency:
+          type: string
+        period:
+          type: string
+          enum:
+            - billing_period
+            - calendar_month
+            - lifetime
+        period_start:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        period_end:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: '`null` for a `lifetime` limit.'
+        mode:
+          type: string
+          enum:
+            - hard
+            - soft
+    UsageLimitWebhookObject:
+      type: object
+      description: Engine 2.34.0, Core 11.23.0. A Feature's hard usage limit (an entitlement `usage_limit`) that reached 50, 80, 90 or 100 %.
+      required:
+        - subscription_external_id
+        - external_customer_id
+        - feature_code
+        - threshold
+        - usage
+        - limit
+        - period_start
+        - period_end
+        - mode
+      properties:
+        subscription_external_id:
+          type: string
+        external_customer_id:
+          type: string
+        feature_code:
+          type: string
+        threshold:
+          type: integer
+          enum:
+            - 50
+            - 80
+            - 90
+            - 100
+          description: The highest threshold the usage crossed.
+        usage:
+          type: string
+          description: Usage this billing period, in units, as a decimal string.
+        limit:
+          type: integer
+          format: int64
+          description: The usage limit, in units.
+        period_start:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        period_end:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        mode:
+          type: string
+          enum:
+            - hard
   responses:
     Unauthorized:
       description: 'Missing, unknown or expired API key, or a key refused by its environment: a sandbox key (`sk_nozle_test_`, `pk_nozle_test_`) on a live organization, a live key on a sandbox, or a key of a reset sandbox. The body does not say which. A `401` carries no `X-Nozle-Livemode` header.'
@@ -41897,7 +43689,7 @@ components:
             code: customer_payment_overdue
             error: "This customer's invoices are unpaid past their grace period. Usage resumes once they are paid."
     OpenAIProxyBadRequest:
-      description: '`invalid_request`: `X-Nozle-Customer-Id` is missing, or the request body could not be read. In the OpenAI error shape from Engine 2.22.0.'
+      description: '`invalid_request`: `X-Nozle-Customer-Id` is missing, the request body could not be read, or (Engine 2.34.0) `X-Nozle-Credit-Hold` is not a positive decimal metric amount. In the OpenAI error shape from Engine 2.22.0.'
       content:
         application/json:
           schema:
@@ -41921,7 +43713,7 @@ components:
               code: unauthorized
             code: unauthorized
     OpenAIProxyPaymentRequired:
-      description: '`customer_payment_overdue` (Engine 2.22.0): the customer''s unpaid invoices are past the grace of their plan and their [dunning policy](/guides/billing/dunning) ends with `block`; the provider is not called. `workspace_suspended` or `card_required`: your workspace is blocked by Nozle, see [Errors](/api/errors#workspace-billing-errors). Do not retry. In the OpenAI error shape from Engine 2.22.0.'
+      description: '`customer_payment_overdue` (Engine 2.22.0): the customer''s unpaid invoices are past the grace of their plan and their [dunning policy](/guides/billing/dunning) ends with `block`; the provider is not called. `workspace_suspended` or `card_required`: your workspace is blocked by Nozle, see [Errors](/api/errors#workspace-billing-errors). Do not retry. `insufficient_credits` (Engine 2.34.0): the customer''s free credits do not cover the `X-Nozle-Credit-Hold` amount; the provider is not called. `budget_exceeded` (Engine 2.34.0): a hard spend limit covering the Feature is used up, or the `X-Nozle-Credit-Hold` estimate does not fit in it; the provider is not called and the body adds the limit as `budget`. In the OpenAI error shape from Engine 2.22.0.'
       content:
         application/json:
           schema:
@@ -41932,6 +43724,18 @@ components:
               type: payment_required
               code: customer_payment_overdue
             code: customer_payment_overdue
+    OpenAIProxyUsageLimitExceeded:
+      description: '`usage_limit_exceeded`: the customer reached a hard usage limit of the Feature; the provider is not called. A refusal, not a rate limit: do not retry until the limit or the period changes. In the OpenAI error shape.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpenAIProxyError'
+          example:
+            error:
+              message: the customer's hard usage limit is reached
+              type: rate_limit_error
+              code: usage_limit_exceeded
+            code: usage_limit_exceeded
     OpenAIProxyForbidden:
       description: '`publishable_key_not_allowed` (a publishable key) or `permission_denied` (the key cannot write events). In the OpenAI error shape from Engine 2.22.0.'
       content:
@@ -41969,7 +43773,7 @@ components:
               code: unavailable
             code: unavailable
     AnthropicProxyBadRequest:
-      description: '`invalid_request`: `X-Nozle-Customer-Id` is missing, or the request body could not be read. In the Anthropic error shape from Engine 2.22.0.'
+      description: '`invalid_request`: `X-Nozle-Customer-Id` is missing, the request body could not be read, or (Engine 2.34.0) `X-Nozle-Credit-Hold` is not a positive decimal metric amount. In the Anthropic error shape from Engine 2.22.0.'
       content:
         application/json:
           schema:
@@ -41995,7 +43799,7 @@ components:
               code: unauthorized
             code: unauthorized
     AnthropicProxyPaymentRequired:
-      description: '`customer_payment_overdue` (Engine 2.22.0): the customer''s unpaid invoices are past the grace of their plan and their [dunning policy](/guides/billing/dunning) ends with `block`; the provider is not called. `workspace_suspended` or `card_required`: your workspace is blocked by Nozle, see [Errors](/api/errors#workspace-billing-errors). Do not retry. In the Anthropic error shape from Engine 2.22.0.'
+      description: '`customer_payment_overdue` (Engine 2.22.0): the customer''s unpaid invoices are past the grace of their plan and their [dunning policy](/guides/billing/dunning) ends with `block`; the provider is not called. `workspace_suspended` or `card_required`: your workspace is blocked by Nozle, see [Errors](/api/errors#workspace-billing-errors). Do not retry. `insufficient_credits` (Engine 2.34.0): the customer''s free credits do not cover the `X-Nozle-Credit-Hold` amount; the provider is not called. `budget_exceeded` (Engine 2.34.0): a hard spend limit covering the Feature is used up, or the `X-Nozle-Credit-Hold` estimate does not fit in it; the provider is not called and the body adds the limit as `budget`. In the Anthropic error shape from Engine 2.22.0.'
       content:
         application/json:
           schema:
@@ -42007,6 +43811,19 @@ components:
               message: 'This customer''s invoices are unpaid past their grace period. Usage resumes once they are paid.'
               code: customer_payment_overdue
             code: customer_payment_overdue
+    AnthropicProxyUsageLimitExceeded:
+      description: '`usage_limit_exceeded`: the customer reached a hard usage limit of the Feature; the provider is not called. A refusal, not a rate limit: do not retry until the limit or the period changes. In the Anthropic error shape.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AnthropicProxyError'
+          example:
+            type: error
+            error:
+              type: rate_limit_error
+              message: the customer's hard usage limit is reached
+              code: usage_limit_exceeded
+            code: usage_limit_exceeded
     AnthropicProxyForbidden:
       description: '`publishable_key_not_allowed` (a publishable key) or `permission_denied` (the key cannot write events). In the Anthropic error shape from Engine 2.22.0.'
       content:
