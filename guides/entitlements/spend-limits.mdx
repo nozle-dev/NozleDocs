@@ -161,7 +161,9 @@ try {
 }
 ```
 
-The estimate is the charge's price of the held amount on top of the period's usage. The spend counted from the finalized usage is exact. See [Create a Credit Hold](/api/create-usage-hold#budget-holds) for the response and the hold's limits.
+The estimate is the charge's price of the held amount on top of the period's usage. The spend counted from the finalized usage is exact.
+
+Retries are safe. A `/usage/track` retry with the same `Idempotency-Key` replays its first answer before any spend limit or overdue-payment refusal, so a call accepted before the limit ran out is never answered `budget_exceeded` on retry. A budget hold's key covers only the request you sent (body, amount to hold, TTL), never the estimate, so a same-body retry replays even after usage moved the charge to another tier. See [Create a Credit Hold](/api/create-usage-hold#budget-holds) for the response and the hold's limits.
 
 ## Notifications
 
@@ -200,8 +202,7 @@ A hard usage limit in units (an entitlement `usage_limit` with a hard limit) sen
 - **Per subscription only.** A limit caps one subscription. There is no limit across a customer's subscriptions, and no currency conversion.
 - **Usage events are never refused.** Usage sent with `POST /events` is billed even past a hard limit. Only the calls that check (`/can`, the proxy, `/usage/check`, `/usage/track`, holds) are refused.
 - **The LLM proxy fails open.** When the spend limits or a budget hold cannot be read, the proxy lets the call through rather than refuse it. `/can`, `/usage/check` and `/usage/track` answer `503 budget_unavailable` instead.
-- **`/usage/track` checks before the replay.** A retry of a track that was accepted before the limit ran out gets `budget_exceeded`, although the first request was recorded.
-- **Budget hold estimates are approximate for some charges.** A charge with filters, pricing groups or percentage free units is estimated on the Feature's total usage, and a dynamic charge at 0. On a tiered charge the estimate grows with the period's usage, so a hold retried with the same `Idempotency-Key` after more usage was counted can answer `409 idempotency_key_reused`.
+- **Budget hold estimates are approximate for some charges.** A charge with filters, pricing groups or percentage free units is estimated on the Feature's total usage, and a dynamic charge at 0.
 - **A finalized budget hold keeps counting** until its usage event is counted, at least 10 minutes after the finalize. Budget holds resolved more than 7 days ago are deleted, and a retry of their key then creates a new hold.
 - **Charges that cannot be priced are not counted.** Nozle refuses limits on them and refuses to change a covered charge into one. If an event under a limit still cannot be priced, it is logged and its spend is not counted.
 - **After a usage counter rebuild, late events of an ended period are not counted.** While lost usage counters are being rebuilt, `/can` answers `503 usage_unavailable` for a Feature with a hard usage limit instead of reading zero usage.

@@ -86,6 +86,7 @@ From Engine 2.31.0, a hold on a Feature the plan bills in money (a priced usage 
 - **The estimate** is the charge's price of the metric amount in `properties`, on top of the period's usage so far, in the plan's currency. Send the most the call can use.
 - **Refused** when the estimate does not fit, or a limit is already used up: `200` with `allowed: false`, `status: "denied"`, `reason: "budget_exceeded"` and the limit in `budget`. Nothing is reserved.
 - **Allowed:** `status: "held"`, `amount_held` is the estimate and `budget` is the tightest limit as it stood just before this hold (this hold is not in its `held`).
+- **Retries replay.** The `Idempotency-Key` covers only what you sent (the body, the amount to hold and `ttl_seconds`), never the estimate. A retry with the same body returns the first answer, even after other usage moved the charge to another tier.
 - **Settle it** with [Finalize](/api/finalize-usage-hold#budget-holds) (the usage is sent as one event and its spend is counted once) or [Release](/api/release-usage-hold). `ttl_seconds`, expiry and the sweep work as for credit holds.
 - Without a hard spend limit covering the Feature, a Feature billed in money still answers `409 feature_billed_in_money`.
 
@@ -126,7 +127,6 @@ A budget hold has `kind: "budget"`, `subscription_id`, `amount_held` and `curren
 Known limits:
 
 - A charge with filters, pricing groups or percentage free units is estimated on the Feature's total usage, not its own, and a dynamic charge (priced by its events) is estimated at 0. The spend booked from the finalized usage is exact.
-- The estimate is part of the request's fingerprint. On a tiered charge it can change as the period's usage grows, so a retry with the same key after other usage was counted can answer `409 idempotency_key_reused`.
 - Budget holds resolved more than 7 days ago are deleted; a retry of their `Idempotency-Key` after that creates a new hold.
 
 ## Errors
