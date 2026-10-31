@@ -37,7 +37,7 @@ The body is the [`/usage/track`](/api/usage-track) body plus `ttl_seconds`. `cus
 
 ## Idempotency
 
-`Idempotency-Key` is required and must not exceed 255 bytes; otherwise the request returns `400 invalid_request`. A retry with the same key and the same body returns the first answer, including a denial, and reserves nothing again. The same key with a different body returns `409 idempotency_key_reused`. Retry `503` answers with the same key and body.
+`Idempotency-Key` is required and must not exceed 255 bytes; otherwise the request returns `400 invalid_request`. Keys starting with `hold:` are reserved for Nozle and also return `400 invalid_request`. A retry with the same key and the same body returns the first answer, including a denial, and reserves nothing again. A replay is answered even when a new hold would now be refused, for example with `402 customer_payment_overdue`. The same key with a different body returns `409 idempotency_key_reused`. Retry `503` answers with the same key and body.
 
 ## Response
 
@@ -81,9 +81,9 @@ A short balance answers `200` with `allowed: false`, `status: "denied"` and `rea
 
 | Status | `code` | Meaning |
 |--------|--------|---------|
-| `400` | `invalid_request` | Invalid JSON, an unknown field, a missing `customer_id`, `feature_code` or `timestamp`, or a missing or invalid `Idempotency-Key`. |
+| `400` | `invalid_request` | Invalid JSON, an unknown field, a missing `customer_id`, `feature_code` or `timestamp`, or a missing or invalid `Idempotency-Key` (including one starting with `hold:`). |
 | `400` | `hold_ttl_invalid` | `ttl_seconds` is not an integer from 1 to 86400. |
-| `402` | `customer_payment_overdue` | The customer is blocked by your [dunning policy](/guides/billing/dunning). Nothing is held. |
+| `402` | `customer_payment_overdue` | The customer is blocked by your [dunning policy](/guides/billing/dunning). Nothing is held. A retry of an earlier request with the same key gets its stored answer instead. |
 | `403` | `permission_denied` | The key lacks `credit_system:write`. |
 | `404` | `customer_not_found`, `active_subscription_not_found`, `feature_not_found`, `entity_not_found` | As on `/usage/track`. |
 | `409` | `idempotency_key_reused` | The key was used with a different body. |

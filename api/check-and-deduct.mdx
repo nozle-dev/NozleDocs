@@ -19,7 +19,7 @@ Without an `Idempotency-Key`, every call that returns `allowed: true` deducts, a
 
 ## Idempotency-Key
 
-From Engine 2.30.0 the endpoint accepts an optional `Idempotency-Key` header of at most 255 bytes. The first answer under a key, allowed or not, is stored with the deduction, and a retry with the same key, `customer_id` and `credits` returns that answer (with its `remaining`) without deducting again. The same key with another customer or amount answers `409 idempotency_key_reused`. A blank or longer key answers `400 invalid_request`.
+From Engine 2.30.0 the endpoint accepts an optional `Idempotency-Key` header of at most 255 bytes. The first answer under a key, allowed or not, is stored with the deduction, and a retry with the same key, `customer_id` and `credits` returns that answer (with its `remaining`) without deducting again. The same key with another customer or amount answers `409 idempotency_key_reused`. A blank or longer key answers `400 invalid_request`. Keys are kept for 7 days; a retry with an older key deducts again.
 
 One gap remains: when Core's wallet transaction succeeds but the Engine then fails to record the answer, the key is not stored and a retry deducts again. Use `/usage/track` when exactly-once matters.
 

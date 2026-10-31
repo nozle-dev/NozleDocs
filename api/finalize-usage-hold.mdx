@@ -34,7 +34,7 @@ Content-Type: application/json
 
 ## Retries
 
-A repeated finalize with the same body returns the first answer and spends nothing again. Sending other usage to a finalized hold returns `409 hold_already_resolved`, and so does finalizing a released or denied hold. Keep the `timestamp` fixed across retries; the SDKs reuse a timestamp they filled in for the same hold on the same client.
+A repeated finalize with the same body returns the first answer and spends nothing again; that includes a zero-usage finalize that released the hold. Sending other usage to a finalized hold returns `409 hold_already_resolved`, and so does finalizing a released or denied hold. Keep the `timestamp` fixed across retries; the SDKs reuse a timestamp they filled in for the same hold on the same client.
 
 ## Response
 
