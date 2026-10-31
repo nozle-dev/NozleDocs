@@ -114,10 +114,34 @@ try {
 }
 ```
 
+## Batching events
+
+From `@nozle-js/node` 0.26.0, `trackBatch()` sends many events through Engine's `/events/batch`. It splits them into gzipped requests of up to 5000 events, sends several at once and returns one result per event. It needs Engine 2.28.0, which accepts gzip and 5000 events per request.
+
+```ts
+const result = await nozle.trackBatch([
+  { customerId: 'workspace_123', event: 'api_calls', metadata: { tokens: 100 } },
+  { customerId: 'workspace_456', event: 'api_calls', timestamp: '2026-10-29T09:30:00Z' },
+], { chunkSize: 5000, concurrency: 4 })
+
+for (const r of result.results) {
+  if (r.status === 'rejected') console.warn(r.index, r.errors) // { code: ['value_is_mandatory'] }
+  if (r.status === 'failed') console.error(r.index, r.transactionId, r.error) // resend with this transactionId
+}
+```
+
+- **Events.** Each event is `{ customerId, event, subscriptionId?, metadata?, transactionId?, timestamp? }`, the arguments of `track()`.
+- **Size.** `chunkSize` is 1 to 5000 (default 5000) events per request, and `concurrency` is 1 to 64 (default 4) requests in flight. An Engine with a lower limit answers `too_many_events`; the SDK then splits that request in half and resends each half.
+- **Result.** `{ total, accepted, rejected, failed, results }`. `results[i]` belongs to `events[i]`: `accepted` (stored), `rejected` (Engine refused this event; `errors` maps a field to codes, and resending it unchanged fails again) or `failed` (its request failed, so the event may or may not be stored; `error` says why). `trackBatch()` throws only for invalid arguments.
+- **Partial batches.** Engine stores the valid events of a request and names the refused ones by position. An Engine before 2.28.0 refuses a whole request for one invalid event; the SDK then rejects the named events and resends the rest.
+- **Idempotency.** Every event has a `transactionId`, yours or a generated one returned in `results[i].transactionId`. A request retried after a network error, a timeout, a `429` or a `5xx` records each event once. IDs must be unique in one call.
+
+`trackBatch()` records events like `track()`; it does not deduct credits. There is no client-side buffer yet: collect events and call `trackBatch()`.
+
 ## Operational guidance
 
 - Await `track()` when the request must know whether ingestion succeeded.
-- For high-volume workloads, publish through your own durable queue and call `track()` from a worker.
+- For high-volume workloads, publish through your own durable queue and call `trackBatch()` from a worker.
 - Do not create a new random transaction ID on each retry.
 - Do not regenerate the timestamp when retrying an accepted business event.
 - Match property names to the Feature aggregation configuration exactly.

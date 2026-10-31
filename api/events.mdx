@@ -40,7 +40,7 @@ A Feature that aggregates a property (`sum`, `max`, `latest`, `weighted_sum` or 
 
 An event needs `external_subscription_id` or `external_customer_id`. With only the customer, Nozle looks up that customer's active subscription and stores the event with its `external_subscription_id`, as the SDKs do. The customer must have exactly one active subscription; with several, send `external_subscription_id`.
 
-For direct HTTP ingestion, send this envelope to `POST https://api.nozle.app/engine/api/v1/events` with a secret key. Send batches of 1–100 events to `POST https://api.nozle.app/engine/api/v1/events/batch` using an `events` array. Event reads and fee estimates use the Core API. Prefer the SDKs so subscription lookup, UUID generation, timeout handling, and errors remain consistent.
+For direct HTTP ingestion, send this envelope to `POST https://api.nozle.app/engine/api/v1/events` with a secret key. Send batches of 1–5000 events to `POST https://api.nozle.app/engine/api/v1/events/batch` using an `events` array, as plain JSON or gzipped with `Content-Encoding: gzip`. The valid events of a batch are stored even when others are refused (Engine 2.28.0; before, the limit was 100 and one invalid event refused the whole batch). Event reads and fee estimates use the Core API. Prefer the SDKs so subscription lookup, UUID generation, timeout handling, and errors remain consistent.
 
 <Note>
 For retry safety, preserve the complete event payload, including `timestamp`, and reuse the same `transaction_id`. Never reuse a `transaction_id` for a different event: on the standard event store the first accepted event owns that identifier, the same event returns the stored one, and a different one (another code, subscription, properties or sent `timestamp`) gets `409 transaction_id_conflict`. On the high-volume event store the repeat is accepted with `200`, which does not tell you how it is counted; a repeat is deduplicated only when `transaction_id` and `timestamp` both match. Without a `timestamp`, each attempt is stamped when it arrives, so send one and reuse it. See [deduplication](/guides/billing/event-pipeline#2-ingest-and-deduplicate).
@@ -50,12 +50,14 @@ For retry safety, preserve the complete event payload, including `timestamp`, an
 
 | Case | Result |
 |---|---|
-| Accepted | `200` with the event under `event`. A batch returns the events under `events`. |
-| Batch size | 1 to 100 events. An empty array returns `422` with `events: ["no_events"]`, and more than 100 returns `422` with `events: ["too_many_events"]`. |
-| An invalid event in a batch | The whole batch is rejected with `422 validation_errors` and nothing is stored. `error_details` is keyed by the position of the event in the array, for example `{"0": {"external_customer_id": ["active_subscription_ambiguous"]}}`. |
+| Accepted | `200` with the event under `event`. A batch returns the stored events under `events`. |
+| Batch size | 1 to 5000 events. An empty array returns `422` with `events: ["no_events"]`, and more than 5000 returns `422` with `events: ["too_many_events"]`; nothing is stored. |
+| Batch body | Plain JSON, or gzip with `Content-Encoding: gzip`. A body over 16 MiB, decoded, returns `413 payload_too_large`; a body that is not valid gzip returns `400`. |
+| Some events of a batch refused | `200`. The valid events are stored and returned in `events`. Each refused event is listed in `error_details` by its position in the array, with the same codes a single event gets, for example `{"3": {"external_customer_id": ["active_subscription_ambiguous"]}}`. A blocked customer's event is listed with `external_customer_id: ["customer_payment_overdue"]` or `["customer_blocked"]`. |
+| Every event of a batch refused | Nothing is stored. `402` when every refusal is a blocked customer (`customer_blocked` if any is blocked by staff, otherwise `customer_payment_overdue`), otherwise `422 validation_errors`. `error_details` lists every event by position. |
 | A `transaction_id` already used, same payload | Standard event store: `200` with the stored event, and nothing new is stored. High-volume event store: `200`, and billing removes the repeat. |
 | A `transaction_id` already used, different payload | Standard event store: `409 transaction_id_conflict` with `error_details` `{"transaction_id": ["value_already_exist"]}`, and nothing is stored. High-volume event store: `200`, and billing counts one copy. See [deduplication](/guides/billing/event-pipeline#2-ingest-and-deduplicate). |
-| The same `transaction_id` twice in one batch, or a reused one with a different payload | Standard event store: the batch is rejected with `422 validation_errors` and `transaction_id: ["value_already_exist"]` for that event. High-volume event store: `200`. |
+| The same `transaction_id` twice in one batch, or a reused one with a different payload | Standard event store: that event is refused with `transaction_id: ["value_already_exist"]` in `error_details`, and the others are stored. High-volume event store: `200`. |
 | A `timestamp` that is not a number | `422` with `timestamp: ["invalid_format"]`. |
 | Neither `external_subscription_id` nor `external_customer_id` | `422 validation_errors` with `external_subscription_id: ["value_is_mandatory"]`. |
 | Only `external_customer_id`, and the customer is unknown or has no active subscription | `422 active_subscription_not_found` with `error_details` `{"external_customer_id": ["active_subscription_not_found"]}`. |
@@ -69,7 +71,7 @@ Nozle does not reject events for being old or in the future. A feature code that
 
 - Retry a network error, a timeout or a `5xx` with the same `transaction_id` and the same payload.
 - Do not retry a `4xx`. Fix the event first, because the same request gets the same answer.
-- For a batch, resend the whole batch after a failure you cannot read: a batch is either stored or rejected.
+- For a batch, resend the whole batch with the same transaction IDs after a network error, a timeout or a `5xx`: each ID is billed once. After a `200`, resend nothing but the events listed in `error_details`, once you have fixed them.
 
 See [idempotency](/api/idempotency) and [errors](/api/errors).
 

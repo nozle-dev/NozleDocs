@@ -3457,7 +3457,7 @@ paths:
       tags:
         - Events
       summary: Batch multiple events
-      description: This endpoint can be used to send a batch of usage records. Each request may include up to 100 events.
+      description: 'Send a batch of usage records: 1 to 5000 events per request (Engine 2.28.0; 100 before). The body may be gzipped with `Content-Encoding: gzip`; decoded, it is limited to 16 MiB. The valid events are stored even when others are refused. A `5xx` stores nothing for the request: resend it with the same transaction ids.'
       operationId: createBatchEvents
       requestBody:
         description: Batch events payload
@@ -3468,7 +3468,7 @@ paths:
         required: true
       responses:
         '200':
-          description: 'Events received. From Engine 2.22.0, events of a customer blocked by its [dunning policy](/guides/billing/dunning) are refused one by one and listed in `error_details` by their position; the other events are stored and returned in `events`.'
+          description: 'Events received. The stored events are returned in `events`. Refused events are listed in `error_details` by their position, with the codes a single event gets: an invalid event or a `transaction_id` already stored with other values (Engine 2.28.0), or a customer blocked by its [dunning policy](/guides/billing/dunning) (Engine 2.22.0).'
           content:
             application/json:
               schema:
@@ -3493,8 +3493,10 @@ paths:
                       - customer_payment_overdue
         '403':
           $ref: '#/components/responses/Forbidden'
+        '413':
+          description: 'The body is over 16 MiB, decoded. Nothing is stored. `code` is `payload_too_large`.'
         '422':
-          description: 'The batch was not stored. `code` is `validation_errors` and `error_details` is keyed by the position of each failing event, with the same field errors as a single event, for example `{"0": {"external_customer_id": ["active_subscription_not_found"]}}`. An empty batch returns `events: [no_events]`, more than 100 events `events: [too_many_events]`. On the standard (PostgreSQL) event store, the same `transaction_id` twice in the batch, or one already used by an event with a different payload, fails that event with `transaction_id: [value_already_exist]`; the high-volume (ClickHouse) event store accepts repeats.'
+          description: 'No event of the batch was stored. `code` is `validation_errors` and `error_details` is keyed by the position of each refused event, with the same field errors as a single event, for example `{"0": {"external_customer_id": ["active_subscription_not_found"]}}`. When only some events are refused, the answer is `200` instead. An empty batch returns `events: [no_events]`, more than 5000 events `events: [too_many_events]`. On the standard (PostgreSQL) event store, the same `transaction_id` twice in the batch, or one already used by an event with a different payload, refuses that event with `transaction_id: [value_already_exist]`; the high-volume (ClickHouse) event store accepts repeats.'
           content:
             application/json:
               schema:
@@ -3511,7 +3513,7 @@ paths:
         - lang: Go
           label: Go
           source: |-
-            err := client.Meter(ctx, []nozle.MeterEvent{
+            res, err := client.TrackBatch(ctx, []nozle.TrackParams{
             	{CustomerID: "cust_123", SubscriptionID: "sub_123", Event: "api_calls", Metadata: map[string]any{"tokens": 1200}},
             	{CustomerID: "cust_123", SubscriptionID: "sub_123", Event: "api_calls", Metadata: map[string]any{"tokens": 800}},
             })
@@ -30987,6 +30989,8 @@ components:
       properties:
         events:
           type: array
+          minItems: 1
+          maxItems: 5000
           items:
             $ref: '#/components/schemas/EventInputObject'
     EventsCreated:
@@ -31007,7 +31011,7 @@ components:
                     example: null
         error_details:
           type: object
-          description: 'Engine 2.22.0, `POST /events/batch` only. Present when events were refused because their customer is blocked by its [dunning policy](/guides/billing/dunning): keyed by the position of each refused event in the request. The other events were stored.'
+          description: '`POST /events/batch` only. Present when some events were refused, keyed by the position of each refused event in the request: an invalid event or a reused `transaction_id` (Engine 2.28.0), or a customer blocked by its [dunning policy](/guides/billing/dunning) (Engine 2.22.0). The other events were stored.'
           additionalProperties:
             type: object
             additionalProperties:
