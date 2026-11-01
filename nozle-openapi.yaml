@@ -42308,6 +42308,7 @@ components:
         - mode
         - on_unavailable
         - on_not_configured
+        - scope
         - maximum_snapshot_age_seconds
         - decision
         - reason
@@ -42336,6 +42337,14 @@ components:
             - allow
             - warn
             - deny
+        scope:
+          type: string
+          description: The target of the policy that decided the call, the narrowest that has a policy (customer, plan, then organization; a feature policy beats an all-features one within a target). Needs Engine 2.40.0.
+          enum:
+            - customer
+            - plan
+            - feature
+            - organization
         minimum_margin_amount:
           type: string
           description: Decimal string. Absent when not set.

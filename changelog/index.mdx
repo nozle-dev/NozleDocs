@@ -5,6 +5,15 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Margin policies for a plan or a customer (Core 11.25.1, Engine 2.40.0)
+
+_November 1, 2026_
+
+- **More targets.** A margin policy can apply to one catalog plan or one customer, besides the organization or one feature. `can()` takes the narrowest: the customer's policy, else the plan's, else the organization's; within one target a feature policy beats an all-features one. `policy.scope` in the answer says which one decided.
+- **Plan versions keep the policy.** Publishing a new plan version copies the plan's policies in effect, so subscribers who move keep the rule.
+- **Features with no Cost Rule.** `on_not_configured` (Core 11.24.0, Engine 2.39.0) decides them, default `allow`; `on_unavailable` now covers only real faults.
+- **Create them** through `nozleCreateMarginPolicy` with `planId` or `customerId` (not both). See [Margin policies and monitoring](/guides/margin/alerts#policies-per-plan-and-per-customer).
+
 ### Spend limits count period-to-date spend (Engine 2.38.0)
 
 _November 1, 2026_

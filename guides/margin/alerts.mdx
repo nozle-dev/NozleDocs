@@ -1,19 +1,29 @@
 ---
-title: Monitor margin yourself
-description: Nozle has no server-side margin alerts. Build your own checks from can() economics and the Cost Intelligence report.
+title: Margin policies and monitoring
+description: Margin policies warn or refuse a call that breaks your margin rule and notify admins. Period checks you build yourself from can() economics and the Cost Intelligence report.
 ---
 
-Nozle does not send margin alerts today. There is no margin alert type, webhook, email or scheduled check, and no way to set a margin floor that notifies you. The [dashboard](/guides/margin/dashboard) margin views are lists you open and read. If you want to be told when margin drops, run the check in your own code, on your own schedule, and send the notification yourself.
+A margin policy tells you when a call breaks your margin rule: workspace admins get an in-app and an email notification, and `can()` warns or refuses the call. Nozle does not run a scheduled margin check, and there is no margin alert on a period total, so a check on customer or plan margin over time is still yours to build. The [dashboard](/guides/margin/dashboard) margin views are lists you open and read.
 
-What Nozle does provide:
+What you get:
 
 - **`can()` economics:** a point-in-time estimate of cost, revenue and margin for one call, with the status and the costs it leaves out. See [The can() endpoint](/guides/entitlements/can-endpoint#field-reference).
-- **A margin policy:** a versioned policy (`mode`, `on_unavailable`, thresholds) that `can()` applies to that estimate. In `deny` mode it denies the call with `economic_policy_denied`. In `warn` mode it returns `decision: "warn"` and the call stays allowed. `on_unavailable` (`allow`, `warn` or `deny`) decides what happens when the estimate is `unavailable` or `stale`. A policy never notifies anyone: it only changes the response of the call.
+- **A margin policy:** a versioned policy (`mode`, `on_unavailable`, `on_not_configured`, thresholds) that `can()` applies to that estimate, for the whole organization, one feature, one [plan or one customer](#policies-per-plan-and-per-customer). In `deny` mode it denies the call with `economic_policy_denied`. In `warn` mode it returns `decision: "warn"` and the call stays allowed. When a call breaks a threshold, workspace admins get a `margin_policy.breached` notification (in the app and by email), at most once an hour for the same policy and reason. `on_unavailable` (`allow`, `warn` or `deny`) decides what happens when the estimate is `unavailable` or `stale`, and `on_not_configured` what happens for a feature with no Cost Rule.
 - **The Cost Intelligence report:** ledger-backed costs per Feature and customer, built from your Cost Sheets. See [Cost Intelligence report](/api/cost-intelligence-report).
 
 <Warning>
 The `/margin/*` queries, such as `margin.trend`, include the cost of rated Cost Events but not Feature Event costs or shared period costs from Cost Sheets. A margin check built on them can show less cost than the Cost Intelligence report. See [Margin Intelligence](/guides/margin/overview).
 </Warning>
+
+## Policies per plan and per customer
+
+A policy can apply to the whole organization, to one feature, to one catalog plan, or to one customer. A free plan can have a stricter floor than an enterprise plan, and one key account can have its own rule.
+
+For each call `can()` takes the policy of the narrowest target that has one: the customer's, else the plan's (the plan of the customer's subscription), else the organization's. Within one target, a policy for the feature of the call beats a policy for all features. A customer policy ends the lookup, so a plan policy for the same call is not consulted. The answer's `policy.scope` says which target decided: `customer`, `plan`, `feature` or `organization`.
+
+A plan policy follows the plan: when you publish a new version of the plan, the policies in effect are copied to it, so subscribers who move to the new version keep the rule. A customer's override plan uses the policy of the plan it was made from. Creating a policy never changes the earlier version of the same target: it closes it and starts the next one.
+
+Create policies in the dashboard under **Margin policies**, or through the `nozleCreateMarginPolicy` mutation with `planId` or `customerId` (not both).
 
 ## Check the margin of one call
 
