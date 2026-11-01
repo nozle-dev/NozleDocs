@@ -59,7 +59,7 @@ Without a selector, `can()` evaluates the customer's only subscription. When the
 | `limit` | `number \| null` | Configured usage limit. `null` when the feature has no limit. |
 | `remaining` | `number \| null` | Remaining allowance. `null` when the feature has no limit. |
 | `overage` | `boolean?` | `true` when usage has reached a soft limit; the usage is billed as overage. Never a denial by itself. Present only when it applies. |
-| `policy` | `object?` | Configured policy. Present only when configured. |
+| `policy` | `CanPolicy?` | The margin policy version that decided the call, with its `decision` and `reason`. Present only when a policy covers the feature. See [Margin policy](#margin-policy). |
 | `configuration` | `Record<string, string>?` | Feature configuration. Present only when configured. |
 | `economics` | `object?` | Point-in-time Cost Sheet estimate with exact decimal strings, Cost Rule version identifiers, and explicit exclusions. |
 | `budget` | `Budget?` | 0.30.0, Engine 2.34.0. The spend limit that refused the call (`reason: 'budget_exceeded'`), else the tightest one covering the feature. See [Spend limits](#spend-limits). |
@@ -74,6 +74,37 @@ Without a selector, `can()` evaluates the customer's only subscription. When the
 | `excludes` | What the estimate excludes. |
 | `reason` | Why the estimate has its status, for example `missing_cost_composition`. |
 | `calculated_at` | When the estimate was calculated. |
+
+## Margin policy
+
+When a [margin policy](/guides/margin/overview) covers the feature, `can()` returns `policy`, the policy version that decided the call. `CanResult.policy` is typed as `CanPolicy`.
+
+| Field | Meaning |
+|---|---|
+| `mode` | What the policy does when the call is below its thresholds: `allow`, `warn` or `deny`. |
+| `on_unavailable` | What it does when the economics cannot be estimated: `allow`, `warn` or `deny`. |
+| `minimum_margin_amount`, `minimum_margin_percent`, `maximum_estimated_cost` | The thresholds of the policy; each is present only when set. |
+| `maximum_snapshot_age_seconds` | An estimate older than this is `stale` and follows `on_unavailable`. |
+| `decision` | `allow`, `warn` or `deny`: what the policy decided for this call. |
+| `reason` | Why: `within_policy`, `minimum_margin_percentage_not_met`, `minimum_margin_amount_not_met`, `maximum_estimated_cost_exceeded`, `economics_not_configured`, `economics_unavailable`, `economics_stale`, `reporting_currency_mismatch` or `margin_percentage_unavailable_for_zero_revenue`. |
+
+A `deny` is a refusal: `allowed` is `false` and `reason` is `economic_policy_denied`. A `warn` is **not** a refusal: `allowed` stays `true`, so read the policy `decision` to see it. The call never reaches the provider on a refusal, so deny before protected work and log or alert on a warning.
+
+A feature with no Cost Rule has `economics.status` `not_configured`, and the policy applies `on_unavailable` to it. An organization-wide policy with `on_unavailable: deny` therefore also refuses features that have no costs at all; scope such a policy to the features that have Cost Rules, or use `allow` or `warn`.
+
+The estimate behind the decision is in `economics`: `estimated_incremental_cost`, `estimated_incremental_revenue`, `estimated_incremental_margin` and `estimated_margin_percent`, exact decimal strings. For a feature priced $0.10 per call with a $0.08 cost rule, the margin is `0.02` (20%), so a policy with a 50% minimum refuses it with `minimum_margin_percentage_not_met`.
+
+```ts
+import { RefusalReason } from '@nozle-js/node'
+
+const check = await nozle.can('workspace_123', 'llm_tokens')
+if (!check.allowed && check.reason === RefusalReason.EconomicPolicyDenied) {
+  // check.policy.reason, for example 'minimum_margin_percentage_not_met';
+  // check.economics.estimated_margin_percent is the margin that failed the policy
+} else if (check.policy?.decision === 'warn') {
+  // allowed, but flagged: log it or alert
+}
+```
 
 ## Spend limits
 

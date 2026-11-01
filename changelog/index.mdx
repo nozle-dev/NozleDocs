@@ -25,6 +25,15 @@ _November 1, 2026_
 - **Go logs through `slog`.** Without `OnError`, the Go event buffer and the LLM capture wrappers log undelivered events through `slog.Default()` at error level, with `code`, `count` and `error`, never the events or the API key. The buffer used the standard `log` package before, and the wrappers dropped the error.
 - See [Node.js](/sdks/node/llm-auto-capture#buffered-delivery), [Python](/sdks/python/llm-auto-capture#buffered-delivery), [Python async buffer](/sdks/python/tracking-events#async-event-buffer) and [Go](/sdks/go/llm-usage#buffered-delivery).
 
+### Margin policy in the SDKs (Go v0.29.0, Core 11.24.0, Engine 2.39.0; docs for Node, Python and Go)
+
+_November 1, 2026_
+
+- **Typed margin policy in Go.** `CanResult.Policy` is a `*nozle.CanPolicy` (it was raw JSON): `Mode`, `OnUnavailable`, the thresholds, `MaximumSnapshotAgeSeconds`, `Decision` and `Reason`. `CanResult.MarginWarning()` is `true` when a policy in `warn` mode flagged an allowed call. Node and Python already typed `policy`.
+- **Documented in all three SDKs.** The entitlements pages explain `policy`, the `decision` and `reason` values, and that a `warn` leaves `allowed: true` while a `deny` is `economic_policy_denied`, with a code example each.
+- **Checked on production, 1 November.** With real cost data (a feature priced $0.10 with $0.04 and $0.08 cost rules) a policy with a 50% minimum margin allowed the 60% call and refused the 20% call with `minimum_margin_percentage_not_met`; `warn`, maximum cost, minimum margin amount, `on_unavailable` allow, warn and deny, a currency mismatch and a feature policy over an organization policy all behaved as documented, and `margin_policy.breached` was delivered for each refusal.
+- **Features with no Cost Rule.** A new policy setting, `on_not_configured` (`allow`, `warn` or `deny`, default `allow`), decides them; `on_unavailable` now covers only real faults. Before, an organization-wide `on_unavailable: deny` also refused features that have no costs. Set it through the API or GraphQL; it is on production for Core 11.24.0 and Engine 2.39.0. **Known limits.** A policy applies to an organization or a feature, not to a single customer.
+
 ### Spend limits and budgets (Core 11.23.0 and 11.23.1, Engine 2.34.0, Node 0.30.0, Python 0.28.0, Go v0.27.0)
 
 _November 1, 2026_
