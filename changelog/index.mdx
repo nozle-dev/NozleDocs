@@ -5,6 +5,15 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Token buckets, uncosted-model alert, aborted streams (Engine 2.46.0, Core 11.30.0, Node 0.35.0, Python 0.33.0, Go v0.33.0)
+
+_November 2, 2026_
+
+- **Token buckets.** Usage events carry cache write (1 hour), audio and image breakdowns and `service_tier`. The proxy sends one cost event per bucket when the request has `X-Nozle-Cost-Meter`. See [token buckets](/guides/ai/token-billing#token-buckets).
+- **Uncosted models.** An LLM model with no price is recorded by provider, model and bucket, and you get an in-app and email notification once per model per day. Set `uncosted_model_action` to `warn` or `ignore`; `deny` is not available yet. New: `GET /cost-intelligence/uncosted-models`, `POST .../dismiss`, and `uncosted_models` in the cost report.
+- **Aborted streams.** A stream cut before the final usage is billed what was delivered or an estimate (`ceil(UTF-8 bytes / 4)`), with `usage_source` and `stream_aborted`. Holds are finalized with it. Waiving this billing is not available yet.
+- **Docs fix.** An unpriced model is no longer described as always entering the Uncosted queue; every path now records it.
+
 ### Void a usage event (Engine, Node, Python, Go)
 
 _November 1, 2026_

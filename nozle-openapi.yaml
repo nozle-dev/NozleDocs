@@ -7,7 +7,7 @@ info:
     **Legacy key names, removed in Core 6.0.0.** REST responses, webhook payloads and CSV exports carry only the Nozle names: `nozle_id` and the plain `<key>` names such as `customer_id` and `invoice_id`. The former-prefix keys, the former EU tax codes, the former CSV id columns and the former webhook headers are gone. Webhook deliveries carry `webhook-id`, `webhook-timestamp` and `webhook-signature`. nozle-js and nozle-python older than 0.10.0 and nozle-go older than 0.9.1 cannot read a credit system id from Core 6.0.0.
 
     **Live and sandbox (unreleased).** Live and sandbox use the same servers. The API key decides the environment: live keys start with `sk_nozle_` or `pk_nozle_`, sandbox keys with `sk_nozle_test_` or `pk_nozle_test_`, and each only reaches its own organization's data. A key whose prefix does not match its organization's environment, or a key of a reset sandbox, is refused with `401`. Every response to an accepted key, Core and Engine, carries the header `X-Nozle-Livemode: true` (live) or `false` (sandbox); browsers can read it. Webhook payloads carry `livemode` the same way. See https://docs.nozle.dev/guides/getting-started/sandbox.
-  version: 1.53.0
+  version: 1.54.0
   license:
     name: AGPLv3
     url: https://github.com/nozle-dev/core/blob/main/LICENSE
@@ -3817,6 +3817,98 @@ paths:
           description: 'A publishable key, or `code: permission_denied` when API key permissions are enabled and the secret key lacks `analytic:read`.'
         '500':
           description: A report data source could not be queried
+  /cost-intelligence/uncosted-models:
+    servers:
+      - url: https://api.nozle.app/engine/api/v1
+        description: Engine API
+    get:
+      tags:
+        - Cost Intelligence
+      summary: List LLM models that have no price
+      description: |
+        Returns the provider, model and token bucket of LLM calls that no cost rule priced, counted per key
+        and not stored per event. The calls are still accepted and billed; their cost counts as zero.
+        Requires a secret key. With API key permissions, the key needs `analytic:read`.
+      operationId: listUncostedModels
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [open, resolved, dismissed, all]
+            default: open
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: cursor
+          in: query
+          required: false
+          description: The `next_cursor` of the previous page.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Uncosted models
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uncosted_models]
+                properties:
+                  uncosted_models:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UncostedModel'
+                  next_cursor:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:read`.'
+  /cost-intelligence/uncosted-models/dismiss:
+    servers:
+      - url: https://api.nozle.app/engine/api/v1
+        description: Engine API
+    post:
+      tags:
+        - Cost Intelligence
+      summary: Dismiss an uncosted model
+      description: |
+        Sets the status of one key to `dismissed`. A later failure of a dismissed key does not reopen it.
+        Requires a secret key. With API key permissions, the key needs `analytic:write`.
+      operationId: dismissUncostedModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, model, token_type, source]
+              properties:
+                provider:
+                  type: string
+                model:
+                  type: string
+                token_type:
+                  type: string
+                  description: Token bucket, or an empty string for a whole call.
+                source:
+                  type: string
+                  enum: [cost_event, feature_event, legacy_cost_model]
+      responses:
+        '200':
+          description: The key is dismissed.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:write`.'
   /events/{transaction_id}:
     parameters:
       - name: transaction_id
@@ -32160,6 +32252,36 @@ components:
         detected_at:
           type: string
           format: date-time
+    UncostedModel:
+      type: object
+      required: [provider, model, token_type, source, status, event_count, first_seen_at, last_seen_at]
+      properties:
+        provider:
+          type: string
+        model:
+          type: string
+        token_type:
+          type: string
+          description: Token bucket (`input`, `output`, `cached_input`, and so on). Empty for a whole call.
+        source:
+          type: string
+          enum: [cost_event, feature_event, legacy_cost_model]
+        status:
+          type: string
+          enum: [open, resolved, dismissed]
+        event_count:
+          type: integer
+        first_seen_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+        sample_source_id:
+          type: string
+          description: Transaction or cost event ID of the latest affected call, for replay.
+        last_failure_code:
+          type: string
     CostIntelligenceReport:
       type: object
       required:
@@ -32201,6 +32323,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CostIntelligenceUncostedSource'
+        uncosted_models:
+          type: array
+          description: Open LLM models that have no price, at most 50. See `GET /cost-intelligence/uncosted-models`.
+          items:
+            $ref: '#/components/schemas/UncostedModel'
         conflicts:
           type: array
           items:

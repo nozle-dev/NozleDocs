@@ -38,6 +38,7 @@ Proxies all requests to `https://api.openai.com/v1/*`. Usage is recorded for cha
 | `X-Nozle-Feature-Code` | Code of the usage event. Default `llm_tokens`. Must match a metered Feature to bill. |
 | `X-Nozle-Feature` | Stored as the `feature` property of the event. |
 | `X-Nozle-Credit-Hold` | Metric amount to reserve in credits before the provider is called, for example the most tokens the call can use. Engine 2.34.0. See [Credit holds](#credit-holds). |
+| `X-Nozle-Cost-Meter` | Code of a Detailed Cost Event meter, for example `ai_tokens`. The proxy then sends one cost event per token bucket. Engine 2.46.0. See [Cost events](#cost-events). |
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/openai/v1/chat/completions \
@@ -76,6 +77,7 @@ Proxies all requests to `https://api.anthropic.com/v1/*`.
 | `X-Nozle-Feature-Code` | Code of the usage event. Default `llm_tokens`. Must match a metered Feature to bill. |
 | `X-Nozle-Feature` | Stored as the `feature` property of the event. |
 | `X-Nozle-Credit-Hold` | Metric amount to reserve in credits before the provider is called, for example the most tokens the call can use. Engine 2.34.0. See [Credit holds](#credit-holds). |
+| `X-Nozle-Cost-Meter` | Code of a Detailed Cost Event meter, for example `ai_tokens`. The proxy then sends one cost event per token bucket. Engine 2.46.0. See [Cost events](#cost-events). |
 
 ```bash title="cURL"
 curl -X POST https://api.nozle.app/engine/api/v1/proxy/anthropic/v1/messages \
@@ -112,11 +114,19 @@ Engine finds the subscription to bill before it calls the provider. Without `X-N
 ## How it works
 
 - The path after `/proxy/openai/` or `/proxy/anthropic/` is sent to the provider host unchanged, with the same method, query string, headers and body, except as noted below.
-- Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature`, `X-Nozle-Feature-Code` and `X-Nozle-Credit-Hold` before forwarding. All other headers, including `Authorization` and `x-api-key`, are forwarded. `Accept-Encoding` is set to `identity` so the usage can be read.
+- Engine removes `X-Nozle-Key`, `X-Nozle-Customer-Id`, `X-Nozle-Subscription`, `X-Nozle-Feature`, `X-Nozle-Feature-Code`, `X-Nozle-Cost-Meter` and `X-Nozle-Credit-Hold` before forwarding. All other headers, including `Authorization` and `x-api-key`, are forwarded. `Accept-Encoding` is set to `identity` so the usage can be read.
 - A chat completion stream (`"stream": true` to `/chat/completions`) is sent with `stream_options.include_usage: true`, because OpenAI leaves usage out of streams otherwise.
 - Streaming (`text/event-stream`) responses are passed through as they arrive; usage is read from the stream as it passes.
 - Usage is recognised by the shape of the response: chat completions, the Responses API, and Anthropic messages, including cached input and cache writes.
 - An event is recorded only for a successful response that reports more than zero tokens. It carries `external_customer_id` and the resolved `external_subscription_id`, so it is billed to that subscription. Its `transaction_id` is `llm-<format>-<response id>`, so the same response is never billed twice. Its properties are `provider`, `provider_host`, `model`, `input_tokens` (all input, including cached), `output_tokens`, `latency_ms` and, when sent, `feature`. Recording runs in the background; a recording failure does not change the response.
+
+## Cost events
+
+From Engine 2.46.0, a request with `X-Nozle-Cost-Meter: <meter code>` also records the cost of the call per [token bucket](/guides/ai/token-billing#token-buckets). The proxy sends one cost event for each non-zero bucket, linked to the usage event: `cost_event_id` is `<usage transaction_id>:<bucket>`, `operation_key` is `<bucket>`, and the properties are `{ tokens, provider, model, type }`. They are delivered like the usage event. Without the header only the usage event is sent. The header is not forwarded to the provider.
+
+## Aborted streams
+
+If the client disconnects or the upstream stops before the provider's final usage, the proxy bills what was delivered. It uses the usage the provider reported, or an estimate of `ceil(UTF-8 bytes / 4)` when there is none, and sets `usage_source` and `stream_aborted: true` on the usage event. A credit or budget hold on the call is finalized with that usage. See [aborted streams](/guides/ai/token-billing#aborted-streams). Waiving billing for aborted streams is not available yet.
 
 ## Credit holds
 

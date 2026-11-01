@@ -50,6 +50,86 @@ For `can()` to return an estimated cost and margin before work starts, also add 
 
 Usage capture does not spend [product credits](/guides/credits/overview). To deduct credits per call, make the Feature consumable (**Count**, or **Sum** on a property without an expression), give it a credit system rate, and call `usage.track()` with the token count after the LLM call instead of relying on capture. See [credit usage tracking](/guides/credits/usage-tracking).
 
+## Token buckets
+
+Every token is counted once, in one of these disjoint buckets. SDKs and the proxy split the provider response into them. The `type` of a cost event is the bucket name, and a cost rule prices one bucket.
+
+| Bucket (`type`) | Meaning | OpenAI | Anthropic | Gemini |
+|---|---|---|---|---|
+| `input` | Text input not in another bucket | `prompt_tokens` minus cached, audio | `input_tokens` | `promptTokenCount` minus cached, audio, image |
+| `cached_input` | Cache read | `prompt_tokens_details.cached_tokens` | `cache_read_input_tokens` | `cachedContentTokenCount` |
+| `cache_write` | Cache write, default 5 minute TTL | `prompt_tokens_details.cache_write_tokens`, if present | `cache_creation_input_tokens` minus the 1 hour part | none |
+| `cache_write_1h` | Cache write, 1 hour TTL | none | `cache_creation.ephemeral_1h_input_tokens` | none |
+| `output` | Text output without reasoning and audio | `completion_tokens` minus reasoning, audio | `output_tokens` | `candidatesTokenCount` minus audio, image |
+| `reasoning` | Thinking tokens | `completion_tokens_details.reasoning_tokens` | none reported; stays in `output` | `thoughtsTokenCount` |
+| `audio_input`, `audio_output` | Audio | `*_details.audio_tokens` | none | `promptTokensDetails` and `candidatesTokensDetails`, modality `AUDIO` |
+| `image_input`, `image_output` | Images | none today | none | same, modality `IMAGE` |
+| `batch_input`, `batch_output` | Whole call billed at the batch tier | batch API calls | message batches | batch mode |
+
+The input-side buckets add up to the call's total input, and the output-side buckets to its total output. A bucket larger than its total is clamped by Engine, so a client bug cannot make buckets exceed the totals. A batch-tier call moves its `input` and `output` into `batch_input` and `batch_output`; its other buckets keep their names. Server tool use such as web search is not tokens and is not counted.
+
+### Usage event properties
+
+The usage event carries the totals and the breakdowns. A breakdown is left out when it is 0.
+
+| Property | Meaning |
+|---|---|
+| `input_tokens`, `output_tokens` | Total input and output, inclusive of every bucket |
+| `cached_input_tokens`, `cache_write_tokens`, `cache_write_1h_tokens`, `reasoning_tokens` | Breakdowns of the totals |
+| `audio_input_tokens`, `audio_output_tokens`, `image_input_tokens`, `image_output_tokens` | Modality breakdowns of the totals |
+| `service_tier` | `batch` or `standard`. Left out means standard. |
+| `usage_source` | `reported` (the provider sent the usage) or `estimated` |
+| `stream_aborted` | `true`, only when the stream ended before the provider's final usage |
+
+A per-model cost model (legacy) rates by bucket. Optional rates `cache_write_1h`, `reasoning`, `audio_input` and `audio_output` fall back when missing: `cache_write_1h` to `cache_write`, then input; `audio_input` to input; `reasoning` and `audio_output` to output. Image tokens use the input and output rates.
+
+### Cost events per bucket
+
+One cost event is sent for each non-zero bucket, with `cost_event_id` `<usage transaction_id>:<bucket>`, `operation_key` `<bucket>` and properties `{ tokens, provider, model, type }`. The SDKs send them when you set the cost meter code (see step 4 above). The [LLM proxy](/api/llm-proxy#cost-events) sends them when the request has the header `X-Nozle-Cost-Meter: <meter code>`, where the code belongs to a Detailed Cost Event meter such as `ai_tokens`. Without the header, the proxy sends only the usage event. SDK and proxy use the same ID shape, so a retry never rates a bucket twice. A `cache_write_1h` price entry needs Core 11.30.0.
+
+## Aborted streams
+
+A stream can end before the provider sends its final usage: the client disconnects, or the upstream stops. Nozle bills what was delivered instead of nothing.
+
+- If the provider reported usage before the cut, that usage is used. Anthropic reports about 1 output token at the start of a stream, so its output is raised to the estimate of the delivered text when that is larger.
+- If the provider reported nothing, as OpenAI does on a cut stream, Nozle estimates: `ceil(UTF-8 bytes / 4)`, of the request text for input and of the delivered text for output. A client wrapper that only sees the response estimates output only and reports input 0.
+- The usage event has `usage_source` set to `reported` or `estimated`, and `stream_aborted: true`.
+- A credit or budget hold on the call is finalized with that usage. Before, a cut stream released the hold, which made the call free.
+
+The estimate is coarse by design. The `usage_source` property lets you tell estimated usage from reported usage.
+
+<Warning>
+The option to waive billing for aborted streams is not available yet. Aborted streams are always billed as described. Providers do not document how they bill a client abort, so the provider's own charge for the cut call can differ from the estimate.
+</Warning>
+
+## Uncosted models
+
+When an LLM call is rated and no cost rule prices it, Nozle records the provider, model and token bucket. An LLM call is an event whose `properties.model` is a non-empty string. The call is still accepted and billed, and its cost counts as zero in margin until a price exists. Nozle records three cases:
+
+| Source | When |
+|---|---|
+| `cost_event` | A Cost Event is uncosted with `no_matching_cost_rule`. The bucket is its `type`. |
+| `feature_event` | A Feature Event is uncosted with `no_matching_cost_rule`. The bucket is empty. |
+| `legacy_cost_model` | A per-model cost model has no rate for the model. The bucket is empty. |
+
+Calls are counted per key, not stored one by one. A later priced call of the same key resolves it. Each organization keeps at most 500 open keys; more keys count in one `other` row.
+
+**Setting.** `uncosted_model_action` is set per organization in GraphQL as `billingConfiguration.uncostedModelAction`:
+
+| Value | Effect |
+|---|---|
+| `warn` (default) | Record, show in the dashboard, and notify. |
+| `ignore` | Record and show in the dashboard. No notification. |
+| `deny` | Not available yet. The update is refused with `deny_is_reserved_and_not_supported_yet`, and Engine reads a stored `deny` as `warn`. |
+
+**Notification.** With `warn`, admins and members with `cost_intelligence:manage` get an in-app and an email notification, once per model per UTC day. At most 20 per organization per day are sent; the rest fold into one digest. No webhook is sent.
+
+**API.** `GET /api/v1/cost-intelligence/uncosted-models` lists keys (`status` `open`, `resolved`, `dismissed` or `all`; `limit`; `cursor`) and needs `analytic:read`. `POST /api/v1/cost-intelligence/uncosted-models/dismiss` with `{provider, model, token_type, source}` dismisses one and needs `analytic:write`. The [cost report](/api/cost-intelligence-report) has a new field `uncosted_models` with the top 50 open keys.
+
+**Dashboard.** The list is under **Usage → Margin**, tab **Uncosted**.
+
+To fix a key, add a price for the model in your [cost model](/guides/margin/cost-models). Dismiss a key you do not want to price.
+
 ## Checklist
 
 | Goal | You need |
