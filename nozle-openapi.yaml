@@ -1781,7 +1781,11 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: 'Validation errors in `error_details`: `tax_identification_type: value_is_invalid`, `tax_identification_number: value_is_mandatory`, `tax_identification_number: invalid_format` (Core 11.31.0), plus the existing customer errors.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
       x-codeSamples:
         - lang: TypeScript
           label: Node.js
@@ -1978,6 +1982,37 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /customers/{external_customer_id}/tax_identification/recheck:
+    parameters:
+      - name: external_customer_id
+        in: path
+        description: The customer external unique identifier (provided by your own application)
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+        - Customers
+      summary: Recheck a customer's tax ID
+      description: Asks for a new VIES check of the customer's EU VAT number. Requires a secret key with customer write permission. The customer's status becomes `pending` and the result arrives in the `customer.vies_check` webhook. Available from Core 11.31.0.
+      operationId: recheckCustomerTaxIdentification
+      responses:
+        '202':
+          description: Check requested. The customer has `tax_identification_status` `pending`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: '`error_details: {"tax_identification": ["eu_tax_not_applicable"]}` when the billing entity has no EU tax management, or the tax ID is not an `eu_vat` number.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
   /customers/{external_customer_id}/applied_coupons:
     get:
       tags:
@@ -8398,13 +8433,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '409':
-          description: 'Core: `subscription_selection_required`, `plan_upgrade_checkout_in_progress` (another upgrade checkout is open, or its time ran out while the provider reports a payment in progress or cannot be reached), `subscription_checkout_in_progress` or `entity_subscription_checkout_in_progress` (a payment for the abandoned new-subscription checkout on another plan is still processing, or it was paid; an abandoned checkout is otherwise replaced), `billing_anchor_checkout_in_progress`, `idempotency_key_reused` (quoted checkout), `plan_change_quote_changed`, `subscription_change_pending` (a paid upgrade while the subscription has a scheduled cancellation or plan change, or an upgrade payment in progress).'
+          description: 'Core: `subscription_selection_required`, `plan_upgrade_checkout_in_progress` (another upgrade checkout is open, or its time ran out while the provider reports a payment in progress or cannot be reached), `subscription_checkout_in_progress` or `entity_subscription_checkout_in_progress` (a payment for the abandoned new-subscription checkout on another plan is still processing, or it was paid; an abandoned checkout is otherwise replaced), `billing_anchor_checkout_in_progress`, `idempotency_key_reused` (quoted checkout), `plan_change_quote_changed`, `subscription_change_pending` (a paid upgrade while the subscription has a scheduled cancellation or plan change, or an upgrade payment in progress), `customer_tax_check_pending` (Core 11.31.0: a VIES check holds the customer; the body has `retry_after_seconds`).'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '422':
-          description: 'Core: `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active` (also right after a late upgrade payment for this plan was applied), `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`, or `base: [invalid_invoice_status_or_payment_status]` for an invoice checkout of an invoice that is paid, voided, draft, closed, failed or has nothing due, or `base: [payment_already_processing]` while a Stripe payment of the invoice''s last Checkout Session is processing or has succeeded, or from Core 11.16.0 while an automatic debit of the invoice is waiting for the bank, or `base: [invoice_carried_forward]` from Core 11.16.0 when the invoice''s amount due is below the provider''s minimum charge and was carried to the next invoice). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
+          description: 'Core: `customer_tax_location_required` (Core 11.31.0: the billing entity has `customer_location_required` on and the customer lacks a country or `address_line1`, `city` or `zipcode`; `error_details.customer` is `country_missing` or `address_missing`), `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active` (also right after a late upgrade payment for this plan was applied), `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`, or `base: [invalid_invoice_status_or_payment_status]` for an invoice checkout of an invoice that is paid, voided, draft, closed, failed or has nothing due, or `base: [payment_already_processing]` while a Stripe payment of the invoice''s last Checkout Session is processing or has succeeded, or from Core 11.16.0 while an automatic debit of the invoice is waiting for the bank, or `base: [invoice_carried_forward]` from Core 11.16.0 when the invoice''s amount due is below the provider''s minimum charge and was carried to the next invoice). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
           content:
             application/json:
               schema:
@@ -24160,6 +24195,11 @@ components:
           type: boolean
           example: true
           description: Whether to finalize invoices with zero amount for this billing entity
+        customer_location_required:
+          type: boolean
+          default: false
+          example: false
+          description: When true, checkout for this billing entity's customers answers `422 customer_tax_location_required` unless the customer has a country, `address_line1`, `city` and `zipcode`.
         invoice_footer:
           type:
             - string
@@ -24363,6 +24403,11 @@ components:
               type: boolean
               example: true
               description: Whether to finalize invoices with zero amount for this billing entity
+            customer_location_required:
+              type: boolean
+              default: false
+              example: false
+              description: When true, checkout for this billing entity's customers answers `422 customer_tax_location_required` unless the customer has a country, `address_line1`, `city` and `zipcode`.
             billing_configuration:
               type: object
               properties:
@@ -24698,6 +24743,11 @@ components:
           type: boolean
           example: true
           description: Whether to finalize invoices with zero amount for this billing entity
+        customer_location_required:
+          type: boolean
+          default: false
+          example: false
+          description: When true, checkout for this billing entity's customers answers `422 customer_tax_location_required` unless the customer has a country, `address_line1`, `city` and `zipcode`.
         billing_configuration:
           type: object
           properties:
@@ -27780,6 +27830,47 @@ components:
           format: date-time
           example: '2022-04-29T08:59:51Z'
           description: The date of the metadata object creation, represented in ISO 8601 datetime format and expressed in Coordinated Universal Time (UTC). The creation_date provides a standardized and internationally recognized timestamp for when the metadata object was created
+    TaxTreatment:
+      type: string
+      enum:
+        - standard
+        - reverse_charge
+        - exempt
+        - provider
+        - pending
+        - none
+      description: 'How tax is applied. `standard`: normal VAT. `reverse_charge`: the recipient accounts for VAT (EU, Article 196 of Council Directive 2006/112/EC). `exempt`: the EU exempt tax code applies. `provider`: a connected tax provider (Anrok, Avalara) decides. `pending`: a VIES check holds the customer. `none`: EU tax management is off.'
+    InvoiceTaxDetails:
+      type: object
+      description: Snapshot written once at finalization.
+      properties:
+        treatment:
+          $ref: '#/components/schemas/TaxTreatment'
+        tax_identification_number:
+          type:
+            - string
+            - 'null'
+        tax_identification_type:
+          type:
+            - string
+            - 'null'
+        tax_identification_status:
+          type:
+            - string
+            - 'null'
+        tax_identification_consultation_number:
+          type:
+            - string
+            - 'null'
+        customer_country:
+          type:
+            - string
+            - 'null'
+        seller_tax_identification_number:
+          type:
+            - string
+            - 'null'
+          description: The billing entity's tax ID at finalization.
     CustomerBaseObject:
       type: object
       required:
@@ -27923,6 +28014,44 @@ components:
             - 'null'
           example: EU123456789
           description: The tax identification number of the customer
+        tax_identification_type:
+          type:
+            - string
+            - 'null'
+          example: eu_vat
+          description: The tax ID type, one of the Stripe tax ID types (`eu_vat`, `gb_vat`, `in_gst`, `us_ein`, ...). Null when no type was sent.
+        tax_identification_status:
+          type: string
+          enum:
+            - unverified
+            - pending
+            - valid
+            - invalid
+          example: valid
+          description: 'Result of the tax ID check. `unverified`: stored, not checked or not checkable (every type except `eu_vat`). `pending`: a VIES check is running or retried. `valid` or `invalid`: the VIES answer. An `invalid` number is treated as a consumer: standard VAT applies.'
+        tax_identification_checked_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: When the tax ID was last checked.
+        tax_identification_consultation_number:
+          type:
+            - string
+            - 'null'
+          description: The VIES consultation number. Always null for now.
+        tax_treatment:
+          $ref: '#/components/schemas/TaxTreatment'
+        vies_check_pending:
+          type: boolean
+          description: True while a VIES check holds the customer, which is when `tax_treatment` is `pending`.
+        tax_identification_warnings:
+          type: array
+          items:
+            type: string
+            enum:
+              - country_mismatch
+          description: Only on write responses. `country_mismatch` when an `eu_vat` number starts with another country than the customer's `country`. The write still succeeds.
         timezone:
           $ref: '#/components/schemas/TimezoneOrNull'
           description: The customer's timezone, used for billing purposes in their local time. Overrides the organization's timezone
@@ -28075,6 +28204,9 @@ components:
         - created_at
         - updated_at
       properties:
+        tax_treatment:
+          $ref: '#/components/schemas/TaxTreatment'
+          description: The `tax_treatment` of the credit note's invoice.
         nozle_id:
           type: string
           format: uuid
@@ -28827,6 +28959,10 @@ components:
                 - 'null'
               example: EU123456789
               description: The tax identification number of the customer
+            tax_identification_type:
+              type: string
+              example: eu_vat
+              description: 'The tax ID type, one of the Stripe tax ID types (`eu_vat`, `gb_vat`, `in_gst`, `us_ein`, ...). A type needs `tax_identification_number`. Errors (422): `tax_identification_type: value_is_invalid` for an unknown type, `tax_identification_number: value_is_mandatory` for a type without a number, `tax_identification_number: invalid_format` for a malformed `eu_vat` number or an `in_gst` number that is not 15 letters and digits. Sending `tax_identification_number: null` clears the type, status and check time.'
             timezone:
               $ref: '#/components/schemas/TimezoneOrNull'
               description: The customer's timezone, used for billing purposes in their local time. Overrides the organization's timezone
@@ -28852,7 +28988,6 @@ components:
               type: string
               enum:
                 - inherit
-                - skip
                 - finalize
               example: inherit
               description: |-
@@ -28963,6 +29098,20 @@ components:
         - created_at
         - updated_at
       properties:
+        tax_status:
+          type: string
+          enum:
+            - pending
+            - succeeded
+            - failed
+          description: State of the tax calculation for the invoice.
+        tax_treatment:
+          $ref: '#/components/schemas/TaxTreatment'
+        tax_details:
+          oneOf:
+            - $ref: '#/components/schemas/InvoiceTaxDetails'
+            - type: 'null'
+          description: Snapshot of the tax facts written once when the invoice is finalized, from Core 11.31.0. Null for invoices finalized before that. Their `tax_treatment` is derived.
         nozle_id:
           type: string
           format: uuid
@@ -38367,6 +38516,28 @@ components:
                   type: string
                 address:
                   type: string
+                tax_identification_status:
+                  type: string
+                  enum:
+                    - unverified
+                    - pending
+                    - valid
+                    - invalid
+                  description: The stored status after this check. Core 11.31.0.
+                consultation_number:
+                  type:
+                    - string
+                    - 'null'
+                  description: Always null for now. Core 11.31.0.
+                error:
+                  type: string
+                  description: Set when the check failed.
+                error_type:
+                  type: string
+                  description: Kind of failure.
+                timed_out:
+                  type: boolean
+                  description: True when the 48 hour VIES hold ended. The customer is then taxed at the standard rate of the billing entity's country, the status is `unverified`, and held invoices finalize.
             external_salesforce_id:
               type:
                 - string

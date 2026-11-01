@@ -40,6 +40,42 @@ customer, err := client.UpsertCustomer(ctx, nozle.Customer{
 
 Use `GetEntity`, `ListEntities`, `ActivateEntity`, `SuspendEntity`, and `BulkUpsertEntities` for the Entity lifecycle. List pages accept `PageOptions` with status, limit (1–100), and cursor. Bulk upsert accepts 1–500 distinct IDs. Mutations use caller-supplied idempotency keys of at most 255 UTF-8 bytes. Entity lifecycle changes do not emit seat billing events automatically.
 
+## Tax IDs and VAT checks
+
+Available from `v0.33.0`, which ships after Core 11.31.0. `UpsertCustomer` takes the address and the tax ID. Core checks the format and, for an EU VAT number on a billing entity with EU tax management, starts a VIES check.
+
+```go
+customer, err := client.UpsertCustomer(ctx, nozle.Customer{
+  ExternalID:   "workspace_123",
+  CustomerType: "company",
+  LegalName:    "Acme GmbH",
+  Address:      &nozle.CustomerAddress{Line1: "Main St 1", City: "Berlin", PostalCode: "10115", Country: "DE"},
+  TaxID:        &nozle.CustomerTaxID{Type: nozle.TaxIDTypeEuVat, Value: "DE811128135"},
+})
+_ = err
+// customer.TaxIdentificationStatus is "pending" while VIES runs.
+// customer.TaxTreatment and customer.TaxIdentificationWarnings are set too.
+```
+
+`ShippingAddress` takes the same struct. Core validates the format: use `errors.As` with `*nozle.APIError`, then `HasCode(nozle.CodeInvalidFormat)`. The SDK only refuses a `TaxID` that has a type but no value.
+
+To remove a stored tax ID, set `ClearTaxID: true`:
+
+```go
+_, err = client.UpsertCustomer(ctx, nozle.Customer{ExternalID: "workspace_123", ClearTaxID: true})
+_ = err
+```
+
+Read the result with `GetCustomer(ctx, externalID)`. Before a checkout, wait until the check ends:
+
+```go
+ready, err := client.WaitForTaxCheck(ctx, "workspace_123", nozle.WaitForTaxCheckOptions{}) // 10 s by default
+_ = ready
+_ = err
+```
+
+`WaitForTaxCheck` polls until the status is not `pending`. On timeout it returns `ErrTaxCheckPending`. A checkout call fails with `customer_tax_location_required` (422) or `customer_tax_check_pending` (409). `(*APIError).RetryAfterSeconds()` gives the wait. See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
+
 ## Read and update Entities
 
 ```go

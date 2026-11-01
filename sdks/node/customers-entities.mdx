@@ -52,6 +52,40 @@ await nozle.customers.upsert({
 
 Nozle keeps the assignment with or without `syncWithProvider`, and checkout charges only through the assigned connection. See [Assign the connection to customers](/integrations/stripe#assign-the-connection-to-customers).
 
+## Tax IDs and VAT checks
+
+Available from Node.js `0.35.0`, which ships after Core 11.31.0. `customers.upsert` takes the address and the tax ID. Core checks the format and, for an EU VAT number on a billing entity with EU tax management, starts a VIES check.
+
+```ts
+const customer = await nozle.customers.upsert({
+  externalId: 'workspace_123',
+  customerType: 'company',
+  legalName: 'Acme GmbH',
+  address: { line1: 'Main St 1', city: 'Berlin', postalCode: '10115', country: 'DE' },
+  taxId: { type: 'eu_vat', value: 'DE811128135' },
+})
+
+console.log(customer.tax_identification_status) // 'pending' while VIES runs
+console.log(customer.tax_treatment)
+console.log(customer.tax_identification_warnings) // for example ['country_mismatch']
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `customerType` | `'company' \| 'individual'` | Customer type. |
+| `legalName` | `string` | Legal name for invoices. |
+| `address`, `shippingAddress` | `{ line1, line2, city, state, postalCode, country }` | The SDK sends Core's flat keys (`address_line1`, `zipcode`). |
+| `taxId` | `{ type, value } \| null` | `null` clears the stored tax ID. Core validates the format. The SDK only refuses a `taxId` without type or value. |
+
+Read the result with `customers.get(externalId)`. Before a checkout, wait until the check ends:
+
+```ts
+const ready = await nozle.customers.waitForTaxCheck('workspace_123') // { timeoutMs } defaults to 10000
+console.log(ready.tax_identification_status) // 'valid', 'invalid' or 'unverified'
+```
+
+`waitForTaxCheck` polls `customers.get` until the status is not `pending`, and throws after `timeoutMs`. A checkout call fails with `customer_tax_location_required` (422) or `customer_tax_check_pending` (409, `error.retryAfterSeconds`). See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
+
 ## Read Entities
 
 ```ts

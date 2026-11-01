@@ -1,0 +1,146 @@
+---
+title: Tax IDs, reverse charge and VAT checks
+description: What Nozle stores for a customer's tax ID, how EU VAT numbers are checked in VIES, what reverse charge means on an invoice, and the checkout checks that go with it
+keywords: ["tax id", "vat", "vies", "reverse charge", "article 196", "tax_treatment", "customer_location_required"]
+---
+
+Available from Core 11.31.0. The SDK helpers on this page ship after Core: Node 0.35.0, Python 0.33.0, Go v0.33.0 (a later number is possible if another release takes these first).
+
+This page covers what Nozle stores for a customer's tax ID, how it is checked, and what that changes on an invoice. It does not cover Stripe Tax. See [What is not available yet](#what-is-not-available-yet).
+
+<Note>
+The invoice wording on this page is not tax advice. Check it with your accountant before you rely on it.
+</Note>
+
+## What Nozle stores
+
+You send the tax ID with [`POST /customers`](/api/create-customer). Nozle stores these fields on the customer:
+
+| Field | Values | Meaning |
+| --- | --- | --- |
+| `tax_identification_type` | `eu_vat`, `gb_vat`, `in_gst`, `us_ein`, and the other [Stripe tax ID types](https://docs.stripe.com/billing/customer/tax-ids#supported-tax-id) | The kind of number. Optional. A number sent without a type works as before. |
+| `tax_identification_number` | string | The value. An `eu_vat` number is stored upper case without spaces. |
+| `tax_identification_status` | `unverified`, `pending`, `valid`, `invalid` | The result of the check. |
+| `tax_identification_checked_at` | date-time or `null` | When the check last ran. |
+| `tax_treatment` | `standard`, `reverse_charge`, `exempt`, `provider`, `pending`, `none` | How tax is applied to this customer. Read-only. |
+
+Status values:
+
+- `unverified`: stored, but not checked, or not checkable. Every type except `eu_vat` stays `unverified`.
+- `pending`: a VIES check is running or is being retried.
+- `valid`: VIES confirmed the number.
+- `invalid`: VIES rejected the number.
+
+Changing the number or the type resets the status. It becomes `pending` when the billing entity has EU tax management on and the type is `eu_vat` or missing. Otherwise it becomes `unverified`. Sending `tax_identification_number: null` clears the type, the status and the check time.
+
+Nozle checks the format on write. Errors are `422` with `error_details`:
+
+- `tax_identification_type: ["value_is_invalid"]` for a type outside the list.
+- `tax_identification_number: ["value_is_mandatory"]` for a type without a number.
+- `tax_identification_number: ["invalid_format"]` for an `eu_vat` number that is not a well-formed VAT number, or an `in_gst` number that is not 15 letters and digits.
+
+An `eu_vat` number whose country prefix differs from the customer's `country` is accepted. The response then carries `tax_identification_warnings: ["country_mismatch"]`.
+
+Nozle never checks an `in_gst` number. It stores it as given.
+
+## How EU VAT numbers are checked
+
+When the billing entity has EU tax management on, Nozle checks an `eu_vat` number (or a number without a type) in VIES, the EU's VAT number service. The check runs in the background after the write. The write response shows `tax_identification_status: "pending"` and `vies_check_pending: true`.
+
+When the check ends, Nozle stores `valid` or `invalid` and the time in `tax_identification_checked_at`, applies the tax rule below, and sends the [`customer.vies_check`](/api/webhook-events) webhook.
+
+| Customer | `tax_treatment` |
+| --- | --- |
+| EU company in another EU country than the billing entity, status `valid` | `reverse_charge` |
+| EU customer in the billing entity's country, or a consumer | `standard` |
+| The EU exempt tax code applied | `exempt` |
+| Tax calculated by a connected tax provider | `provider` |
+| VIES check running or held (see below) | `pending` |
+| EU tax management off | `none` |
+
+An `invalid` number is treated as a consumer. The customer pays standard VAT for the billing entity's country, and the status shows `invalid`. Nothing fails. Watch the status or the webhook if you want to act on it.
+
+Nozle does not recheck the numbers of existing customers by itself. Use the recheck endpoint below.
+
+## Reverse charge on an invoice
+
+Reverse charge means the seller does not charge VAT, and the customer accounts for it in their own country. On a reverse charge invoice the tax lines show no VAT and the invoice carries this note:
+
+```text
+VAT reverse charge: VAT to be accounted for by the recipient (Article 196, Council Directive 2006/112/EC). Supplier VAT ID: <seller VAT ID>. Customer VAT ID: <customer VAT ID>.
+```
+
+The note names both VAT IDs. Set the tax identification number on the billing entity so the supplier ID prints. Without it the note prints without the supplier ID.
+
+The wording is English for every document language. Other locales fall back to English until they are reviewed. The PDF names the customer's tax ID by its type, for example `VAT ID: DE811128135` or `GSTIN: ...`. A number without a type prints as `Tax ID`.
+
+Credit notes carry the `tax_treatment` of their invoice.
+
+## Tax details on invoices
+
+An invoice finalized from Core 11.31.0 on stores a snapshot of what was true at finalization. The invoice response carries it as `tax_details`:
+
+```json
+{
+  "tax_status": "succeeded",
+  "tax_treatment": "reverse_charge",
+  "tax_details": {
+    "treatment": "reverse_charge",
+    "tax_identification_number": "FR12345678901",
+    "tax_identification_type": "eu_vat",
+    "tax_identification_status": "valid",
+    "tax_identification_consultation_number": null,
+    "customer_country": "FR",
+    "seller_tax_identification_number": "DE811128135"
+  }
+}
+```
+
+The snapshot is written once and never rewritten. The PDF prints the snapshot, not the live customer. `tax_identification_consultation_number` is always `null` for now.
+
+Invoices finalized before this version have `tax_details: null` and a derived `tax_treatment`. Their PDFs still read the live customer. If you change a customer's tax ID, a regenerated PDF of an older invoice shows the new number.
+
+`tax_status` is `pending`, `succeeded` or `failed`.
+
+## When VIES is down
+
+If VIES does not answer, the customer stays `pending` and Nozle holds the customer's invoices, so no invoice is finalized with VAT that may change. Nozle retries the check.
+
+The hold ends after 48 hours. Then Nozle:
+
+- applies standard VAT for the billing entity's country,
+- sets the status to `unverified`,
+- finalizes the held invoices,
+- sends `customer.vies_check` with `error`, `error_type` and `timed_out: true` in `vies_check`.
+
+To ask for a new check, call the recheck endpoint:
+
+```bash
+curl -X POST https://api.nozle.app/core/api/v1/customers/workspace_123/tax_identification/recheck \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY"
+```
+
+It answers `202` with the customer, status `pending`. It answers `422` with `error_details: {"tax_identification": ["eu_tax_not_applicable"]}` when the billing entity has no EU tax management, or the tax ID is not an `eu_vat` number.
+
+## Checkout checks
+
+Checkout fixes the price before the provider session opens, so Nozle checks the customer first. These checks apply to plan, invoice and entity checkouts, for Stripe and Razorpay alike.
+
+| Response | Code | When |
+| --- | --- | --- |
+| `422` | `customer_tax_location_required` | The billing entity requires a location and the customer has no country, or no `address_line1`, `city` or `zipcode`. `error_details` is `{"customer": ["country_missing"]}` or `{"customer": ["address_missing"]}`. |
+| `409` | `customer_tax_check_pending` | A VIES check holds the customer. The body has `retry_after_seconds`. Retry after that time. |
+
+Retrying is safe. A `409` is a wait, not a failure.
+
+The location check is off by default. Turn it on per billing entity with `customer_location_required: true` on [`billing_entities`](/guides/settings/billing-entities) (REST and GraphQL). Nothing changes for an entity that leaves it `false`.
+
+To avoid the `409`, wait for the check before you open the checkout. With the SDKs, upsert the customer, then call `waitForTaxCheck`. It reads the customer until the status is no longer `pending`, up to 10 seconds by default. See the [Node](/sdks/node/customers-entities#tax-ids-and-vat-checks), [Python](/sdks/python/customers-entities#tax-ids-and-vat-checks) and [Go](/sdks/go/customers-entities#tax-ids-and-vat-checks) pages.
+
+## What is not available yet
+
+- Stripe Tax calculation. Nozle does not call Stripe Tax. Tax comes from your tax codes, EU tax management, or a connected Anrok or Avalara account.
+- A browser form to collect billing details. Collect the address and tax ID in your own app and send them with `customers.upsert` from your backend.
+- The reverse charge category in e-invoices (UBL, Factur-X).
+
+The Engine `/customers` proxy does not forward address or billing configuration. The SDKs call Core directly for `customers.upsert`, so use the SDKs or Core for these fields.

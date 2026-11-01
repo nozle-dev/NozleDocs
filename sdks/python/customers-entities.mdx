@@ -43,6 +43,41 @@ nozle.customers.upsert(
 
 `payment_provider` is required inside `billing_configuration`. `payment_provider_code`, `provider_customer_id`, `sync_with_provider` and `provider_payment_methods` are optional. Nozle keeps the assignment with or without `sync_with_provider`, and checkout charges only through the assigned connection. See [Assign the connection to customers](/integrations/stripe#assign-the-connection-to-customers).
 
+## Tax IDs and VAT checks
+
+Available from `nozle-sdk` `0.33.0`, which ships after Core 11.31.0. `customers.upsert` takes the address and the tax ID. Core checks the format and, for an EU VAT number on a billing entity with EU tax management, starts a VIES check.
+
+```python
+customer = nozle.customers.upsert(
+    "workspace_123",
+    customer_type="company",
+    legal_name="Acme GmbH",
+    address={"line1": "Main St 1", "city": "Berlin", "postal_code": "10115", "country": "DE"},
+    tax_id={"type": "eu_vat", "value": "DE811128135"},
+)
+
+print(customer["tax_identification_status"])  # "pending" while VIES runs
+print(customer["tax_treatment"])
+print(customer.get("tax_identification_warnings"))  # for example ["country_mismatch"]
+```
+
+`address` and `shipping_address` take `line1`, `line2`, `city`, `state`, `postal_code` and `country`. The SDK sends Core's flat keys. Core validates the tax ID format. The SDK only refuses a `tax_id` without `type` or `value`.
+
+To remove a stored tax ID, pass `clear_tax_id=True`. Do not pass it together with `tax_id`.
+
+```python
+nozle.customers.upsert("workspace_123", clear_tax_id=True)
+```
+
+Read the result with `customers.get(external_id)`. Before a checkout, wait until the check ends:
+
+```python
+ready = nozle.customers.wait_for_tax_check("workspace_123")  # timeout=10.0 seconds
+print(ready["tax_identification_status"])  # "valid", "invalid" or "unverified"
+```
+
+`wait_for_tax_check` polls `customers.get` until the status is not `pending`, and raises `NozleValidationError` after the timeout. Both methods work on `Nozle` and `AsyncNozle`. A checkout call fails with `customer_tax_location_required` (422) or `customer_tax_check_pending` (409, see `retry_after_seconds`). See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
+
 ## Read Entities
 
 ```python
