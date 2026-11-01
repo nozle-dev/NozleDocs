@@ -69,7 +69,7 @@ When a [margin policy](/guides/margin/overview) covers the feature, `can()` retu
 
 A `deny` is a refusal: `allowed` is `false` and `reason` is `economic_policy_denied`. A `warn` is **not** a refusal: `allowed` stays `true`, so read the policy `decision` to see it. The call never reaches the provider on a refusal, so deny before protected work and log or alert on a warning.
 
-A feature with no Cost Rule has `economics.status` `not_configured`, and the policy applies `on_unavailable` to it. An organization-wide policy with `on_unavailable: deny` therefore also refuses features that have no costs at all; scope such a policy to the features that have Cost Rules, or use `allow` or `warn`.
+A feature with no Cost Rule has `economics.status` `not_configured`. The policy's `on_not_configured` setting (`allow`, `warn` or `deny`, default `allow`; Engine 2.39.0 and Core 11.24.0) decides it, and the `reason` is `economics_not_configured`. `on_unavailable` covers only real faults: a failed lookup, a stale estimate, a currency mismatch or zero revenue for a percentage threshold. Before those versions a feature with no Cost Rule followed `on_unavailable`, so an organization-wide `deny` also refused features that have no costs. The SDK types do not expose `on_not_configured` as a field yet; the `decision` and `reason` are in `policy`.
 
 The estimate behind the decision is in `economics`: `estimated_incremental_cost`, `estimated_incremental_revenue`, `estimated_incremental_margin` and `estimated_margin_percent`, exact decimal strings. For a feature priced $0.10 per call with a $0.08 cost rule, the margin is `0.02` (20%), so a policy with a 50% minimum refuses it with `minimum_margin_percentage_not_met`.
 
