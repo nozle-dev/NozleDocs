@@ -193,7 +193,7 @@ Only `close()` retries a failed event to `maxAttempts` and reports it. Short-liv
 
 The queue lives in memory only. Events still waiting are lost when the process is killed (for example `SIGKILL`) or calls `process.exit()`, which skips `beforeExit`. During a backoff, `beforeExit` only sets a timer that does not keep the process alive. A process whose Nozle endpoint stays unreachable therefore still exits, and its waiting events are lost without a report unless it called `close()`.
 
-`wrapOpenAI`, `wrapAnthropic` and `captureFetch` do not use the buffer yet. They still send one request per call.
+From 0.31.0, `wrapOpenAI`, `wrapAnthropic` and `captureFetch` take the buffer as their `buffer` option and queue each call's usage event in it. Cost events are still sent directly. See [Buffered delivery](/sdks/node/llm-auto-capture#buffered-delivery).
 
 ## Operational guidance
 

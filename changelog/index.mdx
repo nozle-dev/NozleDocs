@@ -5,6 +5,26 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Spend limits count period-to-date spend (Engine 2.38.0)
+
+_November 1, 2026_
+
+- **Limits added mid-period count earlier spend.** A spend limit added during a period, or whose `period` changes, now counts the spend already made since the period start. The Engine counts it within about 5 minutes, a few minutes more while usage is still arriving. Only the highest threshold already crossed is notified. See [Limits added mid-period](/guides/entitlements/spend-limits#limits-added-mid-period).
+- **`counted_from` on every budget.** The `budget` of `/can`, the `/usage/check` and `/usage/track` refusals, budget holds, the LLM proxy refusal and [List Customer Budgets](/api/list-customer-budgets) has `counted_from`: `period_start` once the period's spend is counted in full, the time counting started before that, and `null` when nothing is counted yet. OpenAPI 1.52.0.
+- **`billing_period` limits follow the invoice.** A `billing_period` limit starts on the day the subscription started in its first period, and on the day of a plan change, as the invoice bills it, instead of at the start of the billing period. Spend of the previous plan in the same period no longer counts against the new plan's limit. `calendar_month` and `lifetime` limits are unchanged.
+- **Nightly reconciliation.** The Engine records the exact spend of every priced event and recounts every budget from it each night, correcting a count that stays off. No new webhooks.
+- **Older usage.** Exact per-event spend is recorded from 2.38.0, so a period that contains usage from before the release is not recounted: its limit counts from when counting started. `billing_period` and `calendar_month` limits are recounted from their next period.
+
+### Buffered LLM capture and an async Python buffer (Node 0.31.0, Python 0.29.0, Go v0.28.0)
+
+_November 1, 2026_
+
+- **LLM capture through the event buffer.** Pass an event buffer to the LLM capture: `buffer` on `wrapOpenAI`, `wrapAnthropic` and `captureFetch` (Node), `buffer=` on `wrap_openai()`, `wrap_anthropic()`, `wrap_http_client()`, `capture_http_client()` and `capture_async_http_client()` (Python), and `Buffer` on `ProviderWrapOptions` and `CaptureOptions` (Go). Each usage event is then queued in the buffer and delivered by its `flush` or `close`, so it is no longer lost when a serverless handler returns or a process exits. Without it, nothing changes.
+- **Only usage events are buffered.** Cost events are still sent directly. The usage event keeps its `llm-<format>-<response id>` transaction ID, so a resend never bills twice. Node's `flush()` and `close()` first wait for responses still being read and for their cost events; Python and Go queue it as the response ends, so a flush right after reading the response includes it.
+- **Async Python buffer.** `AsyncNozle.event_buffer()` returns an `AsyncEventBuffer` with the sync buffer's options, defaults and error codes, sent from an asyncio task. `track()` is not awaited; `await flush()`, `await close()` and `async with`. No event loop runs at process exit, so `await close()` before the loop ends.
+- **Go logs through `slog`.** Without `OnError`, the Go event buffer and the LLM capture wrappers log undelivered events through `slog.Default()` at error level, with `code`, `count` and `error`, never the events or the API key. The buffer used the standard `log` package before, and the wrappers dropped the error.
+- See [Node.js](/sdks/node/llm-auto-capture#buffered-delivery), [Python](/sdks/python/llm-auto-capture#buffered-delivery), [Python async buffer](/sdks/python/tracking-events#async-event-buffer) and [Go](/sdks/go/llm-usage#buffered-delivery).
+
 ### Spend limits and budgets (Core 11.23.0 and 11.23.1, Engine 2.34.0, Node 0.30.0, Python 0.28.0, Go v0.27.0)
 
 _November 1, 2026_

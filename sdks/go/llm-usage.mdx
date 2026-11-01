@@ -30,7 +30,7 @@ ctx = nozle.WithCustomer(ctx, workspace.ID)
 response, err := openaiClient.Chat.Completions.New(ctx, params)
 ```
 
-The customer for a request is, in order: the `X-Nozle-Customer-Id` request header (removed before the request is sent), `WithCustomer` on the request context, `CaptureOptions.CustomerIDFunc`, then `CaptureOptions.CustomerID`. A request without a customer passes through and nothing is recorded. `X-Nozle-Feature` (also removed) or `Feature` sets the `feature` property; `CostMeterCode` adds categorized Cost Events. Chat completion streams are sent with `stream_options.include_usage`; set `SkipStreamUsage` for a server that rejects the field. `OnError` also receives, once per event code, a `*nozle.SetupError` with `Code` `feature_not_found` when no Feature has the event code.
+The customer for a request is, in order: the `X-Nozle-Customer-Id` request header (removed before the request is sent), `WithCustomer` on the request context, `CaptureOptions.CustomerIDFunc`, then `CaptureOptions.CustomerID`. A request without a customer passes through and nothing is recorded. `X-Nozle-Feature` (also removed) or `Feature` sets the `feature` property; `CostMeterCode` adds categorized Cost Events. Chat completion streams are sent with `stream_options.include_usage`; set `SkipStreamUsage` for a server that rejects the field. `OnError` also receives, once per event code, a `*nozle.SetupError` with `Code` `feature_not_found` when no Feature has the event code; this check runs only when `OnError` is set. From `v0.28.0`, without `OnError` a recording failure is logged through `slog.Default()`. `Buffer` queues the usage events in an event buffer; see [Buffered delivery](#buffered-delivery).
 
 `client.RecordUsage(ctx, nozle.ProviderCapture{CustomerID: ..., Model: ..., RequestID: ...}, nozle.Usage{InputTokens: ..., OutputTokens: ...})` records usage your code read itself.
 
@@ -98,12 +98,37 @@ Import `github.com/anthropics/anthropic-sdk-go` as `anthropic` and its `/option`
 | `CostMeterCode` | Optional Cost Event Meter for categorized token costs. |
 | `Feature` | Optional Feature Event property. |
 | `DeliveryTimeout` | Timeout for background telemetry; defaults to 15 seconds. |
-| `OnError` | Called with the Nozle delivery error when sending a captured event fails. It does not change the provider response. These wrappers do not check that a Feature has the event code; only `WrapHTTPClient` reports a `*nozle.SetupError` with `Code` `feature_not_found`. |
+| `OnError` | Called with the Nozle delivery error when sending a captured event fails. It does not change the provider response. Without it, from `v0.28.0`, the failure is logged through `slog.Default()` (code, count and error message only); before, it was dropped. These wrappers do not check that a Feature has the event code; only `WrapHTTPClient` reports a `*nozle.SetupError` with `Code` `feature_not_found`. |
 | `OnResult` | `func(error)`, called after every delivery attempt: with `nil` on success, with the error on failure. |
+| `Buffer` | `*EventBuffer`, from `v0.28.0`. Queue each usage event in this [event buffer](/sdks/go/tracking-events#event-buffer) instead of sending it from a goroutine. Also on `CaptureOptions`. See [Buffered delivery](#buffered-delivery). |
 
-The wrapper copies the supplied `*http.Client`; it does not mutate the original. It captures only request paths ending in `/chat/completions` (OpenAI) and `/messages` (Anthropic); other routes, such as `/v1/responses`, pass through without an event. Usage delivery runs in a goroutine after the provider response or stream completes, without delaying the provider result. Use `OnError` to log or queue failures. The wrapper does not automatically retry telemetry.
+The wrapper copies the supplied `*http.Client`; it does not mutate the original. It captures only request paths ending in `/chat/completions` (OpenAI) and `/messages` (Anthropic); other routes, such as `/v1/responses`, pass through without an event. Usage delivery runs in a goroutine after the provider response or stream completes, without delaying the provider result. Use `OnError` to log or queue failures. The wrapper does not automatically retry telemetry; a [buffer](#buffered-delivery) does.
 
-The callbacks fire only when there was usage to deliver. A provider non-2xx response, a body that is not valid JSON, a response without `usage`, or a stream closed before its final usage produces no event and calls neither `OnError` nor `OnResult`. Because delivery is in the background, a process that exits right after the provider call loses the event; wait for `OnResult` before exiting a short-lived program. A `DeliveryTimeout` that is too short fails delivery: with 1 ms, both callbacks receive a context deadline error.
+The callbacks fire only when there was usage to deliver. A provider non-2xx response, a body that is not valid JSON, a response without `usage`, or a stream closed before its final usage produces no event and calls neither `OnError` nor `OnResult`. Because delivery is in the background, a process that exits right after the provider call loses the event; set `Buffer` and close it, or wait for `OnResult`, before exiting a short-lived program. A `DeliveryTimeout` that is too short fails delivery: with 1 ms, both callbacks receive a context deadline error.
+
+### Buffered delivery
+
+From `v0.28.0`, set `Buffer` on `ProviderWrapOptions` (`WrapOpenAIHTTPClient`, `WrapAnthropicHTTPClient`) or `CaptureOptions` (`WrapHTTPClient`) to an [event buffer](/sdks/go/tracking-events#event-buffer). Each usage event is then queued in the buffer instead of sent from a goroutine, so `Flush` and `Close` deliver it, and it is not lost when the process or a serverless handler ends.
+
+```go
+buf := client.NewEventBuffer(nozle.EventBufferOptions{})
+defer buf.Close(ctx)
+
+providerHTTP, err := nozle.WrapHTTPClient(&http.Client{}, client, nozle.CaptureOptions{
+  FeatureCode: "llm_tokens", Buffer: buf,
+})
+if err != nil { return err }
+openaiClient := openai.NewClient(openaiopt.WithHTTPClient(providerHTTP))
+
+response, err := openaiClient.Chat.Completions.New(nozle.WithCustomer(ctx, workspace.ID), params)
+// ...
+buf.Flush(ctx) // before a serverless handler returns
+```
+
+- The event is queued before the response body's last `Read` (or `Close`) returns, so a `Flush` or `Close` right after reading the response includes it.
+- Only the usage event goes through the buffer. Cost Events are still sent directly.
+- The buffer's `OnError` reports usage events it does not deliver. A queue refusal (`ErrBufferFull`, `ErrBufferClosed`) goes to the buffer's `OnError` only, not to the wrapper's as well; `OnResult` still receives it.
+- Without `Buffer`, nothing changes.
 
 ## Manual capture
 

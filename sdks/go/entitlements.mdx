@@ -82,6 +82,6 @@ for _, b := range list.Budgets {
 }
 ```
 
-`ListBudgets(ctx, customerID, subscriptionID)` calls [`GET /customers/{customer_id}/budgets`](/api/list-customer-budgets) and returns `BudgetList{CustomerID, SubscriptionID, Budgets}`. `Budget` has `FeatureCode` (empty for the total limit), `Limit`, `Spent`, `Held`, `Remaining` (decimal strings in major units), `Currency`, `Period`, `PeriodStart`, `PeriodEnd` (empty for `lifetime`), `Mode`, `Status` and `AsOf`.
+`ListBudgets(ctx, customerID, subscriptionID)` calls [`GET /customers/{customer_id}/budgets`](/api/list-customer-budgets) and returns `BudgetList{CustomerID, SubscriptionID, Budgets}`. `Budget` has `FeatureCode` (empty for the total limit), `Limit`, `Spent`, `Held`, `Remaining` (decimal strings in major units), `Currency`, `Period`, `PeriodStart`, `PeriodEnd` (empty for `lifetime`), `Mode`, `Status`, `AsOf` and `CountedFrom` (v0.28.0, Engine 2.38.0: when counting began).
 
 For an exact cap under concurrent calls, take a [budget hold](/sdks/go/credits#budget-holds) instead of a plain `Can`.

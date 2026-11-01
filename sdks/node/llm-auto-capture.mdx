@@ -70,6 +70,7 @@ A request without a customer passes through and nothing is recorded.
 | `costMeterCode` | `string` | Also send one Cost Event per token category to this Cost Event Meter. |
 | `includeStreamUsage` | `boolean` | Default `true`: chat completion streams are sent with `stream_options.include_usage`, which they otherwise leave out. Set `false` for a server that rejects the field. |
 | `onError` | `(error) => void` | Called when usage could not be read or recorded, and once per event code with `code: "feature_not_found"` when no Feature has that code (the usage is then stored but not billed). The provider response is never affected. |
+| `buffer` | `EventBuffer` | From `0.31.0`. Queue each usage event in this [event buffer](/sdks/node/tracking-events#event-buffer) instead of sending it at once. See [Buffered delivery](#buffered-delivery). |
 
 The second argument of `captureFetch` is the `fetch` to wrap; it defaults to the global `fetch`.
 
@@ -193,6 +194,7 @@ For Anthropic streams, the wrapper reads input usage from `message_start` and ou
 | `costMeterCode` | `string` | no | Cost Event Meter code. When set, emits categorized token Cost Events linked to the Feature Event. |
 | `feature` | `string` | no | Included as a `feature` event property. |
 | `onError` | `(error) => void` | no | Called when usage could not be recorded, and once per event code with `code: "feature_not_found"` when no Feature has that code. Without it these failures are silent. |
+| `buffer` | `EventBuffer` | no | From `0.31.0`. Queue each usage event in this [event buffer](/sdks/node/tracking-events#event-buffer) instead of sending it at once. See [Buffered delivery](#buffered-delivery). |
 
 ## Event properties
 
@@ -224,6 +226,25 @@ The usage event's `transaction_id` is `llm-<format>-<response id>`, for example 
 <Warning>
 Without `onError`, `wrapOpenAI` and `wrapAnthropic` record failures silently: no log line and no unhandled rejection, including for a customer with no active subscription. Pass `onError`, or use `recordUsage`, when you need to know.
 </Warning>
+
+### Buffered delivery
+
+By default each call's usage event is sent in the background as soon as the response is read, so an event still in flight is lost when a serverless handler returns or the process exits. From `@nozle-js/node` 0.31.0, pass an [event buffer](/sdks/node/tracking-events#event-buffer) as `buffer` to `wrapOpenAI`, `wrapAnthropic` or `captureFetch`. The usage event is then queued in the buffer and sent in a batch by its timer, `flush()` or `close()`:
+
+```ts
+const buffer = nozle.createEventBuffer()
+const openai = new OpenAI({ fetch: nozle.captureFetch({ customerId: 'workspace_123', buffer }) })
+// or: const openai = wrapOpenAI(new OpenAI(), nozle, { customerId: 'workspace_123', buffer })
+
+await openai.chat.completions.create({ model: 'example-chat-model', messages })
+await buffer.flush() // before a serverless handler returns: sends the usage event
+```
+
+- `flush()` and `close()` first wait for responses the wrappers are still reading (a `captureFetch` stream or JSON body read in the background) and for their cost events.
+- Only the usage event goes through the buffer. Cost events (`costMeterCode`) are still sent directly.
+- The buffer's `onError` receives delivery failures of a buffered usage event. The wrapper's `onError` still receives cost event failures and `feature_not_found`.
+- The `transaction_id` stays `llm-<format>-<response id>`, so a resend never bills twice.
+- Without `buffer`, nothing changes.
 
 For workflows requiring durable delivery, explicit transaction IDs, or strict error handling, track manually through your queue instead of relying on the wrapper.
 
