@@ -218,6 +218,10 @@ The Feature Event preserves total input and output counts. Detailed Cost Events 
 
 Cost calculation remains server-side through the `ai_tokens` Cost Event Meter and effective-dated provider/model/category Cost Rules.
 
+### Breakdown and aborted streams
+
+Since Python 0.33.0: the SDK sends the breakdown properties `cached_input_tokens`, `cache_write_tokens`, `cache_write_1h_tokens`, `reasoning_tokens`, `audio_input_tokens`, `audio_output_tokens`, `image_input_tokens` and `image_output_tokens` (when not 0) and `service_tier`, and sends cost events for the [token buckets](/guides/ai/token-billing#token-buckets). It records aborted streams with `stream_aborted: true` and `usage_source`, including `wrap_openai` and `wrap_anthropic`, which lost a call when the consumer stopped reading. A stream that ends early is billed what was delivered or an estimate; see [aborted streams](/guides/ai/token-billing#aborted-streams). Only numeric token counts count: a numeric string such as `"12"` is read as 0.
+
 ## Failure behavior
 
 The usage event's `transaction_id` is `llm-<format>-<response id>` when the response has an id, so the same response is never recorded twice; otherwise one is generated. It is the `parent_transaction_id` of every detailed Cost Event. Parent and child events may therefore arrive out of order. Tracking failures do not replace a successful provider result; the SDK emits `NozleTrackingWarning`.

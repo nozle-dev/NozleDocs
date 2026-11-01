@@ -56,11 +56,11 @@ Engine sums every active cost-sheet component for a Feature. That is by design: 
 
 ## Artificial Intelligence token template
 
-The guided template creates an `ai_tokens` Cost Event Meter using `tokens` as quantity and `provider`, `model`, and `type` as dimensions. It supports input, cached input, cache creation, output, and reasoning categories.
+The guided template creates an `ai_tokens` Cost Event Meter using `tokens` as quantity and `provider`, `model`, and `type` as dimensions. It supports input, cached input, cache creation (5 minute and 1 hour), output, reasoning, audio and image categories. See the [token buckets](/guides/ai/token-billing#token-buckets).
 
 Rates may be entered manually or loaded from an effective-dated provider price catalogue. Custom rates retain their base catalogue references for audit. A catalogue entry must use the Cost Sheet currency, match the rule dimensions, and be effective on the rule date.
 
-The setup review shows the exact cost of 1,000 tokens for every configured category before publication. Unknown provider, model, or category combinations enter the Uncosted queue rather than becoming zero-cost usage. A Cost Event whose meter code matches no Cost Event Meter is accepted and then lands in the same queue as `uncosted` with `unknown_cost_event_meter`; it is not dropped from the report.
+The setup review shows the exact cost of 1,000 tokens for every configured category before publication. An LLM call whose provider, model, or token bucket matches no rule is never silently free: a Feature Event or Cost Event is marked `uncosted` with `no_matching_cost_rule`, and a legacy per-model cost model records the model with the source `legacy_cost_model`. In both cases the call is still billed and its cost counts as zero in margin. Nozle records the provider, model and bucket as an [uncosted model](/guides/ai/token-billing#uncosted-models) and alerts you. A Cost Event whose meter code matches no Cost Event Meter is accepted and then lands in the same queue as `uncosted` with `unknown_cost_event_meter`; it is not dropped from the report.
 
 ## Margin policy
 
