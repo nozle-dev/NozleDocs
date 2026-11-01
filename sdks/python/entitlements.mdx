@@ -75,7 +75,7 @@ for budget in result["budgets"]:
     print(budget["feature_code"] or "total", budget["spent"], budget["limit"], budget["status"])
 ```
 
-`budgets.list(customer_id, *, subscription_id=None)` calls [`GET /customers/{customer_id}/budgets`](/api/list-customer-budgets) and returns `BudgetList`: `customer_id`, `subscription_id` and `budgets`. Each `Budget` has `feature_code` (`None` for the total limit), `limit`, `spent`, `held`, `remaining` (decimal strings in major units), `currency`, `period`, `period_start`, `period_end`, `mode`, `status` and `as_of`. On `AsyncNozle`, `await nozle.budgets.list(...)`. Types: `Budget`, `BudgetList`, `BudgetPeriod`, `BudgetMode`, `BudgetStatus`.
+`budgets.list(customer_id, *, subscription_id=None)` calls [`GET /customers/{customer_id}/budgets`](/api/list-customer-budgets) and returns `BudgetList`: `customer_id`, `subscription_id` and `budgets`. Each `Budget` has `feature_code` (`None` for the total limit), `limit`, `spent`, `held`, `remaining` (decimal strings in major units), `currency`, `period`, `period_start`, `period_end`, `mode`, `status`, `as_of` and `counted_from` (0.29.0, Engine 2.38.0: when counting began). On `AsyncNozle`, `await nozle.budgets.list(...)`. Types: `Budget`, `BudgetList`, `BudgetPeriod`, `BudgetMode`, `BudgetStatus`.
 
 For an exact cap under concurrent calls, take a [budget hold](/sdks/python/credits#budget-holds) instead of a plain `can()`.
 

@@ -102,7 +102,7 @@ for (const budget of budgets) {
 }
 ```
 
-`budgets.list(customerId, { subscriptionId })` calls [`GET /customers/{customer_id}/budgets`](/api/list-customer-budgets) and returns `BudgetList`: `customer_id`, `subscription_id` and `budgets`. Each `Budget` has `feature_code` (`null` for the total limit), `limit`, `spent`, `held`, `remaining` (decimal strings in major units), `currency`, `period`, `period_start`, `period_end`, `mode`, `status` (`ok`, `warning`, `exceeded`) and `as_of`. Types: `Budget`, `BudgetList`, `BudgetListOptions`.
+`budgets.list(customerId, { subscriptionId })` calls [`GET /customers/{customer_id}/budgets`](/api/list-customer-budgets) and returns `BudgetList`: `customer_id`, `subscription_id` and `budgets`. Each `Budget` has `feature_code` (`null` for the total limit), `limit`, `spent`, `held`, `remaining` (decimal strings in major units), `currency`, `period`, `period_start`, `period_end`, `mode`, `status` (`ok`, `warning`, `exceeded`), `as_of` and `counted_from` (0.31.0, Engine 2.38.0: when counting began). Types: `Budget`, `BudgetList`, `BudgetListOptions`.
 
 For an exact cap under concurrent calls, take a [budget hold](/sdks/node/credits#budget-holds) instead of a plain `can()`.
 
