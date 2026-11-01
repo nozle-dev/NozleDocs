@@ -126,7 +126,7 @@ An endpoint with no `event_types` receives every type, and gets every type Nozle
 | `subscription.started` | `subscription` | A subscription starts or is activated, including the new subscription of a plan change. |
 | `subscription.updated` | `subscription` | A subscription is updated, a plan change is scheduled or canceled, or its entitlements change. A subscription that a plan change replaces also gets this event. |
 | `subscription.termination_alert` | `subscription` | A subscription is about to end, ahead of its `ending_at`. |
-| `subscription.trial_ended` | `subscription` | The free trial of a subscription ends. |
+| `subscription.trial_ended` | `subscription` | The free trial of a subscription ends, or is converted early with `trial.convert`. |
 | `subscription.usage_threshold_reached` | `subscription` | The lifetime usage of a subscription reaches a usage threshold. `usage_threshold` is the threshold that was reached. |
 
 ### Invoices
@@ -483,6 +483,15 @@ Sent for a change to the subscription itself, for a plan change that is schedule
   }
 }
 ```
+
+### `subscription.trial_ending` and `subscription.trial_ended`
+
+Both carry the `subscription` object, as `subscription.updated` does.
+
+- `subscription.trial_ending` is sent ahead of the trial end, once per trial end date. The lead time is 7 days for trials of 14 days or more, 3 days for 7 to 13 days, and 1 day otherwise. It is sent again when the end changes. It runs daily at 09:00 UTC.
+- `subscription.trial_ended` is sent when the trial ends. The hourly job sends it up to an hour after a normal end, and it is sent at once when the trial is converted early. In the payload, `trial_ended_at` is the end time, or the time of the conversion.
+
+The order is `trial_ending`, then `trial_ended`. A conversion can send `trial_ended` with no earlier `trial_ending`. Extending a trial sends `subscription.updated`; a conversion also sends `subscription.updated`. See [Trials](/guides/billing/subscriptions#trials).
 
 ### Wallet events
 

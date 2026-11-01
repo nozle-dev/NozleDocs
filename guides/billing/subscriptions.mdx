@@ -146,6 +146,69 @@ Preview first, present the monetary effect to the merchant, and apply with a sta
 Payment webhooks and the applied transition result are authoritative. Do not unlock paid access from a browser callback alone.
 </Warning>
 
+## Trials
+
+A plan with a `trial_period` (in days) starts each subscription in a trial. The trial ends that many days after the subscription starts. `trial_ends_at` on the subscription shows the end (`null` when there is no trial) and `in_trial` is `true` while it runs. `trial_ended_at` holds the time the trial ended. For a trial converted early, it is the time of the conversion.
+
+Change the trial with `PUT /api/v1/subscriptions/{external_id}` on Core. Send `trial` with exactly one of these fields:
+
+| Field | Effect |
+|---|---|
+| `extend_days` | Adds a positive number of days to the current trial end. |
+| `ends_at` | Sets an absolute new end in ISO 8601. It may shorten or extend the trial and must be at least 30 minutes in the future. |
+| `convert` | `true` ends the trial now and starts paid billing per the plan. |
+
+`reason` is optional (a string of up to 500 characters). Both the reason and the actor are kept in the activity log.
+
+```bash
+curl -X PUT "https://api.nozle.app/core/api/v1/subscriptions/subscription_123" \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"subscription": {"trial": {"extend_days": 14, "reason": "Needs two more weeks"}}}'
+```
+
+To convert now, send `{"subscription": {"trial": {"convert": true}}}`. The response is the subscription with `trial_ends_at` and `in_trial`. See the [Node, Python and Go](/sdks/node/billing#trials) helpers. In GraphQL, `updateSubscription` takes `trial: {extendDays, endsAt, convert, reason}` (exactly one of the three), and the `Subscription` type has `trialEndsAt` and `inTrial`.
+
+### Limits and errors
+
+An extension is at most 90 days. The trial's total length, from the subscription's first start, is at most 365 days. You can extend more than once.
+
+Only a subscription that is in a trial can be changed. A trial that already ended cannot be extended. A change is refused while a plan change is pending, and for externally billed and incomplete subscriptions, as for other updates.
+
+| Status | `code` | Cause |
+|---|---|---|
+| 422 | `trial_invalid_params` | Not exactly one of `extend_days`, `ends_at` and `convert`, or a bad value. |
+| 422 | `trial_not_active` | The subscription is not in a trial, or its trial already ended. |
+| 422 | `trial_extension_too_long` | The extension is over 90 days, or the total trial length would pass 365 days. |
+| 422 | `trial_end_in_past` | `ends_at` is less than 30 minutes in the future. |
+| 422 | `payment_method_required` | `convert` on a pay-in-advance plan when the customer has no way to pay. |
+| 409 | `plan_change_pending` | A plan change is pending on the subscription. |
+
+The 422 codes are listed under `error_details.trial`.
+
+### What is billed
+
+Extending changes only the trial end. Nothing is billed by the extension, and billing periods are unchanged.
+
+Converting ends the trial now:
+
+- **Pay in advance:** the first invoice is created immediately.
+- **Pay in arrears:** no invoice is created immediately. Usage and the subscription fee are billed at period end, prorated from the conversion date.
+
+The payment follows the normal collection flow. A failed payment does not undo the conversion; it follows the usual [dunning](/guides/billing/dunning).
+
+### Reminders
+
+`subscription.trial_ending` (webhook and email) is sent again for the new end. It is sent once per trial end date, so a reminder is not repeated for the same end. The lead time before the end is 7 days for trials of 14 days or more, 3 days for 7 to 13 days, and 1 day otherwise. A trial shortened to less than the lead time before its end is reminded at the next daily run.
+
+### Webhooks and entitlements
+
+An extension sends `subscription.updated`. A conversion sends `subscription.trial_ended` and `subscription.updated`. There are no new event types.
+
+`subscription.trial_ending` runs daily at 09:00 UTC, before the end. `subscription.trial_ended` comes from the hourly job, up to an hour after a normal end, and immediately on a conversion. A conversion can send `trial_ended` with no earlier `trial_ending`. See [Webhook events](/api/webhook-events#subscription-trial-ending-and-subscription-trial-ended).
+
+An extension does not change `/can` answers or credits. After the trial ends, access follows the plan rules.
+
 ## Enforce access in your application
 
 The portal changes billing state; your application enforces feature access using Nozle entitlement checks. The hosted Engine reads the current subscription and database clock for `/can`, denying access at its saved ending even if the termination job has not yet updated the row. Keep is visible after commit without waiting for the old subscription-cache refresh.

@@ -84,6 +84,38 @@ _, err = client.CancelPlanVersionMigration(ctx, "pro", migration.NozleID)
 
 These need a secret key. Another `PlanVersion` for an existing subscription returns a 422 `*APIError`; a second migration while one runs returns 409 with `HasCode("plan_version_migration_running")`. See [Plan versioning](/guides/billing/plan-versions).
 
+## Trials
+
+`ExtendTrial` adds days to a trial or moves its end. `ConvertTrial` ends the trial now and starts paid billing. Both take the subscription's external ID and return the subscription with `TrialEndsAt` and `InTrial`. `ExtendTrial(ctx, id, days, endsAt, reason)` takes exactly one of `days` (greater than zero, adds to the current end) and `endsAt` (an RFC 3339 time); pass `0` or `""` for the one you do not use. `reason` is optional (up to 500 characters). `UpdateSubscription(ctx, id, nozle.TrialUpdate{...})` is the general call both use.
+
+```go
+result, err := client.ExtendTrial(ctx, "subscription_123", 14, "", "Needs two more weeks")
+if err != nil {
+	var apiErr *nozle.APIError
+	if errors.As(err, &apiErr) && apiErr.HasCode(nozle.CodeTrialNotActive) {
+		// The trial already ended or there was none.
+	}
+	return err
+}
+fmt.Println(*result.Subscription.TrialEndsAt, result.Subscription.InTrial)
+
+// Or end the trial now:
+_, err = client.ConvertTrial(ctx, "subscription_123", "Customer asked to start")
+```
+
+To set an absolute end instead, pass `0` for `days` and `"2026-12-01T00:00:00Z"` for `endsAt`. These calls are not retried, because repeating an extension would add the days twice. Refusals return `*nozle.APIError`; test them with `HasCode` and the constants `CodeTrialInvalidParams`, `CodeTrialNotActive`, `CodeTrialExtensionTooLong`, `CodeTrialEndInPast`, `CodePaymentMethodRequired` and `CodePlanChangePending`:
+
+| Status | `code` | Cause |
+| --- | --- | --- |
+| 422 | `trial_invalid_params` | Not exactly one of the three, or a bad value. |
+| 422 | `trial_not_active` | The subscription is not in a trial, or its trial already ended. |
+| 422 | `trial_extension_too_long` | The extension is over 90 days, or the total trial length would pass 365 days. |
+| 422 | `trial_end_in_past` | `ends_at` is less than 30 minutes in the future. |
+| 422 | `payment_method_required` | Convert on a pay-in-advance plan when the customer has no way to pay. |
+| 409 | `plan_change_pending` | A plan change is pending. |
+
+Limits, billing and webhooks are in [Trials](/guides/billing/subscriptions#trials).
+
 ## Subscription self-service
 
 Derive the customer from the authenticated application user and validate ownership of the selected **external** subscription ID. Do not pass Core's internal UUID. These methods support [the React billing portal](/sdks/react/billing-portal).

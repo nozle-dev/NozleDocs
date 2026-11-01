@@ -145,6 +145,50 @@ nozle.cancel_subscription(
 
 See [Cancel Subscription](/api/cancel-subscription) for the rules.
 
+## Trials
+
+`extend_trial()` adds days to a trial or moves its end. `convert_trial()` ends the trial now and starts paid billing. Both take the subscription's external ID and return the subscription with `trial_ends_at` and `in_trial`. `update_subscription(external_id, trial=...)` is the general call; `trial` has exactly one of `extend_days`, `ends_at` or `convert`, plus an optional `reason` of up to 500 characters. `AsyncNozle` has the same methods, awaited.
+
+```python
+from nozle import Nozle, NozleAPIError
+
+nozle = Nozle()  # reads NOZLE_SECRET_KEY
+
+try:
+    result = nozle.extend_trial("subscription_123", days=14, reason="Needs two more weeks")
+    print(result["subscription"]["trial_ends_at"], result["subscription"]["in_trial"])
+
+    # Or set an absolute end (at least 30 minutes ahead):
+    nozle.extend_trial("subscription_123", ends_at="2026-12-01T00:00:00Z")
+
+    # Or end the trial now:
+    nozle.convert_trial("subscription_123", reason="Customer asked to start")
+except NozleAPIError as error:
+    if error.has_code("trial_not_active"):
+        ...  # The trial already ended or there was none.
+    elif error.has_code("payment_method_required"):
+        ...  # Ask the customer to add a way to pay, then convert again.
+    else:
+        raise
+```
+
+```python
+result = await AsyncNozle().extend_trial("subscription_123", days=14)
+```
+
+Refusals raise `NozleAPIError`; test them with `has_code`:
+
+| Status | `code` | Cause |
+| --- | --- | --- |
+| 422 | `trial_invalid_params` | Not exactly one of the three, or a bad value. |
+| 422 | `trial_not_active` | The subscription is not in a trial, or its trial already ended. |
+| 422 | `trial_extension_too_long` | The extension is over 90 days, or the total trial length would pass 365 days. |
+| 422 | `trial_end_in_past` | `ends_at` is less than 30 minutes in the future. |
+| 422 | `payment_method_required` | Convert on a pay-in-advance plan when the customer has no way to pay. |
+| 409 | `plan_change_pending` | A plan change is pending. |
+
+Limits, billing and webhooks are in [Trials](/guides/billing/subscriptions#trials).
+
 ## Subscription self-service
 
 <Info>

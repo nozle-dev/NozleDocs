@@ -130,6 +130,49 @@ await nozle.cancelSubscription('workspace_123', 'subscription_123', {
 
 See [Cancel Subscription](/api/cancel-subscription) for the rules.
 
+## Trials
+
+`extendTrial()` adds days to a trial or moves its end. `convertTrial()` ends the trial now and starts paid billing. Both take the subscription's external ID, need an `sk_` key and return the subscription with `trial_ends_at` and `in_trial`. `updateSubscription(externalId, { trial })` is the general call; `trial` has exactly one of `extend_days`, `ends_at` or `convert: true`, plus an optional `reason` of up to 500 characters.
+
+```ts
+import { NozleApiError, TrialErrorCode } from '@nozle-js/node'
+
+try {
+  const { subscription } = await nozle.extendTrial('subscription_123', {
+    days: 14,
+    reason: 'Needs two more weeks',
+  })
+  console.log(subscription.trial_ends_at, subscription.in_trial)
+
+  // Or set an absolute end (at least 30 minutes ahead):
+  await nozle.extendTrial('subscription_123', { endsAt: '2026-12-01T00:00:00Z' })
+
+  // Or end the trial now:
+  await nozle.convertTrial('subscription_123', { reason: 'Customer asked to start' })
+} catch (error) {
+  if (error instanceof NozleApiError && error.hasCode(TrialErrorCode.NotActive)) {
+    // The trial already ended or there was none.
+  } else if (error instanceof NozleApiError && error.hasCode(TrialErrorCode.PaymentMethodRequired)) {
+    // Ask the customer to add a way to pay, then convert again.
+  } else {
+    throw error
+  }
+}
+```
+
+The SDK does not retry these calls, because a repeated extension would add twice. Arguments that break the rules (none or several of the three, a non-positive `extend_days`, a `reason` over 500 characters) throw `NozleValidationError` before any request. Refusals throw `NozleApiError`; test them with `hasCode`. `TrialErrorCode` holds the values:
+
+| Status | `code` | Cause |
+| --- | --- | --- |
+| 422 | `trial_invalid_params` | Not exactly one of the three, or a bad value. |
+| 422 | `trial_not_active` | The subscription is not in a trial, or its trial already ended. |
+| 422 | `trial_extension_too_long` | The extension is over 90 days, or the total trial length would pass 365 days. |
+| 422 | `trial_end_in_past` | `ends_at` is less than 30 minutes in the future. |
+| 422 | `payment_method_required` | Convert on a pay-in-advance plan when the customer has no way to pay. |
+| 409 | `plan_change_pending` | A plan change is pending. |
+
+Limits, billing and webhooks are in [Trials](/guides/billing/subscriptions#trials).
+
 ## Subscription self-service
 
 <Info>
