@@ -46,7 +46,8 @@ Authorization: Bearer sk_nozle_...
       "period_end": "2026-12-01T00:00:00Z",
       "mode": "hard",
       "status": "warning",
-      "as_of": "2026-11-14T09:30:12.418Z"
+      "as_of": "2026-11-14T09:30:12.418Z",
+      "counted_from": "2026-11-01T00:00:00Z"
     },
     {
       "feature_code": null,
@@ -60,7 +61,8 @@ Authorization: Bearer sk_nozle_...
       "period_end": "2026-12-01T00:00:00Z",
       "mode": "hard",
       "status": "ok",
-      "as_of": "2026-11-14T09:30:12.418Z"
+      "as_of": "2026-11-14T09:30:12.418Z",
+      "counted_from": "2026-11-01T00:00:00Z"
     }
   ]
 }
@@ -77,10 +79,11 @@ Budgets come tightest first (least `remaining`). `budgets` is empty when no spen
 | `remaining` | `limit` minus `spent` and `held`, never below 0. |
 | `currency` | The plan's currency. |
 | `period` | `billing_period`, `calendar_month` or `lifetime`. |
-| `period_start`, `period_end` | The current period. A `lifetime` limit starts at `1970-01-01T00:00:00Z` and has `period_end: null`. |
+| `period_start`, `period_end` | The current period. A `lifetime` limit starts at `1970-01-01T00:00:00Z` and has `period_end: null`. From Engine 2.38.0, a `billing_period` limit starts on the subscription's start day in its first period and on the day of a plan change, as the invoice does. |
 | `mode` | `hard` refuses metered calls once used up; `soft` only notifies. |
 | `status` | `exceeded` when `spent` plus `held` reaches the limit (a soft limit too, though it never refuses), `warning` once they reach a threshold of the limit below 100, else `ok`. |
 | `as_of` | Time of the latest event booked into `spent`; `null` before the first one. Usage reaches the Engine a few seconds after it happens. |
+| `counted_from` | Engine 2.38.0. When `spent` starts. `period_start` once the period's spend is counted in full. Before that, for a limit added mid-period (for about 5 minutes), the time counting started. `null` when nothing is counted yet. See [Limits added mid-period](/guides/entitlements/spend-limits#limits-added-mid-period). |
 
 ## Errors
 

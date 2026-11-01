@@ -13,7 +13,7 @@ Available from Core 11.23.0 and Engine 2.34.0. Usage limits in units (an entitle
 |---|---|
 | **Where it is set** | On a plan, as the default of every subscription of that plan. On one subscription, as an override of the plan's limit for the same Feature (or the total). An override without an amount turns the plan's limit off for that subscription. |
 | **What it covers** | The total of the subscription's usage charges, or the usage charges of one Feature. A Feature limit and a total limit both apply; whichever is used up first refuses. |
-| **Period** | `billing_period` (default): the subscription's usage billing period. `calendar_month`: the calendar month in the customer's time zone. `lifetime`: never resets. |
+| **Period** | `billing_period` (default): the subscription's usage billing period, as the invoice bills it. From Engine 2.38.0, it starts on the day the subscription started in its first period and on the day of a plan change, not at the start of the billing period. `calendar_month`: the calendar month in the customer's time zone. `lifetime`: never resets. |
 | **Mode** | `hard` (default): metered calls are refused once the limit is used up. `soft`: notifications only, nothing is refused. |
 | **Thresholds** | The percentages that notify, each once per period. Default 50, 80, 90 and 100. |
 
@@ -81,7 +81,7 @@ curl -X POST https://api.nozle.app/core/api/v1/spend_limits \
 ```
 
 - `GET /spend_limits?plan_code=pro` or `?external_subscription_id=sub_pro_123` lists limits. `GET`, `PUT` and `DELETE /spend_limits/{id}` read, change and remove one.
-- An update changes `amount_cents`, `period`, `mode` or `thresholds`. The period's spend is kept (it belongs to the subscription, Feature and period, not to the limit), so raising a limit mid-period lets the customer continue at once, and a threshold already sent this period is not sent again. Changing `period` starts a new count.
+- An update changes `amount_cents`, `period`, `mode` or `thresholds`. The period's spend is kept (it belongs to the subscription, Feature and period, not to the limit), so raising a limit mid-period lets the customer continue at once, and a threshold already sent this period is not sent again. Changing `period` starts a new count, which the Engine fills with the spend already made in the new period (see [Limits added mid-period](#limits-added-mid-period)).
 - Deleting an override brings the plan's limit back. Deleting a plan or a Feature removes its limits.
 - One limit per plan or subscription and Feature: a second answers `422` with `feature_id: value_already_exist`.
 
@@ -106,11 +106,22 @@ Read a subscription's budgets with [List Customer Budgets](/api/list-customer-bu
   "period_end": "2026-12-01T00:00:00Z",
   "mode": "hard",
   "status": "warning",
-  "as_of": "2026-11-14T09:30:12.418Z"
+  "as_of": "2026-11-14T09:30:12.418Z",
+  "counted_from": "2026-11-01T00:00:00Z"
 }
 ```
 
-Amounts are decimal strings in major units of `currency` (dollars, not cents). `held` is spend reserved by open [budget holds](#exact-caps-with-budget-holds), and `remaining` is `limit` minus `spent` and `held`. `status` is `ok`, `warning` once a threshold below 100 is reached, or `exceeded` once `spent` plus `held` reaches the limit.
+Amounts are decimal strings in major units of `currency` (dollars, not cents). `held` is spend reserved by open [budget holds](#exact-caps-with-budget-holds), and `remaining` is `limit` minus `spent` and `held`. `status` is `ok`, `warning` once a threshold below 100 is reached, or `exceeded` once `spent` plus `held` reaches the limit. `counted_from` (Engine 2.38.0) is when `spent` starts: `period_start` once the period's spend has been counted in full, see below.
+
+The Engine records the exact spend of every priced event. Each night it recounts every budget from those records and corrects a count that stays off, so `spent` matches the billed usage over time.
+
+### Limits added mid-period
+
+From Engine 2.38.0, a limit added during a period, or whose `period` changes, counts the spend already made since the start of the period. The Engine counts the period's earlier spend within about 5 minutes, a few minutes more while usage is still arriving. Until then, `spent` holds only the spend since the limit was added, and `counted_from` is that time instead of `period_start`. `counted_from` is `null` while nothing is counted yet.
+
+When the earlier spend takes the budget past thresholds, only the highest threshold crossed is notified, as for any jump. For a hard limit already used up, `budget.exceeded` is sent and calls are refused.
+
+Exact per-event spend is recorded from Engine 2.38.0. A period that contains usage from before that release cannot be recounted: its budget keeps counting from when counting started, `counted_from` shows that time, and the nightly recount skips it. `billing_period` and `calendar_month` limits are recounted from their next period; a `lifetime` limit with older usage never is.
 
 ## Where a hard limit refuses
 
@@ -198,7 +209,7 @@ A hard usage limit in units (an entitlement `usage_limit` with a hard limit) sen
 ## Known limits
 
 - **A plain `/can` can overrun a hard limit.** Calls in flight and the few seconds before usage is counted can take the spend past the limit before the next call is refused. Use budget holds for an exact cap.
-- **A new limit counts from when it is set.** Usage processed before a limit existed is not counted, so a limit set mid-period starts at 0 for that period, and so does a limit whose `period` you change. The Engine also reloads which subscriptions have limits every minute, so a new limit refuses calls within a minute; the spend after it is set is counted at once.
+- **A new limit takes a few minutes to count earlier spend.** A limit set mid-period, or whose `period` you change, counts the period's earlier spend within about 5 minutes; until then `spent` is only the spend since it was set. Periods with usage from before Engine 2.38.0 are not recounted. See [Limits added mid-period](#limits-added-mid-period). The Engine reloads which subscriptions have limits every minute, so a new limit refuses calls within a minute.
 - **Per subscription only.** A limit caps one subscription. There is no limit across a customer's subscriptions, and no currency conversion.
 - **Usage events are never refused.** Usage sent with `POST /events` is billed even past a hard limit. Only the calls that check (`/can`, the proxy, `/usage/check`, `/usage/track`, holds) are refused.
 - **The LLM proxy fails open, except for customers it knows are over.** When the spend limits or a budget hold cannot be read, a customer the proxy instance last refused for a hard limit stays refused until that limit's period ends (10 minutes for unit limits); every other call goes ahead with the response header `X-Nozle-Budget-Unverified: true`. The memory is per proxy instance, so a customer who reached a limit since that instance last decided, or whose refusal another instance saw, goes ahead during an outage. `/can`, `/usage/check` and `/usage/track` answer `503 budget_unavailable` instead.
