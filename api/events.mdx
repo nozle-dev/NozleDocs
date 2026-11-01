@@ -75,3 +75,22 @@ Nozle does not reject events for being old or in the future. A feature code that
 
 See [idempotency](/api/idempotency) and [errors](/api/errors).
 
+## Void an event
+
+`POST https://api.nozle.app/engine/api/v1/events/{transaction_id}/void` voids an event you sent by mistake. Send a secret key and a JSON body with a `reason` of 1 to 500 characters.
+
+```json
+{ "reason": "wrong quantity" }
+```
+
+| Case | Result |
+|---|---|
+| Voided | `200` with `void` holding `transaction_id`, `status: voided`, `reason`, `voided_at`, `actor` and `effects`. |
+| Repeated call | `200` with `status: already_voided`. Nothing changes. |
+| Unknown `transaction_id` | `404 event_not_found`. |
+| An invoice covers the event's billing period | `409 period_invoiced`. Nothing changes. Issue an adjustment on the invoice instead. |
+| Missing or too long `reason` | `422 reason_required`. |
+| Your organization stores events in ClickHouse | `501 unsupported_event_store`. Voiding is not available for these organizations. |
+| Sending the voided `transaction_id` again | `POST /events` returns `409 transaction_voided`. Use a new `transaction_id`. |
+
+`effects` reports `event`, `usage`, `credits`, `cost` and `margin`. An effect reads `pending` until its background step finishes. See [Correct wrongly sent usage](/guides/billing/event-pipeline#correct-wrongly-sent-usage).

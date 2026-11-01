@@ -5,6 +5,15 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Void a usage event (Engine, Node, Python, Go)
+
+_November 1, 2026_
+
+- **Void.** `POST /api/v1/events/{transaction_id}/void` takes a `reason` and reverses the event, its usage counters, the credits it used, and its cost and margin. It is refused with `409 period_invoiced` when an invoice covers the event.
+- **No re-send.** A voided `transaction_id` is refused by `POST /events` with `409 transaction_voided`.
+- **SDKs.** `client.events.void(transactionId, { reason })` in Node, `client.events.void(transaction_id, reason=...)` in Python, `client.Events.Void(ctx, transactionID, reason)` in Go.
+- **Webhooks.** `subscription.trial_ending` is now listed with the other event types.
+
 ### Extend a trial or convert it now (Core 11.28.0, Node 0.33.0, Python 0.31.0, Go v0.31.0)
 
 _November 1, 2026_
