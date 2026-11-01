@@ -42307,6 +42307,7 @@ components:
         - version_id
         - mode
         - on_unavailable
+        - on_not_configured
         - maximum_snapshot_age_seconds
         - decision
         - reason
@@ -42323,7 +42324,14 @@ components:
             - deny
         on_unavailable:
           type: string
-          description: Decision used when economics are not `estimated` (for example `unavailable` because the call's revenue cannot be estimated) or cannot be compared.
+          description: Decision used when economics cannot be estimated or compared (for example `unavailable` because the call's revenue cannot be estimated, a `stale` snapshot or a currency mismatch). A feature with no Cost Rule follows `on_not_configured` instead.
+          enum:
+            - allow
+            - warn
+            - deny
+        on_not_configured:
+          type: string
+          description: Decision used when the feature has no Cost Rule (`economics.status` is `not_configured`; `policy.reason` is `economics_not_configured`). Default `allow`. Needs Engine 2.39.0.
           enum:
             - allow
             - warn
