@@ -90,6 +90,7 @@ See [idempotency](/api/idempotency) and [errors](/api/errors).
 | Unknown `transaction_id` | `404 event_not_found`. |
 | An invoice covers the event's billing period | `409 period_invoiced`. Nothing changes. Issue an adjustment on the invoice instead. |
 | Missing or too long `reason` | `422 reason_required`. |
+| Your organization stores events in ClickHouse | `501 unsupported_event_store`. Voiding is not available for these organizations. |
 | Sending the voided `transaction_id` again | `POST /events` returns `409 transaction_voided`. Use a new `transaction_id`. |
 
 `effects` reports `event`, `usage`, `credits`, `cost` and `margin`. An effect reads `pending` until its background step finishes. See [Correct wrongly sent usage](/guides/billing/event-pipeline#correct-wrongly-sent-usage).
