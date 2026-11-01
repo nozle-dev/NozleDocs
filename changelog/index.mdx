@@ -14,6 +14,18 @@ _November 2, 2026_
 - **Aborted streams.** A stream cut before the final usage is billed what was delivered or an estimate (`ceil(UTF-8 bytes / 4)`), with `usage_source` and `stream_aborted`. Holds are finalized with it. Waiving this billing is not available yet.
 - **Docs fix.** An unpriced model is no longer described as always entering the Uncosted queue; every path now records it.
 
+### Tax IDs, reverse charge and VAT checks (Core 11.31.0, Node 0.35.0, Python 0.33.0, Go v0.33.0)
+
+_November 1, 2026_
+
+- **Tax ID fields.** A customer has `tax_identification_type`, `tax_identification_status` (`unverified`, `pending`, `valid`, `invalid`), `tax_identification_checked_at` and a derived `tax_treatment`. `POST /customers` takes `tax_identification_type` and answers `422` for a bad type, a missing number or a bad format.
+- **VIES.** Nozle stores the VIES result. `POST /customers/{external_id}/tax_identification/recheck` asks for a new check. An invalid number is taxed as a consumer.
+- **48 hour cap.** A VIES outage holds invoices for at most 48 hours. Then standard VAT of the entity country applies, the status is `unverified`, held invoices finalize, and `customer.vies_check` carries the error.
+- **Invoices.** Invoices carry `tax_status`, `tax_treatment` and `tax_details` (a snapshot for invoices issued from now on). The reverse charge note names Article 196 and both VAT IDs, in English for every locale.
+- **Checkout.** `422 customer_tax_location_required` and `409 customer_tax_check_pending` (`retry_after_seconds`). The billing entity flag `customer_location_required` is off by default.
+- **SDKs.** `taxId`, `address`, `customers.get` and `waitForTaxCheck` (Python `tax_id`, `clear_tax_id`, `wait_for_tax_check`; Go `TaxID`, `ClearTaxID`, `WaitForTaxCheck`). The SDK releases ship after Core.
+- **Not available yet.** Stripe Tax calculation and a browser form for billing details. See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
+
 ### Void a usage event (Engine, Node, Python, Go)
 
 _November 1, 2026_

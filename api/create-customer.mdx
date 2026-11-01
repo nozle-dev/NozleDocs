@@ -16,7 +16,15 @@ Send customer attributes under the `customer` key:
   "customer": {
     "external_id": "workspace_123",
     "name": "Example workspace",
-    "email": "billing@example.com"
+    "email": "billing@example.com",
+    "customer_type": "company",
+    "legal_name": "Acme GmbH",
+    "country": "DE",
+    "address_line1": "Main St 1",
+    "city": "Berlin",
+    "zipcode": "10115",
+    "tax_identification_number": "DE811128135",
+    "tax_identification_type": "eu_vat"
   }
 }
 ```
@@ -33,6 +41,22 @@ Send customer attributes under the `customer` key:
   Customer email address.
 </ParamField>
 
+<ParamField body="customer.country" type="string">
+  Two-letter country code. Also `address_line1`, `address_line2`, `city`, `state` and `zipcode`.
+</ParamField>
+
+<ParamField body="customer.tax_identification_number" type="string | null">
+  The customer's tax ID. Send `null` to clear it, together with the type, the status and the check time.
+</ParamField>
+
+<ParamField body="customer.tax_identification_type" type="string">
+  The tax ID type, one of the [Stripe tax ID types](https://docs.stripe.com/billing/customer/tax-ids#supported-tax-id), such as `eu_vat` or `in_gst`. Optional. A type needs a number.
+</ParamField>
+
+<Note>
+`tax_identification_type` and the response fields below are available from Core 11.31.0. The SDKs send them from Node 0.35.0, Python 0.33.0 and Go v0.33.0, which ship after Core. The Engine `/customers` proxy does not forward address or billing configuration. The SDKs call Core directly. See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
+</Note>
+
 ### Response
 
 The response wraps the customer in a `customer` object.
@@ -48,6 +72,63 @@ The response wraps the customer in a `customer` object.
 <ResponseField name="customer.email" type="string">
   Customer email address.
 </ResponseField>
+
+<ResponseField name="customer.tax_identification_type" type="string | null">
+  The stored tax ID type.
+</ResponseField>
+
+<ResponseField name="customer.tax_identification_status" type="string">
+  `unverified`, `pending`, `valid` or `invalid`. See [How EU VAT numbers are checked](/guides/billing/tax-ids#how-eu-vat-numbers-are-checked).
+</ResponseField>
+
+<ResponseField name="customer.tax_identification_checked_at" type="string | null">
+  When the tax ID was last checked, as an ISO 8601 date-time.
+</ResponseField>
+
+<ResponseField name="customer.tax_treatment" type="string">
+  `standard`, `reverse_charge`, `exempt`, `provider`, `pending` or `none`.
+</ResponseField>
+
+<ResponseField name="customer.vies_check_pending" type="boolean">
+  `true` while a VIES check holds the customer (`tax_treatment` is `pending`).
+</ResponseField>
+
+<ResponseField name="customer.tax_identification_warnings" type="string[]">
+  Only on write responses. `["country_mismatch"]` when an `eu_vat` number starts with another country than `country`. The write still succeeds.
+</ResponseField>
+
+```json
+{
+  "customer": {
+    "external_id": "workspace_123",
+    "name": "Example workspace",
+    "email": "billing@example.com",
+    "tax_identification_number": "DE811128135",
+    "tax_identification_type": "eu_vat",
+    "tax_identification_status": "pending",
+    "tax_identification_checked_at": null,
+    "tax_treatment": "pending",
+    "vies_check_pending": true,
+    "tax_identification_warnings": []
+  }
+}
+```
+
+### Validation errors
+
+A bad tax ID answers `422` with `code: validation_errors`:
+
+| `error_details` | Cause |
+| --- | --- |
+| `tax_identification_type: ["value_is_invalid"]` | The type is not in the list. |
+| `tax_identification_number: ["value_is_mandatory"]` | A type without a number. |
+| `tax_identification_number: ["invalid_format"]` | An `eu_vat` number that is not well formed, or an `in_gst` number that is not 15 letters and digits. |
+
+## Recheck a tax ID
+
+`POST https://api.nozle.app/core/api/v1/customers/{external_id}/tax_identification/recheck` asks for a new VIES check. Use a secret key. The call answers `202` with the customer in the same shape as above, with `tax_identification_status: "pending"`.
+
+It answers `422` with `error_details: {"tax_identification": ["eu_tax_not_applicable"]}` when the billing entity has no EU tax management, or the tax ID is not an `eu_vat` number. The result arrives in the [`customer.vies_check`](/api/webhook-events) webhook.
 
 ## Customer currency
 
