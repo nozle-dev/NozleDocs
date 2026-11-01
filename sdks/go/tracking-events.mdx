@@ -106,7 +106,7 @@ if errors.Is(err, nozle.ErrBufferFull) {
 | `FlushInterval` | `5 * time.Second` | Flushes whatever is waiting this often. A negative value turns the timer off. |
 | `MaxQueueSize` | `10_000` | Most events held at once, waiting or in a request in flight. |
 | `MaxAttempts` | `3` | Flushes an event may fail in before it is dropped and reported as `failed`. |
-| `OnError` | log | `OnError(err, events)` receives every event the buffer does not deliver. |
+| `OnError` | `slog` | `OnError(err, events)` receives every event the buffer does not deliver. |
 
 A zero field takes its default. For `FlushInterval` this means `0` is 5 seconds, not "off": Go cannot tell an unset field from `0`, so use a negative value, such as `-1`, to turn the timer off. `NewEventBuffer` panics when an option is out of range, as `New` does for a missing key.
 
@@ -129,7 +129,7 @@ Every event that is not delivered goes to `OnError` with an `*EventBufferError`:
 | `failed` | Its requests failed in `MaxAttempts` flushes. Until then a failed event goes back to the front of the queue with the same transaction ID. `Err` is the last request error, or the context error when `Close` ran out of time. |
 | `closed` | `Track` was called after `Close`. The event was dropped; `Track` returned `ErrBufferClosed`. |
 
-`EventBufferError` unwraps to `Err`, so `errors.Is` finds `ErrBufferFull`, `ErrBufferClosed` or the request error. Without `OnError`, the buffer logs each one through the standard `log` package. `OnError` runs on the caller's goroutine for `buffer_full` and `closed`, and on the buffer's goroutine otherwise.
+`EventBufferError` unwraps to `Err`, so `errors.Is` finds `ErrBufferFull`, `ErrBufferClosed` or the request error. Without `OnError`, the buffer logs one `slog.Default()` error record per report, with `code`, `count` and `error` and never the events or the API key (before `v0.28.0` it used the standard `log` package). `OnError` runs on the caller's goroutine for `buffer_full` and `closed`, and on the buffer's goroutine otherwise.
 
 ### Exit and serverless
 
@@ -137,7 +137,7 @@ Go has no exit hook. Call `Close` before the program returns, for example `defer
 
 A serverless function may be frozen or stopped as soon as it returns. Call `buf.Flush(ctx)` (buffer kept between invocations) or `buf.Close(ctx)` (buffer per invocation) before you return from each invocation.
 
-The queue lives in memory only. The OpenAI and Anthropic usage capture does not use the buffer yet.
+The queue lives in memory only. From `v0.28.0`, the LLM usage capture takes the buffer as `Buffer` and queues its usage events in it; Cost Events are still sent directly. See [Buffered delivery](/sdks/go/llm-usage#buffered-delivery).
 
 ## Meter and cost events
 

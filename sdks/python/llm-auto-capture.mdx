@@ -56,8 +56,9 @@ client.chat.completions.create(
 | `cost_meter_code` | Also send one Cost Event per token category to this Cost Event Meter. |
 | `include_stream_usage` | Default `True`: chat completion streams are sent with `stream_options.include_usage`. Set `False` for a server that rejects the field. |
 | `on_error` | Called with a recording failure, and once per event code with an error whose `code` is `feature_not_found` when no Feature has that code. Without it, a `NozleTrackingWarning` is emitted. The provider response is never affected. |
+| `buffer` | From `0.29.0`. An [event buffer](/sdks/python/tracking-events#event-buffer) to queue each usage event in instead of sending it at once. See [Buffered delivery](#buffered-delivery). |
 
-Recording runs in a background thread (with `AsyncNozle`, a task on the event loop) after the response has been read.
+Recording runs in a background thread (with `AsyncNozle`, a task on the event loop) after the response has been read. With `buffer=`, the usage event is queued as the response ends instead.
 
 ### Usage you read yourself
 
@@ -172,6 +173,30 @@ Anthropic streams read input usage from `message_start` and output usage from `m
 | `metric_code` | no | `llm_tokens` | Event code. |
 | `cost_meter_code` | no | `None` | Cost Event Meter code. When set, emits categorized token Cost Events linked to the Feature Event. |
 | `feature` | no | `None` | Optional event property. |
+| `buffer` | no | `None` | From `0.29.0`. An `EventBuffer` or `AsyncEventBuffer` to queue the usage event in. See [Buffered delivery](#buffered-delivery). |
+
+## Buffered delivery
+
+By default each usage event is sent on its own as the response ends (the HTTP capture sends it from a background thread), so an event can be lost when the process exits or a serverless host freezes it. From `nozle-sdk` 0.29.0, pass an [event buffer](/sdks/python/tracking-events#event-buffer) as `buffer=` to `wrap_openai()`, `wrap_anthropic()`, `wrap_http_client()`, `capture_http_client()` or `capture_async_http_client()`. The usage events are then queued in the buffer and delivered in batches by its `flush()`, `close()` and exit hook.
+
+```python
+buffer = nozle.event_buffer()
+client = openai.OpenAI(
+    http_client=nozle.wrap_http_client(openai.DefaultHttpxClient(), customer_id="workspace_123", buffer=buffer),
+)
+# or: client = wrap_openai(openai.OpenAI(), nozle, customer_id="workspace_123", buffer=buffer)
+
+def handler(event, context):
+    ...
+    buffer.flush(timeout=5)  # before a serverless handler returns
+```
+
+With `AsyncNozle`, pass its [async buffer](/sdks/python/tracking-events#async-event-buffer) to wrapped async clients or `capture_async_http_client()`, and `await buffer.flush()` before the handler returns or `await buffer.close()` before the event loop ends.
+
+- The HTTP capture queues the usage event as the response ends, on the caller's thread or event loop, so a `flush()` right after the call includes it.
+- Only the usage event goes through the buffer. Cost events (`cost_meter_code`) and the one-time Feature check are still sent on their own.
+- The `transaction_id` stays `llm-<format>-<response id>`, so a resend never bills twice. Like `track_batch()`, a buffered usage event makes no subscription lookup.
+- Without `buffer=`, nothing changes.
 
 ## Tracked properties
 
@@ -199,7 +224,7 @@ The usage event's `transaction_id` is `llm-<format>-<response id>` when the resp
 
 The warning names only the exception type, not the cause, for example `Nozle tracking failed after a successful LLM response (NozleAPIError)`. A customer with several active subscriptions makes every wrapped call emit it. Under `python -W error`, the SDK swallows the warning instead of raising it.
 
-The synchronous wrapper tracks inline: each wrapped call waits for one tracking request (about 255 ms observed). With `cost_meter_code`, it sends several requests per call. For async provider calls, synchronous Nozle tracking runs in a worker thread through `asyncio.to_thread()`.
+The synchronous wrapper tracks inline: each wrapped call waits for one tracking request (about 255 ms observed). With `cost_meter_code`, it sends several requests per call. With `buffer=`, the usage event is queued without a request; cost events are still sent inline. For async provider calls, synchronous Nozle tracking runs in a worker thread through `asyncio.to_thread()`.
 
 The wrapper does not expose `subscription_id`, so `track()` resolves the customer's single active subscription. Use manual queued tracking when you need to choose the transaction identifier or coordinate delivery through your own queue.
 

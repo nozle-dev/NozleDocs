@@ -5,6 +5,16 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Buffered LLM capture and an async Python buffer (Node 0.31.0, Python 0.29.0, Go v0.28.0)
+
+_November 1, 2026_
+
+- **LLM capture through the event buffer.** Pass an event buffer to the LLM capture: `buffer` on `wrapOpenAI`, `wrapAnthropic` and `captureFetch` (Node), `buffer=` on `wrap_openai()`, `wrap_anthropic()`, `wrap_http_client()`, `capture_http_client()` and `capture_async_http_client()` (Python), and `Buffer` on `ProviderWrapOptions` and `CaptureOptions` (Go). Each usage event is then queued in the buffer and delivered by its `flush` or `close`, so it is no longer lost when a serverless handler returns or a process exits. Without it, nothing changes.
+- **Only usage events are buffered.** Cost events are still sent directly. The usage event keeps its `llm-<format>-<response id>` transaction ID, so a resend never bills twice. Node's `flush()` and `close()` first wait for responses still being read and for their cost events; Python and Go queue it as the response ends, so a flush right after reading the response includes it.
+- **Async Python buffer.** `AsyncNozle.event_buffer()` returns an `AsyncEventBuffer` with the sync buffer's options, defaults and error codes, sent from an asyncio task. `track()` is not awaited; `await flush()`, `await close()` and `async with`. No event loop runs at process exit, so `await close()` before the loop ends.
+- **Go logs through `slog`.** Without `OnError`, the Go event buffer and the LLM capture wrappers log undelivered events through `slog.Default()` at error level, with `code`, `count` and `error`, never the events or the API key. The buffer used the standard `log` package before, and the wrappers dropped the error.
+- See [Node.js](/sdks/node/llm-auto-capture#buffered-delivery), [Python](/sdks/python/llm-auto-capture#buffered-delivery), [Python async buffer](/sdks/python/tracking-events#async-event-buffer) and [Go](/sdks/go/llm-usage#buffered-delivery).
+
 ### Spend limits and budgets (Core 11.23.0 and 11.23.1, Engine 2.34.0, Node 0.30.0, Python 0.28.0, Go v0.27.0)
 
 _November 1, 2026_

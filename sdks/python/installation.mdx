@@ -82,6 +82,7 @@ async with AsyncNozle(max_retries=2) as nozle:  # reads NOZLE_SECRET_KEY
 - Validation, `NozleAPIError` (with `request_id` and `retry_after`), retries and idempotency keys behave exactly as in `Nozle`. Retries wait with `asyncio.sleep`.
 - For an application-wide client, call `await nozle.aclose()` during shutdown.
 - `events.create_transaction_id()` and `cost_events.create_cost_event_id()` make no request and are not awaited.
+- From `0.29.0`, `nozle.event_buffer()` returns an `AsyncEventBuffer`: `track()` is not awaited, `flush()` and `close()` are. Close it before the event loop ends; see [Async event buffer](/sdks/python/tracking-events#async-event-buffer).
 - `await nozle.webhooks.verify(body, headers)` is awaited, because the call is part of the async client. Verification makes no network request. From `0.23.0`, pass `webhook_secret=`; see [Receive Nozle webhooks](/api/receive-webhooks).
 - For [LLM auto-capture](/sdks/python/llm-auto-capture), use `nozle.capture_async_http_client(...)` or wrap an `httpx.AsyncClient`. `AsyncNozle` does not wrap a synchronous `httpx.Client`; use `Nozle` there.
 

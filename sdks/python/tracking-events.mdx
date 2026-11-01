@@ -138,7 +138,7 @@ for r in result.results:
 
 ## Event buffer
 
-From `nozle-sdk` 0.28.0, `event_buffer()` returns a buffer that queues events in memory and sends them through `track_batch()` from a background thread. `buffer.track()` makes no request. It is available on `Nozle` (sync) only; `AsyncNozle` has no buffer yet.
+From `nozle-sdk` 0.28.0, `event_buffer()` returns a buffer that queues events in memory and sends them through `track_batch()` from a background thread. `buffer.track()` makes no request. From 0.29.0, `AsyncNozle` has the same buffer on asyncio; see [Async event buffer](#async-event-buffer).
 
 ```python
 def report(error, events):
@@ -192,7 +192,28 @@ The worker is a daemon thread. An `atexit` handler closes the buffer with a 5 se
 
 A function host may freeze or end the process as soon as your handler returns, before the timer or the exit hook runs. Call `buffer.flush()` (or `buffer.close()`) before you return.
 
-The queue lives in memory only. Like `track_batch()`, the buffer makes no subscription lookup. The OpenAI and Anthropic wrappers and `capture_http_client()` still send each event on its own.
+The queue lives in memory only. Like `track_batch()`, the buffer makes no subscription lookup. From 0.29.0, the OpenAI and Anthropic wrappers and the HTTP capture take the buffer as `buffer=` and queue their usage events in it; see [Buffered delivery](/sdks/python/llm-auto-capture#buffered-delivery).
+
+### Async event buffer
+
+From `nozle-sdk` 0.29.0, `AsyncNozle.event_buffer()` returns an `AsyncEventBuffer`. It takes the same options, with the same defaults, triggers, retries, backoff and error codes, and sends through `track_batch()` from an asyncio task instead of a thread.
+
+```python
+from nozle import AsyncNozle
+
+async with AsyncNozle() as nozle:
+    async with nozle.event_buffer(on_error=report) as buffer:  # leaving the block closes it
+        buffer.track("workspace_123", "api_calls", {"tokens": 100})  # not awaited: no request
+        await buffer.flush(timeout=10)
+```
+
+- **`track()`** is not awaited and returns the `transaction_id`. Call it from the event loop's thread.
+- **The task** starts with the first `track()` made inside a running loop, or with `flush()`. It starts again on a new loop, so a serverless handler that runs `asyncio.run()` per call can keep one buffer. A request cut off when a loop ended is sent again with the same `transaction_id`.
+- **`await flush(timeout=None)`** and **`await close(timeout=None)`** return `True` when done and `False` on timeout; the task keeps sending. `async with` calls `close()`.
+
+<Warning>
+No event loop runs at process exit, so the exit hook cannot send anything: events still queued then are reported as `failed`. Always `await buffer.close()` (or `await buffer.flush()`, or leave `async with`) before the event loop ends.
+</Warning>
 
 ## FastAPI worker pattern
 
