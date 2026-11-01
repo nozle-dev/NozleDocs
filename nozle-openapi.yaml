@@ -29099,12 +29099,15 @@ components:
         - updated_at
       properties:
         tax_status:
-          type: string
+          type:
+            - string
+            - 'null'
           enum:
             - pending
             - succeeded
             - failed
-          description: State of the tax calculation for the invoice.
+            - null
+          description: State of the tax calculation for the invoice. Null when no VIES or provider flow ran.
         tax_treatment:
           $ref: '#/components/schemas/TaxTreatment'
         tax_details:
