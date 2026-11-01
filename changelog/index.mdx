@@ -5,6 +5,17 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Extend a trial or convert it now (Core next, Node next, Python next, Go next)
+
+_November 1, 2026_
+
+- **Change a trial.** `PUT /api/v1/subscriptions/{external_id}` takes `trial` with exactly one of `extend_days`, `ends_at` or `convert: true`, and an optional `reason` (up to 500 characters, kept in the activity log). An extension is at most 90 days, the total trial is at most 365 days, and extending is repeatable.
+- **Billing.** Extending bills nothing and leaves billing periods unchanged. Converting ends the trial now: a pay-in-advance plan gets its first invoice at once; a pay-in-arrears plan bills usage and the fee at period end, prorated from the conversion date.
+- **New fields.** The subscription has `trial_ends_at` and `in_trial`. `trial_ended_at` holds the time of the conversion for a trial converted early.
+- **Errors.** `trial_invalid_params`, `trial_not_active`, `trial_extension_too_long`, `trial_end_in_past` and `payment_method_required` (422); `plan_change_pending` (409).
+- **Webhooks.** An extension sends `subscription.updated`; a conversion sends `subscription.trial_ended` and `subscription.updated`. `subscription.trial_ending` is sent again for the new end. No new event types.
+- **SDKs and GraphQL.** Node `extendTrial` / `convertTrial`, Python `extend_trial` / `convert_trial`, Go `ExtendTrial` / `ConvertTrial`. GraphQL `updateSubscription` takes `trial`. See [Trials](/guides/billing/subscriptions#trials).
+
 ### Margin policies for a plan or a customer (Core 11.25.1, Engine 2.40.0)
 
 _November 1, 2026_
