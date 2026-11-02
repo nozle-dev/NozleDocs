@@ -5,6 +5,15 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Billing entity API reference fixes
+
+_November 2, 2026_
+
+- **Update body.** `PUT /billing_entities/{code}` takes its fields inside `billing_entity`, like create. The reference showed them at the top level.
+- **Responses.** Create and update return `{ "billing_entity": { ... } }`. The reference showed the bare object.
+- **`einvoicing`.** Now in the create and update bodies and the billing entity object. Only `country: FR` is supported; other countries answer `einvoicing: country_not_supported`, and none answers `einvoicing: country_must_be_present`.
+- **Path.** `{code}` is the billing entity code, not a UUID.
+
 ### Stripe Tax calculation (Core 11.32.0)
 
 _November 2, 2026_
