@@ -7,7 +7,7 @@ info:
     **Legacy key names, removed in Core 6.0.0.** REST responses, webhook payloads and CSV exports carry only the Nozle names: `nozle_id` and the plain `<key>` names such as `customer_id` and `invoice_id`. The former-prefix keys, the former EU tax codes, the former CSV id columns and the former webhook headers are gone. Webhook deliveries carry `webhook-id`, `webhook-timestamp` and `webhook-signature`. nozle-js and nozle-python older than 0.10.0 and nozle-go older than 0.9.1 cannot read a credit system id from Core 6.0.0.
 
     **Live and sandbox (unreleased).** Live and sandbox use the same servers. The API key decides the environment: live keys start with `sk_nozle_` or `pk_nozle_`, sandbox keys with `sk_nozle_test_` or `pk_nozle_test_`, and each only reaches its own organization's data. A key whose prefix does not match its organization's environment, or a key of a reset sandbox, is refused with `401`. Every response to an accepted key, Core and Engine, carries the header `X-Nozle-Livemode: true` (live) or `false` (sandbox); browsers can read it. Webhook payloads carry `livemode` the same way. See https://docs.nozle.dev/guides/getting-started/sandbox.
-  version: 1.57.0
+  version: 1.57.1
   license:
     name: AGPLv3
     url: https://github.com/nozle-dev/core/blob/main/LICENSE
@@ -218,7 +218,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BillingEntityObject'
+                type: object
+                required:
+                  - billing_entity
+                properties:
+                  billing_entity:
+                    $ref: '#/components/schemas/BillingEntityObject'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -234,8 +239,7 @@ paths:
         required: true
         schema:
           type: string
-          format: uuid
-        description: The ID of the billing entity
+        description: The code of the billing entity
     get:
       tags:
         - Billing Entities
@@ -272,13 +276,19 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/BillingEntityUpdateInput'
+        required: true
       responses:
         '200':
           description: Billing entity updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BillingEntityObjectExtended'
+                type: object
+                required:
+                  - billing_entity
+                properties:
+                  billing_entity:
+                    $ref: '#/components/schemas/BillingEntityObjectExtended'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -24399,6 +24409,11 @@ components:
           type: boolean
           example: true
           description: Whether to finalize invoices with zero amount for this billing entity
+        einvoicing:
+          type: boolean
+          default: false
+          example: false
+          description: 'Whether e-invoicing is on for this billing entity. Only France is supported: the billing entity needs `country: FR`. Errors (422 `error_details`): `einvoicing: country_must_be_present` (no country), `einvoicing: country_not_supported` (any other country).'
         tax_provider:
           type: string
           enum:
@@ -24622,6 +24637,11 @@ components:
               type: boolean
               example: true
               description: Whether to finalize invoices with zero amount for this billing entity
+            einvoicing:
+              type: boolean
+              default: false
+              example: false
+              description: 'Whether e-invoicing is on for this billing entity. Only France is supported: the billing entity needs `country: FR`. Errors (422 `error_details`): `einvoicing: country_must_be_present` (no country), `einvoicing: country_not_supported` (any other country).'
             tax_provider:
               type: string
               enum:
@@ -24949,182 +24969,192 @@ components:
     BillingEntityUpdateInput:
       type: object
       description: Billing entity update input
+      required:
+        - billing_entity
       properties:
-        name:
-          type: string
-          example: Acme Corp
-          description: The name of the billing entity
-        default_currency:
-          $ref: '#/components/schemas/Currency'
-          description: The default currency of the billing entity
-          example: USD
-        document_numbering:
-          type: string
-          enum:
-            - per_customer
-            - per_billing_entity
-          description: |-
-            The type of document numbering for this billing entity:
-            - `per_customer`: document numbers are unique per customer
-            - `per_billing_entity`: document numbers are unique per billing entity
-        document_number_prefix:
-          type:
-            - string
-            - 'null'
-          example: ABC-123
-          description: The prefix used in document numbers for this billing entity
-        finalize_zero_amount_invoice:
-          type: boolean
-          example: true
-          description: Whether to finalize invoices with zero amount for this billing entity
-        tax_provider:
-          type: string
-          enum:
-            - nozle
-            - stripe_tax
-          default: nozle
-          example: nozle
-          description: 'Who calculates tax on this entity''s invoices. `nozle`: your tax codes, EU tax management or a connected Anrok or Avalara account. `stripe_tax`: Stripe Tax, through the Stripe account connected to the organization (Core 11.32.0). Errors (422 `error_details`): `tax_provider: stripe_account_required` (no connected Stripe account; a Razorpay-only merchant cannot enable it), `tax_provider: value_is_invalid`, `tax_provider: conflicts_with_eu_tax_management`. Stripe Tax and `eu_tax_management` cannot both be on.'
-        provider_tax_code:
-          type:
-            - string
-            - 'null'
-          pattern: ^txcd_[0-9]{8}$
-          example: txcd_10103001
-          description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) used for this entity''s items when the item and its plan have none. Used only with `tax_provider: stripe_tax`. When no level sets one, `txcd_10103001` (SaaS, business use) applies. Error (422): `provider_tax_code: value_is_invalid`.'
-        customer_location_required:
-          type: boolean
-          default: false
-          example: false
-          description: When true, checkout for this billing entity's customers answers `422 customer_tax_location_required` unless the customer has a country, `address_line1`, `city` and `zipcode`.
-        billing_configuration:
+        billing_entity:
           type: object
           properties:
-            invoice_footer:
+            name:
               type: string
-              example: Thank you for your business
-              description: The footer text to be displayed on invoices for this billing entity
-            document_locale:
+              example: Acme Corp
+              description: The name of the billing entity
+            default_currency:
+              $ref: '#/components/schemas/Currency'
+              description: The default currency of the billing entity
+              example: USD
+            document_numbering:
               type: string
-              example: en
-              description: The language of the documents generated for this billing entity
-            invoice_grace_period:
+              enum:
+                - per_customer
+                - per_billing_entity
+              description: |-
+                The type of document numbering for this billing entity:
+                - `per_customer`: document numbers are unique per customer
+                - `per_billing_entity`: document numbers are unique per billing entity
+            document_number_prefix:
+              type:
+                - string
+                - 'null'
+              example: ABC-123
+              description: The prefix used in document numbers for this billing entity
+            finalize_zero_amount_invoice:
+              type: boolean
+              example: true
+              description: Whether to finalize invoices with zero amount for this billing entity
+            einvoicing:
+              type: boolean
+              default: false
+              example: false
+              description: 'Whether e-invoicing is on for this billing entity. Only France is supported: the billing entity needs `country: FR`. Errors (422 `error_details`): `einvoicing: country_must_be_present` (no country), `einvoicing: country_not_supported` (any other country).'
+            tax_provider:
+              type: string
+              enum:
+                - nozle
+                - stripe_tax
+              default: nozle
+              example: nozle
+              description: 'Who calculates tax on this entity''s invoices. `nozle`: your tax codes, EU tax management or a connected Anrok or Avalara account. `stripe_tax`: Stripe Tax, through the Stripe account connected to the organization (Core 11.32.0). Errors (422 `error_details`): `tax_provider: stripe_account_required` (no connected Stripe account; a Razorpay-only merchant cannot enable it), `tax_provider: value_is_invalid`, `tax_provider: conflicts_with_eu_tax_management`. Stripe Tax and `eu_tax_management` cannot both be on.'
+            provider_tax_code:
+              type:
+                - string
+                - 'null'
+              pattern: ^txcd_[0-9]{8}$
+              example: txcd_10103001
+              description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) used for this entity''s items when the item and its plan have none. Used only with `tax_provider: stripe_tax`. When no level sets one, `txcd_10103001` (SaaS, business use) applies. Error (422): `provider_tax_code: value_is_invalid`.'
+            customer_location_required:
+              type: boolean
+              default: false
+              example: false
+              description: When true, checkout for this billing entity's customers answers `422 customer_tax_location_required` unless the customer has a country, `address_line1`, `city` and `zipcode`.
+            billing_configuration:
+              type: object
+              properties:
+                invoice_footer:
+                  type: string
+                  example: Thank you for your business
+                  description: The footer text to be displayed on invoices for this billing entity
+                document_locale:
+                  type: string
+                  example: en
+                  description: The language of the documents generated for this billing entity
+                invoice_grace_period:
+                  type: integer
+                  example: 0
+                  description: The grace period (in days) for invoice finalization
+                subscription_invoice_issuing_date_anchor:
+                  type: string
+                  description: Defines whether the issuing date follows the current billing period's end date or the next period starting date.
+                  enum:
+                    - current_period_end
+                    - next_period_start
+                  default: next_period_start
+                subscription_invoice_issuing_date_adjustment:
+                  type: string
+                  description: The logic applied on top of the subscription_invoice_issuing_date_anchor rule. You can opt to use the invoice finalization date, that includes any configured grace period.
+                  enum:
+                    - align_with_finalization_date
+                    - keep_anchor
+                  default: align_with_finalization_date
+            net_payment_term:
               type: integer
               example: 0
-              description: The grace period (in days) for invoice finalization
-            subscription_invoice_issuing_date_anchor:
-              type: string
-              description: Defines whether the issuing date follows the current billing period's end date or the next period starting date.
-              enum:
-                - current_period_end
-                - next_period_start
-              default: next_period_start
-            subscription_invoice_issuing_date_adjustment:
-              type: string
-              description: The logic applied on top of the subscription_invoice_issuing_date_anchor rule. You can opt to use the invoice finalization date, that includes any configured grace period.
-              enum:
-                - align_with_finalization_date
-                - keep_anchor
-              default: align_with_finalization_date
-        net_payment_term:
-          type: integer
-          example: 0
-          description: The net payment term (in days) for this billing entity
-        address_line1:
-          type:
-            - string
-            - 'null'
-          example: 5230 Penfield Ave
-          description: The first line of the billing address
-        address_line2:
-          type:
-            - string
-            - 'null'
-          example: Suite 100
-          description: The second line of the billing address
-        city:
-          type:
-            - string
-            - 'null'
-          example: Woodland Hills
-          description: The city of the billing address
-        state:
-          type:
-            - string
-            - 'null'
-          example: CA
-          description: The state of the billing address
-        country:
-          $ref: '#/components/schemas/Country'
-          description: The country code of the billing address
-          nullable: true
-        zipcode:
-          type:
-            - string
-            - 'null'
-          example: '91364'
-          description: The zipcode of the billing address
-        email:
-          type:
-            - string
-            - 'null'
-          format: email
-          example: billing@acme.com
-          description: The email address of the billing entity
-        legal_name:
-          type:
-            - string
-            - 'null'
-          example: Acme Corporation
-          description: The legal name of the billing entity
-        legal_number:
-          type:
-            - string
-            - 'null'
-          example: US123456789
-          description: The legal registration number of the billing entity
-        tax_identification_number:
-          type:
-            - string
-            - 'null'
-          example: EU123456789
-          description: The tax identification number of the billing entity
-        timezone:
-          $ref: '#/components/schemas/Timezone'
-          description: The timezone of the billing entity
-          example: UTC
-        tax_codes:
-          $ref: '#/components/schemas/TaxCodes'
-          description: The tax codes that should be associated with this billing entity
-        email_settings:
-          type: array
-          items:
-            type: string
-            enum:
-              - invoice.finalized
-              - credit_note.created
-              - subscription.price_change_scheduled
-              - dunning.step
-          description: The email notification settings for this billing entity. `subscription.price_change_scheduled` is off until you add it.
-        eu_tax_management:
-          type: boolean
-          example: false
-          description: 'Whether EU tax management is enabled for this billing entity. Cannot be on together with `tax_provider: stripe_tax`; the error is `eu_tax_management: conflicts_with_stripe_tax` (422).'
-        logo:
-          type:
-            - string
-            - 'null'
-          format: uri
-          example: data:image/png;base64,...
-          description: The base64 encoded logo image for the billing entity. Sending "null" will remove the logo, if any exist.
-        invoice_custom_section_codes:
-          type: array
-          items:
-            type: string
-          example:
-            - custom_section_1
-            - custom_section_2
-          description: The codes of the invoice custom section that should be associated with this billing entity
+              description: The net payment term (in days) for this billing entity
+            address_line1:
+              type:
+                - string
+                - 'null'
+              example: 5230 Penfield Ave
+              description: The first line of the billing address
+            address_line2:
+              type:
+                - string
+                - 'null'
+              example: Suite 100
+              description: The second line of the billing address
+            city:
+              type:
+                - string
+                - 'null'
+              example: Woodland Hills
+              description: The city of the billing address
+            state:
+              type:
+                - string
+                - 'null'
+              example: CA
+              description: The state of the billing address
+            country:
+              $ref: '#/components/schemas/Country'
+              description: The country code of the billing address
+              nullable: true
+            zipcode:
+              type:
+                - string
+                - 'null'
+              example: '91364'
+              description: The zipcode of the billing address
+            email:
+              type:
+                - string
+                - 'null'
+              format: email
+              example: billing@acme.com
+              description: The email address of the billing entity
+            legal_name:
+              type:
+                - string
+                - 'null'
+              example: Acme Corporation
+              description: The legal name of the billing entity
+            legal_number:
+              type:
+                - string
+                - 'null'
+              example: US123456789
+              description: The legal registration number of the billing entity
+            tax_identification_number:
+              type:
+                - string
+                - 'null'
+              example: EU123456789
+              description: The tax identification number of the billing entity
+            timezone:
+              $ref: '#/components/schemas/Timezone'
+              description: The timezone of the billing entity
+              example: UTC
+            tax_codes:
+              $ref: '#/components/schemas/TaxCodes'
+              description: The tax codes that should be associated with this billing entity
+            email_settings:
+              type: array
+              items:
+                type: string
+                enum:
+                  - invoice.finalized
+                  - credit_note.created
+                  - subscription.price_change_scheduled
+                  - dunning.step
+              description: The email notification settings for this billing entity. `subscription.price_change_scheduled` is off until you add it.
+            eu_tax_management:
+              type: boolean
+              example: false
+              description: 'Whether EU tax management is enabled for this billing entity. Cannot be on together with `tax_provider: stripe_tax`; the error is `eu_tax_management: conflicts_with_stripe_tax` (422).'
+            logo:
+              type:
+                - string
+                - 'null'
+              format: uri
+              example: data:image/png;base64,...
+              description: The base64 encoded logo image for the billing entity. Sending "null" will remove the logo, if any exist.
+            invoice_custom_section_codes:
+              type: array
+              items:
+                type: string
+              example:
+                - custom_section_1
+                - custom_section_2
+              description: The codes of the invoice custom section that should be associated with this billing entity
     ActivityLogObject:
       type: object
       required:
