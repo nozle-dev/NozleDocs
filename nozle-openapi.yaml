@@ -7,7 +7,7 @@ info:
     **Legacy key names, removed in Core 6.0.0.** REST responses, webhook payloads and CSV exports carry only the Nozle names: `nozle_id` and the plain `<key>` names such as `customer_id` and `invoice_id`. The former-prefix keys, the former EU tax codes, the former CSV id columns and the former webhook headers are gone. Webhook deliveries carry `webhook-id`, `webhook-timestamp` and `webhook-signature`. nozle-js and nozle-python older than 0.10.0 and nozle-go older than 0.9.1 cannot read a credit system id from Core 6.0.0.
 
     **Live and sandbox (unreleased).** Live and sandbox use the same servers. The API key decides the environment: live keys start with `sk_nozle_` or `pk_nozle_`, sandbox keys with `sk_nozle_test_` or `pk_nozle_test_`, and each only reaches its own organization's data. A key whose prefix does not match its organization's environment, or a key of a reset sandbox, is refused with `401`. Every response to an accepted key, Core and Engine, carries the header `X-Nozle-Livemode: true` (live) or `false` (sandbox); browsers can read it. Webhook payloads carry `livemode` the same way. See https://docs.nozle.dev/guides/getting-started/sandbox.
-  version: 1.55.0
+  version: 1.56.0
   license:
     name: AGPLv3
     url: https://github.com/nozle-dev/core/blob/main/LICENSE
@@ -24195,6 +24195,21 @@ components:
           type: boolean
           example: true
           description: Whether to finalize invoices with zero amount for this billing entity
+        tax_provider:
+          type: string
+          enum:
+            - nozle
+            - stripe_tax
+          default: nozle
+          example: nozle
+          description: 'Who calculates tax on this entity''s invoices. `nozle`: your tax codes, EU tax management or a connected Anrok or Avalara account. `stripe_tax`: Stripe Tax, through the Stripe account connected to the organization (Core 11.32.0). Errors (422 `error_details`): `tax_provider: stripe_account_required` (no connected Stripe account; a Razorpay-only merchant cannot enable it), `tax_provider: value_is_invalid`, `tax_provider: conflicts_with_eu_tax_management`. Stripe Tax and `eu_tax_management` cannot both be on.'
+        provider_tax_code:
+          type:
+            - string
+            - 'null'
+          pattern: ^txcd_[0-9]{8}$
+          example: txcd_10103001
+          description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) used for this entity''s items when the item and its plan have none. Used only with `tax_provider: stripe_tax`. When no level sets one, `txcd_10103001` (SaaS, business use) applies. Error (422): `provider_tax_code: value_is_invalid`.'
         customer_location_required:
           type: boolean
           default: false
@@ -24309,7 +24324,7 @@ components:
         eu_tax_management:
           type: boolean
           example: false
-          description: Whether EU tax management is enabled for this billing entity
+          description: 'Whether EU tax management is enabled for this billing entity. Cannot be on together with `tax_provider: stripe_tax`; the error is `eu_tax_management: conflicts_with_stripe_tax` (422).'
         logo_url:
           type:
             - string
@@ -24403,6 +24418,21 @@ components:
               type: boolean
               example: true
               description: Whether to finalize invoices with zero amount for this billing entity
+            tax_provider:
+              type: string
+              enum:
+                - nozle
+                - stripe_tax
+              default: nozle
+              example: nozle
+              description: 'Who calculates tax on this entity''s invoices. `nozle`: your tax codes, EU tax management or a connected Anrok or Avalara account. `stripe_tax`: Stripe Tax, through the Stripe account connected to the organization (Core 11.32.0). Errors (422 `error_details`): `tax_provider: stripe_account_required` (no connected Stripe account; a Razorpay-only merchant cannot enable it), `tax_provider: value_is_invalid`, `tax_provider: conflicts_with_eu_tax_management`. Stripe Tax and `eu_tax_management` cannot both be on.'
+            provider_tax_code:
+              type:
+                - string
+                - 'null'
+              pattern: ^txcd_[0-9]{8}$
+              example: txcd_10103001
+              description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) used for this entity''s items when the item and its plan have none. Used only with `tax_provider: stripe_tax`. When no level sets one, `txcd_10103001` (SaaS, business use) applies. Error (422): `provider_tax_code: value_is_invalid`.'
             customer_location_required:
               type: boolean
               default: false
@@ -24517,7 +24547,7 @@ components:
             eu_tax_management:
               type: boolean
               example: false
-              description: Whether EU tax management is enabled for this billing entity
+              description: 'Whether EU tax management is enabled for this billing entity. Cannot be on together with `tax_provider: stripe_tax`; the error is `eu_tax_management: conflicts_with_stripe_tax` (422).'
             logo:
               type:
                 - string
@@ -24743,6 +24773,21 @@ components:
           type: boolean
           example: true
           description: Whether to finalize invoices with zero amount for this billing entity
+        tax_provider:
+          type: string
+          enum:
+            - nozle
+            - stripe_tax
+          default: nozle
+          example: nozle
+          description: 'Who calculates tax on this entity''s invoices. `nozle`: your tax codes, EU tax management or a connected Anrok or Avalara account. `stripe_tax`: Stripe Tax, through the Stripe account connected to the organization (Core 11.32.0). Errors (422 `error_details`): `tax_provider: stripe_account_required` (no connected Stripe account; a Razorpay-only merchant cannot enable it), `tax_provider: value_is_invalid`, `tax_provider: conflicts_with_eu_tax_management`. Stripe Tax and `eu_tax_management` cannot both be on.'
+        provider_tax_code:
+          type:
+            - string
+            - 'null'
+          pattern: ^txcd_[0-9]{8}$
+          example: txcd_10103001
+          description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) used for this entity''s items when the item and its plan have none. Used only with `tax_provider: stripe_tax`. When no level sets one, `txcd_10103001` (SaaS, business use) applies. Error (422): `provider_tax_code: value_is_invalid`.'
         customer_location_required:
           type: boolean
           default: false
@@ -24860,7 +24905,7 @@ components:
         eu_tax_management:
           type: boolean
           example: false
-          description: Whether EU tax management is enabled for this billing entity
+          description: 'Whether EU tax management is enabled for this billing entity. Cannot be on together with `tax_provider: stripe_tax`; the error is `eu_tax_management: conflicts_with_stripe_tax` (422).'
         logo:
           type:
             - string
@@ -25028,6 +25073,13 @@ components:
         - description
         - created_at
       properties:
+        provider_tax_code:
+          type:
+            - string
+            - 'null'
+          pattern: ^txcd_[0-9]{8}$
+          example: txcd_10103001
+          description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) used with `tax_provider: stripe_tax` on the billing entity. Resolution order: this item, then the plan, then the billing entity, then `txcd_10103001` (SaaS, business use). Error (422): `provider_tax_code: value_is_invalid`.'
         nozle_id:
           type: string
           format: uuid
@@ -25086,6 +25138,13 @@ components:
     AddOnBaseInput:
       type: object
       properties:
+        provider_tax_code:
+          type:
+            - string
+            - 'null'
+          pattern: ^txcd_[0-9]{8}$
+          example: txcd_10103001
+          description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) used with `tax_provider: stripe_tax` on the billing entity. Resolution order: this item, then the plan, then the billing entity, then `txcd_10103001` (SaaS, business use). Error (422): `provider_tax_code: value_is_invalid`.'
         name:
           type: string
           description: The name of the add-on.
@@ -27844,6 +27903,34 @@ components:
       type: object
       description: Snapshot written once at finalization.
       properties:
+        provider:
+          type: string
+          enum:
+            - stripe_tax
+          description: 'The tax provider that calculated this invoice. Present when Stripe Tax calculated it (Core 11.32.0).'
+        calculation_id:
+          type: string
+          example: taxcalc_1Nxyz
+          description: 'Stripe Tax calculation id. An id only; no Stripe payload is stored.'
+        transaction_id:
+          type:
+            - string
+            - 'null'
+          example: tax_1Nxyz
+          description: 'Stripe Tax transaction id, set after the invoice is finalized and the transaction is recorded. Null until then.'
+        taxability_reasons:
+          type: array
+          items:
+            type: object
+            properties:
+              reason:
+                type: string
+                example: standard_rated
+                description: 'Stripe''s `taxability_reason` for a line, for example `standard_rated`, `not_collecting`, `reverse_charge`, `customer_exempt`. `not_collecting` means Stripe has no registration for the customer''s location, so tax is zero.'
+              status:
+                type: string
+                description: 'The taxability status of the line as reported by Stripe.'
+          description: 'One entry per taxability reason on the invoice. Ids and status only (Core 11.32.0).'
         treatment:
           $ref: '#/components/schemas/TaxTreatment'
         tax_identification_number:
@@ -27881,6 +27968,11 @@ components:
         - applicable_timezone
         - created_at
       properties:
+        tax_exempt:
+          type: boolean
+          default: false
+          example: false
+          description: 'When true, Nozle sends the customer to Stripe Tax as exempt (`customer_exempt`) and no tax is charged. Used with `tax_provider: stripe_tax` on the billing entity (Core 11.32.0).'
         nozle_id:
           type: string
           format: uuid
@@ -28836,6 +28928,11 @@ components:
           required:
             - external_id
           properties:
+            tax_exempt:
+              type: boolean
+              default: false
+              example: false
+              description: 'When true, Nozle sends the customer to Stripe Tax as exempt (`customer_exempt`) and no tax is charged. Used with `tax_provider: stripe_tax` on the billing entity (Core 11.32.0).'
             external_id:
               type: string
               example: 5eb02857-a71e-4ea2-bcf9-57d3a41bc6ba
@@ -29107,7 +29204,7 @@ components:
             - succeeded
             - failed
             - null
-          description: State of the tax calculation for the invoice. Null when no VIES or provider flow ran.
+          description: 'State of the tax calculation for the invoice. Null when no VIES or provider flow ran. With Stripe Tax: `pending` while the calculation is held or retried, `succeeded`, or `failed` with the invoice `failed`. Failure causes (Stripe error code in the error details, and a `customer.tax_provider_error` webhook): `customer_tax_location_invalid`, `tax_id_invalid`, `stripe_tax_not_authorized`, `stripe_account_required`, `tax_provider_unavailable` (Stripe unreachable for about 25 hours). Use the invoice retry after you fix the cause.'
         tax_treatment:
           $ref: '#/components/schemas/TaxTreatment'
         tax_details:
@@ -34148,6 +34245,13 @@ components:
         - properties
         - filters
       properties:
+        provider_tax_code:
+          type:
+            - string
+            - 'null'
+          pattern: ^txcd_[0-9]{8}$
+          example: txcd_10103001
+          description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) used with `tax_provider: stripe_tax` on the billing entity. Resolution order: this item, then the plan, then the billing entity, then `txcd_10103001` (SaaS, business use). Error (422): `provider_tax_code: value_is_invalid`.'
         nozle_id:
           type: string
           format: uuid
@@ -34352,6 +34456,13 @@ components:
         - properties
         - units
       properties:
+        provider_tax_code:
+          type:
+            - string
+            - 'null'
+          pattern: ^txcd_[0-9]{8}$
+          example: txcd_10103001
+          description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) used with `tax_provider: stripe_tax` on the billing entity. Resolution order: this item, then the plan, then the billing entity, then `txcd_10103001` (SaaS, business use). Error (422): `provider_tax_code: value_is_invalid`.'
         nozle_id:
           type: string
           format: uuid
@@ -34553,6 +34664,13 @@ components:
         - parent_id
         - pending_deletion
       properties:
+        provider_tax_code:
+          type:
+            - string
+            - 'null'
+          pattern: ^txcd_[0-9]{8}$
+          example: txcd_10103001
+          description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) for the plan''s fees when the charge, fixed charge or add-on has none. Used with `tax_provider: stripe_tax`. Resolution order: charge, fixed charge or add-on, then this plan, then the billing entity, then `txcd_10103001`. Error (422): `provider_tax_code: value_is_invalid`.'
         nozle_id:
           type: string
           format: uuid
@@ -35303,6 +35421,13 @@ components:
             - amount_currency
             - pay_in_advance
           properties:
+            provider_tax_code:
+              type:
+                - string
+                - 'null'
+              pattern: ^txcd_[0-9]{8}$
+              example: txcd_10103001
+              description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) for the plan''s fees when the charge, fixed charge or add-on has none. Used with `tax_provider: stripe_tax`. Resolution order: charge, fixed charge or add-on, then this plan, then the billing entity, then `txcd_10103001`. Error (422): `provider_tax_code: value_is_invalid`.'
             name:
               type: string
               example: Startup
@@ -35678,6 +35803,13 @@ components:
         plan:
           type: object
           properties:
+            provider_tax_code:
+              type:
+                - string
+                - 'null'
+              pattern: ^txcd_[0-9]{8}$
+              example: txcd_10103001
+              description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) for the plan''s fees when the charge, fixed charge or add-on has none. Used with `tax_provider: stripe_tax`. Resolution order: charge, fixed charge or add-on, then this plan, then the billing entity, then `txcd_10103001`. Error (422): `provider_tax_code: value_is_invalid`.'
             name:
               type: string
               example: Startup
@@ -36185,6 +36317,13 @@ components:
         - $ref: '#/components/schemas/ChargeOverridableInput'
         - type: object
           properties:
+            provider_tax_code:
+              type:
+                - string
+                - 'null'
+              pattern: ^txcd_[0-9]{8}$
+              example: txcd_10103001
+              description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) used with `tax_provider: stripe_tax` on the billing entity. Resolution order: this item, then the plan, then the billing entity, then `txcd_10103001` (SaaS, business use). Error (422): `provider_tax_code: value_is_invalid`.'
             feature_id:
               type: string
               format: uuid
@@ -36456,6 +36595,13 @@ components:
         - $ref: '#/components/schemas/FixedChargeOverridableInput'
         - type: object
           properties:
+            provider_tax_code:
+              type:
+                - string
+                - 'null'
+              pattern: ^txcd_[0-9]{8}$
+              example: txcd_10103001
+              description: 'Stripe tax code (`txcd_` and 8 digits, see https://docs.stripe.com/tax/tax-codes) used with `tax_provider: stripe_tax` on the billing entity. Resolution order: this item, then the plan, then the billing entity, then `txcd_10103001` (SaaS, business use). Error (422): `provider_tax_code: value_is_invalid`.'
             add_on_id:
               type: string
               format: uuid

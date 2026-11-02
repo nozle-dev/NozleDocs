@@ -5,6 +5,16 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Stripe Tax calculation (Core 11.32.0)
+
+_November 2, 2026_
+
+- **Billing entity.** `tax_provider` (`nozle` default, `stripe_tax`) and `provider_tax_code`. Stripe Tax needs a connected Stripe account (`stripe_account_required`) and excludes EU tax management in both directions (`conflicts_with_eu_tax_management`, `conflicts_with_stripe_tax`).
+- **Tax codes.** `provider_tax_code` on plans, charges, fixed charges and add-ons. Order: item, plan, billing entity, then `txcd_10103001`.
+- **Customers.** `tax_exempt` is sent to Stripe Tax as exempt. The tax ID type and number go to Stripe for reverse charge.
+- **Invoices.** `tax_status` and `tax_details` (`provider`, `calculation_id`, `transaction_id`, `taxability_reasons`). Stripe's per-line amounts are used as they are. Credit notes reverse per line, voids in full.
+- **Failures.** An unusable location, invalid tax ID or missing Stripe Tax access fails the invoice with the Stripe code and a `customer.tax_provider_error` webhook. A Stripe outage holds the invoice for about 25 hours, then fails it with `tax_provider_unavailable`. Use the invoice retry. See [Stripe Tax](/guides/billing/stripe-tax).
+
 ### Token buckets, uncosted-model alert, aborted streams (Engine 2.46.0, Core 11.30.0, Node 0.35.0, Python 0.33.0, Go v0.33.0)
 
 _November 2, 2026_

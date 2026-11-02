@@ -6,7 +6,7 @@ keywords: ["tax id", "vat", "vies", "reverse charge", "article 196", "tax_treatm
 
 Available from Core 11.31.0. The SDK helpers on this page ship after Core: Node 0.35.0, Python 0.33.0, Go v0.33.0 (a later number is possible if another release takes these first).
 
-This page covers what Nozle stores for a customer's tax ID, how it is checked, and what that changes on an invoice. It does not cover Stripe Tax. See [What is not available yet](#what-is-not-available-yet).
+This page covers what Nozle stores for a customer's tax ID, how it is checked, and what that changes on an invoice. For Stripe Tax calculation see [Stripe Tax](/guides/billing/stripe-tax). Stripe Tax and EU tax management cannot both be on.
 
 <Note>
 The invoice wording on this page is not tax advice. Check it with your accountant before you rely on it.
@@ -141,7 +141,7 @@ To avoid the `409`, wait for the check before you open the checkout. With the SD
 
 ## What is not available yet
 
-- Stripe Tax calculation. Nozle does not call Stripe Tax. Tax comes from your tax codes, EU tax management, or a connected Anrok or Avalara account.
+- Stripe Tax is a separate feature from Core 11.32.0. See [Stripe Tax](/guides/billing/stripe-tax).
 - A browser form to collect billing details. Collect the address and tax ID in your own app and send them with `customers.upsert` from your backend.
 - The reverse charge category in e-invoices (UBL, Factur-X).
 
