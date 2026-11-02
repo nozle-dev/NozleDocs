@@ -7,7 +7,7 @@ info:
     **Legacy key names, removed in Core 6.0.0.** REST responses, webhook payloads and CSV exports carry only the Nozle names: `nozle_id` and the plain `<key>` names such as `customer_id` and `invoice_id`. The former-prefix keys, the former EU tax codes, the former CSV id columns and the former webhook headers are gone. Webhook deliveries carry `webhook-id`, `webhook-timestamp` and `webhook-signature`. nozle-js and nozle-python older than 0.10.0 and nozle-go older than 0.9.1 cannot read a credit system id from Core 6.0.0.
 
     **Live and sandbox (unreleased).** Live and sandbox use the same servers. The API key decides the environment: live keys start with `sk_nozle_` or `pk_nozle_`, sandbox keys with `sk_nozle_test_` or `pk_nozle_test_`, and each only reaches its own organization's data. A key whose prefix does not match its organization's environment, or a key of a reset sandbox, is refused with `401`. Every response to an accepted key, Core and Engine, carries the header `X-Nozle-Livemode: true` (live) or `false` (sandbox); browsers can read it. Webhook payloads carry `livemode` the same way. See https://docs.nozle.dev/guides/getting-started/sandbox.
-  version: 1.56.0
+  version: 1.57.0
   license:
     name: AGPLv3
     url: https://github.com/nozle-dev/core/blob/main/LICENSE
@@ -3944,6 +3944,210 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:write`.'
+  /cost-intelligence/uncosted-models/reprocess:
+    servers:
+      - url: https://api.nozle.app/engine/api/v1
+        description: Engine API
+    post:
+      tags:
+        - Cost Intelligence
+      summary: Reprocess the uncosted events of one model
+      description: |
+        Starts a background job that rates again the stored events of one uncosted key, after you added a price, an alias or a cost rule for it.
+        Only sources that are still uncosted are replayed and each is rated once, so running it twice never counts a cost twice.
+        With `invoiced_periods` `skip` (the default) an event inside an invoiced period is left uncosted and counted in `skipped_invoiced`;
+        `include` rates it and changes the margin of that closed period, so ask for confirmation before sending it.
+        An unfinished job for the same key and `invoiced_periods` is returned instead of a second one (`200`, `already_running: true`).
+        Requires a secret key. With API key permissions, the key needs `analytic:write`.
+      operationId: startUncostedReprocess
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, model, source]
+              properties:
+                provider:
+                  type: string
+                model:
+                  type: string
+                token_type:
+                  type: string
+                  description: Token bucket. Required for `cost_event` (an empty string means every bucket of the model), empty for `feature_event`.
+                source:
+                  type: string
+                  enum: [cost_event, feature_event]
+                invoiced_periods:
+                  type: string
+                  enum: [skip, include]
+                  default: skip
+      responses:
+        '202':
+          description: A new job was queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UncostedReprocessStarted'
+        '200':
+          description: An unfinished job for the same key exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UncostedReprocessStarted'
+        '400':
+          description: '`code: invalid_request`.'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:write`.'
+        '422':
+          description: '`unsupported_source` for `legacy_cost_model` (priced at event time, nothing stored to replay), or `unsupported_key` for the overflow `other` row.'
+    get:
+      tags:
+        - Cost Intelligence
+      summary: List reprocess jobs
+      description: Newest first. Requires a secret key. With API key permissions, the key needs `analytic:read`.
+      operationId: listUncostedReprocessJobs
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [queued, running, completed, failed, cancelled]
+      responses:
+        '200':
+          description: Jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [jobs]
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UncostedReprocessJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:read`.'
+  /cost-intelligence/uncosted-models/reprocess/{id}:
+    servers:
+      - url: https://api.nozle.app/engine/api/v1
+        description: Engine API
+    get:
+      tags:
+        - Cost Intelligence
+      summary: Get a reprocess job
+      description: Poll about every 2 seconds while `status` is `queued` or `running`. Requires a secret key. With API key permissions, the key needs `analytic:read`.
+      operationId: getUncostedReprocessJob
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The job
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job]
+                properties:
+                  job:
+                    $ref: '#/components/schemas/UncostedReprocessJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown job, or a job of another organization.
+  /cost-intelligence/uncosted-models/reprocess/{id}/cancel:
+    servers:
+      - url: https://api.nozle.app/engine/api/v1
+        description: Engine API
+    post:
+      tags:
+        - Cost Intelligence
+      summary: Cancel a reprocess job
+      description: |
+        A queued or running job stops after its current batch and becomes `cancelled`. Sources already replayed stay costed. A finished job is returned unchanged.
+        Requires a secret key. With API key permissions, the key needs `analytic:write`.
+      operationId: cancelUncostedReprocess
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The job
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job]
+                properties:
+                  job:
+                    $ref: '#/components/schemas/UncostedReprocessJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown job, or a job of another organization.
+  /margin/simulations:
+    servers:
+      - url: https://api.nozle.app/engine/api/v1
+        description: Engine margin analytics
+    post:
+      tags:
+        - Margin
+      summary: Simulate margin on real usage
+      description: |
+        Replays the recorded margin of a window (at most 92 days) with a hypothetical price, markup or provider cost change and returns the margin and the margin policy breaches before and after. Read only: nothing is written.
+        Revenue and cost are the realized values in the margin store, with voided events netted out. A change edits revenue or cost per group (customer, feature and plan); quantities do not change.
+        The first change whose scope matches a group applies to it. Only usage in `currency` is simulated.
+        Requires a secret key. With API key permissions, the key needs `analytic:read`.
+      operationId: simulateMarginOnUsage
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarginUsageSimulationRequest'
+            example:
+              from: '2026-10-01T00:00:00Z'
+              to: '2026-11-01T00:00:00Z'
+              changes:
+                - scope:
+                    feature_code: llm_tokens
+                  kind: markup_percent
+                  value: '40'
+      responses:
+        '200':
+          description: Simulation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarginUsageSimulation'
+        '400':
+          description: '`invalid_request`, or `invalid_date_range` (`to` not after `from`, or more than 92 days).'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:read`.'
+        '503':
+          description: '`analytics_unavailable`.'
   /events/{transaction_id}:
     parameters:
       - name: transaction_id
@@ -32524,6 +32728,249 @@ components:
           description: Transaction or cost event ID of the latest affected call, for replay.
         last_failure_code:
           type: string
+    UncostedReprocessStarted:
+      type: object
+      required: [job, already_running]
+      properties:
+        job:
+          $ref: '#/components/schemas/UncostedReprocessJob'
+        already_running:
+          type: boolean
+    UncostedReprocessJob:
+      type: object
+      required: [id, provider, model, token_type, source, invoiced_periods, status, total, processed, costed, still_uncosted]
+      properties:
+        id:
+          type: string
+        provider:
+          type: string
+        model:
+          type: string
+        token_type:
+          type: string
+        source:
+          type: string
+          enum: [cost_event, feature_event]
+        invoiced_periods:
+          type: string
+          enum: [skip, include]
+        status:
+          type: string
+          enum: [queued, running, completed, failed, cancelled]
+        total:
+          type: integer
+          description: Matching uncosted sources counted when the job started. Progress is `processed / total`.
+        processed:
+          type: integer
+          description: Sources looked at so far.
+        costed:
+          type: integer
+          description: Replayed and now rated, confirmed zero or excluded from margin (a cost was written).
+        still_uncosted:
+          type: integer
+          description: Replayed, still no matching rule (for example the rule does not cover this bucket).
+        pending_parent:
+          type: integer
+          description: Cost events whose parent usage event is not rated yet.
+        skipped_voided:
+          type: integer
+          description: The event or its parent is voided, so it is never replayed.
+        skipped_invoiced:
+          type: integer
+          description: Sources inside invoiced periods, left alone when `invoiced_periods` is `skip`.
+        skipped_not_replayable:
+          type: integer
+          description: Already costed meanwhile, or no longer uncosted.
+        errors:
+          type: integer
+        last_error:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+    MarginUsageSimulationRequest:
+      type: object
+      required: [from, to, changes]
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+          description: After `from`, at most 92 days later.
+        currency:
+          type: string
+          description: Defaults to the organization's default currency. Usage in other currencies is counted in `skipped_other_currency_groups`, not converted.
+        max_groups:
+          type: integer
+          minimum: 1
+          maximum: 50000
+          default: 10000
+          description: Bound on the groups read. When more exist the result is `truncated`.
+        changes:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            required: [kind, value]
+            properties:
+              scope:
+                type: object
+                description: Optional filters; every given one must match. An empty scope means everything.
+                properties:
+                  feature_code:
+                    type: string
+                  customer_id:
+                    type: string
+                    description: External customer ID.
+                  plan_id:
+                    type: string
+              kind:
+                type: string
+                enum: [price_change_percent, markup_percent, cost_change_percent]
+                description: |
+                  `price_change_percent`: new revenue is revenue x (1 + value/100). `markup_percent`: new revenue is cost x (1 + value/100). `cost_change_percent`: new cost is cost x (1 + value/100).
+              value:
+                type: string
+                description: Decimal percent, at least -100.
+    MarginSimulationTotals:
+      type: object
+      properties:
+        revenue_cents:
+          type: integer
+        cost_cents:
+          type: integer
+        margin_cents:
+          type: integer
+        margin_percent:
+          type: string
+          nullable: true
+          description: Absent or null when there is no revenue.
+    MarginUsageSimulation:
+      type: object
+      properties:
+        window:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date-time
+            to:
+              type: string
+              format: date-time
+        currency:
+          type: string
+        groups_scanned:
+          type: integer
+        truncated:
+          type: boolean
+        skipped_other_currency_groups:
+          type: integer
+        before:
+          $ref: '#/components/schemas/MarginSimulationTotals'
+        after:
+          $ref: '#/components/schemas/MarginSimulationTotals'
+        delta:
+          type: object
+          properties:
+            revenue_cents:
+              type: integer
+            cost_cents:
+              type: integer
+            margin_cents:
+              type: integer
+        policy_breaches:
+          type: object
+          description: "The margin policy in effect now is applied to each group's window totals. `evaluated` is false with `error` set to `policy_lookup_failed` when the policies could not be read; the money results are still returned."
+          properties:
+            evaluated:
+              type: boolean
+            error:
+              type: string
+            before:
+              $ref: '#/components/schemas/MarginSimulationBreachCounts'
+            after:
+              $ref: '#/components/schemas/MarginSimulationBreachCounts'
+            newly_breaching:
+              $ref: '#/components/schemas/MarginSimulationBreachCounts'
+            no_longer_breaching:
+              $ref: '#/components/schemas/MarginSimulationBreachCounts'
+            details:
+              type: array
+              description: Up to 100 groups whose breach state changes or that breach after, ordered by margin after.
+              items:
+                type: object
+                properties:
+                  customer_id:
+                    type: string
+                  feature_code:
+                    type: string
+                  plan_id:
+                    type: string
+                  policy_scope:
+                    type: string
+                  policy_mode:
+                    type: string
+                  reasons_before:
+                    type: array
+                    items:
+                      type: string
+                  reasons_after:
+                    type: array
+                    items:
+                      type: string
+                  margin_percent_before:
+                    type: string
+                  margin_percent_after:
+                    type: string
+        by_feature:
+          type: array
+          description: Top 50 by absolute margin change.
+          items:
+            type: object
+            properties:
+              feature_code:
+                type: string
+              before:
+                $ref: '#/components/schemas/MarginSimulationTotals'
+              after:
+                $ref: '#/components/schemas/MarginSimulationTotals'
+        by_customer:
+          type: array
+          description: Top 50 by absolute margin change.
+          items:
+            type: object
+            properties:
+              customer_id:
+                type: string
+              before:
+                $ref: '#/components/schemas/MarginSimulationTotals'
+              after:
+                $ref: '#/components/schemas/MarginSimulationTotals'
+        notes:
+          type: array
+          items:
+            type: string
+    MarginSimulationBreachCounts:
+      type: object
+      properties:
+        groups:
+          type: integer
+        features:
+          type: integer
+        customers:
+          type: integer
     CostIntelligenceReport:
       type: object
       required:

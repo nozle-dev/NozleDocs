@@ -1,0 +1,37 @@
+---
+title: Margin worked example
+description: One call, two provider costs, and what a margin policy does with each
+---
+
+This page shows the margin arithmetic with real numbers. It is the same arithmetic `can()` and the [LLM proxy](/api/llm-proxy) use when a [margin policy](/guides/margin/alerts) applies.
+
+## The rule
+
+```
+margin         = revenue - cost
+margin percent = margin / revenue x 100
+```
+
+Revenue is what you charge for the call (the unit price times the units of the call). Cost is what the call costs you, from your [Cost Sheets](/guides/margin/cost-models). Both are in the same currency.
+
+## The example
+
+A feature costs your customer **0.10** per call. The policy says the margin must be at least **30 percent**, and `mode` is `deny`.
+
+| | Revenue | Cost | Margin | Margin percent | Policy (minimum 30 percent) |
+|---|---|---|---|---|---|
+| Cheap model | 0.10 | 0.04 | 0.06 | 60 percent | Allowed |
+| Expensive model | 0.10 | 0.08 | 0.02 | 20 percent | Denied |
+
+- Cheap model: margin is `0.10 - 0.04 = 0.06`, and `0.06 / 0.10 = 60 percent`.
+- Expensive model: margin is `0.10 - 0.08 = 0.02`, and `0.02 / 0.10 = 20 percent`, below the 30 percent minimum.
+
+The same call is profitable or not depending only on which model served it. A check on revenue alone (a usage limit, a credit balance) allows both. A margin policy denies the second.
+
+## What the denial looks like
+
+For the expensive model, `can()` answers `allowed: false` with `reason: economic_policy_denied`, and the `policy` object says which threshold failed. The [LLM proxy](/api/llm-proxy) refuses the call before the provider is called. See [margin policies](/guides/margin/alerts) for the fields and [Check an entitlement](/api/check-entitlement) for the answer shape.
+
+## Try the same numbers on your own usage
+
+[Margin simulation](/guides/margin/simulation) replays a past window with a different price, markup or cost and shows how many customers would fall under or rise above a policy.

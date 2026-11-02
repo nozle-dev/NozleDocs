@@ -1,0 +1,50 @@
+---
+title: Margin simulation
+description: See what a different price, markup or provider cost would have done to your margin on real usage
+---
+
+A margin simulation replays the recorded usage of a past window with one change and shows the margin and the margin policy breaches before and after. It reads and writes nothing else: no price, plan or policy changes.
+
+Use it before you change a price, set a markup on cost, or when a provider changes its prices.
+
+## Run one
+
+In the dashboard open **Margin simulation**, pick the window (at most 92 days), what changes and the percent, and optionally limit it to one feature, customer or plan. Or call [`POST /margin/simulations`](/api/margin-simulations), or the GraphQL query `nozleMarginSimulation`.
+
+```bash
+curl -X POST https://api.nozle.app/engine/api/v1/margin/simulations \
+  -H "Authorization: Bearer sk_nozle_your_secret_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "2026-10-01T00:00:00Z",
+    "to": "2026-11-01T00:00:00Z",
+    "changes": [{"scope": {"feature_code": "llm_tokens"}, "kind": "markup_percent", "value": "40"}]
+  }'
+```
+
+## The three kinds of change
+
+| `kind` | New value |
+|---|---|
+| `price_change_percent` | revenue x (1 + value / 100) |
+| `markup_percent` | cost x (1 + value / 100): the price becomes cost plus the markup |
+| `cost_change_percent` | cost x (1 + value / 100): a provider price change |
+
+`value` is at least `-100`. The first change whose `scope` matches a group (customer x feature x plan) applies to it; other groups are unchanged.
+
+## What you get back
+
+- **Before and after** revenue, cost, margin and margin percent, and the change.
+- **Policy breaches.** The margin policy in effect now is applied to each group's totals for the window. You get how many groups, features and customers breach before and after, how many start breaching (`newly_breaching`) and stop (`no_longer_breaching`), and up to 100 groups with the reasons. See [margin policies](/guides/margin/alerts).
+- **By feature** and **by customer**: the 50 biggest changes.
+- `truncated: true` when more groups existed than `max_groups`; the result is then partial.
+
+## Read the result with care
+
+- Revenue and cost are the realized values in the margin store, with voided events netted out. The cost of events that are still [uncosted](/guides/margin/reprocess) is missing from "before", as in every margin report.
+- A change edits revenue or cost per group. **Quantities do not change**: there is no demand elasticity, so a price rise does not lose any customer in the simulation.
+- Policy thresholds are checked on the totals of the window per customer and feature, not per call. A single call can still be denied by `can()` when the simulation shows a healthy total.
+- Only usage in the chosen currency is simulated; other currencies are counted in `skipped_other_currency_groups`, not converted.
+- Policy checks that cannot be read return `policy_breaches.evaluated: false`; the money results are still valid.
+
+For the arithmetic behind margin and percent see the [margin worked example](/guides/margin/worked-example).

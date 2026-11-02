@@ -1,0 +1,52 @@
+---
+title: Reprocess uncosted events
+description: Price events that were recorded before you added a price
+---
+
+When an LLM call arrives for a model that has no price, Nozle accepts it, bills it and records the model in the [Uncosted models](/guides/ai/token-billing#uncosted-models) queue. Its cost counts as zero until you add a price. Adding the price does not change events already recorded. **Reprocess** rates them again with the prices you have now.
+
+## Start a reprocess
+
+In the dashboard, open **Margin**, the **Uncosted** tab, and choose **Reprocess** on a row. Or call the API:
+
+```bash
+curl -X POST https://api.nozle.app/engine/api/v1/cost-intelligence/uncosted-models/reprocess \
+  -H "Authorization: Bearer sk_nozle_your_secret_key" \
+  -H "Content-Type: application/json" \
+  -d '{"provider": "openai", "model": "gpt-5", "token_type": "input", "source": "cost_event"}'
+```
+
+- `source` is `cost_event` or `feature_event`. A `legacy_cost_model` entry is priced when the event arrives and has no stored event to replay, so it answers `422 unsupported_source`.
+- `token_type` is the bucket. For `cost_event` an empty string means every bucket of the model.
+- The call answers `202` with the job. If a job for the same key is already queued or running you get it back with `200` and `already_running: true`.
+
+See [Reprocess uncosted events](/api/uncosted-reprocess) for every field.
+
+## Invoiced periods
+
+An event inside a period that already has an invoice is **skipped** by default. It stays uncosted and is counted in `skipped_invoiced`, so the margin of closed periods does not move under you.
+
+Send `"invoiced_periods": "include"` to rate those events too. This changes the margin of periods that are already closed. The dashboard asks you to tick a box and confirm a second time before it sends `include`. Do the same in your own tools.
+
+## Follow the job
+
+The job reports its progress. Poll `GET /cost-intelligence/uncosted-models/reprocess/{id}` about every 2 seconds while `status` is `queued` or `running`. The dashboard does this and shows a progress bar and the counts:
+
+| Field | Meaning |
+|---|---|
+| `total`, `processed` | Sources counted when the job started, and looked at so far |
+| `costed` | Replayed and now have a cost |
+| `still_uncosted` | Replayed, but no rule covers them yet (for example a bucket you did not price) |
+| `skipped_invoiced` | Left alone because of an invoiced period |
+| `skipped_voided` | The event or its parent was voided |
+| `pending_parent` | Cost events whose usage event is not rated yet |
+| `skipped_not_replayable` | Already costed meanwhile, or no longer uncosted |
+| `errors`, `last_error` | Infrastructure errors |
+
+Cancel a job with `POST .../reprocess/{id}/cancel`. It stops after the current batch, and sources already replayed stay costed.
+
+## Safe to repeat
+
+Only events that are still uncosted and have no cost entry are replayed, so running a reprocess twice cannot count a cost twice. Jobs run in batches of 100 with a short pause, and a job that stops can be started again: a new job selects what is still uncosted.
+
+When no uncosted event of the key remains, the entry leaves the queue (`resolved`). If events remain because of `still_uncosted` or skips, it stays open.

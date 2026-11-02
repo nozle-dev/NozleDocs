@@ -1,0 +1,64 @@
+---
+title: "Simulate Margin on Real Usage"
+api: "POST https://api.nozle.app/engine/api/v1/margin/simulations"
+---
+
+Base URL: `https://api.nozle.app/engine/api/v1`. Engine 2.47.0.
+
+Replays the realized margin of a window with a price, markup or cost change. Read only. For one metric at a flat price see [Simulate Margin](/api/margin-simulate). The [guide](/guides/margin/simulation) explains how to read the result.
+
+**Auth:** `sk_` only. With [API key permissions](/api/authentication#key-permissions), the key needs `analytic:read`.
+
+```json
+{
+  "from": "2026-10-01T00:00:00Z",
+  "to": "2026-11-01T00:00:00Z",
+  "currency": "USD",
+  "changes": [
+    { "scope": { "feature_code": "llm_tokens", "customer_id": "cust_1", "plan_id": "plan_1" }, "kind": "markup_percent", "value": "40" }
+  ],
+  "max_groups": 10000
+}
+```
+
+<ParamField body="from" type="string" required>RFC3339 start of the window.</ParamField>
+<ParamField body="to" type="string" required>RFC3339 end, after `from`, at most 92 days later. Otherwise `400 invalid_date_range`.</ParamField>
+<ParamField body="currency" type="string">Defaults to the organization's default currency. Usage in other currencies is counted in `skipped_other_currency_groups`; there is no conversion.</ParamField>
+<ParamField body="changes" type="array" required>1 to 20 changes. Each has `kind`, `value` (a decimal string, at least `-100`) and an optional `scope` with `feature_code`, `customer_id` (external ID) and `plan_id`. All given scope fields must match; an empty scope means everything. The first matching change applies to a group.</ParamField>
+<ParamField body="max_groups" type="integer" default="10000">1 to 50000. When more groups exist the answer has `truncated: true`.</ParamField>
+
+| `kind` | New value |
+|---|---|
+| `price_change_percent` | revenue x (1 + value / 100) |
+| `markup_percent` | cost x (1 + value / 100) |
+| `cost_change_percent` | cost x (1 + value / 100) |
+
+## Response
+
+```json
+{
+  "window": {"from": "2026-10-01T00:00:00Z", "to": "2026-11-01T00:00:00Z"},
+  "currency": "USD", "groups_scanned": 412, "truncated": false, "skipped_other_currency_groups": 0,
+  "before": {"revenue_cents": 120000, "cost_cents": 70000, "margin_cents": 50000, "margin_percent": "41.67"},
+  "after": {"revenue_cents": 130000, "cost_cents": 70000, "margin_cents": 60000, "margin_percent": "46.15"},
+  "delta": {"revenue_cents": 10000, "cost_cents": 0, "margin_cents": 10000},
+  "policy_breaches": {
+    "evaluated": true,
+    "before": {"groups": 3, "features": 2, "customers": 3},
+    "after": {"groups": 1, "features": 1, "customers": 1},
+    "newly_breaching": {"groups": 0, "features": 0, "customers": 0},
+    "no_longer_breaching": {"groups": 2, "features": 1, "customers": 2},
+    "details": []
+  },
+  "by_feature": [], "by_customer": [],
+  "notes": ["policy thresholds are evaluated on window totals per customer and feature, not per call"]
+}
+```
+
+Amounts are integer cents. Revenue and cost are the realized values with voided events netted out; the cost of still-uncosted events is missing, as in every margin report. A change edits revenue or cost per group; quantities do not change.
+
+**Policy breaches.** The margin policy in effect now (narrowest of customer, plan, feature, organization, as `can()` resolves it) is applied to each group's window totals: `minimum_margin_percent`, `minimum_margin_amount` (in cents, skipped when the policy currency differs) and `maximum_estimated_cost` (total window cost, an approximation). A group breaches when a threshold is not met, whatever the policy mode. `details` lists up to 100 groups whose state changes or that breach after, ordered by margin after. A group with no revenue has no margin percent, so that threshold is not evaluated. When the policies cannot be read, `evaluated` is `false` with `error: "policy_lookup_failed"` and the money results are still returned.
+
+`by_feature` and `by_customer` hold the top 50 by absolute margin change.
+
+Errors: `400 invalid_request`, `400 invalid_date_range`, `503 analytics_unavailable`.
