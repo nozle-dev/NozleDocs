@@ -27921,16 +27921,9 @@ components:
         taxability_reasons:
           type: array
           items:
-            type: object
-            properties:
-              reason:
-                type: string
-                example: standard_rated
-                description: 'Stripe''s `taxability_reason` for a line, for example `standard_rated`, `not_collecting`, `reverse_charge`, `customer_exempt`. `not_collecting` means Stripe has no registration for the customer''s location, so tax is zero.'
-              status:
-                type: string
-                description: 'The taxability status of the line as reported by Stripe.'
-          description: 'One entry per taxability reason on the invoice. Ids and status only (Core 11.32.0).'
+            type: string
+            example: standard_rated
+          description: 'Stripe''s `taxability_reason` values seen on the invoice''s lines, without duplicates, for example `standard_rated`, `not_collecting`, `reverse_charge`, `customer_exempt`, `product_exempt`. `not_collecting` means Stripe has no registration for the customer''s location, so tax is zero.'
         treatment:
           $ref: '#/components/schemas/TaxTreatment'
         tax_identification_number:

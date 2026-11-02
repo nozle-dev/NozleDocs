@@ -25,7 +25,7 @@ Errors are `422` with `error_details`:
 
 | `error_details` | Cause |
 | --- | --- |
-| `tax_provider: ["stripe_account_required"]` | The organization has no connected Stripe account. A merchant that has no Stripe account, or pays only through Razorpay, cannot turn Stripe Tax on. |
+| `tax_provider: ["stripe_account_required"]` | The organization has no connected Stripe account. A merchant that has no Stripe account, or pays only through Razorpay, cannot turn Stripe Tax on. A merchant that has a Stripe key connected can use Stripe Tax even when some customers pay through Razorpay: Stripe Tax only needs the Stripe key, not Stripe as the payment method. |
 | `tax_provider: ["value_is_invalid"]` | The value is not `nozle` or `stripe_tax`. |
 | `tax_provider: ["conflicts_with_eu_tax_management"]` | `eu_tax_management` is on. |
 | `eu_tax_management: ["conflicts_with_stripe_tax"]` | You tried to turn `eu_tax_management` on while `tax_provider` is `stripe_tax`. |
@@ -71,9 +71,7 @@ The invoice has `tax_status`: `pending`, `succeeded` or `failed`. `tax_details` 
     "provider": "stripe_tax",
     "calculation_id": "taxcalc_1Nxyz",
     "transaction_id": "tax_1Nxyz",
-    "taxability_reasons": [
-      { "reason": "standard_rated", "status": "taxable" }
-    ]
+    "taxability_reasons": ["standard_rated"]
   }
 }
 ```
