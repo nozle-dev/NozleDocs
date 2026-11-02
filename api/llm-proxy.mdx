@@ -151,6 +151,25 @@ curl -X POST https://api.nozle.app/engine/api/v1/proxy/openai/v1/chat/completion
 - **Fallback.** If the finalize fails, the hold is released and the usage is sent as a plain usage event, as without a hold. If Nozle cannot confirm that the hold was not finalized, nothing is sent and the miss is logged: the hold expires on its own, and the call is not charged twice. A finalize of 0 tokens also sends the plain event.
 - **When no hold is taken.** For a Feature with no credit rate, a Feature the plan bills in money, or a Feature that is not consumable, the call goes ahead without a hold. From Engine 2.34.0, a Feature billed in money under a hard spend limit takes a budget hold instead: see [Spend limits](#spend-limits). If holds are unavailable, the call is not refused (fail open, as the usage limit check does).
 
+## Automatic credit reserve
+
+From Engine 2.47.0 the proxy can reserve credits for a call even when the request carries no `X-Nozle-Credit-Hold`. This is **opt-in and off by default**: the Engine runs it only when `NOZLE_PROXY_AUTO_CREDIT_HOLD` is set to `true`. Without it, nothing changes: only a request with the header takes a hold. On Nozle's hosted service, ask support to enable it for your workspace.
+
+When it is on, a call without the header reserves an estimate before the provider is called:
+
+- **Input:** `ceil(request body bytes / 4)` tokens.
+- **Output:** the largest output the request allows (`max_tokens`, `max_completion_tokens` or `max_output_tokens`), or **1024** tokens when the request names none.
+
+The estimate is sized by the Feature's metric the same way the real usage will be, so the reserve is `estimated tokens x the credit rate`. The rest of the flow is the one of [credit holds](#credit-holds): the hold is taken after the usage limit and margin checks, the call is paid from it when the usage is known, less usage releases the rest, and a call with no usage releases it.
+
+- **`402 insufficient_credits`.** When the balance does not cover the estimate, the proxy answers `402 insufficient_credits` and the provider is not called.
+- **`X-Nozle-Credit-Hold` still wins.** A request with the header reserves exactly that amount, never the estimate.
+- **Same exceptions as holds.** No hold is taken for a Feature with no credit rate, a Feature billed in money (a budget hold applies instead) or one that is not consumable, and a hold store failure does not refuse the call.
+
+**When to enable it.** Turn it on when many calls of one customer run at the same time and you want the balance protected before the provider spends money, without changing every client to send the header.
+
+**The `max_tokens` caveat.** The reserve uses the *maximum* output the request allows, not what the model will write. A customer whose balance covers the real cost of the call, but not its maximum, gets `402 insufficient_credits`. Keep `max_tokens` close to what you need, or send `X-Nozle-Credit-Hold` with your own amount for those calls. A request with no output limit reserves 1024 output tokens, which can be more or less than the call uses; the hold is settled with the real usage either way.
+
 ## Spend limits
 
 From Engine 2.34.0 the proxy enforces the customer's [spend limits](/guides/entitlements/spend-limits) before the provider is called, after the usage limit check and with the same decision as [`/can`](/api/check-entitlement#spend-limits). When a hard spend limit covering the `X-Nozle-Feature-Code` Feature is used up, the proxy answers `402 budget_exceeded` and adds the limit as a top-level `budget` next to the provider-shaped error:

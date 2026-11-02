@@ -25,6 +25,14 @@ A plan policy follows the plan: when you publish a new version of the plan, the 
 
 Create policies in the dashboard under **Margin policies**, or through the `nozleCreateMarginPolicy` mutation with `planId` or `customerId` (not both).
 
+## When the policy cannot be read
+
+If the margin policy of a call cannot be read (a store failure, not a missing policy), `can()` and the [LLM proxy](/api/llm-proxy) do not guess. From Engine 2.47.0 they follow the `on_unavailable` value of the **last policy known** for the same organization, feature, plan and customer: `deny` denies the call with `economic_policy_denied`, `allow` and `warn` let it through. The answer's `economics.status` is `unavailable` with `reason: margin_policy_lookup_failed`, and the `policy` object shows the policy that was followed.
+
+When no policy is known for that call yet (for example right after the Engine started), the call is allowed, as a call that no policy covers. Before 2.47.0 a lookup failure was not handled this way, so calls were allowed regardless of `on_unavailable`.
+
+Both cases are counted in `GET /metrics/projections` under `margin_policy_lookup`: `margin_policy_last_known` (a known policy was followed) and `margin_policy_fail_open` (none known, allowed). A rising `margin_policy_fail_open` means calls pass unchecked while policies cannot be read.
+
 ## Check the margin of one call
 
 Call `can()` from your backend before protected work and act on the estimate. Check `status` first: only `estimated` carries a margin.

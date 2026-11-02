@@ -15,6 +15,17 @@ _November 2, 2026_
 - **Invoices.** `tax_status` and `tax_details` (`provider`, `calculation_id`, `transaction_id`, `taxability_reasons`). Stripe's per-line amounts are used as they are. Credit notes reverse per line, voids in full.
 - **Failures.** An unusable location, invalid tax ID or missing Stripe Tax access fails the invoice with the Stripe code and a `customer.tax_provider_error` webhook. A Stripe outage holds the invoice for about 25 hours, then fails it with `tax_provider_unavailable`. Use the invoice retry. See [Stripe Tax](/guides/billing/stripe-tax).
 
+### Shared prices, reprocess, margin simulation, proxy credit reserve (Engine 2.47.0, Core 11.32.0)
+
+_November 2, 2026_
+
+- **Shared prices.** Nozle keeps a price list of provider models, each price with its source page and the day it was read. Your own rates always win; adopt a shared price in one click from the Uncosted queue. See [shared prices](/guides/margin/shared-prices).
+- **Reprocess.** Price events recorded before you added a price, with progress and a safe default that skips invoiced periods. New: `POST /cost-intelligence/uncosted-models/reprocess` and job status and cancel. See [reprocess](/guides/margin/reprocess).
+- **Margin simulation.** Replay a past window with a price, markup or cost change and see margin and policy breaches before and after: `POST /margin/simulations`. See [margin simulation](/guides/margin/simulation).
+- **Proxy credit reserve.** Opt-in automatic credit hold for proxy calls without `X-Nozle-Credit-Hold`. See [automatic credit reserve](/api/llm-proxy#automatic-credit-reserve).
+- **Policy lookup failure.** When a margin policy cannot be read, `can()` and the proxy follow the last known policy's `on_unavailable`, and allow when none is known. See [when the policy cannot be read](/guides/margin/alerts#when-the-policy-cannot-be-read).
+- **Margin worked example.** [One call, two costs](/guides/margin/worked-example): revenue 0.10, cost 0.04 gives 60 percent; cost 0.08 gives 20 percent.
+
 ### Token buckets, uncosted-model alert, aborted streams (Engine 2.46.0, Core 11.30.0, Node 0.35.0, Python 0.33.0, Go v0.33.0)
 
 _November 2, 2026_

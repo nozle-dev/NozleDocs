@@ -1,0 +1,50 @@
+---
+title: "Reprocess uncosted events"
+api: "POST https://api.nozle.app/engine/api/v1/cost-intelligence/uncosted-models/reprocess"
+---
+
+Base URL: `https://api.nozle.app/engine/api/v1`. Engine 2.47.0.
+
+Starts a background job that rates again the stored events of one [uncosted model](/guides/ai/token-billing#uncosted-models) key after you added a price. See the [guide](/guides/margin/reprocess).
+
+**Auth:** `sk_` only. With [API key permissions](/api/authentication#key-permissions), starting or cancelling needs `analytic:write` and reading needs `analytic:read`.
+
+## Start
+
+```json
+{ "provider": "openai", "model": "gpt-5", "token_type": "input", "source": "cost_event", "invoiced_periods": "skip" }
+```
+
+<ParamField body="provider" type="string" required>Provider of the key, as listed by `GET /cost-intelligence/uncosted-models`.</ParamField>
+<ParamField body="model" type="string" required>Model of the key.</ParamField>
+<ParamField body="source" type="string" required>`cost_event` or `feature_event`. `legacy_cost_model` answers `422 unsupported_source`; the overflow `other` row answers `422 unsupported_key`.</ParamField>
+<ParamField body="token_type" type="string">The bucket. Required for `cost_event` (an empty string means every bucket of the model); empty for `feature_event`.</ParamField>
+<ParamField body="invoiced_periods" type="string" default="skip">`skip` leaves sources inside invoiced periods uncosted and counts them in `skipped_invoiced`. `include` rates them and changes the margin of closed periods: ask for confirmation first.</ParamField>
+
+`202` with `{"job": {...}, "already_running": false}` for a new job. `200` with `already_running: true` returns the unfinished job for the same key and `invoiced_periods` instead of a second one. `400 invalid_request` for a bad body.
+
+## Job status
+
+`GET /cost-intelligence/uncosted-models/reprocess/{id}` returns `{"job": {...}}`; `404` for an unknown job or one of another organization. `GET /cost-intelligence/uncosted-models/reprocess?limit=20&status=` returns `{"jobs": [...]}`, newest first. Poll about every 2 seconds while the job is `queued` or `running`.
+
+## Cancel
+
+`POST /cost-intelligence/uncosted-models/reprocess/{id}/cancel` stops a queued or running job after its current batch (`status: cancelled`). Sources already replayed stay costed. A finished job is returned unchanged.
+
+## The job
+
+```json
+{
+  "id": "5b0c1f2e-0000-0000-0000-000000000000",
+  "provider": "openai", "model": "gpt-5", "token_type": "input", "source": "cost_event",
+  "invoiced_periods": "skip", "status": "running",
+  "total": 1200, "processed": 800, "costed": 790, "still_uncosted": 5, "pending_parent": 0,
+  "skipped_voided": 2, "skipped_invoiced": 3, "skipped_not_replayable": 0,
+  "errors": 0, "last_error": null,
+  "created_at": "2026-11-02T10:00:00Z", "started_at": "2026-11-02T10:00:01Z", "finished_at": null
+}
+```
+
+`status` is `queued`, `running`, `completed`, `failed` or `cancelled`. Progress is `processed / total`. `failed` follows repeated infrastructure errors; starting again resumes, because a new job selects what is still uncosted.
+
+Only sources that are still `uncosted` and have no cost entry are replayed, so a second run never counts a cost twice. Voided events are never replayed. When no uncosted source of the key remains, its entry becomes `resolved`.

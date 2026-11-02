@@ -1,0 +1,46 @@
+---
+title: Shared prices
+description: A price list of provider models that Nozle keeps for every workspace, and how to adopt a price
+---
+
+Every LLM model needs a price per token bucket before Nozle can compute your cost. Instead of typing the same provider prices in every workspace, Nozle keeps a **shared price list** of provider models. You read it, you can adopt a price into your own catalog with one click, and your own rates always win.
+
+## What is on the list
+
+Each entry is one revision of one provider model and has:
+
+- the provider, the model and the other names the provider reports for it (aliases such as dated snapshots)
+- a price per token for each bucket: `input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`, `batch_input`, `batch_output` (the same buckets as [token buckets](/guides/ai/token-billing#token-buckets))
+- the currency, and the dates the price is in force
+- the **source page** and the **day Nozle read the price there**
+
+The list holds only prices that Nozle read on the provider's own pricing page. A model or price that could not be verified is not listed. A change is a new revision; the one before it is closed and stays readable. Nozle staff maintain the list in the admin console. Your workspace cannot change it.
+
+Open **Shared prices** in the dashboard, or query `nozleSharedProviderPrices` (GraphQL, `cost_intelligence:view`). Prices are shown per one million tokens in the dashboard and per token in the API.
+
+## How a price is chosen
+
+For one model at one moment, Nozle uses this order, every time:
+
+1. **Your own catalog.** The catalog version of your workspace in force at that moment whose model or alias is the model.
+2. **The shared list.** The shared revision chosen the same way.
+3. **Per bucket.** Your rate wins for every bucket your catalog has. The shared price only fills a bucket your catalog has no rate for, and only in the same currency. A shared price that differs from yours is shown as "yours differs" and is never applied.
+
+Within one list, an exact model name beats an alias, then the later start date wins, then the higher version number.
+
+<Note>
+The shared list never changes a rate you already have. It also does not price events by itself: a shared price starts to count only after you adopt it and a Cost Sheet component uses it.
+</Note>
+
+You can read the resolved price of a model, bucket by bucket with where each rate comes from (`organization` or `shared`), with `nozleResolvedProviderPrice(provider, model)`.
+
+## Adopt a shared price
+
+When a model is in the [Uncosted models](/guides/ai/token-billing#uncosted-models) queue and the shared list has a price for it, the row shows **Adopt shared price**. One click:
+
+1. copies the shared price into your own catalog (`nozleAdoptSharedProviderPrice`), with a link back to the revision it came from, and
+2. opens the new Cost Sheet form with the provider, the model and the rates already filled in, so you choose the feature and publish.
+
+Adoption is refused when your workspace already has a catalog for the model (`already_priced_by_organization`), so an existing rate is never replaced. After you publish, use [Reprocess](/guides/margin/reprocess) to price the events that were already recorded.
+
+Your copy is yours: later changes to the shared list do not change it. To follow a new shared price, create a new catalog version.
