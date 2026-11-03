@@ -30,5 +30,5 @@ The fee appears in margin totals, in margin by customer and plan, and in the [ma
 The daily sync runs at 00:20 UTC and when the Engine starts. A fee shows in margin after the next run, and a missed run is caught up by the next one.
 
 <Note>
-In the simulation, fee rows are ordinary groups under the feature `__subscription_fee__`, with cost 0 and no quantity. A change whose scope has no `feature_code` also matches them: `price_change_percent` scales the fee, and `markup_percent` sets revenue to cost plus the markup, which is 0 for a group with no cost. To leave fixed fees as they are, give the change a `feature_code`.
+In the simulation, fee rows are groups under the feature `__subscription_fee__`, with cost 0 and no quantity. Only `price_change_percent` applies to them, so a percent price change without a `feature_code` also scales the fixed fees. Every other kind (`markup_percent`, `cost_change_percent`, `price_per_unit_absolute`, `model_swap`, `provider_price_change`) leaves them as they are. To leave fixed fees out of a percent price change, give the change a `feature_code`.
 </Note>
