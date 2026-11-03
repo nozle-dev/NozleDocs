@@ -4,7 +4,7 @@ description: Let Stripe Tax calculate the tax on Nozle invoices with your connec
 keywords: ["stripe tax", "tax_provider", "provider_tax_code", "txcd", "tax_exempt", "tax_status", "taxability_reasons", "not_collecting"]
 ---
 
-Available from Core 11.32.0.
+Available from Core 11.32.0. Invoices of more than 100 lines, the void after credit notes fix, the address check and the activation check are from Core 11.38.0.
 
 With Stripe Tax on, Nozle asks Stripe Tax for the tax of every invoice, using the Stripe account you connected to Nozle. You never call Stripe yourself. You set a flag on the billing entity, tax codes on what you sell, and a country on each customer.
 
@@ -26,6 +26,7 @@ Errors are `422` with `error_details`:
 | `error_details` | Cause |
 | --- | --- |
 | `tax_provider: ["stripe_account_required"]` | The organization has no connected Stripe account. A merchant that has no Stripe account, or pays only through Razorpay, cannot turn Stripe Tax on. A merchant that has a Stripe key connected can use Stripe Tax even when some customers pay through Razorpay: Stripe Tax only needs the Stripe key, not Stripe as the payment method. |
+| `tax_provider: ["stripe_tax_not_activated"]` | Tax is not activated in the connected Stripe account (Stripe reports the settings status `pending`, usually no head office address). Finish the Tax setup in your Stripe Dashboard, then turn it on. A key that cannot read the Tax settings, or Stripe being down, does not block the change. |
 | `tax_provider: ["value_is_invalid"]` | The value is not `nozle` or `stripe_tax`. |
 | `tax_provider: ["conflicts_with_eu_tax_management"]` | `eu_tax_management` is on. |
 | `eu_tax_management: ["conflicts_with_stripe_tax"]` | You tried to turn `eu_tax_management` on while `tax_provider` is `stripe_tax`. |
@@ -47,16 +48,24 @@ A tax code tells Stripe what you sell. Use a code from [Stripe's tax code list](
 
 ## Customers
 
-- **Country.** The customer's country is mandatory for Stripe Tax. The shipping address wins over the billing address when the customer has one.
+- **Address.** The customer's country is mandatory for Stripe Tax. The shipping address wins over the billing address when the customer has one. Some countries need more, and Nozle refuses the calculation before it calls Stripe when it is missing:
+
+  | Country | Needed besides the country |
+  | --- | --- |
+  | US | The postal code. Stripe advises the full address: a postal code alone is not exact in some states. |
+  | Canada, India | The state (province) or the postal code. |
+  | Other countries | Nothing. |
+
+  The error is `customer_tax_location_invalid`, with a message that names the missing field.
 - **`tax_exempt`.** Send `tax_exempt: true` on the customer (request and response, default `false`). Nozle sends the customer to Stripe Tax as exempt.
 - **Tax ID.** Nozle sends the customer's `tax_identification_type` and number to Stripe Tax, so Stripe can decide on reverse charge. A number without a type is not sent. See [Tax IDs](/guides/billing/tax-ids#what-nozle-stores) for the types.
 
 ## How it works
 
-1. When an invoice is finalized, Nozle sends one line per fee to Stripe Tax. The amount is the fee amount after coupons, with the tax code above.
+1. When an invoice is finalized, Nozle sends one line per fee to Stripe Tax. The amount is the fee amount after coupons, with the tax code above. Stripe takes at most 100 lines in one calculation, so an invoice with more lines is calculated in slices of 100: each slice is its own calculation and transaction.
 2. Nozle uses Stripe's per-line amounts as they are. It does not recompute tax from the rate, so the invoice tax equals Stripe's tax to the cent.
 3. After the invoice is finalized, Nozle records the transaction in Stripe Tax.
-4. A credit note reverses the tax in Stripe partly, per line. A voided invoice reverses it in full.
+4. A credit note reverses the tax in Stripe partly, per line. A voided invoice reverses it in full. When the invoice already has credit notes, including the credit note that voiding with a credit note creates, the void reverses only what they left, line by line: Stripe's full reversal ignores earlier partial ones and would reverse the same tax twice.
 
 Where you have no registration in Stripe for the customer's location, Stripe charges no tax. The line shows `not_collecting` in `taxability_reasons`, and the tax is zero. This is not an error. Add your registrations in the Stripe Dashboard. Nozle does not manage registrations.
 
@@ -76,7 +85,7 @@ The invoice has `tax_status`: `pending`, `succeeded` or `failed`. `tax_details` 
 }
 ```
 
-`transaction_id` is `null` until the transaction is recorded after finalization.
+`transaction_id` is `null` until the transaction is recorded after finalization. An invoice calculated in slices also has `calculation_ids` and `transaction_ids`, in order; `calculation_id` and `transaction_id` are the first of each.
 
 ## When tax fails
 
@@ -84,7 +93,7 @@ A cause you must fix sets `tax_status: failed` and the invoice `failed`. The Str
 
 | Stripe error code | Meaning |
 | --- | --- |
-| `customer_tax_location_invalid` | Stripe cannot use the customer's location. Fix the address or country. |
+| `customer_tax_location_invalid` | Stripe cannot use the customer's location, or the address misses what its country needs (see [Customers](#customers)). Fix the address or country. |
 | `tax_id_invalid` | Stripe rejected the customer's tax ID. Fix or clear it. |
 | `stripe_tax_not_authorized` | Stripe Tax is not activated, or the key has no Tax permission. |
 | `stripe_account_required` | The organization has no Stripe account any more. |
