@@ -1,0 +1,34 @@
+---
+title: Fixed fee revenue in margin
+description: How a plan's fixed subscription fee counts as revenue in margin and in the simulation
+---
+
+Margin revenue includes the fixed subscription fee of a plan, not only usage revenue. Fixed fees are billed per period, so they reach margin as one daily share per day of the billed period.
+
+## What is counted
+
+- Subscription fees (the base fee of a plan) on **finalized** invoices, without tax.
+- The amount is spread evenly over the days of the billed period, one share per calendar day, so the shares add up to the fee exactly. Only days up to today are counted: a year paid in advance accrues day by day.
+- Pay in advance and pay in arrears fees are treated the same: the billed period decides the days.
+- The currency is the invoice's currency. The fee is attributed to the invoice's customer, subscription and plan.
+- When an invoice is **voided**, the days already counted are reversed, so the totals net to zero.
+
+## What is not counted
+
+- Add-on, one-off, credit purchase, commitment true-up and fixed-charge fees.
+- Taxes.
+- Discounts, coupons and prepaid credits: the fee counts at its amount before them.
+- Credit notes.
+- Fees of invoices that are not finalized (draft, failed, pending).
+- Days older than the sync window (120 days by default).
+- Usage fees: they are already in margin from usage events.
+
+## Where it shows
+
+The fee appears in margin totals, in margin by customer and plan, and in the [margin simulation](/guides/margin/simulation) as revenue. It is listed under the pseudo-feature `__subscription_fee__` (shown as `subscription_fee`) in views that group by feature. That pseudo-feature has no usage quantity, no price per unit and no events, and it does not add to event counts.
+
+The daily sync runs at 00:20 UTC and when the Engine starts. A fee shows in margin after the next run, and a missed run is caught up by the next one.
+
+<Note>
+The simulation replays these fee rows as they were recorded. Its price, markup and per-unit changes act on usage revenue; a fixed fee is not repriced by them.
+</Note>
