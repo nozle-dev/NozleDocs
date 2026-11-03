@@ -7,7 +7,7 @@ info:
     **Legacy key names, removed in Core 6.0.0.** REST responses, webhook payloads and CSV exports carry only the Nozle names: `nozle_id` and the plain `<key>` names such as `customer_id` and `invoice_id`. The former-prefix keys, the former EU tax codes, the former CSV id columns and the former webhook headers are gone. Webhook deliveries carry `webhook-id`, `webhook-timestamp` and `webhook-signature`. nozle-js and nozle-python older than 0.10.0 and nozle-go older than 0.9.1 cannot read a credit system id from Core 6.0.0.
 
     **Live and sandbox (unreleased).** Live and sandbox use the same servers. The API key decides the environment: live keys start with `sk_nozle_` or `pk_nozle_`, sandbox keys with `sk_nozle_test_` or `pk_nozle_test_`, and each only reaches its own organization's data. A key whose prefix does not match its organization's environment, or a key of a reset sandbox, is refused with `401`. Every response to an accepted key, Core and Engine, carries the header `X-Nozle-Livemode: true` (live) or `false` (sandbox); browsers can read it. Webhook payloads carry `livemode` the same way. See https://docs.nozle.dev/guides/getting-started/sandbox.
-  version: 1.58.0
+  version: 1.58.1
   license:
     name: AGPLv3
     url: https://github.com/nozle-dev/core/blob/main/LICENSE
@@ -4176,6 +4176,16 @@ paths:
                         to_model_prices:
                           input: '0.15'
                           output: '0.60'
+              cost_by_model:
+                summary: Cost of one model down 20 percent
+                value:
+                  from: '2026-08-01T00:00:00Z'
+                  to: '2026-10-01T00:00:00Z'
+                  changes:
+                    - scope:
+                        model: gpt-4o
+                      kind: cost_change_percent
+                      value: '-20'
               limit_impact:
                 summary: Customers a monthly 50 USD spend limit would block
                 value:
@@ -32952,6 +32962,11 @@ components:
           description: External customer ID.
         plan_id:
           type: string
+        model:
+          type: string
+          maxLength: 200
+          description: |
+            Limits a change to usage of one LLM model. It matches only usage that carries the model: LLM proxy events do, an SDK event sent without a `model` property cannot be matched by model. Accepted only for cost changes: kind `cost_change_percent` (and, in the back-test, only with `observed_kind: cost_change_percent`). For `model_swap` and `provider_price_change` the model is their own param, and a different `scope.model` answers `400 invalid_request`. Every other kind answers `400 invalid_request` with `changes[i]: scope.model applies to cost changes only (cost_change_percent, provider_price_change, model_swap)`. A change with `scope.model` makes the run split its groups by model.
     MarginUsageSimulationRequest:
       type: object
       required: [from, to, changes]

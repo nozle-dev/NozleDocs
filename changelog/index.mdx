@@ -5,6 +5,13 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Margin simulation: scope a cost change to one model
+
+_November 3, 2026_
+
+- **`scope.model`.** The change `scope` of `POST /margin/simulations` and `POST /margin/simulations/backtest` takes an optional `model` (up to 200 characters). It matches only usage that carries the model: LLM proxy events do, an SDK event without a `model` property cannot be matched by model. Only `cost_change_percent` accepts it (in the back-test, only with `observed_kind: cost_change_percent`); every other kind answers `400 invalid_request`. The dashboard's Margin simulation has a model field for cost changes. See [scope a cost change to one model](/guides/margin/simulation#scope-a-cost-change-to-one-model).
+- **OpenAPI 1.58.1.**
+
 ### Margin simulation: new kinds, coverage, back-test; shared price fallback; deny unpriced models; fixed fee revenue
 
 _November 3, 2026_

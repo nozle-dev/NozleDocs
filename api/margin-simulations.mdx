@@ -127,6 +127,16 @@ The response also has these keys. They are always present, as an empty array or 
 - **`limit_impacts`**: per `limit_impact` change, `customers_scanned`, `customers_breaching`, `periods_breaching`, `blocked` and `total` (`quantity`, `revenue_cents`, `cost_cents`), `truncated` (capped at 200000 customer-days) and the top 50 `top_customers` by blocked revenue. Usage is replayed per UTC day; usage after the cumulative amount passes the limit is blocked, and on that day the excess share is blocked pro rata. It is an approximation.
 - **`insights`**: `before` is realized, `after` is with the changes. `unprofitable` lists the top 50 customer and feature pairs by loss with `revenue_cents`, `cost_cents`, `margin_cents`, `margin_percent`, `quantity` and `break_even_price_per_unit` (cost divided by quantity, major units). `concentration` has `customers`, and for `cost` and `revenue` the `top_1_share`, `top_5_share` and `top_10_share` as percent strings (`null` when the total is 0).
 
+### Scope a cost change to one model
+
+`scope.model` (string, up to 200 characters) limits a change to usage of one LLM model. It matches only usage that carries the model: LLM proxy events do, an SDK event sent without a `model` property cannot be matched by model. A change with `scope.model` makes the run split its groups by model.
+
+```json
+{ "scope": { "model": "gpt-4o" }, "kind": "cost_change_percent", "value": "-20" }
+```
+
+Only `cost_change_percent` accepts it. Every other kind answers `400 invalid_request` with `changes[0]: scope.model applies to cost changes only (cost_change_percent, provider_price_change, model_swap)`. For `model_swap` and `provider_price_change` the model is their own param (`from_model`, `model`), and a different `scope.model` is refused with `400` too.
+
 `model_swap` is an approximation: tokens are summed per group and re-costed with the same bucket split the cost rating uses, the share that stays is assumed to cost in proportion to its current cost, and batch-tier prices are not modelled. See the [guide](/guides/margin/simulation).
 
 Errors, with body `{"code": "...", "error": "..."}`: `400 invalid_request`, `400 invalid_date_range`, `400 model_price_unavailable` (a `model_swap` target with no `to_model_prices` and no shared price), `400 price_currency_mismatch` (its shared price is in another currency than the simulation and no `to_model_prices` was given), `503 analytics_unavailable`.
@@ -153,8 +163,9 @@ Checks how well a simulation would have predicted a change you already made. Sam
 <ParamField body="change_at" type="string" required>RFC3339 time the change took effect.</ParamField>
 <ParamField body="window_days" type="integer" default="28">1 to 92, per side. The before window is `[change_at - window_days, change_at)` and the after window is `[change_at, change_at + window_days)`. When the after window ends in the future the call is `400 invalid_date_range`.</ParamField>
 <ParamField body="currency" type="string">Defaults to the organization's default currency.</ParamField>
-<ParamField body="scope" type="object">`feature_code`, `customer_id`, `plan_id`. Only groups that match are compared. Coverage warnings are scoped the same way.</ParamField>
+<ParamField body="scope" type="object">`feature_code`, `customer_id`, `plan_id`, `model`. Only groups that match are compared. Coverage warnings are scoped the same way.</ParamField>
 <ParamField body="observed_kind" type="string" required>`price_change_percent`, `cost_change_percent` or `markup_percent`.</ParamField>
+<ParamField body="scope.model" type="string">Up to 200 characters. Allowed only with `observed_kind: cost_change_percent`; otherwise `400 invalid_request`. Groups are split by model. See [scope a cost change to one model](#scope-a-cost-change-to-one-model).</ParamField>
 <ParamField body="value" type="string" required>Decimal percent, as for the simulation kinds.</ParamField>
 
 The response has `change_at`, `window_days`, `currency`, `scope`, `observed` (`kind`, `value`), `before_window` and `after_window` (`from`, `to`), `before_coverage` and `after_coverage` (the same block as `data_coverage`), and:
