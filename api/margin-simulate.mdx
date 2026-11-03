@@ -9,6 +9,10 @@ Simulate the margin of one metric at a new unit price before you change it. The 
 
 **Auth:** `sk_` only. With [API key permissions](/api/authentication#key-permissions), the key needs `analytic:read`; without it the call returns `403` with `code: permission_denied`.
 
+<Note>
+This call changes the price of one metric and keeps the recorded cost. To simulate several changes at once (price, markup, cost, a cheaper model, a target margin, a spend limit), with data coverage warnings and a back-test, use [`POST /margin/simulations`](/api/margin-simulations).
+</Note>
+
 <Warning>
 All margin endpoints require a secret key (`sk_`). These endpoints expose cost data that should never be visible to your end users.
 </Warning>

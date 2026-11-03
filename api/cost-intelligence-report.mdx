@@ -46,6 +46,10 @@ The optional `from` and `to` query parameters take an RFC3339 timestamp or a `YY
 
 The report has a field `uncosted_models`: the top 50 open LLM models that no price covers, by provider, model and token bucket. `GET /cost-intelligence/uncosted-models` lists all of them and `POST /cost-intelligence/uncosted-models/dismiss` dismisses one. See [uncosted models](/guides/ai/token-billing#uncosted-models).
 
+## Price source
+
+Every ledger line (Cost Event or Feature Event cost) has `price_source`: `org` when one of your own Cost Rules rated it, `shared` when none matched and the [shared price list](/guides/margin/shared-prices#shared-price-fallback) did. Your own rates are never overridden.
+
 ## Finalized revenue
 
 The dashboard's GraphQL layer (`nozleCostIntelligenceReport`: `summary`, `features` and `customers`) adds finalized revenue to the calculated cost.
