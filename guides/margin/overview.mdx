@@ -34,3 +34,13 @@ A Cost Event counts once in `event_count`, however many ledger entries it posts.
 Feature Event costs and shared period costs from Cost Sheets are in the [Cost Intelligence report](/api/cost-intelligence-report), not in the `/margin/*` responses. See [Dashboard](/guides/margin/dashboard).
 
 The `can()` endpoint can return a labelled decimal `economics` estimate so your backend can log warnings or apply a versioned merchant policy. Calling `/can` never writes usage or financial ledger entries.
+
+## Where cost in margin comes from
+
+Margin adds up three kinds of cost, each shown from the moment it is rated:
+
+- **Feature Event cost rated from a Cost Sheet**, for example every call through the LLM proxy. Each rated entry that costs something and that the feature's cost composition keeps in margin is added to the customer, plan and feature of the call. It is not counted as an extra event, as tokens, or as revenue.
+- **Detailed Cost Events** sent to `/cost-events`.
+- **Legacy Cost Models** on a charge. If a legacy Cost Model already prices a feature's events, the Cost Sheet cost of those events is not added to margin a second time. It stays in the Cost Intelligence report.
+
+Cost is summed exactly and rounded once, so many calls that each cost a fraction of a cent add up instead of showing as zero. The [margin simulation](/guides/margin/simulation) replays the same cost, so a provider cost change moves it.

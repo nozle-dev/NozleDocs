@@ -5,12 +5,24 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
-### Agent payments: Stripe Shared Payment Tokens and x402 (early access)
+### Agent payments (SPT, x402) and Stripe-chosen payment methods
+
+_November 4, 2026_
+
+- **Shared Payment Tokens.** `POST /invoices/{id}/pay_with_agent_token` pays a finalized invoice with an `spt_...` token an AI agent gave you, charged on your own connected Stripe account. Expired, deactivated, other-currency and over-limit tokens are refused before charging. Behind the organization flag `stripe_agent_payment_token`. See [Agent payments](/guides/billing/agent-payments).
+- **x402, any client.** Every USD invoice has a public x402 URL (`resource.url` of `GET /invoices/{id}/x402_requirements`). Any x402 client pays it in USDC on Base: Nozle answers `402` with `PAYMENT-REQUIRED`, has the facilitator settle the signed payment, and records it with Stripe. `POST /invoices/{id}/pay_with_x402` still takes a transaction hash. Behind the organization flag `stripe_x402_payments`. See [x402](/guides/billing/agent-payments#x402-stablecoin).
+- **Stripe chooses the payment methods.** Checkout pages, pay links and the setup page offer every method you turned on in Stripe that fits the payment (Klarna, Cash App Pay, Amazon Pay, ACH and others); renewals charge the saved method. `provider_payment_methods` only selects bank transfer and crypto. Nozle's card page is for customers in India. See [Payment methods](/integrations/stripe#payment-methods).
+- **Stripe preview APIs** (`2026-09-30.preview` for SPT, `2026-05-27.preview` for x402) may change.
+- **OpenAPI 1.59.0.**
+
+### Stripe Tax: invoices over 100 lines, void after credit notes, address and activation checks
 
 _November 3, 2026_
 
-- **New endpoint.** `POST /invoices/{id}/pay_with_agent_token` pays a finalized invoice with an `spt_...` token an AI agent gave you, charged on your own connected Stripe account. Behind an organization flag that is off by default: ask Nozle to enable it. Stripe's API is a preview and may change. - **x402.** `GET /invoices/{id}/x402_requirements` and `POST /invoices/{id}/pay_with_x402` let an agent pay a USD invoice in USDC on Base, verified by Stripe. Behind the organization flag `stripe_x402_payments`, off by default. See [Agent payments](/guides/billing/agent-payments#x402-stablecoin).
-- **OpenAPI 1.59.0.**
+- **More than 100 lines.** An invoice with more than 100 taxable lines is calculated in slices of 100, each its own Stripe Tax calculation and transaction. `tax_details` gains `calculation_ids` and `transaction_ids`; `calculation_id` and `transaction_id` stay and hold the first.
+- **Void after credit notes.** Voiding an invoice that already has credit notes reverses only the tax they left, line by line. Before, the full reversal could reverse the same tax twice.
+- **Address check.** A US address needs a postal code, a Canadian or Indian one a state or postal code. Without it the invoice fails before the Stripe call with `customer_tax_location_invalid` and a message that names the field.
+- **Activation check.** Setting `tax_provider` to `stripe_tax` is refused with `stripe_tax_not_activated` while Tax is not activated in the connected Stripe account. See [Stripe Tax](/guides/billing/stripe-tax).
 
 ### Margin simulation: scope a cost change to one model
 
