@@ -107,6 +107,13 @@ curl -i -X POST "https://api.nozle.app/core/x402/invoices/<token>"
 | `409` | Another payment of this invoice is running |
 | `429` | More than 30 requests a minute from one address |
 | `502` | Settled on-chain, but Stripe could not record it: `PAYMENT-RESPONSE` holds the transaction hash, record it with `pay_with_x402` below |
+| `503` | `x402_not_available`: your Stripe account cannot record stablecoin payments yet (turn on **Stablecoins and Crypto** in Stripe), or `x402_facilitator_unavailable`. No payment requirements are shown, so no agent can pay |
+
+_From Core 11.39.1 (November 4, 2026)._ Before it offers an x402 payment, Nozle checks that your connected Stripe account can record stablecoin payments, so an agent never pays into an account that cannot take the payment. The check is cached per connection (12 hours once ready, 15 minutes while not). Nozle also links the invoice's customer to a Stripe customer (created if missing) and attaches it to the payment, so it shows under that customer in Stripe.
+
+### Refunds
+
+Refund an x402 payment like any other: issue a [credit note](/api-reference/credit-notes/create-a-credit-note) with a refund amount. Nozle asks Stripe to refund it, and Stripe sends the USDC back to the wallet that paid. Full and partial refunds work; stablecoin payments have no disputes or chargebacks. If the payer paid from an exchange or a shared wallet, they may not receive a refund sent there. The credit note shows `succeeded` once Stripe confirms the refund.
 
 ### Record a transaction yourself
 
