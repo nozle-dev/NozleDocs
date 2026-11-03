@@ -7,7 +7,7 @@ info:
     **Legacy key names, removed in Core 6.0.0.** REST responses, webhook payloads and CSV exports carry only the Nozle names: `nozle_id` and the plain `<key>` names such as `customer_id` and `invoice_id`. The former-prefix keys, the former EU tax codes, the former CSV id columns and the former webhook headers are gone. Webhook deliveries carry `webhook-id`, `webhook-timestamp` and `webhook-signature`. nozle-js and nozle-python older than 0.10.0 and nozle-go older than 0.9.1 cannot read a credit system id from Core 6.0.0.
 
     **Live and sandbox (unreleased).** Live and sandbox use the same servers. The API key decides the environment: live keys start with `sk_nozle_` or `pk_nozle_`, sandbox keys with `sk_nozle_test_` or `pk_nozle_test_`, and each only reaches its own organization's data. A key whose prefix does not match its organization's environment, or a key of a reset sandbox, is refused with `401`. Every response to an accepted key, Core and Engine, carries the header `X-Nozle-Livemode: true` (live) or `false` (sandbox); browsers can read it. Webhook payloads carry `livemode` the same way. See https://docs.nozle.dev/guides/getting-started/sandbox.
-  version: 1.58.1
+  version: 1.59.0
   license:
     name: AGPLv3
     url: https://github.com/nozle-dev/core/blob/main/LICENSE
@@ -5008,6 +5008,172 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /invoices/{id}/pay_with_agent_token:
+    post:
+      tags:
+        - Invoices
+      summary: Pay an invoice with an agent payment token
+      description: |-
+        Early access. Pays a finalized invoice with a Stripe Shared Payment Token (SPT) that an AI agent gave you. Nozle charges your own connected Stripe account with a PaymentIntent: you never call Stripe. The payment is recorded like any Stripe payment, so refunds, credit notes and webhooks work as usual. Nozle stores only the token id, never card data.
+
+        Nozle refuses before charging when the token is expired or deactivated, its currency differs from the invoice, or the invoice amount exceeds its limit. A repeat call with the same token and invoice is idempotent.
+
+        The endpoint is behind the organization flag `stripe_agent_payment_token`, which is off by default: ask Nozle to enable it. Stripe's SPT API is a preview (`2026-09-30.preview`) and may change. See [Agent payments](/guides/billing/agent-payments).
+
+        Errors:
+        - `403` `feature_not_enabled`: the flag is off for your organization.
+        - `404`: the invoice was not found.
+        - `422` with `error_details.agent_payment_token`: `invalid_format`, `token_deactivated`, `token_expired`, `currency_mismatch`, `amount_exceeds_limit`.
+        - `422` with `code` `invoice_not_payable`: the invoice is not finalized, is already paid, or has nothing due.
+        - `422` with `error_details.payment_provider` `stripe_required`: the customer does not pay through Stripe.
+        - `422` `third_party_error`: Stripe refused the charge.
+      parameters:
+        - $ref: '#/components/parameters/invoice_id'
+      operationId: payInvoiceWithAgentToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - agent_payment_token
+              properties:
+                agent_payment_token:
+                  type: string
+                  description: The Stripe Shared Payment Token id the agent gave you.
+                  example: spt_1AbC23dEf
+      responses:
+        '200':
+          description: The invoice, with the payment recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /invoices/{id}/x402_requirements:
+    get:
+      tags:
+        - Invoices
+      summary: Get the x402 payment requirements of an invoice
+      description: |-
+        Early access. Returns the x402 (version 2) payment requirements for a finalized USD invoice: the amount in USDC atomic units (cents x 10000, as a string), the USDC contract and the merchant's Stripe deposit address (`payTo`). Relay them to the paying agent inside an HTTP 402 response (`payment-required` header, base64 JSON). Live keys return Base (`eip155:8453`), test keys Base Sepolia (`eip155:84532`). Only USD invoices and USDC on Base are supported.
+
+        Behind the organization flag `stripe_x402_payments`, which is off by default: ask Nozle to enable it. Stripe's API is a preview (`2026-05-27.preview`) and may change. See [Agent payments](/guides/billing/agent-payments#x402-stablecoin).
+
+        Errors: `403` `feature_not_enabled`; `404` invoice not found; `422` `invoice_not_payable` (`code`), or `error_details` `currency: [usd_required]` or `payment_provider: [stripe_required]`.
+      parameters:
+        - $ref: '#/components/parameters/invoice_id'
+      operationId: getInvoiceX402Requirements
+      responses:
+        '200':
+          description: The x402 payment requirements
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  x402_requirements:
+                    type: object
+                    properties:
+                      x402Version:
+                        type: integer
+                        example: 2
+                      accepts:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            scheme:
+                              type: string
+                              example: exact
+                            network:
+                              type: string
+                              example: eip155:8453
+                            amount:
+                              type: string
+                              description: Amount in USDC atomic units (6 decimals).
+                              example: '10000000'
+                            asset:
+                              type: string
+                              description: USDC contract address.
+                            payTo:
+                              type: string
+                              description: The merchant's Stripe deposit address.
+                            maxTimeoutSeconds:
+                              type: integer
+                              example: 300
+                            extra:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+                                version:
+                                  type: string
+                      resource:
+                        type: object
+                        properties:
+                          description:
+                            type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /invoices/{id}/pay_with_x402:
+    post:
+      tags:
+        - Invoices
+      summary: Pay an invoice with an x402 transaction
+      description: |-
+        Early access. Pays a finalized USD invoice with a USDC transaction the agent already settled on Base to your Stripe deposit address (see the x402 requirements endpoint). Nozle asks Stripe to verify the on-chain transaction, using the transaction hash as idempotency key, so one transaction pays one invoice once. Nozle never holds keys or funds and stores only provider ids and status, never wallet data.
+
+        The payment is `processing` first and the invoice stays pending until Stripe confirms. It then becomes paid through the normal webhook, and you receive the usual payment webhooks.
+
+        Behind the organization flag `stripe_x402_payments`, which is off by default: ask Nozle to enable it. Stripe's API is a preview (`2026-05-27.preview`) and may change. See [Agent payments](/guides/billing/agent-payments#x402-stablecoin).
+
+        Errors: `403` `feature_not_enabled`; `404` invoice not found; `422` `invoice_not_payable` (`code`), or `error_details` `currency: [usd_required]`, `payment_provider: [stripe_required]`, `transaction_hash: [invalid_format]`; `422` `third_party_error` when Stripe refuses.
+      parameters:
+        - $ref: '#/components/parameters/invoice_id'
+      operationId: payInvoiceWithX402
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - transaction_hash
+              properties:
+                transaction_hash:
+                  type: string
+                  description: The on-chain transaction hash, `0x` followed by 64 hex characters.
+                  example: '0x1111111111111111111111111111111111111111111111111111111111111111'
+      responses:
+        '200':
+          description: The invoice, with the payment recorded (usually `processing`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /invoices/{id}/retry_payment:
     post:
       tags:
