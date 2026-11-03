@@ -4124,10 +4124,13 @@ paths:
         - Margin
       summary: Simulate margin on real usage
       description: |
-        Replays the recorded margin of a window (at most 92 days) with a hypothetical price, markup or provider cost change and returns the margin and the margin policy breaches before and after. Read only: nothing is written.
-        Revenue and cost are the realized values in the margin store, with voided events netted out. A change edits revenue or cost per group (customer, feature and plan); quantities do not change.
-        The first change whose scope matches a group applies to it. Only usage in `currency` is simulated.
-        Requires a secret key. With API key permissions, the key needs `analytic:read`.
+        Replays the recorded margin of a window (at most 92 days) with up to 20 hypothetical changes and returns the margin and the margin policy breaches before and after. Read only: nothing is written, and no run is blocked for lack of history: the `data_coverage` block and its `warnings` say how much history the window holds. See the [simulation guide](/guides/margin/simulation) and [Simulate margin on real usage](/api/margin-simulations).
+
+        Revenue and cost are the realized values in the margin store, with voided events netted out. Revenue is usage revenue plus fixed subscription fees accrued per day over the billed period (see [fixed fee revenue](/guides/margin/fixed-fee-revenue)). A change edits revenue or cost per group (customer, feature and plan; also model when a `model_swap` or `provider_price_change` is present); quantities do not change.
+
+        Kinds that change the totals: `price_change_percent`, `markup_percent`, `cost_change_percent` (take `value`), `price_per_unit_absolute`, `model_swap` and `provider_price_change` (take `params`). The first matching change applies to a group. Kinds that only report: `target_margin_percent` (answer in `targets`) and `limit_impact` (answer in `limit_impacts`); they never consume a group and never change `before`/`after`.
+
+        Only usage in `currency` is simulated. Requires a secret key. With API key permissions, the key needs `analytic:read`.
       operationId: simulateMarginOnUsage
       security:
         - bearerAuth: []
@@ -4137,14 +4140,53 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/MarginUsageSimulationRequest'
-            example:
-              from: '2026-10-01T00:00:00Z'
-              to: '2026-11-01T00:00:00Z'
-              changes:
-                - scope:
-                    feature_code: llm_tokens
-                  kind: markup_percent
-                  value: '40'
+            examples:
+              markup:
+                summary: Markup on cost for one feature
+                value:
+                  from: '2026-10-01T00:00:00Z'
+                  to: '2026-11-01T00:00:00Z'
+                  changes:
+                    - scope:
+                        feature_code: llm_tokens
+                      kind: markup_percent
+                      value: '40'
+              target_margin:
+                summary: Lowest price for a 60 percent margin
+                value:
+                  from: '2026-08-01T00:00:00Z'
+                  to: '2026-10-01T00:00:00Z'
+                  changes:
+                    - scope:
+                        feature_code: chat
+                      kind: target_margin_percent
+                      params:
+                        margin_percent: '60'
+              model_swap:
+                summary: Move half of gpt-4o traffic to gpt-4o-mini
+                value:
+                  from: '2026-08-01T00:00:00Z'
+                  to: '2026-10-01T00:00:00Z'
+                  changes:
+                    - kind: model_swap
+                      params:
+                        from_model: gpt-4o
+                        to_model: gpt-4o-mini
+                        share_percent: '50'
+                        to_model_prices:
+                          input: '0.15'
+                          output: '0.60'
+              limit_impact:
+                summary: Customers a monthly 50 USD spend limit would block
+                value:
+                  from: '2026-08-01T00:00:00Z'
+                  to: '2026-10-01T00:00:00Z'
+                  changes:
+                    - kind: limit_impact
+                      params:
+                        limit_kind: spend_cents
+                        limit_amount: '5000'
+                        period: month
       responses:
         '200':
           description: Simulation result
@@ -4153,7 +4195,53 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarginUsageSimulation'
         '400':
-          description: '`invalid_request`, or `invalid_date_range` (`to` not after `from`, or more than 92 days).'
+          description: |
+            `invalid_request` (bad body, unknown key in `params`, a value out of range), `invalid_date_range` (`to` not after `from`, or more than 92 days), `model_price_unavailable` (`model_swap` to a model that has no `to_model_prices` and no shared price), `price_currency_mismatch` (the shared price of the `to_model` is in another currency than the simulation and no `to_model_prices` was given). Body: `{"code": "...", "error": "..."}`.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:read`.'
+        '503':
+          description: '`analytics_unavailable`.'
+  /margin/simulations/backtest:
+    servers:
+      - url: https://api.nozle.app/engine/api/v1
+        description: Engine margin analytics
+    post:
+      tags:
+        - Margin
+      summary: Back-test a past change
+      description: |
+        Checks how well a simulation would have predicted a change you already made. It replays the window before `change_at` with the change you made (`observed_kind` and `value`), compares the prediction with what the window after `change_at` actually recorded, and reports the error per total and a confidence label. Read only.
+
+        The before window is `[change_at - window_days, change_at)` and the after window is `[change_at, change_at + window_days)`. When `change_at + window_days` is in the future the call answers `400 invalid_date_range`. Only groups that match `scope` are compared. Each side carries its own `data_coverage`.
+
+        Requires a secret key. With API key permissions, the key needs `analytic:read`. See [read a back-test](/guides/margin/simulation#back-test-a-past-change).
+      operationId: backtestMarginSimulation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarginBacktestRequest'
+            example:
+              change_at: '2026-09-15T00:00:00Z'
+              window_days: 28
+              scope:
+                feature_code: chat
+              observed_kind: price_change_percent
+              value: '20'
+      responses:
+        '200':
+          description: Back-test result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarginBacktest'
+        '400':
+          description: '`invalid_request`, or `invalid_date_range` (the after window ends in the future). Body: `{"code": "...", "error": "..."}`.'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -14270,7 +14358,7 @@ paths:
         - name: model
           in: query
           required: false
-          description: Model the call will use. With the organization setting `uncosted_model_action` at `deny`, a model with neither an organization cost rule nor a shared price is refused with `reason: uncosted_model_denied`. Without it no price check is made.
+          description: 'Model the call will use. With the organization setting `uncosted_model_action` at `deny`, a model with neither an organization cost rule nor a shared price is refused with `reason: uncosted_model_denied`. Without it no price check is made.'
           schema:
             type: string
           example: gpt-4o
@@ -32853,6 +32941,17 @@ components:
           type: string
           format: date-time
           nullable: true
+    MarginSimulationScope:
+      type: object
+      description: Optional filters; every given one must match. An empty scope means everything.
+      properties:
+        feature_code:
+          type: string
+        customer_id:
+          type: string
+          description: External customer ID.
+        plan_id:
+          type: string
     MarginUsageSimulationRequest:
       type: object
       required: [from, to, changes]
@@ -32878,28 +32977,73 @@ components:
           minItems: 1
           maxItems: 20
           items:
-            type: object
-            required: [kind, value]
-            properties:
-              scope:
-                type: object
-                description: Optional filters; every given one must match. An empty scope means everything.
-                properties:
-                  feature_code:
-                    type: string
-                  customer_id:
-                    type: string
-                    description: External customer ID.
-                  plan_id:
-                    type: string
-              kind:
+            $ref: '#/components/schemas/MarginSimulationChange'
+    MarginSimulationChange:
+      type: object
+      required: [kind]
+      properties:
+        scope:
+          $ref: '#/components/schemas/MarginSimulationScope'
+        kind:
+          type: string
+          enum:
+            - price_change_percent
+            - markup_percent
+            - cost_change_percent
+            - price_per_unit_absolute
+            - target_margin_percent
+            - model_swap
+            - provider_price_change
+            - limit_impact
+          description: |
+            `price_change_percent`: revenue x (1 + value/100). `markup_percent`: revenue = cost x (1 + value/100). `cost_change_percent`: cost x (1 + value/100). These three need `value` and ignore `params`.
+
+            `price_per_unit_absolute`: revenue = quantity x `unit_price` x 100 for the matching groups that have a quantity; the scope needs at least one of `feature_code`, `customer_id`, `plan_id`. The price is applied flat per unit: the plan's charge model (tiers, allowance, overage) is not replayed, and every group it touched is listed in `change_notes` as `non_flat_charge_model_not_replayed`. `target_margin_percent`: output only, the lowest price that reaches the margin, in `targets`. `model_swap`: moves `share_percent` of the traffic of `from_model` to `to_model`. `provider_price_change`: cost x (1 + `price_change_percent`/100) for groups whose model is `model`. `limit_impact`: output only, who a proposed limit would block, in `limit_impacts`.
+
+            These five need `params` and ignore `value`. An unknown key inside `params` answers `400 invalid_request`.
+        value:
+          type: string
+          description: Decimal percent between -100 and 1000000. Required for `price_change_percent`, `markup_percent` and `cost_change_percent`; ignored for the other kinds.
+        params:
+          type: object
+          description: |
+            Required for `price_per_unit_absolute`, `target_margin_percent`, `model_swap`, `provider_price_change` and `limit_impact`. Decimals may be JSON strings or numbers.
+
+            | kind | keys |
+            |---|---|
+            | `price_per_unit_absolute` | `unit_price`: price per unit in major units of the simulation currency, at least 0. |
+            | `target_margin_percent` | `margin_percent`: 0 to 99.99. |
+            | `model_swap` | `from_model`, `to_model`, `share_percent` (0 to 100), and optionally `to_model_prices`. |
+            | `provider_price_change` | `model`, `price_change_percent` (-100 to 1000000). |
+            | `limit_impact` | `limit_kind` (`spend_cents` or `quantity`), `limit_amount` (above 0), `period` (`month` or `day`). |
+          properties:
+            unit_price:
+              type: string
+            margin_percent:
+              type: string
+            from_model:
+              type: string
+            to_model:
+              type: string
+            share_percent:
+              type: string
+            to_model_prices:
+              type: object
+              description: 'Price per 1,000,000 tokens in major units of the simulation currency, by bucket: `input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`. When omitted the shared price list (USD, per token) is used; with none, `400 model_price_unavailable`.'
+              additionalProperties:
                 type: string
-                enum: [price_change_percent, markup_percent, cost_change_percent]
-                description: |
-                  `price_change_percent`: new revenue is revenue x (1 + value/100). `markup_percent`: new revenue is cost x (1 + value/100). `cost_change_percent`: new cost is cost x (1 + value/100).
-              value:
-                type: string
-                description: Decimal percent, at least -100.
+            model:
+              type: string
+            price_change_percent:
+              type: string
+            limit_kind:
+              type: string
+              enum: [spend_cents, quantity]
+            limit_amount:
+              type: string
+            period:
+              type: string
+              enum: [month, day]
     MarginSimulationTotals:
       type: object
       properties:
@@ -33015,6 +33159,392 @@ components:
               after:
                 $ref: '#/components/schemas/MarginSimulationTotals'
         notes:
+          type: array
+          items:
+            type: string
+        data_coverage:
+          $ref: '#/components/schemas/MarginDataCoverage'
+        assumptions:
+          type: array
+          description: What the replay assumes. Always present.
+          items:
+            type: string
+        change_notes:
+          type: array
+          description: Changes or groups the replay could not apply exactly. Always present, possibly empty.
+          items:
+            $ref: '#/components/schemas/MarginSimulationChangeNote'
+        targets:
+          type: array
+          description: One entry per `target_margin_percent` change. Always present, possibly empty.
+          items:
+            $ref: '#/components/schemas/MarginSimulationTarget'
+        limit_impacts:
+          type: array
+          description: One entry per `limit_impact` change. Always present, possibly empty.
+          items:
+            $ref: '#/components/schemas/MarginSimulationLimitImpact'
+        insights:
+          type: object
+          description: Always present. `before` is realized, `after` is after the changes.
+          properties:
+            before:
+              $ref: '#/components/schemas/MarginSimulationInsights'
+            after:
+              $ref: '#/components/schemas/MarginSimulationInsights'
+    MarginDataCoverage:
+      type: object
+      description: How much recorded history the window holds. It never blocks a run.
+      properties:
+        first_event_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Null when the window holds no data.
+        last_event_at:
+          type: string
+          format: date-time
+          nullable: true
+        days_with_data:
+          type: integer
+        window_days:
+          type: integer
+        customers:
+          type: integer
+        events:
+          type: integer
+        truncated:
+          type: boolean
+          description: The group query hit `max_groups`; the same as the top-level `truncated`.
+        warnings:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+                enum: [less_than_30_days, less_than_90_days, low_confidence_customers, no_data_in_window]
+                description: '`less_than_30_days`: less than one billing cycle of data. `less_than_90_days`: no seasonality captured. `low_confidence_customers`: customers with fewer than 14 days of data. `no_data_in_window`: nothing was recorded in the window.'
+              message:
+                type: string
+              count:
+                type: integer
+                description: Only on `low_confidence_customers`.
+              customer_ids:
+                type: array
+                description: Only on `low_confidence_customers`; up to 50.
+                items:
+                  type: string
+    MarginSimulationChangeNote:
+      type: object
+      properties:
+        change_index:
+          type: integer
+          description: Index of the change in `changes`.
+        code:
+          type: string
+          enum: [non_flat_charge_model_not_replayed, missing_quantity_groups, no_token_data_groups]
+          description: '`non_flat_charge_model_not_replayed`: every group a `price_per_unit_absolute` applied to was priced flat per unit. `missing_quantity_groups`: matched groups of `price_per_unit_absolute` with no usage quantity were left unchanged. `no_token_data_groups`: matched groups of the `from_model` of a `model_swap` have no token data and were left unchanged.'
+        message:
+          type: string
+        groups:
+          type: integer
+    MarginSimulationTarget:
+      type: object
+      description: Answer of one `target_margin_percent` change. Amounts are cents; per-unit values are strings in major units, null when the quantity is 0.
+      properties:
+        change_index:
+          type: integer
+        margin_percent:
+          type: string
+        summary:
+          type: object
+          properties:
+            groups:
+              type: integer
+            groups_below_target:
+              type: integer
+            cost_cents:
+              type: integer
+            current_revenue_cents:
+              type: integer
+            target_revenue_cents:
+              type: integer
+            revenue_gap_cents:
+              type: integer
+        by_feature:
+          type: array
+          items:
+            type: object
+            properties:
+              feature_code:
+                type: string
+              quantity:
+                type: string
+              cost_cents:
+                type: integer
+              current_revenue_cents:
+                type: integer
+              target_revenue_cents:
+                type: integer
+              current_price_per_unit:
+                type: string
+                nullable: true
+              target_price_per_unit:
+                type: string
+                nullable: true
+        groups:
+          type: array
+          description: Top 50 by revenue gap.
+          items:
+            type: object
+            properties:
+              customer_id:
+                type: string
+              feature_code:
+                type: string
+              plan_id:
+                type: string
+              model:
+                type: string
+              quantity:
+                type: string
+              cost_cents:
+                type: integer
+              current_revenue_cents:
+                type: integer
+              current_margin_percent:
+                type: string
+                nullable: true
+              target_revenue_cents:
+                type: integer
+              current_price_per_unit:
+                type: string
+                nullable: true
+              target_price_per_unit:
+                type: string
+                nullable: true
+    MarginSimulationLimitImpact:
+      type: object
+      description: Answer of one `limit_impact` change. Usage is replayed per UTC day per customer. `spend_cents` is the customer's usage revenue in the window; period `month` is the UTC calendar month. Usage after the cumulative amount passes the limit is blocked, and on the day it passes, the excess share of that day's usage is blocked (pro rata). An approximation.
+      properties:
+        change_index:
+          type: integer
+        limit_kind:
+          type: string
+        limit_amount:
+          type: string
+        period:
+          type: string
+        customers_scanned:
+          type: integer
+        customers_breaching:
+          type: integer
+        periods_breaching:
+          type: integer
+        blocked:
+          $ref: '#/components/schemas/MarginSimulationLimitTotals'
+        total:
+          $ref: '#/components/schemas/MarginSimulationLimitTotals'
+        truncated:
+          type: boolean
+          description: The day buckets were capped at 200000 customer-days.
+        top_customers:
+          type: array
+          description: Top 50 by blocked revenue.
+          items:
+            type: object
+            properties:
+              customer_id:
+                type: string
+              periods_breaching:
+                type: integer
+              blocked_quantity:
+                type: string
+              blocked_revenue_cents:
+                type: integer
+              blocked_cost_cents:
+                type: integer
+    MarginSimulationLimitTotals:
+      type: object
+      properties:
+        quantity:
+          type: string
+        revenue_cents:
+          type: integer
+        cost_cents:
+          type: integer
+    MarginSimulationInsights:
+      type: object
+      properties:
+        unprofitable:
+          type: array
+          description: Top 50 customer and feature pairs by loss, merged over plans and models.
+          items:
+            type: object
+            properties:
+              customer_id:
+                type: string
+              feature_code:
+                type: string
+              revenue_cents:
+                type: integer
+              cost_cents:
+                type: integer
+              margin_cents:
+                type: integer
+              margin_percent:
+                type: string
+                nullable: true
+              quantity:
+                type: string
+                nullable: true
+              break_even_price_per_unit:
+                type: string
+                nullable: true
+                description: Cost divided by quantity, in major units.
+        concentration:
+          type: object
+          description: Share of the total held by the biggest customers, as percent strings; null when the total is 0.
+          properties:
+            customers:
+              type: integer
+            cost:
+              $ref: '#/components/schemas/MarginSimulationConcentration'
+            revenue:
+              $ref: '#/components/schemas/MarginSimulationConcentration'
+    MarginSimulationConcentration:
+      type: object
+      properties:
+        top_1_share:
+          type: string
+          nullable: true
+        top_5_share:
+          type: string
+          nullable: true
+        top_10_share:
+          type: string
+          nullable: true
+    MarginBacktestRequest:
+      type: object
+      required: [change_at, observed_kind, value]
+      properties:
+        change_at:
+          type: string
+          format: date-time
+          description: When the change took effect. `change_at` plus `window_days` must not be in the future.
+        window_days:
+          type: integer
+          minimum: 1
+          maximum: 92
+          default: 28
+          description: Length of the window on each side.
+        currency:
+          type: string
+          description: Defaults to the organization's default currency.
+        scope:
+          $ref: '#/components/schemas/MarginSimulationScope'
+        observed_kind:
+          type: string
+          enum: [price_change_percent, cost_change_percent, markup_percent]
+        value:
+          type: string
+          description: Decimal percent, as for the simulation kinds.
+    MarginBacktestTotals:
+      type: object
+      properties:
+        revenue_cents:
+          type: integer
+        cost_cents:
+          type: integer
+        margin_cents:
+          type: integer
+        margin_percent:
+          type: string
+          nullable: true
+    MarginBacktestError:
+      type: object
+      description: '|predicted - actual| / |actual| x 100, as a percent string. Null when the actual value is 0.'
+      properties:
+        revenue:
+          type: string
+          nullable: true
+        cost:
+          type: string
+          nullable: true
+        margin:
+          type: string
+          nullable: true
+    MarginBacktest:
+      type: object
+      properties:
+        change_at:
+          type: string
+          format: date-time
+        window_days:
+          type: integer
+        currency:
+          type: string
+        scope:
+          $ref: '#/components/schemas/MarginSimulationScope'
+        observed:
+          type: object
+          properties:
+            kind:
+              type: string
+            value:
+              type: string
+        before_window:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date-time
+            to:
+              type: string
+              format: date-time
+        after_window:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date-time
+            to:
+              type: string
+              format: date-time
+        before_coverage:
+          $ref: '#/components/schemas/MarginDataCoverage'
+        after_coverage:
+          $ref: '#/components/schemas/MarginDataCoverage'
+        baseline:
+          $ref: '#/components/schemas/MarginBacktestTotals'
+        predicted:
+          $ref: '#/components/schemas/MarginBacktestTotals'
+        actual:
+          $ref: '#/components/schemas/MarginBacktestTotals'
+        error_percent:
+          $ref: '#/components/schemas/MarginBacktestError'
+        confidence:
+          type: string
+          enum: [high, medium, low, insufficient_data]
+          description: 'From the worst non-null error: up to 5 is `high`, up to 15 `medium`, above that `low`. `insufficient_data` when either side has fewer than 7 days with data, or every error is null.'
+        by_feature:
+          type: array
+          description: Top 20 by absolute margin error.
+          items:
+            type: object
+            properties:
+              feature_code:
+                type: string
+              predicted:
+                $ref: '#/components/schemas/MarginBacktestTotals'
+              actual:
+                $ref: '#/components/schemas/MarginBacktestTotals'
+              error_percent:
+                $ref: '#/components/schemas/MarginBacktestError'
+        truncated:
+          type: boolean
+        assumptions:
           type: array
           items:
             type: string
