@@ -46,7 +46,7 @@ To assign a connection yourself, select it in the customer's **Payment provider*
 
 - **Provider customer ID**, for a customer that already exists in Stripe. It is locked once set.
 - **Create customer in payment provider**, which makes Nozle create the Stripe customer.
-- The payment methods the customer may use on hosted Stripe pages and automatic charges: `card`, `link`, `sepa_debit`, `us_bank_account`, `bacs_debit`, `boleto`, `crypto` and `customer_balance`. `link` needs `card`, and `customer_balance` cannot be combined with another method.
+- The payment methods the customer may use on hosted Stripe pages and automatic charges: `card`, `link`, `sepa_debit`, `us_bank_account`, `bacs_debit`, `boleto`, `klarna`, `cashapp`, `amazon_pay`, `crypto` and `customer_balance`. `link` needs `card`, and `customer_balance` cannot be combined with another method. See [Payment methods](#payment-methods).
 
 At checkout Nozle creates the missing Stripe customer with the customer's name, email, address and phone, and `card` as the payment method when the customer has no Stripe link yet. Moving a customer to a different Stripe connection at checkout creates a new Stripe customer in that account, so saved payment methods do not carry over.
 
@@ -57,6 +57,39 @@ To link a customer that already exists in Stripe from code, pass the Stripe cust
 On a later upsert or update of a linked customer, Nozle sends Stripe only the name, email, phone and address that the request changed. A changed address line sends the whole address, because Stripe replaces the address as a whole. A repeated upsert, an upsert without `billing_configuration`, and an upsert that only links a `cus_…` leave the Stripe customer's email, phone and address as they are, so edits made in Stripe are kept. Nozle never clears a Stripe customer field: a field sent as `null` or blank is cleared on the Nozle customer only.
 
 Credit top-ups and payment links do not assign a customer. The customer must already be assigned and linked to a Stripe customer. See [Credit top-ups](#credit-top-ups).
+
+### Payment methods
+
+A customer pays only with the methods set on it (`provider_payment_methods`). This applies to the invoice checkout page, pay links, the payment-method setup page and automatic renewal charges. Nozle never offers the other methods of your Stripe account, so a customer cannot pay with a method that a renewal could not charge again. A customer without the setting gets `card`.
+
+| Method | Value | Saved for renewals | Notes |
+|---|---|---|---|
+| Card | `card` | Yes | Apple Pay and Google Pay show on the card form when your Stripe account has them on. |
+| Link | `link` | Yes | Needs `card`. |
+| SEPA Direct Debit | `sepa_debit` | Yes | EUR. |
+| ACH Direct Debit | `us_bank_account` | Yes | USD. The payment is `processing` for a few days; the invoice stays pending until it succeeds. |
+| Bacs Direct Debit | `bacs_debit` | Yes | GBP. |
+| Boleto | `boleto` | Yes | BRL. |
+| Klarna | `klarna` | Yes | _Unreleased (Core 11.38.0)._ |
+| Cash App Pay | `cashapp` | Yes | _Unreleased (Core 11.38.0)._ USD, US accounts. |
+| Amazon Pay | `amazon_pay` | Yes | _Unreleased (Core 11.38.0)._ |
+| Crypto (stablecoins) | `crypto` | No | Every invoice is paid by hand. See [x402](/guides/billing/agent-payments). |
+| Bank transfer | `customer_balance` | No | Cannot be combined with another method. |
+
+Affirm and Afterpay are not supported: Stripe can charge them once but never again for a renewal. A request with an unsupported value fails with `422 validation_errors`: `provider_payment_methods` holds `value_is_invalid` and, from Core 11.38.0, `unsupported payment methods: <values> (supported: <list>)`.
+
+To turn on a method:
+
+1. Turn the method on in your Stripe account: **Settings → Payments → Payment methods** in the Stripe Dashboard (in test mode for a test key). Stripe decides which methods your account's country and currency can use. A method that is off in Stripe makes the checkout fail with Stripe's error.
+2. Set it on the customer. In the dashboard, open the customer, then **Payment provider**, and select the methods. From code, send `billing_configuration.provider_payment_methods` when you create or update the customer, for example `["card", "klarna"]`. The same field is in the [Node.js](/sdks/node/customers-entities), [Python](/sdks/python/customers-entities) and [Go](/sdks/go/customers-entities) SDKs.
+3. The customer's next checkout or pay link offers the methods. The method used to pay is saved, and renewals charge it automatically.
+
+Methods are tied to currencies. From Core 11.38.0, Nozle leaves out a method that cannot take the invoice currency, on the checkout page, the pay link and the automatic charge, so a `["card", "cashapp"]` customer still pays a EUR invoice by card. Klarna and Amazon Pay follow the country of your Stripe account:
+
+- **Klarna:** an account in the EEA, the United Kingdom or Switzerland takes EUR, GBP, CHF, DKK, NOK, SEK, PLN, CZK and RON. An account in the United States, Canada, Australia or New Zealand takes only its own currency.
+- **Amazon Pay:** a US account takes USD. A European account takes AUD, CHF, DKK, EUR, GBP, HKD, JPY, NOK, NZD, SEK, USD and ZAR.
+
+When none of the customer's methods takes the currency (a `["cashapp"]` customer and a EUR invoice), the payment fails with Stripe's error and the invoice stays unpaid. Keep at least one method on the customer that works in each currency you bill them in.
 
 ## Sandbox
 
