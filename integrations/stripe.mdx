@@ -71,7 +71,7 @@ What your customers see:
 
 - **Payments that save the method** (a subscription checkout, an invoice pay link, a card setup link): Stripe shows only methods that can be charged again at renewal, so renewals are charged automatically with the method the customer used.
 - **One-off payments that do not save a method**: Stripe can also show methods that pay once, such as Affirm or Afterpay.
-- **Renewals**: Nozle charges the saved method off-session. If you turn that method off in Stripe later, the renewal fails and the customer pays on the pay link.
+- **Renewals**: Nozle charges the saved method off-session, by its type, even if you turn that method off in Stripe later. Turning a method off only stops it from being offered on new payments.
 
 The customer's `provider_payment_methods` setting no longer limits Stripe pages. It still selects two flows: `["customer_balance"]` makes the customer pay by bank transfer, and `crypto` makes Nozle skip saving the payment method.
 
