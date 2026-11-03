@@ -5,6 +5,15 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Stripe Tax: invoices over 100 lines, void after credit notes, address and activation checks
+
+_November 3, 2026_
+
+- **More than 100 lines.** An invoice with more than 100 taxable lines is calculated in slices of 100, each its own Stripe Tax calculation and transaction. `tax_details` gains `calculation_ids` and `transaction_ids`; `calculation_id` and `transaction_id` stay and hold the first.
+- **Void after credit notes.** Voiding an invoice that already has credit notes reverses only the tax they left, line by line. Before, the full reversal could reverse the same tax twice.
+- **Address check.** A US address needs a postal code, a Canadian or Indian one a state or postal code. Without it the invoice fails before the Stripe call with `customer_tax_location_invalid` and a message that names the field.
+- **Activation check.** Setting `tax_provider` to `stripe_tax` is refused with `stripe_tax_not_activated` while Tax is not activated in the connected Stripe account. See [Stripe Tax](/guides/billing/stripe-tax).
+
 ### Margin simulation: scope a cost change to one model
 
 _November 3, 2026_
