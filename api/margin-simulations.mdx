@@ -3,9 +3,9 @@ title: "Simulate Margin on Real Usage"
 api: "POST https://api.nozle.app/engine/api/v1/margin/simulations"
 ---
 
-Base URL: `https://api.nozle.app/engine/api/v1`. Engine 2.47.0.
+Base URL: `https://api.nozle.app/engine/api/v1`.
 
-Replays the realized margin of a window with a price, markup or cost change. Read only. For one metric at a flat price see [Simulate Margin](/api/margin-simulate). The [guide](/guides/margin/simulation) explains how to read the result.
+Replays the realized margin of a window with up to 20 changes: price, markup, cost, a flat unit price, a target margin, a model swap, a provider price change or a limit. Read only. For one metric at a flat price see [Simulate Margin](/api/margin-simulate). The [guide](/guides/margin/simulation) explains each kind and how to read the result.
 
 **Auth:** `sk_` only. With [API key permissions](/api/authentication#key-permissions), the key needs `analytic:read`.
 
@@ -24,14 +24,49 @@ Replays the realized margin of a window with a price, markup or cost change. Rea
 <ParamField body="from" type="string" required>RFC3339 start of the window.</ParamField>
 <ParamField body="to" type="string" required>RFC3339 end, after `from`, at most 92 days later. Otherwise `400 invalid_date_range`.</ParamField>
 <ParamField body="currency" type="string">Defaults to the organization's default currency. Usage in other currencies is counted in `skipped_other_currency_groups`; there is no conversion.</ParamField>
-<ParamField body="changes" type="array" required>1 to 20 changes. Each has `kind`, `value` (a decimal string, at least `-100`) and an optional `scope` with `feature_code`, `customer_id` (external ID) and `plan_id`. All given scope fields must match; an empty scope means everything. The first matching change applies to a group.</ParamField>
+<ParamField body="changes" type="array" required>1 to 20 changes. Each has `kind`, an optional `scope` with `feature_code`, `customer_id` (external ID) and `plan_id`, and `value` or `params` (below). All given scope fields must match; an empty scope means everything. The first matching change that changes totals applies to a group.</ParamField>
 <ParamField body="max_groups" type="integer" default="10000">1 to 50000. When more groups exist the answer has `truncated: true`.</ParamField>
 
-| `kind` | New value |
+| `kind` | Input | Effect |
+|---|---|---|
+| `price_change_percent` | `value` | revenue x (1 + value / 100) |
+| `markup_percent` | `value` | revenue = cost x (1 + value / 100) |
+| `cost_change_percent` | `value` | cost x (1 + value / 100) |
+| `price_per_unit_absolute` | `params.unit_price` | revenue = quantity x unit price x 100 for groups with a quantity. The scope needs `feature_code`, `customer_id` or `plan_id`. |
+| `target_margin_percent` | `params.margin_percent` | Output only (`targets`). |
+| `model_swap` | `params.from_model`, `to_model`, `share_percent`, optional `to_model_prices` | Cost of matching groups = cost x (1 - share) + the share's tokens re-costed at the `to_model` prices. |
+| `provider_price_change` | `params.model`, `params.price_change_percent` | cost x (1 + p / 100) for groups of that model. |
+| `limit_impact` | `params.limit_kind`, `limit_amount`, `period` | Output only (`limit_impacts`). |
+
+`value` is required for the first three kinds (from `-100` to `1000000`); `params` is ignored for them. For the other kinds `params` is required and `value` is ignored. Decimals may be JSON strings or numbers. An unknown key in `params` returns `400 invalid_request`.
+
+| `params` key | Values |
 |---|---|
-| `price_change_percent` | revenue x (1 + value / 100) |
-| `markup_percent` | cost x (1 + value / 100) |
-| `cost_change_percent` | cost x (1 + value / 100) |
+| `unit_price` | Major units of the simulation currency, at least 0. |
+| `margin_percent` | 0 to 99.99. |
+| `share_percent` | 0 to 100. |
+| `to_model_prices` | Price per 1,000,000 tokens in major units of the simulation currency, by bucket: `input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`. Optional: without it the shared price list is used (per token, USD). |
+| `price_change_percent` | `-100` to `1000000`. |
+| `limit_kind` | `spend_cents` (the customer's usage revenue) or `quantity`. |
+| `limit_amount` | Above 0. |
+| `period` | `month` (UTC calendar month) or `day` (UTC day). |
+
+`target_margin_percent` and `limit_impact` never consume a group. `model_swap` and `provider_price_change` also match on the model of the group, so the simulation splits groups by model when one is present.
+
+Example with four kinds:
+
+```json
+{
+  "from": "2026-08-01T00:00:00Z",
+  "to": "2026-10-01T00:00:00Z",
+  "changes": [
+    { "scope": { "feature_code": "chat" }, "kind": "target_margin_percent", "params": { "margin_percent": "60" } },
+    { "kind": "model_swap", "params": { "from_model": "gpt-4o", "to_model": "gpt-4o-mini", "share_percent": "50", "to_model_prices": { "input": "0.15", "output": "0.60" } } },
+    { "kind": "provider_price_change", "params": { "model": "gpt-4o", "price_change_percent": "-20" } },
+    { "kind": "limit_impact", "params": { "limit_kind": "spend_cents", "limit_amount": "5000", "period": "month" } }
+  ]
+}
+```
 
 ## Response
 
@@ -55,10 +90,79 @@ Replays the realized margin of a window with a price, markup or cost change. Rea
 }
 ```
 
-Amounts are integer cents. Revenue and cost are the realized values with voided events netted out; the cost of still-uncosted events is missing, as in every margin report. A change edits revenue or cost per group; quantities do not change.
+Amounts are integer cents. Revenue (usage revenue plus [fixed subscription fees](/guides/margin/fixed-fee-revenue)) and cost are the realized values with voided events netted out; the cost of still-uncosted events is missing, as in every margin report. A change edits revenue or cost per group; quantities do not change.
 
 **Policy breaches.** The margin policy in effect now (narrowest of customer, plan, feature, organization, as `can()` resolves it) is applied to each group's window totals: `minimum_margin_percent`, `minimum_margin_amount` (in cents, skipped when the policy currency differs) and `maximum_estimated_cost` (total window cost, an approximation). A group breaches when a threshold is not met, whatever the policy mode. `details` lists up to 100 groups whose state changes or that breach after, ordered by margin after. A group with no revenue has no margin percent, so that threshold is not evaluated. When the policies cannot be read, `evaluated` is `false` with `error: "policy_lookup_failed"` and the money results are still returned.
 
 `by_feature` and `by_customer` hold the top 50 by absolute margin change.
 
-Errors: `400 invalid_request`, `400 invalid_date_range`, `503 analytics_unavailable`.
+The response also has these keys. They are always present, as an empty array or object when they do not apply.
+
+```json
+{
+  "data_coverage": {
+    "first_event_at": "2026-08-03T10:00:00Z", "last_event_at": "2026-09-30T23:10:00Z",
+    "days_with_data": 41, "window_days": 61, "customers": 120, "events": 98213, "truncated": false,
+    "warnings": [
+      {"code": "less_than_30_days", "message": "less than one billing cycle of data"},
+      {"code": "less_than_90_days", "message": "no seasonality captured"},
+      {"code": "low_confidence_customers", "message": "customers with fewer than 14 days of data", "count": 33, "customer_ids": ["c1"]}
+    ]
+  },
+  "assumptions": ["..."],
+  "change_notes": [{"change_index": 0, "code": "non_flat_charge_model_not_replayed", "message": "...", "groups": 12}],
+  "targets": [],
+  "limit_impacts": [],
+  "insights": {
+    "before": {"unprofitable": [], "concentration": {}},
+    "after": {"unprofitable": [], "concentration": {}}
+  }
+}
+```
+
+- **`data_coverage`** says how much history the window holds and never blocks a run. `first_event_at` and `last_event_at` are `null` with no data. Warning codes: `less_than_30_days`, `less_than_90_days`, `low_confidence_customers` (adds `count` and up to 50 `customer_ids`; fewer than 14 days of data) and `no_data_in_window`. `truncated` equals the top-level `truncated`.
+- **`assumptions`**: what the replay assumes. Usage is replayed, customers are assumed not to change behaviour, and revenue is usage revenue plus fixed subscription fees accrued per day (discounts, credit notes, taxes and one-off fees are not in it).
+- **`change_notes`**: `change_index`, `code` and `groups`. Codes: `non_flat_charge_model_not_replayed` (every group a `price_per_unit_absolute` applied to), `missing_quantity_groups` (groups with no usage quantity, left unchanged), `no_token_data_groups` (groups of a `model_swap` `from_model` with no token data, left unchanged).
+- **`targets`**: per `target_margin_percent` change, a `summary` (`groups`, `groups_below_target`, `cost_cents`, `current_revenue_cents`, `target_revenue_cents`, `revenue_gap_cents`), `by_feature` with `current_price_per_unit` and `target_price_per_unit` (major units, `null` when the quantity is 0) and the top 50 `groups` by revenue gap.
+- **`limit_impacts`**: per `limit_impact` change, `customers_scanned`, `customers_breaching`, `periods_breaching`, `blocked` and `total` (`quantity`, `revenue_cents`, `cost_cents`), `truncated` (capped at 200000 customer-days) and the top 50 `top_customers` by blocked revenue. Usage is replayed per UTC day; usage after the cumulative amount passes the limit is blocked, and on that day the excess share is blocked pro rata. It is an approximation.
+- **`insights`**: `before` is realized, `after` is with the changes. `unprofitable` lists the top 50 customer and feature pairs by loss with `revenue_cents`, `cost_cents`, `margin_cents`, `margin_percent`, `quantity` and `break_even_price_per_unit` (cost divided by quantity, major units). `concentration` has `customers`, and for `cost` and `revenue` the `top_1_share`, `top_5_share` and `top_10_share` as percent strings (`null` when the total is 0).
+
+`model_swap` is an approximation: tokens are summed per group and re-costed with the same bucket split the cost rating uses, the share that stays is assumed to cost in proportion to its current cost, and batch-tier prices are not modelled. See the [guide](/guides/margin/simulation).
+
+Errors, with body `{"code": "...", "error": "..."}`: `400 invalid_request`, `400 invalid_date_range`, `400 model_price_unavailable` (a `model_swap` target with no `to_model_prices` and no shared price), `400 price_currency_mismatch` (its shared price is in another currency than the simulation and no `to_model_prices` was given), `503 analytics_unavailable`.
+
+## Back-test
+
+```http
+POST /margin/simulations/backtest
+```
+
+Checks how well a simulation would have predicted a change you already made. Same auth (`analytic:read`).
+
+```json
+{
+  "change_at": "2026-09-15T00:00:00Z",
+  "window_days": 28,
+  "currency": "USD",
+  "scope": { "feature_code": "chat" },
+  "observed_kind": "price_change_percent",
+  "value": "20"
+}
+```
+
+<ParamField body="change_at" type="string" required>RFC3339 time the change took effect.</ParamField>
+<ParamField body="window_days" type="integer" default="28">1 to 92, per side. The before window is `[change_at - window_days, change_at)` and the after window is `[change_at, change_at + window_days)`. When the after window ends in the future the call is `400 invalid_date_range`.</ParamField>
+<ParamField body="currency" type="string">Defaults to the organization's default currency.</ParamField>
+<ParamField body="scope" type="object">`feature_code`, `customer_id`, `plan_id`. Only groups that match are compared. Coverage warnings are scoped the same way.</ParamField>
+<ParamField body="observed_kind" type="string" required>`price_change_percent`, `cost_change_percent` or `markup_percent`.</ParamField>
+<ParamField body="value" type="string" required>Decimal percent, as for the simulation kinds.</ParamField>
+
+The response has `change_at`, `window_days`, `currency`, `scope`, `observed` (`kind`, `value`), `before_window` and `after_window` (`from`, `to`), `before_coverage` and `after_coverage` (the same block as `data_coverage`), and:
+
+- `baseline`, `predicted`, `actual`: `revenue_cents`, `cost_cents`, `margin_cents`, `margin_percent` (`null` without revenue). `baseline` is the before window as recorded.
+- `error_percent`: `revenue`, `cost`, `margin`, as |predicted - actual| / |actual| x 100, `null` when the actual value is 0.
+- `confidence`: `high`, `medium`, `low` or `insufficient_data`. From the worst error that is not `null`: up to 5 is `high`, up to 15 `medium`, above that `low`. `insufficient_data` when either side has fewer than 7 days with data, or every error is `null`.
+- `by_feature`: the top 20 features by absolute margin error, each with `predicted`, `actual` and `error_percent`.
+- `truncated`, `assumptions`.
+
+Errors: `400 invalid_request`, `400 invalid_date_range`, `503 analytics_unavailable`. How to read the result: [back-test a past change](/guides/margin/simulation#back-test-a-past-change).

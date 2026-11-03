@@ -1,50 +1,209 @@
 ---
 title: Margin simulation
-description: See what a different price, markup or provider cost would have done to your margin on real usage
+description: Replay real usage with a different price, cost, model or limit and see what it would have done to your margin
 ---
 
-A margin simulation replays the recorded usage of a past window with one change and shows the margin and the margin policy breaches before and after. It reads and writes nothing else: no price, plan or policy changes.
+A margin simulation replays the recorded usage of a past window with up to 20 changes and shows the result before and after. It is read only: no price, plan, limit or policy changes.
 
-Use it before you change a price, set a markup on cost, or when a provider changes its prices.
-
-## Run one
-
-In the dashboard open **Margin simulation**, pick the window (at most 92 days), what changes and the percent, and optionally limit it to one feature, customer or plan. Or call [`POST /margin/simulations`](/api/margin-simulations), or the GraphQL query `nozleMarginSimulation`.
+Run one in the dashboard under **Margin simulation**, with [`POST /margin/simulations`](/api/margin-simulations), or with the GraphQL query `nozleMarginSimulation`.
 
 ```bash
 curl -X POST https://api.nozle.app/engine/api/v1/margin/simulations \
   -H "Authorization: Bearer sk_nozle_your_secret_key" \
   -H "Content-Type: application/json" \
   -d '{
-    "from": "2026-10-01T00:00:00Z",
-    "to": "2026-11-01T00:00:00Z",
+    "from": "2026-08-01T00:00:00Z",
+    "to": "2026-10-01T00:00:00Z",
     "changes": [{"scope": {"feature_code": "llm_tokens"}, "kind": "markup_percent", "value": "40"}]
   }'
 ```
 
-## The three kinds of change
+## Three families of what-if
 
-| `kind` | New value |
-|---|---|
-| `price_change_percent` | revenue x (1 + value / 100) |
-| `markup_percent` | cost x (1 + value / 100): the price becomes cost plus the markup |
-| `cost_change_percent` | cost x (1 + value / 100): a provider price change |
+| Family | Question | Kinds |
+|---|---|---|
+| Revenue | What if I charged differently? | `price_change_percent`, `markup_percent`, `price_per_unit_absolute`, `target_margin_percent` |
+| Cost and margin | What if my cost changed, or I served the same work with another model? | `cost_change_percent`, `provider_price_change`, `model_swap` |
+| Limits | Who would a limit block, and how much usage would be lost? | `limit_impact` |
 
-`value` is at least `-100`. The first change whose `scope` matches a group (customer x feature x plan) applies to it; other groups are unchanged.
+A change has a `kind`, an optional `scope` (`feature_code`, `customer_id`, `plan_id`; an empty scope means everything) and either `value` or `params`:
+
+- `price_change_percent`, `markup_percent` and `cost_change_percent` take `value`, a decimal percent from `-100` to `1000000`.
+- The other kinds take `params` and ignore `value`. An unknown key in `params` is a `400 invalid_request`.
+- The first change that matches a group (customer, feature and plan) and changes totals applies to it. `target_margin_percent` and `limit_impact` only report; they never consume a group.
+
+## Kinds
+
+| `kind` | Input | Effect |
+|---|---|---|
+| `price_change_percent` | `value` | revenue x (1 + value / 100) |
+| `markup_percent` | `value` | revenue = cost x (1 + value / 100) |
+| `cost_change_percent` | `value` | cost x (1 + value / 100) |
+| `price_per_unit_absolute` | `params.unit_price` | revenue = quantity x unit price x 100 |
+| `target_margin_percent` | `params.margin_percent` | Output only: the lowest price for that margin, in `targets` |
+| `model_swap` | `params.from_model`, `to_model`, `share_percent`, optional `to_model_prices` | Moves a share of one model's traffic to another and re-costs it |
+| `provider_price_change` | `params.model`, `price_change_percent` | cost x (1 + value / 100) for groups of that model |
+| `limit_impact` | `params.limit_kind`, `limit_amount`, `period` | Output only: who a limit would block, in `limit_impacts` |
+
+### Charge a flat price per unit
+
+`unit_price` is in major units of the simulation currency (at least 0). The scope needs at least one of `feature_code`, `customer_id`, `plan_id`. Only groups with a usage quantity change.
+
+```json
+{ "scope": { "feature_code": "chat" }, "kind": "price_per_unit_absolute", "params": { "unit_price": "0.002" } }
+```
+
+The price is applied flat per unit. The plan's own charge model (tiers, allowance, overage) is not replayed, and every group it touched is listed in `change_notes` as `non_flat_charge_model_not_replayed`. Groups with no quantity are left unchanged and listed as `missing_quantity_groups`.
+
+### Find the price for a target margin
+
+```json
+{ "scope": { "feature_code": "chat" }, "kind": "target_margin_percent", "params": { "margin_percent": "60" } }
+```
+
+This does not change the totals. `targets` answers, for the scope: how many groups are below the target, the revenue gap, and per feature the current and target price per unit (major units, `null` when the quantity is 0), plus the 50 groups with the biggest gap.
+
+```json
+{
+  "change_index": 0, "margin_percent": "60",
+  "summary": {"groups": 40, "groups_below_target": 11, "cost_cents": 5000, "current_revenue_cents": 9000, "target_revenue_cents": 12500, "revenue_gap_cents": 3500},
+  "by_feature": [{"feature_code": "chat", "quantity": "120000", "cost_cents": 4000, "current_revenue_cents": 6000, "target_revenue_cents": 10000,
+                  "current_price_per_unit": "0.0005", "target_price_per_unit": "0.000833333333"}]
+}
+```
+
+Here `chat` costs 40.00 for 120000 units and earns 60.00 (a 33.33 percent margin). A 60 percent margin needs 100.00 of revenue, so the price per unit must move from 0.0005 to about 0.000833.
+
+### Move traffic to a cheaper model
+
+```json
+{
+  "kind": "model_swap",
+  "params": {
+    "from_model": "gpt-4o", "to_model": "gpt-4o-mini", "share_percent": "50",
+    "to_model_prices": { "input": "0.15", "output": "0.60" }
+  }
+}
+```
+
+The cost of the groups on `from_model` becomes cost x (1 - share) plus the share's tokens re-costed at the `to_model` prices. `to_model_prices` is the price per 1,000,000 tokens in major units of the simulation currency, per bucket (`input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`). Without it the [shared price list](/guides/margin/shared-prices) is used (USD, per token). With neither, the call is a `400 model_price_unavailable`; a shared price in another currency than the simulation gives `400 price_currency_mismatch`.
+
+This is an approximation. Tokens are summed per group and re-costed with the same bucket split the cost rating uses; the share that stays on `from_model` is assumed to cost in proportion to its current cost; batch-tier prices are not modelled. Groups of `from_model` without token data are left unchanged and listed as `no_token_data_groups`. Revenue sits on usage rows that may have no model, so per-model groups carry cost, while the by-customer and by-feature totals stay right.
+
+### Apply a provider price change
+
+```json
+{ "kind": "provider_price_change", "params": { "model": "gpt-4o", "price_change_percent": "-20" } }
+```
+
+### See who a limit would block
+
+```json
+{ "kind": "limit_impact", "params": { "limit_kind": "spend_cents", "limit_amount": "5000", "period": "month" } }
+```
+
+`limit_kind` is `spend_cents` (the customer's usage revenue) or `quantity`; `period` is `month` (UTC calendar month) or `day` (UTC day). `scope` filters the usage looked at. The result is in `limit_impacts`:
+
+```json
+{
+  "change_index": 0, "limit_kind": "spend_cents", "limit_amount": "5000", "period": "month",
+  "customers_scanned": 120, "customers_breaching": 7, "periods_breaching": 9,
+  "blocked": {"quantity": "5000", "revenue_cents": 12000, "cost_cents": 3000},
+  "total": {"quantity": "900000", "revenue_cents": 400000, "cost_cents": 90000},
+  "truncated": false,
+  "top_customers": [{"customer_id": "c9", "periods_breaching": 2, "blocked_quantity": "100", "blocked_revenue_cents": 900, "blocked_cost_cents": 200}]
+}
+```
+
+Usage is replayed per UTC day per customer. After the day the cumulative amount passes the limit, usage is blocked, and on that day the excess share of the day's usage (pro rata) is blocked. It is an approximation. The day data is capped at 200000 customer-days; `truncated: true` means the cap was hit.
 
 ## What you get back
 
-- **Before and after** revenue, cost, margin and margin percent, and the change.
-- **Policy breaches.** The margin policy in effect now is applied to each group's totals for the window. You get how many groups, features and customers breach before and after, how many start breaching (`newly_breaching`) and stop (`no_longer_breaching`), and up to 100 groups with the reasons. See [margin policies](/guides/margin/alerts).
-- **By feature** and **by customer**: the 50 biggest changes.
-- `truncated: true` when more groups existed than `max_groups`; the result is then partial.
+- **Before, after and delta** for revenue, cost, margin and margin percent, with `by_feature` and `by_customer` (the 50 biggest changes).
+- **`policy_breaches`**: the margin policy in effect now is applied to each group's totals. See [margin policies](/guides/margin/alerts).
+- **`targets`** and **`limit_impacts`**, one entry per change of those kinds.
+- **`insights`**, `before` (realized) and `after` (with the changes): the top 50 unprofitable customer and feature pairs with their `break_even_price_per_unit` (cost divided by quantity), and the share of cost and revenue held by the top 1, 5 and 10 customers.
+- **`change_notes`**, **`assumptions`** and **`data_coverage`**: see below.
 
-## Read the result with care
+Every one of these keys is always present, as an empty array or object when it does not apply.
 
-- Revenue and cost are the realized values in the margin store, with voided events netted out. The cost of events that are still [uncosted](/guides/margin/reprocess) is missing from "before", as in every margin report.
-- A change edits revenue or cost per group. **Quantities do not change**: there is no demand elasticity, so a price rise does not lose any customer in the simulation.
+## Read data coverage before you trust a result
+
+A simulation replays what happened, so it is only as good as the history in the window. There is no minimum number of months and no run is refused for too little data. `data_coverage` tells you what you have:
+
+```json
+{
+  "first_event_at": "2026-08-03T10:00:00Z", "last_event_at": "2026-09-30T23:10:00Z",
+  "days_with_data": 41, "window_days": 61, "customers": 120, "events": 98213, "truncated": false,
+  "warnings": [
+    {"code": "less_than_30_days", "message": "less than one billing cycle of data"},
+    {"code": "less_than_90_days", "message": "no seasonality captured"},
+    {"code": "low_confidence_customers", "message": "customers with fewer than 14 days of data", "count": 33, "customer_ids": ["c1"]}
+  ]
+}
+```
+
+| Warning | Meaning |
+|---|---|
+| `less_than_30_days` | Less than one billing cycle of data. Monthly patterns (invoice cycles, month-end batches) are missing. |
+| `less_than_90_days` | No seasonality captured. A quiet or busy season may not be in the window. |
+| `low_confidence_customers` | Customers with fewer than 14 days of data. `count` is how many; `customer_ids` lists up to 50. Read their numbers as thin. |
+| `no_data_in_window` | Nothing was recorded in the window. |
+
+`first_event_at` and `last_event_at` are `null` when there is no data. `days_with_data` against `window_days` shows gaps. `truncated: true` means the group query hit `max_groups`, so the result is partial.
+
+**How much history to use.** As guidance, not a rule the API enforces: use at least one full billing cycle, and ideally 90 days, so the window has no warning. The window is at most 92 days. A new workspace can still run a simulation on what it has, with the warnings.
+
+## What is replayed, and what is not
+
+The simulation states its assumptions in `assumptions`:
+
+- **Usage is replayed.** The realized usage of the window is re-priced. Nothing is forecast.
+- **Customers do not change behaviour.** The same usage would have happened at the new price or cost. There is no demand response: a price rise loses no customer.
+- **Revenue** is usage revenue plus fixed subscription fees accrued per day over the billed period. Discounts, credit notes, taxes and one-off fees are not in the replayed data. See [fixed fee revenue](/guides/margin/fixed-fee-revenue).
+- Revenue and cost are the realized values with voided events netted out. The cost of events that are still [uncosted](/guides/margin/reprocess) is missing from "before", as in every margin report.
 - Policy thresholds are checked on the totals of the window per customer and feature, not per call. A single call can still be denied by `can()` when the simulation shows a healthy total.
 - Only usage in the chosen currency is simulated; other currencies are counted in `skipped_other_currency_groups`, not converted.
-- Policy checks that cannot be read return `policy_breaches.evaluated: false`; the money results are still valid.
+- If the policies cannot be read, `policy_breaches.evaluated` is `false`; the money results are still valid.
+
+## Back-test a past change
+
+A back-test checks how well a simulation would have predicted a change you already made. Give the date of the change, what it was, and the window length on each side:
+
+```bash
+curl -X POST https://api.nozle.app/engine/api/v1/margin/simulations/backtest \
+  -H "Authorization: Bearer sk_nozle_your_secret_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "change_at": "2026-09-15T00:00:00Z",
+    "window_days": 28,
+    "scope": {"feature_code": "chat"},
+    "observed_kind": "price_change_percent",
+    "value": "20"
+  }'
+```
+
+Nozle takes the window before `change_at`, applies the change you made to it (`predicted`), and compares it with what the window after `change_at` actually recorded (`actual`). `baseline` is the before window as recorded. The windows are `[change_at - window_days, change_at)` and `[change_at, change_at + window_days)`, with `window_days` from 1 to 92 (default 28). The after window must have ended, otherwise the call is `400 invalid_date_range`. With too little data on either side the call still runs and `confidence` is `insufficient_data`. `observed_kind` is `price_change_percent`, `cost_change_percent` or `markup_percent`.
+
+Read the result:
+
+```json
+{
+  "baseline":  {"revenue_cents": 100000, "cost_cents": 60000, "margin_cents": 40000, "margin_percent": "40.00"},
+  "predicted": {"revenue_cents": 120000, "cost_cents": 60000, "margin_cents": 60000, "margin_percent": "50.00"},
+  "actual":    {"revenue_cents": 116000, "cost_cents": 59700, "margin_cents": 56300, "margin_percent": "48.53"},
+  "error_percent": {"revenue": "3.45", "cost": "0.50", "margin": "6.57"},
+  "confidence": "medium"
+}
+```
+
+(Numbers here are illustrative. The shape is the response's.)
+
+- **`error_percent`** is |predicted - actual| / |actual| x 100 for revenue, cost and margin; `null` when the actual value is 0. Small means the simulation's assumption (same usage, new price) held. Large means behaviour changed, or the two windows differ for another reason.
+- **`confidence`** comes from the worst error that is not `null`: up to 5 is `high`, up to 15 `medium`, above that `low`. It is `insufficient_data` when either side has fewer than 7 days with data, or every error is `null`.
+- **`before_coverage`** and **`after_coverage`** carry the same warnings as a simulation, scoped to the back-test `scope`. Check them first.
+- **`by_feature`** shows the 20 features with the biggest margin error.
+
+A `high` back-test on a change like the one you plan to make is a reason to trust the simulation more. It proves nothing about changes of another size or on other customers.
 
 For the arithmetic behind margin and percent see the [margin worked example](/guides/margin/worked-example).
