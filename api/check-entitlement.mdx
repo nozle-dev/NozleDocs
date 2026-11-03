@@ -29,6 +29,14 @@ A subscription on an override plan (a plan made from a catalog plan for one cust
 
 Without `subscription_id` or `entity_id`, `/can` evaluates the customer's only current subscription. A customer with several current subscriptions is evaluated on its own subscription (not owned by an Entity) when there is exactly one; otherwise the answer is `allowed: false` with the reason `subscription_required`. Before Engine 2.0.0, the most recently started subscription was used. See [which subscription is checked](/guides/entitlements/can-endpoint#which-subscription-is-checked).
 
+<ParamField query="model" type="string">
+  Model the call will use. When the organization's `uncosted_model_action` is `deny` and the model has neither an organization cost rule nor a shared price, the answer is `allowed: false` with `reason: "uncosted_model_denied"`. Without `model`, no price check is made. See [shared prices and uncosted models](/guides/margin/shared-prices#refuse-calls-to-unpriced-models).
+</ParamField>
+
+<ParamField query="provider" type="string">
+  Provider of the model, such as `openai` or `anthropic`. Narrows the price lookup for `model`.
+</ParamField>
+
 <ParamField query="metadata" type="string">
   URL-encoded JSON object of event properties. The economics estimate uses it to evaluate Cost Sheet conditions and quantities, and, for a sum Feature, reads the call's units from the Feature's `field_name`. A value that is not a JSON object returns `400`.
 </ParamField>
@@ -38,7 +46,7 @@ Without `subscription_id` or `entity_id`, `/can` evaluates the customer's only c
 </ResponseField>
 
 <ResponseField name="reason" type="string">
-  Present only when access is denied; omitted when `allowed` is `true`. One of `feature_not_found`, `no_subscription`, `subscription_required`, `no_entitlement`, `usage_limit_exceeded`, `economic_policy_denied`, or `budget_exceeded` (Engine 2.34.0).
+  Present only when access is denied; omitted when `allowed` is `true`. One of `feature_not_found`, `no_subscription`, `subscription_required`, `no_entitlement`, `usage_limit_exceeded`, `economic_policy_denied`, `budget_exceeded` (Engine 2.34.0), or `uncosted_model_denied`.
 </ResponseField>
 
 <ResponseField name="feature_type" type="string">
@@ -86,8 +94,9 @@ The `economics.status` value is `estimated`, `not_configured`, `unavailable`, or
 | `usage_limit_exceeded` | A hard limit is reached. A soft limit never denies; it sets `overage` to `true`. |
 | `economic_policy_denied` | A margin policy in `deny` mode rejected the estimated cost or margin. The `policy` object has the detail. |
 | `budget_exceeded` | Engine 2.34.0. A hard spend limit covering the feature is used up: the period's spend plus open budget holds reached the limit. The `budget` object is that limit. |
+| `uncosted_model_denied` | The call names a `model`, `uncosted_model_action` is `deny`, and nothing prices the model. The response adds `model` and `message`. |
 
-A denial is an HTTP `200` response with `allowed: false`. The order is: the usage limit, then spend limits, then the margin policy.
+A denial is an HTTP `200` response with `allowed: false`. The order is: the usage limit, then spend limits, then the margin policy. `uncosted_model_denied` is decided before the entitlement is evaluated.
 
 ## Spend limits
 

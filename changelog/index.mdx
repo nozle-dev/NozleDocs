@@ -5,6 +5,19 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Margin simulation: new kinds, coverage, back-test; shared price fallback; deny unpriced models; fixed fee revenue
+
+_November 3, 2026_
+
+- **Simulation kinds.** `POST /margin/simulations` takes `params` and five new kinds: `price_per_unit_absolute`, `target_margin_percent` (the lowest price for a margin), `model_swap`, `provider_price_change` and `limit_impact` (who a limit would block). The response adds `data_coverage` with warnings, `assumptions`, `change_notes`, `targets`, `limit_impacts` and `insights` (unprofitable customers, break-even price, cost concentration). See [margin simulation](/guides/margin/simulation).
+- **Coverage.** No run is blocked for lack of history. Warnings tell you when the window is under 30 days (less than one billing cycle) or 90 days (no seasonality), and list customers with under 14 days of data. We suggest at least one billing cycle and ideally 90 days; the window is at most 92 days.
+- **Back-test.** New `POST /margin/simulations/backtest` replays a change you made, compares it with what happened and returns `error_percent` and a `confidence` label.
+- **Shared price fallback.** An LLM event no cost rule of yours matches is rated from the shared price list (`price_source: shared` on cost lines), never overriding your rates. Events before the price's `effective_from` stay uncosted. Uncosted model rows gain `shared_price_available`. See [shared prices](/guides/margin/shared-prices#shared-price-fallback).
+- **Deny unpriced models.** `uncosted_model_action` accepts `deny`. `GET /can` takes `model` and `provider` and answers `uncosted_model_denied`; the LLM proxy answers `403 uncosted_model_denied`. See [refuse calls to unpriced models](/guides/margin/shared-prices#refuse-calls-to-unpriced-models).
+- **Policy lookup default.** New organization setting `margin_policy_unavailable_default` (`allow` default, `deny`): what `can()` and the proxy do when the margin policy cannot be read and no earlier policy is known. See [when the policy cannot be read](/guides/margin/alerts#when-the-policy-cannot-be-read).
+- **Fixed fee revenue.** Fixed subscription fees from finalized invoices now count in margin revenue, accrued per day over the billed period; voided invoices are reversed. Add-on, one-off and charge fees, taxes, discounts and credit notes are not counted. See [fixed fee revenue](/guides/margin/fixed-fee-revenue).
+- **OpenAPI 1.58.0.**
+
 ### Billing entity API reference fixes
 
 _November 2, 2026_

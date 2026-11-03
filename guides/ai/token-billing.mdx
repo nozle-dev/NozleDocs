@@ -104,7 +104,7 @@ The option to waive billing for aborted streams is not available yet. Aborted st
 
 ## Uncosted models
 
-When an LLM call is rated and no cost rule prices it, Nozle records the provider, model and token bucket. An LLM call is an event whose `properties.model` is a non-empty string. The call is still accepted and billed, and its cost counts as zero in margin until a price exists. Nozle records three cases:
+When an LLM call is rated and no cost rule prices it, Nozle records the provider, model and token bucket. An LLM call is an event whose `properties.model` is a non-empty string. The call is still accepted and billed, and its cost counts as zero in margin until a price exists. A model the [shared price list](/guides/margin/shared-prices#shared-price-fallback) prices is rated from that list when none of your rules matches, so it is not uncosted for events from the price's start date. Nozle records three cases:
 
 | Source | When |
 |---|---|
@@ -120,11 +120,11 @@ Calls are counted per key, not stored one by one. A later priced call of the sam
 |---|---|
 | `warn` (default) | Record, show in the dashboard, and notify. |
 | `ignore` | Record and show in the dashboard. No notification. |
-| `deny` | Not available yet. The update is refused with `deny_is_reserved_and_not_supported_yet`, and Engine reads a stored `deny` as `warn`. |
+| `deny` | Refuse a call to a model that no cost rule of yours and no [shared price](/guides/margin/shared-prices) prices: `GET /can` with `model` answers `uncosted_model_denied`, and the [LLM proxy](/api/llm-proxy) answers `403 uncosted_model_denied` before the provider is called. See [refuse calls to unpriced models](/guides/margin/shared-prices#refuse-calls-to-unpriced-models). |
 
 **Notification.** With `warn`, admins and members with `cost_intelligence:manage` get an in-app and an email notification, once per model per UTC day. At most 20 per organization per day are sent; the rest fold into one digest. No webhook is sent.
 
-**API.** `GET /api/v1/cost-intelligence/uncosted-models` lists keys (`status` `open`, `resolved`, `dismissed` or `all`; `limit`; `cursor`) and needs `analytic:read`. `POST /api/v1/cost-intelligence/uncosted-models/dismiss` with `{provider, model, token_type, source}` dismisses one and needs `analytic:write`. The [cost report](/api/cost-intelligence-report) has a new field `uncosted_models` with the top 50 open keys.
+**API.** `GET /api/v1/cost-intelligence/uncosted-models` lists keys (`status` `open`, `resolved`, `dismissed` or `all`; `limit`; `cursor`) and needs `analytic:read`. `POST /api/v1/cost-intelligence/uncosted-models/dismiss` with `{provider, model, token_type, source}` dismisses one and needs `analytic:write`. Each row has `shared_price_available`, true when the shared price list prices the model now. The [cost report](/api/cost-intelligence-report) has a new field `uncosted_models` with the top 50 open keys.
 
 **Dashboard.** The list is under **Usage → Margin**, tab **Uncosted**.
 
