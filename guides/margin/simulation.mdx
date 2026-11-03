@@ -90,6 +90,16 @@ The cost of the groups on `from_model` becomes cost x (1 - share) plus the share
 
 This is an approximation. Tokens are summed per group and re-costed with the same bucket split the cost rating uses; the share that stays on `from_model` is assumed to cost in proportion to its current cost; batch-tier prices are not modelled. Groups of `from_model` without token data are left unchanged and listed as `no_token_data_groups`. Revenue sits on usage rows that may have no model, so per-model groups carry cost, while the by-customer and by-feature totals stay right.
 
+### Scope a cost change to one model
+
+Add `scope.model` to a `cost_change_percent` change to apply it to one LLM model only. It matches usage that carries the model: LLM proxy events do, an SDK event sent without a `model` property cannot be matched by model.
+
+```json
+{ "scope": { "model": "gpt-4o" }, "kind": "cost_change_percent", "value": "-20" }
+```
+
+Every other kind refuses it with `400 invalid_request` (`scope.model applies to cost changes only`). `model_swap` and `provider_price_change` name their own model, and a different `scope.model` is refused. The back-test accepts it only with `observed_kind: cost_change_percent`. The dashboard's **Margin simulation** has a model field for cost changes.
+
 ### Apply a provider price change
 
 ```json
