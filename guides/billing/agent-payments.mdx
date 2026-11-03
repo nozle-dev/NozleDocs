@@ -1,0 +1,164 @@
+---
+title: Agent payments
+description: Let an AI agent pay a Nozle invoice with a Stripe Shared Payment Token or an x402 stablecoin payment
+---
+
+<Note>
+Early access. The endpoints are behind organization flags that are off by default (`stripe_agent_payment_token` for SPT, `stripe_x402_payments` for x402): ask Nozle to enable them. Stripe's APIs are previews (`2026-09-30.preview` for SPT, `2026-05-27.preview` for x402) and may change.
+</Note>
+
+## What Nozle supports
+
+| | Stripe Shared Payment Tokens (SPT) | x402 (stablecoin) |
+|---|---|---|
+| **What the agent sends** | An `spt_...` token with limits (currency, maximum amount, expiry) | A signed USDC payment (x402 v2, `exact` scheme, EIP-3009) |
+| **Paid in** | The token's currency, on the card behind the token | USDC on Base. USD invoices only |
+| **Who settles** | Your connected Stripe account | The x402 facilitator settles on-chain to your Stripe deposit address; Stripe records it as a PaymentIntent |
+| **How the agent pays** | Your backend calls `pay_with_agent_token` | Any x402 client pays the invoice's public x402 URL, or your backend sends Nozle the transaction hash |
+| **Your Stripe account needs** | Stripe's SPT preview, in a [supported country](#region-availability) | **Stablecoins and Crypto** turned on in Stripe; US businesses outside New York, others by request to Stripe |
+| **Refused before charging** | Expired, deactivated, other currency, amount over the limit | Wrong network, asset, recipient or amount; invoice already paid or being paid |
+| **Nozle stores** | The token id, status and limits, never card data | The PaymentIntent id and transaction hash, never the signed payment |
+| **After payment** | A normal Stripe payment: invoice paid, `payment.succeeded`, refunds and credit notes work as usual | Same |
+
+Both work in Stripe test mode (sandbox token helper for SPT, Base Sepolia and the public `x402.org` facilitator for x402) and are behind organization flags while in early access.
+
+An AI agent can pay one of your invoices without a customer filling in a card form. The agent gives you a Stripe Shared Payment Token (SPT, an `spt_...` id) with limits: currency, maximum amount and expiry. Your backend sends the token to Nozle, and Nozle charges your own connected Stripe account.
+
+## Stripe Shared Payment Tokens
+
+1. The agent gives your backend an `spt_...` token.
+2. Your backend calls [`POST /invoices/{id}/pay_with_agent_token`](/api-reference/invoices/pay-an-invoice-with-an-agent-payment-token) with the token.
+3. Nozle checks the token, then creates a PaymentIntent on your connected Stripe account. You never call Stripe.
+4. The payment is recorded like any Stripe payment. Refunds, credit notes and webhooks work as usual.
+
+Nozle refuses before charging when the token is expired or deactivated, its currency differs from the invoice, or the invoice amount exceeds its limit. Nozle stores only the token id, never card data. A repeat call with the same token and invoice is idempotent.
+
+```bash
+curl -X POST "https://api.nozle.app/core/api/v1/invoices/INVOICE_ID/pay_with_agent_token" \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "agent_payment_token": "spt_..." }'
+```
+
+The same call from any HTTP client:
+
+```ts
+const res = await fetch(
+  `https://api.nozle.app/core/api/v1/invoices/${invoiceId}/pay_with_agent_token`,
+  {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.NOZLE_SECRET_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ agent_payment_token: sptToken }),
+  },
+)
+```
+
+SDK helpers for both methods follow in the next SDK release.
+
+A success returns the invoice. On failure, `404` means the invoice was not found, and `422` carries a code under `error_details.agent_payment_token`: `invalid_format`, `token_deactivated`, `token_expired`, `currency_mismatch` or `amount_exceeds_limit`. See the [endpoint reference](/api-reference/invoices/pay-an-invoice-with-an-agent-payment-token) for every error.
+
+## Region availability
+
+| Method | Availability |
+| --- | --- |
+| SPT | The 34 countries below, by the country of your Stripe account |
+| x402 | US businesses in all states except New York. Elsewhere, email machine-payments@stripe.com with your Stripe account ID |
+
+SPT countries:
+
+| Region | Countries |
+| --- | --- |
+| European Union | AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT RO SE SI SK |
+| Other Europe | CH GB GI LI NO |
+| North America | CA US |
+
+Nozle shows this per connected Stripe account as `agentPayments.spt` and `agentPayments.x402` on the GraphQL `StripeProvider` type. Each is `true` or `false` from the account country, and `null` when unknown. `x402` cannot detect New York.
+
+## x402 (stablecoin)
+
+x402 lets an agent pay in USDC. Nozle supports USD invoices and USDC on Base only for now. Stripe also supports Solana and Tempo, which are not wired in Nozle yet.
+
+### Let any x402 client pay (recommended)
+
+_From Core 11.39.0 (November 4, 2026)._ Every invoice has a public x402 URL. Give it to the agent: any x402 client (Coinbase's `@x402/fetch`, Stripe's `purl`) pays it with no Nozle API key and no code on your side.
+
+1. Call `GET /invoices/{id}/x402_requirements`. Its `resource.url` is the invoice's x402 URL (`https://api.nozle.app/core/x402/invoices/<token>`). The token is signed: it cannot be guessed or changed to another invoice.
+2. Hand that URL to the agent. A request without payment gets `402` with the `PAYMENT-REQUIRED` header (x402 v2, base64 JSON): USDC on Base, the amount due, and your Stripe deposit address as `payTo`.
+3. The agent signs the payment and repeats the request with the `PAYMENT-SIGNATURE` header. Nozle checks it matches the invoice, has the x402 facilitator settle it on-chain (Coinbase CDP in live mode, `x402.org` in test mode), and records it with Stripe.
+4. The agent gets `200` with the `PAYMENT-RESPONSE` header (the transaction hash) and the invoice status. The invoice is paid once Stripe confirms the transfer (`payment.succeeded` webhook), usually within seconds.
+
+```bash
+# What an agent sees before paying
+curl -i -X POST "https://api.nozle.app/core/x402/invoices/<token>"
+# HTTP/1.1 402 Payment Required
+# PAYMENT-REQUIRED: eyJ4NDAyVmVyc2lvbiI6Mi...
+```
+
+| Status | When |
+|---|---|
+| `200` | Paid, or the invoice is already paid or its payment is being confirmed |
+| `402` | No payment yet, a payment that does not match the invoice (`payment_requirements_mismatch`), or the facilitator refused or could not settle it |
+| `400` | The `PAYMENT-SIGNATURE` header is not valid base64 JSON |
+| `403` | x402 is not enabled for your organization |
+| `404` | Unknown or altered token |
+| `409` | Another payment of this invoice is running |
+| `429` | More than 30 requests a minute from one address |
+| `502` | Settled on-chain, but Stripe could not record it: `PAYMENT-RESPONSE` holds the transaction hash, record it with `pay_with_x402` below |
+
+### Record a transaction yourself
+
+If you run the x402 handshake yourself, the agent pays on-chain and you send Nozle the transaction hash:
+
+1. Call `GET /invoices/{id}/x402_requirements`. It returns the payment requirements.
+2. Relay them to the paying agent in an HTTP 402 response (`PAYMENT-REQUIRED` header, base64 JSON).
+3. The agent pays on-chain through an x402 facilitator.
+4. Call `POST /invoices/{id}/pay_with_x402` with the transaction hash.
+
+```bash
+curl "https://api.nozle.app/core/api/v1/invoices/INVOICE_ID/x402_requirements" \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY"
+```
+
+```json
+{
+  "x402_requirements": {
+    "x402Version": 2,
+    "accepts": [{
+      "scheme": "exact",
+      "network": "eip155:8453",
+      "amount": "10000000",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "payTo": "0x...",
+      "maxTimeoutSeconds": 300,
+      "extra": { "name": "USD Coin", "version": "2" }
+    }],
+    "resource": {
+      "url": "https://api.nozle.app/core/x402/invoices/<token>",
+      "description": "Acme - Invoice ACME-001",
+      "mimeType": "application/json"
+    }
+  }
+}
+```
+
+`amount` is in USDC atomic units, as a string: cents x 10000. `payTo` is your Stripe deposit address. Live keys return Base (`eip155:8453`); test keys return Base Sepolia (`eip155:84532`).
+
+```bash
+curl -X POST "https://api.nozle.app/core/api/v1/invoices/INVOICE_ID/pay_with_x402" \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "transaction_hash": "0x<64 hex characters>" }'
+```
+
+Nozle asks Stripe to verify the on-chain transaction, with the hash as idempotency key, so one transaction pays one invoice once. The call returns the invoice. The payment is `processing` first and the invoice stays pending until Stripe confirms. It then becomes paid through the normal webhook, and you receive the usual payment webhooks.
+
+Errors: `403` `feature_not_enabled`; `404` invoice not found; `422` `invoice_not_payable`, or `error_details` `currency: ["usd_required"]`, `payment_provider: ["stripe_required"]`, `transaction_hash: ["invalid_format"]`; and `422` `third_party_error` when Stripe refuses. See the [reference](/api-reference/invoices/pay-an-invoice-with-an-x402-transaction).
+
+Funds settle to your Stripe balance as Stripe records them. Nozle never holds keys or funds, and stores only provider ids and status, never wallet data.
+
+### Test in the sandbox
+
+Use a Stripe sandbox, Base Sepolia, the public test facilitator `https://x402.org/facilitator`, and fund a test wallet with Circle's Base Sepolia USDC faucet. In a Stripe sandbox the PaymentIntent stays `processing` until a real Base Sepolia transaction to the deposit address is verified.

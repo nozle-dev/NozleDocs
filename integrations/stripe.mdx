@@ -46,7 +46,7 @@ To assign a connection yourself, select it in the customer's **Payment provider*
 
 - **Provider customer ID**, for a customer that already exists in Stripe. It is locked once set.
 - **Create customer in payment provider**, which makes Nozle create the Stripe customer.
-- The payment methods the customer may use on hosted Stripe pages and automatic charges: `card`, `link`, `sepa_debit`, `us_bank_account`, `bacs_debit`, `boleto`, `crypto` and `customer_balance`. `link` needs `card`, and `customer_balance` cannot be combined with another method.
+- The customer's payment method setting: `customer_balance` (bank transfer only) or `crypto` select those flows. Other values no longer limit what Stripe offers. See [Payment methods](#payment-methods).
 
 At checkout Nozle creates the missing Stripe customer with the customer's name, email, address and phone, and `card` as the payment method when the customer has no Stripe link yet. Moving a customer to a different Stripe connection at checkout creates a new Stripe customer in that account, so saved payment methods do not carry over.
 
@@ -57,6 +57,24 @@ To link a customer that already exists in Stripe from code, pass the Stripe cust
 On a later upsert or update of a linked customer, Nozle sends Stripe only the name, email, phone and address that the request changed. A changed address line sends the whole address, because Stripe replaces the address as a whole. A repeated upsert, an upsert without `billing_configuration`, and an upsert that only links a `cus_…` leave the Stripe customer's email, phone and address as they are, so edits made in Stripe are kept. Nozle never clears a Stripe customer field: a field sent as `null` or blank is cleared on the Nozle customer only.
 
 Credit top-ups and payment links do not assign a customer. The customer must already be assigned and linked to a Stripe customer. See [Credit top-ups](#credit-top-ups).
+
+### Payment methods
+
+_From Core 11.39.0 (November 4, 2026)._ Your customers can pay with every payment method you turn on in your Stripe account. Nozle does not choose or limit methods: on each payment, Stripe offers the ones that fit it (currency, the customer's country, amount, and whether the method can be saved for renewals), and Nozle records the payment and the saved method.
+
+To offer a method:
+
+1. Turn it on in the Stripe Dashboard under **Settings → Payments → Payment methods** (in test mode for a test key). Some methods, such as Klarna or Affirm, need Stripe's approval first.
+2. That is all. The next checkout page or pay link offers it where Stripe allows it, with no change in Nozle.
+
+What your customers see:
+
+- **Payments that save the method** (a subscription checkout, an invoice pay link, a card setup link): Stripe shows only methods that can be charged again at renewal, so renewals are charged automatically with the method the customer used.
+- **One-off payments that do not save a method**: Stripe can also show methods that pay once, such as Affirm or Afterpay.
+- **Renewals**: Nozle charges the saved method off-session, by its type, even if you turn that method off in Stripe later. Turning a method off only stops it from being offered on new payments.
+
+The customer's `provider_payment_methods` setting no longer limits Stripe pages. It still selects two flows: `["customer_balance"]` makes the customer pay by bank transfer, and `crypto` makes Nozle skip saving the payment method.
+
 
 ## Sandbox
 
@@ -336,7 +354,7 @@ The customer must already be assigned to the Stripe connection and linked to a S
 
 ## Saved payment methods and automatic charging
 
-- **Saving a card.** Checkout asks Stripe to save the payment method for later off-session use. Nozle skips this for customers who use `crypto`. When the connection has a publishable key and the customer pays by card (or Link) only, a card setup link opens Nozle's card page instead of Stripe Checkout. See [Indian cards and automatic payments](#indian-cards-and-automatic-payments).
+- **Saving a payment method.** Checkout asks Stripe to save the payment method for later off-session use. Nozle skips this for customers who use `crypto`. When the connection has a publishable key, a customer in India saves a card on Nozle's card page instead of Stripe Checkout. See [Indian cards and automatic payments](#indian-cards-and-automatic-payments).
 - **Automatic charges.** When an invoice is issued for a customer who has a Stripe customer ID, Nozle charges it through Stripe on its own, using the customer's saved payment method. This covers renewals. Checkout and top-up invoices are paid through their own session instead. If the saved method is gone, Nozle uses the first payment method it finds on the Stripe customer. Customers who pay by `customer_balance` bank transfer are charged on session, not off session. A card issued in India is charged automatically only through its mandate (see below). The customer's `country` is not what decides this: the card and its mandate are.
 - **Authentication.** Stripe can refuse an off-session charge with `authentication_required`. With **Support 3DSecure** on, Nozle retries it on session. The payment moves to `requires_action`, Nozle sends the `payment.requires_action` webhook, and the invoice stays pending until the customer completes the action. With it off, the payment fails.
 - **Small amounts.** Nozle checks Stripe's minimum charge (for example USD 0.50) before it calls Stripe, for the currencies it knows the minimum of (_Unreleased_). An off-session charge below it is not sent: the payment fails with `amount_below_provider_minimum`, the invoice stays pending and you receive the payment error webhook. An `amount_too_small` error that Stripe itself returns also leaves the invoice pending instead of failed.
@@ -358,8 +376,8 @@ Indian rules (RBI) do not let a business debit a card issued in India on its own
 |---|---|---|
 | **Saving a card** | Stripe Checkout, Stripe's own page | Nozle's card page with Stripe's secure card fields |
 | **Card from India** | Saved without a mandate. It cannot be charged automatically: the customer pays each invoice on the pay link | One OTP from the bank registers the mandate. Renewals are then charged automatically, after the bank's 24 hour notice |
-| **Card from anywhere else** | Works as before | Works as before, with no extra step. The mandate settings are ignored |
-| **Pay link of an invoice** | Stripe Checkout | Nozle's page when the customer pays by card, or is from India |
+| **Customer outside India** | Stripe Checkout | Stripe Checkout, with every method you turned on in Stripe (from Core 11.39.0; before, card-only customers used the card page) |
+| **Pay link of an invoice** | Stripe Checkout | Nozle's page when the customer is from India |
 | **Workspace card step** | Stripe Checkout | Nozle's card page |
 | **Payment requests, crypto, paid plan upgrade checkout** | Stripe Checkout | Stripe Checkout. They cannot register a mandate |
 | **Link and wallets** | Stripe's own page offers Link, Apple Pay and Google Pay | The card page offers Link too. Apple Pay and Google Pay show once the card page's host is registered with your Stripe account (see below) |

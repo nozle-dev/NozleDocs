@@ -5,6 +5,16 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Agent payments (SPT, x402) and Stripe-chosen payment methods
+
+_November 4, 2026_
+
+- **Shared Payment Tokens.** `POST /invoices/{id}/pay_with_agent_token` pays a finalized invoice with an `spt_...` token an AI agent gave you, charged on your own connected Stripe account. Expired, deactivated, other-currency and over-limit tokens are refused before charging. Behind the organization flag `stripe_agent_payment_token`. See [Agent payments](/guides/billing/agent-payments).
+- **x402, any client.** Every USD invoice has a public x402 URL (`resource.url` of `GET /invoices/{id}/x402_requirements`). Any x402 client pays it in USDC on Base: Nozle answers `402` with `PAYMENT-REQUIRED`, has the facilitator settle the signed payment, and records it with Stripe. `POST /invoices/{id}/pay_with_x402` still takes a transaction hash. Behind the organization flag `stripe_x402_payments`. See [x402](/guides/billing/agent-payments#x402-stablecoin).
+- **Stripe chooses the payment methods.** Checkout pages, pay links and the setup page offer every method you turned on in Stripe that fits the payment (Klarna, Cash App Pay, Amazon Pay, ACH and others); renewals charge the saved method. `provider_payment_methods` only selects bank transfer and crypto. Nozle's card page is for customers in India. See [Payment methods](/integrations/stripe#payment-methods).
+- **Stripe preview APIs** (`2026-09-30.preview` for SPT, `2026-05-27.preview` for x402) may change.
+- **OpenAPI 1.59.0.**
+
 ### Stripe Tax: invoices over 100 lines, void after credit notes, address and activation checks
 
 _November 3, 2026_
