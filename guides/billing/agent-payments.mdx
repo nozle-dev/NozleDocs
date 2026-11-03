@@ -66,8 +66,39 @@ Nozle shows this per connected Stripe account as `agentPayments.spt` and `agentP
 
 x402 lets an agent pay in USDC. Nozle supports USD invoices and USDC on Base only for now. Stripe also supports Solana and Tempo, which are not wired in Nozle yet.
 
+### Let any x402 client pay (recommended)
+
+_Unreleased (Core 11.38.0)._ Every invoice has a public x402 URL. Give it to the agent: any x402 client (Coinbase's `@x402/fetch`, Stripe's `purl`) pays it with no Nozle API key and no code on your side.
+
+1. Call `GET /invoices/{id}/x402_requirements`. Its `resource.url` is the invoice's x402 URL (`https://api.nozle.app/core/x402/invoices/<token>`). The token is signed: it cannot be guessed or changed to another invoice.
+2. Hand that URL to the agent. A request without payment gets `402` with the `PAYMENT-REQUIRED` header (x402 v2, base64 JSON): USDC on Base, the amount due, and your Stripe deposit address as `payTo`.
+3. The agent signs the payment and repeats the request with the `PAYMENT-SIGNATURE` header. Nozle checks it matches the invoice, has the x402 facilitator settle it on-chain (Coinbase CDP in live mode, `x402.org` in test mode), and records it with Stripe.
+4. The agent gets `200` with the `PAYMENT-RESPONSE` header (the transaction hash) and the invoice status. The invoice is paid once Stripe confirms the transfer (`payment.succeeded` webhook), usually within seconds.
+
+```bash
+# What an agent sees before paying
+curl -i -X POST "https://api.nozle.app/core/x402/invoices/<token>"
+# HTTP/1.1 402 Payment Required
+# PAYMENT-REQUIRED: eyJ4NDAyVmVyc2lvbiI6Mi...
+```
+
+| Status | When |
+|---|---|
+| `200` | Paid, or the invoice is already paid or its payment is being confirmed |
+| `402` | No payment yet, a payment that does not match the invoice (`payment_requirements_mismatch`), or the facilitator refused or could not settle it |
+| `400` | The `PAYMENT-SIGNATURE` header is not valid base64 JSON |
+| `403` | x402 is not enabled for your organization |
+| `404` | Unknown or altered token |
+| `409` | Another payment of this invoice is running |
+| `429` | More than 30 requests a minute from one address |
+| `502` | Settled on-chain, but Stripe could not record it: `PAYMENT-RESPONSE` holds the transaction hash, record it with `pay_with_x402` below |
+
+### Record a transaction yourself
+
+If you run the x402 handshake yourself, the agent pays on-chain and you send Nozle the transaction hash:
+
 1. Call `GET /invoices/{id}/x402_requirements`. It returns the payment requirements.
-2. Relay them to the paying agent in an HTTP 402 response (`payment-required` header, base64 JSON).
+2. Relay them to the paying agent in an HTTP 402 response (`PAYMENT-REQUIRED` header, base64 JSON).
 3. The agent pays on-chain through an x402 facilitator.
 4. Call `POST /invoices/{id}/pay_with_x402` with the transaction hash.
 
@@ -89,7 +120,11 @@ curl "https://api.nozle.app/core/api/v1/invoices/INVOICE_ID/x402_requirements" \
       "maxTimeoutSeconds": 300,
       "extra": { "name": "USD Coin", "version": "2" }
     }],
-    "resource": { "description": "Acme - Invoice ACME-001" }
+    "resource": {
+      "url": "https://api.nozle.app/core/x402/invoices/<token>",
+      "description": "Acme - Invoice ACME-001",
+      "mimeType": "application/json"
+    }
   }
 }
 ```
