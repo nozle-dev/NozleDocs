@@ -33047,7 +33047,7 @@ components:
           type: string
         shared_price_available:
           type: boolean
-          description: True when the shared price list prices this model now, so it can be adopted into your own catalog. Events at or after the shared price's `effective_from` are already rated from it.
+          description: Kept for compatibility and always `false`. Nozle does not price models for you; add a price to your own cost model.
     UncostedReprocessStarted:
       type: object
       required: [job, already_running]
@@ -33210,7 +33210,7 @@ components:
               type: string
             to_model_prices:
               type: object
-              description: 'Price per 1,000,000 tokens in major units of the simulation currency, by bucket: `input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`. When omitted the shared price list (USD, per token) is used; with none, `400 model_price_unavailable`.'
+              description: 'Price per 1,000,000 tokens in major units of the simulation currency, by bucket: `input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`. Required for `model_swap`; without it, `400 model_price_unavailable`.'
               additionalProperties:
                 type: string
             model:
