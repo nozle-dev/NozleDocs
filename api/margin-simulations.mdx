@@ -45,7 +45,7 @@ Replays the realized margin of a window with up to 20 changes: price, markup, co
 | `unit_price` | Major units of the simulation currency, at least 0. |
 | `margin_percent` | 0 to 99.99. |
 | `share_percent` | 0 to 100. |
-| `to_model_prices` | Price per 1,000,000 tokens in major units of the simulation currency, by bucket: `input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`. Optional: without it the shared price list is used (per token, USD). |
+| `to_model_prices` | Price per 1,000,000 tokens in major units of the simulation currency, by bucket: `input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`. Required for `model_swap`: Nozle does not price models for you. |
 | `price_change_percent` | `-100` to `1000000`. |
 | `limit_kind` | `spend_cents` (the customer's usage revenue) or `quantity`. |
 | `limit_amount` | Above 0. |
@@ -139,7 +139,7 @@ Only `cost_change_percent` accepts it. Every other kind answers `400 invalid_req
 
 `model_swap` is an approximation: tokens are summed per group and re-costed with the same bucket split the cost rating uses, the share that stays is assumed to cost in proportion to its current cost, and batch-tier prices are not modelled. See the [guide](/guides/margin/simulation).
 
-Errors, with body `{"code": "...", "error": "..."}`: `400 invalid_request`, `400 invalid_date_range`, `400 model_price_unavailable` (a `model_swap` target with no `to_model_prices` and no shared price), `400 price_currency_mismatch` (its shared price is in another currency than the simulation and no `to_model_prices` was given), `503 analytics_unavailable`.
+Errors, with body `{"code": "...", "error": "..."}`: `400 invalid_request`, `400 invalid_date_range`, `400 model_price_unavailable` (a `model_swap` without `to_model_prices`), `503 analytics_unavailable`.
 
 ## Back-test
 

@@ -3872,9 +3872,9 @@ paths:
       summary: List LLM models that have no price
       description: |
         Returns the provider, model and token bucket of LLM calls that no cost rule priced, counted per key
-        and not stored per event. The calls are still accepted and billed; their cost counts as zero, unless the shared
-        price list prices the model: then new events are rated from it (`price_source: shared`) and the row shows
-        `shared_price_available: true`. See [shared prices and uncosted models](/guides/margin/shared-prices).
+        and not stored per event. The calls are still accepted and billed; their cost counts as zero until you add a
+        price for the model. `shared_price_available` is kept for compatibility and is always `false`. See
+        [uncosted models](/guides/ai/token-billing#uncosted-models).
         Requires a secret key. With API key permissions, the key needs `analytic:read`.
       operationId: listUncostedModels
       parameters:
@@ -14479,9 +14479,9 @@ paths:
         | `usage_limit_exceeded` | Usage reached a hard limit. A soft limit never denies; it sets `overage: true`. |
         | `economic_policy_denied` | A margin policy decided `deny`. The `policy` object has the detail. |
         | `budget_exceeded` | Engine 2.34.0. A hard spend limit covering the feature is used up: spend plus open budget holds reached the limit. The `budget` object is that limit. |
-        | `uncosted_model_denied` | The call names a `model`, the organization's `uncosted_model_action` is `deny`, and the model has neither a cost rule of the organization nor a shared price at that moment. The response adds `model` and `message`. |
+        | `uncosted_model_denied` | The call names a `model`, the organization's `uncosted_model_action` is `deny`, and the organization has no cost rule for the model at that moment. The response adds `model` and `message`. |
 
-        **Uncosted models.** Send `model` (and `provider`) to have the call checked for a price before it runs. The check is skipped without `model`, and `warn` and `ignore` never refuse. If the price cannot be looked up, the answer follows the `on_unavailable` of the margin policy that applies (the last one known for the call); with no policy known the call is allowed. See [shared prices and uncosted models](/guides/margin/shared-prices).
+        **Uncosted models.** Send `model` (and `provider`) to have the call checked for a price before it runs. The check is skipped without `model`, and `warn` and `ignore` never refuse. If the price cannot be looked up, the answer follows the `on_unavailable` of the margin policy that applies (the last one known for the call); with no policy known the call is allowed. See [refuse calls to unpriced models](/guides/ai/token-billing#refuse-calls-to-unpriced-models).
 
         **Spend limits (Engine 2.34.0).** For a feature the plan prices with a usage charge, the response adds `budget`: the limit that refused the call, else the tightest spend limit covering the feature. It is checked after the usage limit and before the margin policy. A soft limit never refuses; its `status` still turns `exceeded`. A plain `/can` is check-then-call: calls already in flight and the few seconds before usage is counted can take spend past a cap. For an exact cap, take a budget hold with `POST /usage/holds`. A new limit refuses calls within a minute. When budgets cannot be read and a hard limit may apply, the response is `503 budget_unavailable`. See [Spend limits and budgets](/guides/entitlements/spend-limits).
 
