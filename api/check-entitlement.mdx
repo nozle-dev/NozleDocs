@@ -30,7 +30,7 @@ A subscription on an override plan (a plan made from a catalog plan for one cust
 Without `subscription_id` or `entity_id`, `/can` evaluates the customer's only current subscription. A customer with several current subscriptions is evaluated on its own subscription (not owned by an Entity) when there is exactly one; otherwise the answer is `allowed: false` with the reason `subscription_required`. Before Engine 2.0.0, the most recently started subscription was used. See [which subscription is checked](/guides/entitlements/can-endpoint#which-subscription-is-checked).
 
 <ParamField query="model" type="string">
-  Model the call will use. When the organization's `uncosted_model_action` is `deny` and the model has neither an organization cost rule nor a shared price, the answer is `allowed: false` with `reason: "uncosted_model_denied"`. Without `model`, no price check is made. See [shared prices and uncosted models](/guides/margin/shared-prices#refuse-calls-to-unpriced-models).
+  Model the call will use. When the organization's `uncosted_model_action` is `deny` and the organization has no cost rule for the model, the answer is `allowed: false` with `reason: "uncosted_model_denied"`. Without `model`, no price check is made. See [refuse calls to unpriced models](/guides/ai/token-billing#refuse-calls-to-unpriced-models).
 </ParamField>
 
 <ParamField query="provider" type="string">

@@ -5,6 +5,15 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Shared provider prices off; three-decimal currencies; pricing scenarios priced from events
+
+_November 4, 2026_
+
+- **Your own prices only.** Nozle no longer costs usage from its shared list of provider prices. A model without a price in your [cost model](/guides/margin/cost-models) is [uncosted](/guides/ai/token-billing#uncosted-models) until you add one. The Shared prices page and **Adopt shared price** are gone, and `shared_price_available` is always `false`. Cost lines rated before this change keep `price_source: shared`. With `uncosted_model_action: deny`, a model that only had a shared price is now refused.
+- **Margin simulation.** `model_swap` needs `to_model_prices`; without it the answer is `400 model_price_unavailable`.
+- **Three-decimal currencies.** Margin revenue in KWD, BHD, OMR, JOD and TND keeps its third decimal (1.234 KWD reads 1.234, not 1.23). Usage revenue of less than a cent per event is added up before rounding, so new usage totals can differ by a few cents from before. Existing rows are unchanged.
+- **Pricing scenarios.** Charges the invoice alone cannot price again (prorated, pricing unit, dynamic, custom, percentage with per-transaction rules, and new filters) are now priced from the period's usage events. At most 500 billing periods per run are priced this way; a period whose events no longer match what was billed is kept at the billed amount.
+
 ### x402 readiness check and refunds
 
 _November 4, 2026_

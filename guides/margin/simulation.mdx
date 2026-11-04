@@ -86,7 +86,7 @@ Here `chat` costs 40.00 for 120000 units and earns 60.00 (a 33.33 percent margin
 }
 ```
 
-The cost of the groups on `from_model` becomes cost x (1 - share) plus the share's tokens re-costed at the `to_model` prices. `to_model_prices` is the price per 1,000,000 tokens in major units of the simulation currency, per bucket (`input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`). Without it the [shared price list](/guides/margin/shared-prices) is used (USD, per token). With neither, the call is a `400 model_price_unavailable`; a shared price in another currency than the simulation gives `400 price_currency_mismatch`.
+The cost of the groups on `from_model` becomes cost x (1 - share) plus the share's tokens re-costed at the `to_model` prices. `to_model_prices` is the price per 1,000,000 tokens in major units of the simulation currency, per bucket (`input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`). It is required: without it the call is a `400 model_price_unavailable`.
 
 This is an approximation. Tokens are summed per group and re-costed with the same bucket split the cost rating uses; the share that stays on `from_model` is assumed to cost in proportion to its current cost; batch-tier prices are not modelled. Groups of `from_model` without token data are left unchanged and listed as `no_token_data_groups`. Revenue sits on usage rows that may have no model, so per-model groups carry cost, while the by-customer and by-feature totals stay right.
 
