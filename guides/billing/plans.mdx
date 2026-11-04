@@ -54,12 +54,12 @@ A plan family can sell one plan per interval and currency, each at its own fixed
 
 ## Grace days and dunning
 
-_Unreleased (Core 11.16.0)._ A plan says how long a subscriber keeps access while one of its invoices stays unpaid. Set the grace days on the plan form under **Unpaid invoices**, or in the REST `plan` payload of `POST /plans` and `PUT /plans/{code}`. Pick the campaign on the plan form under **Dunning policy** (shown when your Nozle plan includes dunning), or through the API (REST `dunning_campaign_code`, GraphQL `dunningCampaignId`).
+A plan says how long a subscriber keeps access while one of its invoices stays unpaid. Set the grace days on the plan form under **Unpaid invoices** (the plan's page shows them in its **Overview** tab), or in the REST `plan` payload of `POST /plans` and `PUT /plans/{code}`. Pick the campaign on the plan form under **Dunning policy** (shown when your Nozle plan includes dunning), or through the API (REST `dunning_campaign_code`, GraphQL `dunningCampaignId`).
 
 | Field | Meaning |
 |---|---|
 | `unpaid_invoice_grace_days` | Days between day 0 of an unpaid invoice of the plan and the end action of its [dunning policy](/guides/billing/dunning). Whole days, 0 to 90, default 7. `0` blocks at once. |
-| `limit_grace_days` | Days after the unpaid invoice of an automatic upgrade at the plan's MRR limit. Whole days, 0 to 90, default 7. Nozle reads it for its own plans (see [Workspace billing](/guides/getting-started/workspace-billing#grace-a-and-grace-b)). The dunning policy of your customers reads `unpaid_invoice_grace_days` only. |
+| `limit_grace_days` | Days after the unpaid invoice of an automatic upgrade at the plan's MRR limit. Whole days, 0 to 90, default 7. Only Nozle's own workspace plans use it (see [Workspace billing](/guides/getting-started/workspace-billing#grace-a-and-grace-b)): an automatic upgrade at a limit exists only for Nozle's own workspaces, never for your customers, so the plan form does not offer it. The dunning policy of your customers reads `unpaid_invoice_grace_days` only. |
 | `dunning_campaign_code` | The dunning campaign the plan's unpaid invoices follow, before the customer's or the billing entity's. `null` unlinks it. An unknown code returns `404` `dunning_campaign_not_found`. |
 
 - A value outside 0 to 90 is refused with `value_is_out_of_range`.

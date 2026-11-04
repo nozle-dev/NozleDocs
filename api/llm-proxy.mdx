@@ -209,7 +209,7 @@ From Engine 2.34.0 the proxy enforces the customer's [spend limits](/guides/enti
 
 These come from Engine. Provider errors are returned unchanged, with the provider's status and body.
 
-From Engine 2.22.0 (_Unreleased_), every refusal of the proxy has the error shape of the provider the route targets, so the provider's SDK surfaces the code. The top-level `code` is kept. Before, the body was `{"code": "...", "error": "<message>"}`, with `error` a string.
+From Engine 2.22.0, every refusal of the proxy has the error shape of the provider the route targets, so the provider's SDK surfaces the code. The top-level `code` is kept. Before, the body was `{"code": "...", "error": "<message>"}`, with `error` a string.
 
 OpenAI routes:
 
@@ -249,7 +249,7 @@ Anthropic routes:
 | `401` | `unauthorized` | `invalid nozle key` | The key is unknown. |
 | `402` | `workspace_suspended` or `card_required` | | Your workspace is blocked by Nozle. See [Workspace billing errors](/api/errors#workspace-billing-errors). |
 | `402` | `insufficient_credits` | `the customer's credit balance does not cover the requested hold` | Engine 2.34.0. The `X-Nozle-Credit-Hold` amount is not covered by the customer's free credits. The provider is not called. |
-| `402` | `customer_payment_overdue` | `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` | _Unreleased (Engine 2.22.0)._ The customer is blocked by your [dunning policy](/guides/billing/dunning). The provider is not called. |
+| `402` | `customer_payment_overdue` | `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` | The customer is blocked by your [dunning policy](/guides/billing/dunning). The provider is not called. |
 | `402` | `budget_exceeded` | `the customer's hard spend limit is reached` | Engine 2.34.0. A hard [spend limit](#spend-limits) covering the Feature is used up. The body adds `budget`. The provider is not called. |
 | `402` | `budget_exceeded` | `the customer's hard spend limit does not cover the requested hold` | Engine 2.34.0. The `X-Nozle-Credit-Hold` estimate does not fit in a hard spend limit. The body adds `budget`. The provider is not called. |
 | `403` | `economic_policy_denied` | `the customer's margin policy denies this call` | A margin policy in `deny` mode refused the call. The provider is not called. |
@@ -262,4 +262,4 @@ Anthropic routes:
 | `502` | | Empty body | Engine could not reach the provider. |
 | `503` | `unavailable` | `API key verification is unavailable` | The key could not be verified. Retry later. |
 | `503` | `unavailable` | `subscription lookup is unavailable` | The subscription could not be looked up. The provider is not called. Retry later. |
-| `503` | `unavailable` | `customer payment state is unavailable` | _Unreleased (Engine 2.22.0)._ Whether the customer is blocked could not be read. The provider is not called. Retry later. |
+| `503` | `unavailable` | `customer payment state is unavailable` | Whether the customer is blocked could not be read. The provider is not called. Retry later. |

@@ -3,9 +3,9 @@ title: Dunning policy
 description: Grace, retries, reminders and the block of a customer whose invoices stay unpaid
 ---
 
-_Unreleased (Core 11.16.0, Engine 2.22.0)._ A dunning policy decides what happens to one of your customers while an invoice stays unpaid: when Nozle retries the charge, when it reminds the customer, and what it does when the grace ends. This page is about your customers. For what your own workspace pays Nozle, see [Workspace billing](/guides/getting-started/workspace-billing).
+A dunning policy decides what happens to one of your customers while an invoice stays unpaid: when Nozle retries the charge, when it reminds the customer, and what it does when the grace ends. This page is about your customers. For what your own workspace pays Nozle, see [Workspace billing](/guides/getting-started/workspace-billing).
 
-Automatic dunning is part of the Growth, Scale and Enterprise [Nozle plans](/guides/getting-started/nozle-plans#premium-features). On Starter the dashboard's dunning pages say that dunning is not on your plan, with a link to the plans. A customer excluded from dunning is never dunned.
+Automatic dunning is part of every [Nozle plan](/guides/getting-started/nozle-plans#premium-features), Starter included (from Core 11.41.2). Open **Billing > Dunning** in the dashboard to create a campaign. A workspace that has no Nozle plan sees "Dunning is not available". A customer excluded from dunning is never dunned.
 
 ## Turn the policy on
 
@@ -30,7 +30,7 @@ An invoice whose amount due is below the payment provider's minimum charge is ne
 
 ## The timeline
 
-Day 0 of an invoice is the day its charge failed, or the moment it is past its due date and has stayed unpaid for one hour without a charge waiting for the bank. A debit that is still processing (for example an Indian card during the bank's notice) is not a failure and does not start day 0.
+The first charge is tried as soon as the invoice is finalized, within seconds, not after a wait. Day 0 of an invoice is the day that charge failed, or the moment it is past its due date and has stayed unpaid for one hour without a charge waiting for the bank. A debit that is still processing (for example an Indian card during the bank's notice) is not a failure and does not start day 0.
 
 With the default grace of 7 days:
 
@@ -44,7 +44,7 @@ With the default grace of 7 days:
 | 7 | `end_action`: the customer is blocked. |
 | Any day | `resolved` once the invoice no longer needs paying. The block lifts at once. |
 
-For another grace, the reminder falls on `round(grace × 3 / 7)`, the final reminder on the day before the end, and the end action on the last day. Retries stay on days 1 and 5 when they fall before the end. With a grace of 0, day 0 runs the end action at once.
+For another grace, the reminder falls on `round(grace × 3 / 7)`, the final reminder on the day before the end, and the end action on the last day. Retries stay on days 1 and 5 when they fall before the end. With a grace of 0, the charge is still tried first: a customer whose charge succeeds is never blocked, and one whose charge fails is blocked on day 0 with no retries (the block lands at the next hourly run).
 
 Nozle never retries a charge that cannot succeed without the customer: an authentication request, no usable mandate, an amount above the mandate's ceiling, or no payment method at all. It never retries a hard decline either (for example a lost, stolen or expired card). Failures are classified from the payment provider's structured decline codes, never from message text. When the customer saves a new valid default payment method, every invoice of that customer the policy runs on is retried at once, and the block lifts as soon as they are paid. An Indian card whose mandate becomes inactive does not trigger this retry.
 

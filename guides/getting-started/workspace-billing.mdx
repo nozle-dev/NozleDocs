@@ -7,10 +7,6 @@ This page is about what your workspace pays Nozle. It never touches how you bill
 
 Your [sandbox](/guides/getting-started/sandbox) is free on every plan and never billed. It follows your live workspace: when the workspace is suspended, sandbox keys get the same `402`. Your plan, payment method and Nozle invoices are managed in live.
 
-<Note>
-No card at onboarding, the usage and payment method reminders, the per-plan grace, the retries on days 1 and 5 and the past-due rules are _Unreleased_ (Core 11.16.0 to 11.18.0, dashboard 2.4.0) until deployed. So are the Nozle card page and automatic charges of Indian cards through a mandate (see [India cards](#india-cards)).
-</Note>
-
 ## No card at onboarding
 
 A new workspace is not asked for a card, on any plan. It starts on Starter and the dashboard is usable at once.
@@ -107,7 +103,7 @@ The first failed-payment email and the reminder on day 3 say what to do, based o
 | `CONFIRM_PAYMENT` | Your bank asked you to confirm the payment (authentication needed, or the India mandate is missing, cancelled or not approved). | "Your bank asked you to confirm this payment". Use **Pay now** to confirm it with your bank. Nozle does not retry it: nothing happens until a member pays. |
 | `CHANGE_CARD` | The card will not work for this invoice (for example lost, stolen or expired). | "This card could not be charged". Use **Change card** to pay with another card. Nozle does not retry it. |
 | `RETRY_LATER` | The card may work later (for example insufficient funds). | "Declined or needs your approval". Nozle retries the card on days 1 and 5 (before the deadline), and you can pay at any time. |
-| `ADD_PAYMENT_METHOD` | No payment failed: the workspace has no payment method Nozle can charge (_Unreleased_). | Pay with the **Pay** link, or add a payment method. Nothing says a card was declined. |
+| `ADD_PAYMENT_METHOD` | No payment failed: the workspace has no payment method Nozle can charge. | Pay with the **Pay** link, or add a payment method. Nothing says a card was declined. |
 
 The final reminder and the suspension email do not promise a retry in any case.
 
@@ -157,5 +153,5 @@ Cards issued in India can be charged automatically after a one-time approval at 
 
 - **Bills up to about INR 15,000.** Charged automatically. The bank sends a notice 24 hours before the debit, so the payment stays **processing** for up to 26 hours. A processing payment does not start the failed-payment steps above.
 - **Bills above about INR 15,000** (or above the mandate maximum, whichever is lower) need your approval each time: approve the bank's notice before the debit, or the charge is declined. Use the **Pay** link in the email if you prefer to pay on the hosted page.
-- **Cards saved before the card page**, and cards whose mandate the bank refused or cancelled, have no active mandate. Their invoices are paid on the hosted **Pay** link or under **Nozle invoices**, as before. Add the card again to register a mandate. Paying through the **Pay** link registers one too when the card was issued in India (_Unreleased_).
+- **Cards saved before the card page**, and cards whose mandate the bank refused or cancelled, have no active mandate. Their invoices are paid on the hosted **Pay** link or under **Nozle invoices**, as before. Add the card again to register a mandate. Paying through the **Pay** link registers one too when the card was issued in India.
 - **When a charge fails** for a reason that retrying cannot fix (the bank needs you to act, the mandate is missing or cancelled, or the card is lost or expired), Nozle does not retry it: every member gets the **Pay** link at once and the failed-payment steps above still apply.
