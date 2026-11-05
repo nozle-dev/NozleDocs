@@ -1,0 +1,170 @@
+---
+title: Revenue metrics
+description: MRR, ARR, MRR movements, churn, NRR, GRR and cohorts, computed from your finalized invoices
+---
+
+Revenue metrics answer "how much recurring revenue do I have, and why did it change?" Nozle builds them from your finalized invoices, so the numbers match what you billed and not what a plan list price says.
+
+Before you use them:
+
+- Customers need finalized invoices. A customer that was never invoiced has no MRR.
+- The history is built nightly (23:45 UTC). A new workspace sees "Revenue history is being built; it appears after tonight's build." until the first build. In the API, `built_at` is `null` until then.
+- The screens need the `analytics:view` permission. The REST endpoints need a secret key (`sk_`) with `analytic:read`.
+- Available from Engine 2.52.0 and Core 11.40.0. The invoice-based history replaces the old analytics Data API, which Nozle no longer uses.
+
+Nothing here uses an LLM. Every number is arithmetic on invoice rows.
+
+## Where to see them
+
+| Screen | What it shows |
+|---|---|
+| **Reports > Overview** | **MRR**, **ARR** and **Last 12 months recurring revenue, through (month)** |
+| **Reports > Revenue** | **MRR and ARR** (trend), **MRR movements** (the bridge from last month to this month, with the customers behind each bar), **Churn**, **Net and gross revenue retention**, **Cohort retention** |
+
+Pick a reporting currency on the Revenue page. The same figures are in the [REST API](#rest-api) and GraphQL.
+
+## How MRR is computed
+
+MRR is **invoice-based, net of discounts, and excludes tax**. For each customer and month, Nozle looks at the customer's subscriptions that were active at the end of the month and takes the most recent invoiced period of each kind of fee.
+
+| Counts in MRR | Does not count |
+|---|---|
+| Subscription fees | Add-on (one-off) fees |
+| Fixed charges | Credits (wallet top-ups) |
+| Usage charges, including minimum true-ups | Draft, voided and progressive-billing invoices |
+| Minimum commitments | Tax |
+
+Only finalized invoices that are not voided and are not progressive-billing invoices are read. Progressive invoices are left out because the periodic invoice already holds the whole period.
+
+### Intervals become months
+
+Each fee is divided to one month, so an annual plan is not a spike in the month it is invoiced.
+
+| Plan interval | One invoiced period counts as |
+|---|---|
+| Weekly | 52 / 12 months of MRR (a weekly fee of 10 counts as 43.33 a month) |
+| Monthly | 1 |
+| Quarterly | 1 / 3 |
+| Semiannual | 1 / 6 |
+| Yearly | 1 / 12 |
+
+A prorated first or last period is scaled up to a full period before this division, so a customer who joined mid-month shows the plan's real MRR and not half of it. Usage charges count from the **last complete period**, so usage MRR lags the current month by one period.
+
+### Discounts, credit notes, trials and tax
+
+- **Coupons.** MRR is net of the coupon discount applied to each fee. A one-time coupon lowers the MRR of the period it was applied to, then MRR returns to normal.
+- **Credit notes.** A finalized, non-voided credit note lowers MRR by the amount it credits, after its share of any coupon. Credit notes whose reason is `order_change` or `order_cancellation` are not subtracted: those are the ones Nozle itself creates when a plan changes or a subscription ends, and the change shows up in MRR as a movement instead. A manual credit note, for example `product_unsatisfactory`, does reduce MRR.
+- **Trials.** A subscription in a trial whose subscription fee is zero is counted as **trialing**, not as paying, and none of its fees count. The Revenue page shows the number next to **Paying customers**. A paid trial counts as normal.
+- **Tax** is never included.
+- **Usage is included.** Usage charges are part of MRR here. Some tools exclude them by default; Nozle includes them because for usage-priced products they are most of the recurring revenue.
+- **Currencies.** MRR is stored in the invoice currency. When a report converts, both months of every comparison are converted at the same **month-end exchange rate** (today's rate for the month in progress), so a currency move never looks like growth or churn. If a currency has no rate yet, the request is refused with `503 fx_rate_unavailable` and the currencies that lack one, rather than showing wrong totals.
+- Active subscriptions count when they started before the end of the month and are still active, or ended on or after it. Pending and canceled subscriptions never count.
+
+## Movements
+
+A movement is what happened to one customer's MRR from one month to the next.
+
+| Movement | Meaning |
+|---|---|
+| **New** | MRR above zero this month, never paid before |
+| **Reactivation** | MRR above zero this month, paid in an earlier month, none last month |
+| **Expansion** | Paying in both months, MRR went up |
+| **Contraction** | Paying in both months, MRR went down |
+| **Churn** | Paying last month, MRR is zero this month |
+
+The bridge always adds up:
+
+```
+last month's MRR (at this month's rates) + new + reactivation + expansion - contraction - churn = this month's MRR
+```
+
+When customers pay in more than one currency, the **Exchange rates** line (`fx_adjustment_cents`) restates last month's MRR at this month's rates, so the rest of the bridge is free of currency moves. Select a bar to list the customers behind it, largest change first.
+
+## ARR and the last 12 months
+
+- **ARR = MRR x 12.** It is labelled "Annualized run rate (MRR x 12), not a forecast". On the Overview it is exactly the MRR figure times 12.
+- **Last 12 months recurring revenue** is the sum of the MRR of the last 12 **complete** months, each converted at its own month-end rate. It shows "through" and the last complete month, shows "—" when there is no complete month yet, and says "N months of history" while fewer than 12 months exist. It is a different figure from ARR and is never called ARR: ARR looks at the latest month and scales it, the trailing figure adds up what was actually recurring.
+
+## Churn, NRR, GRR and cohorts
+
+- **Logo churn** is the customers paying at the start of the month who stopped, divided by the customers paying at the start. Nozle shows the 95% Wilson interval beside it. **With fewer than 30 customers at the start of the month, only the interval is shown** (the page says "Too few customers for a point estimate"), because one customer more or less would otherwise swing the rate.
+- **Revenue churn** is (churn + contraction) divided by the starting MRR.
+- **NRR** (net revenue retention) is (starting MRR + expansion - contraction - churn) divided by the starting MRR, for the customers paying at the start. New customers and reactivations are not in it.
+- **GRR** (gross revenue retention) leaves expansion out: (starting MRR - contraction - churn) divided by the starting MRR, so it never exceeds 100%.
+- **Trailing 12 months.** NRR and GRR also compare the customers paying 12 months earlier with their MRR now. GRR caps each customer at what it paid back then. They appear once the history is at least 13 months long.
+- A rate has no value when there was no starting MRR to divide by.
+- **Cohorts** group customers by the month of their first MRR. Each row shows how many of them (**Customers**) or how much of their starting MRR (**MRR**) is still paying in month 0, 1, 2 and later. MRR retention can pass 100% when a cohort expands. A customer that churns and returns counts again in the later months it pays.
+
+## Worked example
+
+Four customers, all in USD on monthly plans (illustrative numbers).
+
+| Customer | September | October | Movement |
+|---|---|---|---|
+| A | 100 | 100 | none |
+| B | 200 | 250 | expansion +50 |
+| C | 300 | 0 | churn -300 |
+| E | 400 | 400 | none |
+| D | 0 | 150 | new +150 |
+| **MRR** | **1,000** | **900** | |
+
+- Bridge: 1,000 + 150 (new) + 0 (reactivation) + 50 (expansion) - 0 (contraction) - 300 (churn) = 900.
+- ARR in October: 900 x 12 = 10,800.
+- NRR: (1,000 + 50 - 300) / 1,000 = 75%. GRR: (1,000 - 0 - 300) / 1,000 = 70%.
+- Logo churn: 1 of 4 customers, a Wilson interval of about 4.6% to 69.9%. With only 4 customers the page shows that range and no single rate.
+- An annual plan of 1,200 invoiced in January adds 100 of MRR every month from January, not 1,200 in January.
+
+## Known limits
+
+- A **manual credit note** reduces MRR, and a one-time coupon always reduces the MRR of its period. Other tools ignore one-off refunds.
+- A customer whose only recurring revenue is usage, with a month of zero usage, reads as churned that month and reactivated the next.
+- Nozle assumes one billing currency per customer. A customer invoiced in two currencies would have both summed into the first.
+- The history is as fresh as the last nightly build. The Revenue page's bridge shows a warning if its movements differ from the month's MRR before the next build.
+
+## REST API
+
+All endpoints are on the Engine (`https://api.nozle.app/engine/api/v1`), take a secret key with `analytic:read`, and use months as `YYYY-MM`. Amounts are integer cents, in the reporting `currency` (the organization's default when omitted).
+
+| Endpoint | Query | Returns |
+|---|---|---|
+| `GET /revenue/mrr` | `from`, `to`, `currency` | The bridge of every month: `months[]`, and `by_currency[]` with the same rows per billing currency, unconverted |
+| `GET /revenue/movements` | `month`, `type`, `currency` | The customers behind one month's movements, largest change first. `type` is `new`, `reactivation`, `expansion`, `contraction` or `churn` |
+| `GET /revenue/retention` | `from`, `to`, `currency` | Per month: logo churn with its interval, revenue churn, NRR, GRR and their trailing 12-month versions |
+| `GET /revenue/cohorts` | `from`, `to`, `currency` | Per first-paid month: the cohort size, starting MRR and a cell per later month |
+
+`from` and `to` default to the 12 months ending with the last built month; a later `to` is clamped to it. A range covers at most 120 months. A bad month answers `400 invalid_month`, a bad `type` answers `400 invalid_type`, a currency without a rate answers `503 fx_rate_unavailable`, and an unavailable store answers `503 analytics_unavailable`.
+
+```bash
+curl "https://api.nozle.app/engine/api/v1/revenue/mrr?from=2026-09&to=2026-10&currency=USD" \
+  -H "Authorization: Bearer sk_nozle_your_secret_key"
+```
+
+A month of the `months` array, with the worked example's October numbers (shortened, illustrative):
+
+```json
+{
+  "month": "2026-10",
+  "mrr_cents": 90000,
+  "previous_mrr_cents": 100000,
+  "starting_mrr_cents": 100000,
+  "fx_adjustment_cents": 0,
+  "new_cents": 15000,
+  "reactivation_cents": 0,
+  "expansion_cents": 5000,
+  "contraction_cents": 0,
+  "churn_cents": 30000,
+  "paying_customers": 4,
+  "starting_paying_customers": 4,
+  "new_customers": 1,
+  "churned_customers": 1,
+  "trialing_customers": 0,
+  "ttm_recurring_cents": 190000,
+  "ttm_months": 2
+}
+```
+
+Contraction and churn are positive numbers that are subtracted. The row also has `reactivated_customers`, `expanded_customers` and `contracted_customers`. `ttm_recurring_cents` is the trailing figure above (this month's MRR and the 11 months before it) and `ttm_months` how many of those 12 months exist.
+
+In `GET /revenue/retention`, `logo_churn` is `{rate, lower, upper}` with `rate` `null` below 30 starting customers; `revenue_churn`, `nrr`, `grr`, `nrr_trailing_12m` and `grr_trailing_12m` are fractions (0.75 is 75%) and `null` without a base. `GET /revenue/cohorts` cells carry `offset`, `month`, `customers`, `mrr_cents`, `logo_retention` and `mrr_retention`, converted at the rates of the last month requested.
+
+The same data is in GraphQL as `nozleRevenueMrr`, `nozleRevenueMovements`, `nozleRevenueRetention` and `nozleRevenueCohorts` (cents are `BigInt`, rates are nullable `Float`). For the numbers that look ahead, see the [revenue and margin forecast](/guides/margin/forecast).

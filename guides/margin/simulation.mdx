@@ -5,7 +5,7 @@ description: Replay real usage with a different price, cost, model or limit and 
 
 A margin simulation replays the recorded usage of a past window with up to 20 changes and shows the result before and after. It is read only: no price, plan, limit or policy changes.
 
-Run one in the dashboard under **Margin simulation**, with [`POST /margin/simulations`](/api/margin-simulations), or with the GraphQL query `nozleMarginSimulation`.
+Run one in the dashboard under **Plan and simulate > Margin simulation**, with [`POST /margin/simulations`](/api/margin-simulations), or with the GraphQL query `nozleMarginSimulation`.
 
 ```bash
 curl -X POST https://api.nozle.app/engine/api/v1/margin/simulations \
@@ -217,3 +217,5 @@ Read the result:
 A `high` back-test on a change like the one you plan to make is a reason to trust the simulation more. It proves nothing about changes of another size or on other customers.
 
 For the arithmetic behind margin and percent see the [margin worked example](/guides/margin/worked-example).
+
+A margin simulation re-prices recorded usage. To see what a plan change would have done to your real closed invoices, use [pricing scenarios](/guides/margin/pricing-scenarios). To see where revenue, cost and margin are heading, see the [forecast](/guides/margin/forecast).

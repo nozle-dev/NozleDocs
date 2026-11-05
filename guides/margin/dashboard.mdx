@@ -74,14 +74,7 @@ curl -X POST https://api.nozle.app/engine/api/v1/margin/simulate \
   -d '{ "metric_code": "agent_execution", "new_price_dollars": 1 }'
 ```
 
-**Forecast** — projected daily revenue, cost and margin for the 30 days after the range (REST only):
-
-```bash
-curl https://api.nozle.app/engine/api/v1/margin/forecast \
-  -H "Authorization: Bearer sk_nozle_..."
-```
-
-The forecast fits a straight line to the daily totals of the range (by default the last month) and returns 30 daily `points`, starting on the first UTC day the history does not reach: with a plain `to` date such as `2026-10-15` (which includes that day, so the range ends at `2026-10-16T00:00:00Z`) the first point is `2026-10-16`; an RFC3339 `to` at midnight starts on that day; a `to` with a time of day, such as the default range's end (now), starts on the next day, so the default forecast starts tomorrow. `projected_revenue`, `projected_cost` and `projected_margin` are integer cents, although their names have no `_cents` suffix. `confidence` is `low`, `medium` or `high`, depending on how many days of the range have events. With fewer than 2 such days, `points` is an empty array and `confidence` is `low`.
+**Forecast.** The 30-day straight-line `GET /margin/forecast` was removed in Engine 2.52.0. Use the [revenue and margin forecast](/guides/margin/forecast): MRR, ARR, revenue, cost and margin for the next 3, 6 or 12 months, each as Low, Expected and High, with `GET /revenue/forecast`.
 
 Every endpoint accepts optional `from` and `to` parameters. Use a `YYYY-MM-DD` date or an RFC3339 timestamp (`2026-07-01T09:30:00Z`). A plain date `to` includes that whole day, while an RFC3339 `to` is an exclusive instant. The Python and Go SDKs send the same values as `from_date` and `to_date`, which the API accepts as aliases. These four names, and `granularity` on the trend, are the only query parameters the endpoints read. Other query parameters are ignored without an error.
 
