@@ -1,0 +1,155 @@
+---
+title: Revenue and margin forecast
+description: Where MRR, ARR, revenue, cost and margin are likely to be in the next 3, 6 or 12 months, with a Low, Expected and High range and honest data gates
+---
+
+The forecast shows where your recurring revenue, cost and margin are likely to be in the coming months. It gives a range instead of a single number, tells you how accurate past forecasts were, and says "Not enough data yet" instead of guessing when your history is too short.
+
+Before you use it:
+
+- You need [invoice-based MRR](/guides/margin/revenue-metrics). The forecast starts from the last complete month of it, so a workspace needs at least 3 complete months of invoices and 10 paying customers for the first number.
+- Cost and margin need recorded cost, for example rated from your [Cost Sheets](/guides/margin/cost-models). Without it you still get a revenue forecast.
+- The screen is **Plan and simulate > Forecast** and needs the `analytics:view` permission. The REST endpoint needs a secret key with `analytic:read`.
+- Available from Engine 2.52.0 and Core 11.40.0. It replaces the 30-day straight-line `GET /margin/forecast` and the GraphQL `nozleMarginForecast`, which were removed.
+
+**No calculation here uses an LLM.** The forecast is statistics on your own history: counting, medians and a simulation with a fixed random seed. The same data always draws the same range.
+
+## What you see
+
+Pick a **Horizon** (3, 6 or 12 months) and a **Currency**. The page shows:
+
+| Panel | What it holds |
+|---|---|
+| **MRR, ARR, Revenue, Cost, Margin forecast** | A chart of actuals (solid), the Expected forecast (dashed) and the shaded likely range. Switch the measure with the toggle. |
+| **Forecast by month** | A table with **Low**, **Expected** and **High** for each month and measure, and **Export CSV** (`*_low`, `*_expected`, `*_high` columns in major units, empty where there is no number yet) |
+| **Accuracy and method** | How the forecast did on past months, and the method used |
+| **Churn assumed** | Monthly customer churn with its 95% range |
+| **Data the forecast needs** | Each gate with **Ready** or **Not enough data yet** |
+
+The first forecast month is the month after the last complete month. ARR is the MRR forecast x 12. **Revenue** equals the MRR forecast (the forecast has no one-off revenue), so the table leaves its column out when it would repeat MRR; the CSV keeps it.
+
+## Low, Expected and High
+
+- **Expected** is the point forecast: the most likely middle outcome.
+- **Low** and **High** bound the likely range. Nozle simulates 1,000 possible futures, finds how far the 10th and the 90th percentile of those futures lie below and above their median, and puts Low and High that far from Expected. About 8 in 10 simulated futures fall between them. Low and High of MRR, ARR, revenue and cost never go below zero; margin can be negative.
+- Each simulated future replays the coming months using months drawn from the last 6 (in blocks of 2 consecutive months) for churn, expansion and new customers. Your 20 largest customers are followed one by one, so each one either churns or stays as a whole. Usage revenue is drawn from the last 3 months.
+- A month has the same range whichever horizon you pick; the horizon only decides how many months are shown.
+
+## How the forecast is built (`retention_v1`)
+
+1. **Start** from each paying customer's recurring MRR in the last complete month. Usage MRR is handled separately.
+2. **Each month**, recurring MRR is multiplied by (1 - the churn hazard) and by (1 + the median net expansion).
+   - The **churn hazard** is MRR-weighted: the recurring MRR of customers who stopped, divided by the recurring MRR of customers who were paying, over the trailing 6 months. It is split by customer age (under 3 months, 3 to 11 months, 12 months or more) from 30 paying customers, and pooled below that. If no MRR was at risk it falls back to the share of customers lost.
+   - **Net expansion** is the median monthly growth of the recurring MRR of customers who stayed, over the trailing 6 months.
+3. **New customers** add the trailing 3 months' average of new and reactivated recurring MRR each month. From the next month they churn and expand like everyone else.
+4. **Usage MRR** is held flat at its trailing 3-month average. It has no churn and no growth.
+5. **Seasonality.** With 24 or more months of history, seasonal multipliers (each calendar month's MRR against a centred 12-month average) are applied. With fewer, the forecast leaves seasonality out.
+6. **Cost** follows either revenue (the trailing 3 months' cost as a share of MRR, applied to the forecast) or the trailing monthly average cost. Nozle picks whichever had the smaller error in the back-test, and the page says which. **Margin** is the revenue forecast minus the cost forecast, so the three always add up.
+
+Amounts are in the currency you pick. History is converted at today's exchange rate so a currency move never reads as growth.
+
+### Worked example
+
+A workspace with 10,000 of recurring MRR, a churn hazard of 3% a month, median net expansion of 1%, 400 of new MRR a month and 500 of flat usage MRR. Cost has been 20% of revenue. (Illustrative round numbers; the simulated range cannot be redone by hand.)
+
+| Step | Month 1 | Month 2 |
+|---|---|---|
+| Recurring MRR carried in | 10,000 | 10,197 |
+| After churn (x 0.97) | 9,700 | 9,891.09 |
+| After expansion (x 1.01) | 9,797 | 9,990.00 |
+| Plus new customers | 10,197 | 10,390 |
+| Plus usage MRR | **10,697** | **10,890** |
+
+- Expected MRR is 10,697 in month 1 and 10,890 in month 2. Expected ARR in month 1 is 10,697 x 12 = 128,364.
+- Expected cost in month 1 is 20% x 10,697 = 2,139.40, so expected margin is 10,697 - 2,139.40 = 8,557.60.
+- The simulation might then give a month 1 range of Low 10,150 and High 11,200 around the Expected 10,697.
+
+## Data gates
+
+A number whose gate is not met is hidden. The screen says **Not enough data yet: X of Y** (for example "Not enough data yet: 6 of 12 complete months" or "4 of 10 paying customers"), and **Data the forecast needs** lists every gate.
+
+| Forecast | Needs |
+|---|---|
+| MRR, ARR and revenue, 3 months | At least 3 complete months and at least 10 paying customers in the last complete month |
+| 6 months | At least 6 complete months, and the 3-month gate met |
+| 12 months | At least 12 complete months, and the 6-month gate met |
+| Seasonality | 24 complete months |
+| Churn point rate | 30 customers paying at the start of the churn window. Below that you see the range only. |
+| Cost | At least 1 complete month with recorded cost, and the MRR forecast available (cost follows revenue) |
+| Margin | Both the revenue forecast and the cost forecast available |
+
+So a workspace with 8 complete months and 12 paying customers sees the first 6 months of a 12-month forecast, and "Not enough data yet: 8 of 12 complete months" for months 7 to 12. "Churn assumed" says "Not enough data yet: churn needs at least two complete months" until there are two.
+
+The forecast only counts complete months. The month in progress is never part of the history, and a workspace whose revenue history has not been built yet sees "The forecast is being built tonight; it appears after tonight's build."
+
+## Accuracy and the fallback
+
+Nozle tests the method on your own past before showing it. A rolling back-test forecasts from every earlier month that has at least one month of change behind it, and compares each forecast with what happened. It also compares the same months against the simplest forecast: **next month equals this month** (the naive forecast).
+
+- The accuracy line reads "Back-tested on N past forecasts; X% better than assuming no change". X is 1 minus the ratio of the model's total error to the naive forecast's total error. The API field is called `mase`; it is that error ratio, not the textbook scaled error, and below 1 means better than naive.
+- **If the model is not better than naive** (ratio of 1 or more), Nozle returns the naive forecast instead: Expected MRR stays at last month's value, and the range shows how far recent months have moved it. The page says "Showing the no-change forecast", `method` is `naive_v1` and the warning is `forecast_not_better_than_naive`.
+- Young workspaces often land on the fallback, because the back-test has few months and the model has little to learn from.
+- While no forecast is shown (a gate is not met), there is nothing to back-test: the accuracy line says it is measured once there are enough past months, and `accuracy` is `null`.
+
+### Warnings
+
+| Warning | When | Effect |
+|---|---|---|
+| `few_paying_customers` | Fewer than 30 paying customers | `low_confidence` is `true`. Read the range, not only the middle line. |
+| `customer_concentration` | One customer is more than 30% of MRR | `low_confidence` is `true`, and the page shows the share. Losing that customer would move the forecast a lot. |
+
+## What the forecast does not do
+
+- **Churn is applied to dollars,** so it assumes churn is not tied to customer size. MRR weighting reduces the bias from small customers leaving, and the 20 largest customers are simulated one by one in the range, but a few large customers can still make the real result land outside it.
+- **Usage MRR is a flat run-rate.** It has no churn or growth, which matters most when usage is most of your revenue.
+- **The range ignores uncertainty in the rates themselves** and learns from only the last 6 months, so it can be narrow for a small workspace.
+- **Customer age buckets switch on all at once** at 30 paying customers.
+- **New MRR is a flat 3-month average.** A coming launch, campaign or sales push is not known to it.
+- **Planned changes are not modelled.** A [pricing scenario](/guides/margin/pricing-scenarios) you have applied, a price rise or a plan migration only shows up once it reaches invoices.
+- **Revenue is the MRR forecast.** One-off fees are not forecast.
+
+## REST API
+
+`GET /revenue/forecast` on the Engine (`https://api.nozle.app/engine/api/v1`). Query: `horizon` (`3`, `6` or `12`, default `12`) and `currency` (the organization's default when omitted). A different `horizon` answers `400 invalid_horizon`; a currency without a rate answers `503 fx_rate_unavailable`.
+
+```bash
+curl "https://api.nozle.app/engine/api/v1/revenue/forecast?horizon=6&currency=USD" \
+  -H "Authorization: Bearer sk_nozle_your_secret_key"
+```
+
+Amounts are integer cents as **strings**. A band is `null` while its gate is not met.
+
+```json
+{
+  "currency": "USD",
+  "as_of": "2026-10",
+  "built_at": "2026-11-05T23:45:11Z",
+  "horizon": 6,
+  "method": "retention_v1",
+  "cost_method": "cost_ratio",
+  "low_confidence": false,
+  "concentration_top1": 0.12,
+  "warnings": [],
+  "accuracy": {"mase": 0.69, "backtest_points": 41},
+  "churn": {"window_months": 6, "customers_at_start": 48, "rate": 0.021, "lower": 0.012, "upper": 0.036},
+  "gates": [
+    {"metric": "mrr", "horizon": 3, "met": true, "have": 14, "need": 3, "unit": "months"},
+    {"metric": "mrr", "horizon": 3, "met": true, "have": 48, "need": 10, "unit": "paying_customers"},
+    {"metric": "seasonality", "horizon": null, "met": false, "have": 14, "need": 24, "unit": "months"}
+  ],
+  "months": [
+    {
+      "month": "2026-11",
+      "mrr": {"p10": "1015000", "p50": "1069700", "p90": "1120000"},
+      "arr": {"p10": "12180000", "p50": "12836400", "p90": "13440000"},
+      "revenue": {"p10": "1015000", "p50": "1069700", "p90": "1120000"},
+      "cost": {"p10": "198000", "p50": "213940", "p90": "231000"},
+      "margin": {"p10": "810000", "p50": "855760", "p90": "901000"}
+    }
+  ]
+}
+```
+
+(Shortened and illustrative. `p10` is Low, `p50` is Expected and `p90` is High.) The gates are `mrr` (one per horizon, and for the 3-month gate one for months and one for paying customers), `seasonality`, `churn`, `cost` and `margin`. `concentration_top1` is the largest customer's share of MRR. `churn.rate` is `null` below 30 customers; `lower` and `upper` stay. `accuracy` is `null` while no forecast is shown, and `cost_method` is `null` while the cost gate is not met.
+
+The same data is in GraphQL as `nozleRevenueForecast(horizon, currency)`. For the history the forecast starts from, see [revenue metrics](/guides/margin/revenue-metrics); to ask what a price change would do instead, see [margin simulation](/guides/margin/simulation) and [pricing scenarios](/guides/margin/pricing-scenarios).

@@ -1,0 +1,166 @@
+---
+title: Pricing scenarios
+description: Replay a plan price change on your real closed invoices, see what each customer would have paid, then apply it with notice
+---
+
+A pricing scenario answers "what would my customers have paid last quarter if the plan had cost this?" You edit a copy of a plan, Nozle prices your **closed, finalized past invoices** again with the change, and shows the difference per customer next to what was actually billed, with a check of how faithful the replay is. When you like the result, you apply the scenario: it saves the next version of the plan and moves customers to it with notice.
+
+This is different from a [margin simulation](/guides/margin/simulation), which re-prices recorded usage events and never touches billing rules. A scenario runs the plan's own charge models over the quantities of real invoices, so tiers, free units, minimums, commitments and coupons behave as they do when billing.
+
+Before you use it:
+
+- The plan needs closed, finalized subscription invoices in the window. A run on a window without any shows "No closed billing period to compare yet".
+- Reading needs the `plans:view` permission. Creating, editing, running and applying need `plans:update`.
+- Scenarios are in the dashboard under **Plan and simulate > Pricing scenarios** and in GraphQL. There is no REST endpoint.
+- Available from Core 11.40.0. Charges that need the period's usage events are priced from them from Core 11.41.0, and a run that priced nothing cannot be applied from Core 11.41.1. Cost per customer needs Engine 2.52.0.
+
+**No calculation here uses an LLM.** A run is the billing code applied to stored invoice quantities and events. Nothing is estimated or generated, and nothing is written while a run replays: no invoice, fee or event changes.
+
+## The flow
+
+1. **Start.** Choose **New scenario**, pick a plan and select **Start from this plan**, or select **Simulate on past data** in the plan editor. The scenario starts as a copy of the plan's **current** version.
+2. **Edit the draft plan.** Change the price, charges, tiers, commitment, trial or interval. In **Setup** you can add coupons the scenario applies, and choose who moves when you apply. A scenario cannot change the plan's currency.
+3. **Run.** Pick a **Window** (**Last N closed months**, 1 to 12, 3 by default) and select **Run**. The run is a background job; the page updates while it works (**Queued**, **Running**, then **Finished**, **Failed** or **Failed the fidelity check**).
+4. **Read the result.** Check the fidelity panel first, then the change per customer.
+5. **Apply** (optional). Choose the notice, the effective day and who moves.
+
+You can run again with another window, edit the draft and run again, or **Compare runs** (up to 5) side by side. **Archive** a scenario you will not use: it can no longer be run, edited or applied, and its runs stay readable.
+
+A scenario can only start from the plan's current catalog version. A customer's custom-priced plan is refused with `plan_is_an_override` and an older version with `plan_version_not_current`.
+
+## What a run does
+
+For every subscription of the plan (and of its custom-price overrides) that has a closed, finalized invoice in the window, Nozle replays each past billing period **twice**:
+
+1. **Baseline.** The plan as it is now. This proves the replay: it should give back what was billed.
+2. **Scenario.** The same periods with your edits.
+
+Rules of the window:
+
+- Only **closed** periods of finalized subscription invoices (starting, periodic and terminating) are replayed. Add-on, one-off, advance-charge and progressive-billing invoices are not rows; the periodic invoice already holds the whole period.
+- A window is at most **12 months**, UTC, and must end before today. Longer windows are refused with `window_over_12_months`, and a window in the future with `in_the_future`.
+- A customer with custom pricing on the plan keeps it in the scenario (the result carries a note), because a version migration never moves custom pricing.
+
+The result is one row per customer, subscription and month, **before tax**, in the plan's currency: **Billed** (what the invoices said), **Current plan** (the baseline), **Scenario**, **Change** (scenario minus baseline) and **Change %**. The headline is the scenario against the baseline, not against billed.
+
+### Assumptions
+
+- **Customers do not change behaviour.** Same usage, same coupons, no churn, no upgrades.
+- **Cost does not change.** Nozle reads each customer's cost per month once from your recorded cost, in the plan's currency. A pricing change does not change cost, so margin after is the scenario revenue minus the same cost.
+- **Months without recorded cost show "Cost not tracked".** Margin is computed only over the months that have cost and says so: "Margin over 2 of 3 months with tracked cost". If no month has cost, margin is not shown. Cost recorded in another currency is not converted; a note shows it ("Cost in EUR not included").
+- **New charges add nothing to the past.** A charge that is new in the scenario has no past usage to replay, so it adds nothing to past months. The run says how many.
+- **Coupons are replayed.** Coupons the invoices applied are applied again, in order, on the replayed amount. A coupon the scenario adds is replayed as if applied before the first period: a once coupon until it is used up, a recurring one for its number of periods, a forever one on every period.
+
+## The fidelity check
+
+Every run proves itself by replaying the current plan and comparing it with the invoices.
+
+- **Amount reproduced** is 1 minus the total of |replayed - billed| divided by the total billed, coupons included.
+- **Fees reproduced** is the share of fees that came out to the cent.
+
+| State (badge) | Rule | What you see |
+|---|---|---|
+| `ok` (**Fidelity OK**) | At least **99.5%** of the amount **and** at least **98%** of the fees | "The replay matches what was billed." Numbers can be relied on. |
+| `low_fidelity` (**Low fidelity**) | At least **95%** of the amount, but not `ok` | "The replay is close, not exact." Treat the numbers as an estimate. The 20 largest differences are listed. |
+| `failed` (**Fidelity failed**) | Below **95%** of the amount | No change is shown, because it could not be trusted. The run ends **Failed the fidelity check**. Shorten the window to recent months, or months without the listed differences, and run again. |
+| `no_data` (**No data**) | No closed billing period was replayed | Nothing to compare, no change shown, and the scenario cannot be applied. |
+
+For example, a run of 200 fees where 195 come out exact and the amounts differ by 0.2% in total reaches 99.8% of the amount but only 97.5% of the fees, so it is `low_fidelity`, not `ok`.
+
+**A fee Nozle cannot price again counts as not reproduced and its whole amount counts as error.** It is kept at its billed amount in both the baseline and the scenario, and the run lists it under "Fees kept at their billed amount". If those fees are more than 5% of the billed amount (together with any other difference), the run fails the check.
+
+Each customer row also has its own badge: **Exact**, **Partial** (some fees kept at their billed amount) or **Mismatch**.
+
+## What can be priced
+
+| How | Charges |
+|---|---|
+| **Exactly, from the quantities stored on each past fee** | Standard, graduated, volume, package and graduated percentage charge models; percentage charges without per-transaction rules; base fee with proration and trials (the scenario's trial length is applied to the past); fixed charges (not prorated); minimum-amount true-ups; minimum commitments that one invoice holds whole; coupons |
+| **From the period's usage events** (Core 11.41.0) | Prorated charges, charges in a custom pricing unit (without a minimum), dynamic and custom charges, percentage charges with per-transaction rules (free events, per-transaction minimum or maximum), and new or changed filters |
+| **Kept at the billed amount, with a reason shown** | Pay-in-advance charges with tiers or allotments, an interval change on a metric that does not add up across periods (a maximum or a unique count) or on a charge with tiers, new filters on the enriched event store, prorated fixed charges, a pricing-unit charge with a minimum, and a minimum commitment that spans several periods |
+
+How event pricing works: Nozle runs billing's own charge service on an unsaved copy of the charge, inside a transaction that is rolled back, reading the events where billing reads them. No fee is saved and no plan is locked. Two safety rules apply:
+
+- A run prices at most **500** subscription periods this way. Beyond that, charges stay at the billed amount with the reason `event_replay_cap`. Pick a shorter window or fewer customers.
+- If the events found for a period do not match the events it billed (some were deleted or arrived late), the charge stays at the billed amount with the reason `events_unavailable`.
+
+When you change the interval, the base fee is prorated to each past period (a note says so).
+
+## Apply
+
+**Apply** saves the scenario as version N+1 of the plan and starts a [version migration](/guides/billing/plan-versions) of the customers you choose. **Nothing is charged** when it runs: customers are billed the new price from their first period on the new version.
+
+### When a scenario can be applied
+
+The scenario can only be applied when all of these hold:
+
+| Refusal | Why |
+|---|---|
+| `pricing_scenario_not_draft` | It was already applied or archived. |
+| `latest_run_not_succeeded` | The latest run is still running, failed, or failed its fidelity check. |
+| `run_priced_nothing` | The latest run replayed no billing period, so it shows no impact. Run it on a window with closed periods. |
+| `latest_run_stale` | The scenario was edited after its last run. Renaming the plan does not make a run stale; a pricing change does. |
+| `plan_changed_since_run` | The plan's pricing changed after the run. |
+| `plan_version_not_current` | The plan has a newer version than the one the scenario started from. |
+
+So you can only apply the replay you actually saw. Apply never needs a second approver: anyone with `plans:update` applies, and the scenario records who applied it (`appliedByUserId`), when (`appliedAt`), the new version (`appliedPlan`) and its migration.
+
+### Notice and effective day
+
+In the **Apply** dialog:
+
+- **Notice** (0 to 365 days) is how far ahead customers are told. The **Effective day** may not be earlier than today plus the notice, otherwise the call is refused with `notice_too_short`.
+- **Who moves** is every subscription on the version, or only the customers you pick. Customers who are not picked stay on their version. The subscriptions considered are fixed at the moment you apply: a subscription created on the old version later is not moved. Choosing who moves needs no new run.
+- Each subscription moves at its **first billing-period boundary on or after the effective day**, like a scheduled downgrade. New sign-ups get the new version right away.
+- A subscription whose current period ends **before** the effective day **waits**: its migration item is `waiting`, and it is moved when its first period after the effective day ends. The migration stays `running` while any item waits, and an hourly job resumes it, so a long notice never leaves it stuck.
+- Subscriptions that are not eligible (custom pricing, in a trial the new version would change, with another change already scheduled, and so on) are skipped with the reasons listed in [plan versioning](/guides/billing/plan-versions#move-subscribers-to-a-newer-version).
+- Coupons you added in the scenario are applied on the effective day.
+
+### Price increases need your confirmation
+
+The run measured, for every replayed subscription, whether the scenario made its bill go up, down or stay the same. If any customer who would move pays more, or would go above the limit of their auto-pay mandate, Apply is refused until you confirm: tick **I confirm these customers move to a higher price** in the dialog, or send `allowPriceIncrease: true`. Without it the call answers `price_increase_not_allowed`.
+
+### The customer email
+
+Each customer who moves gets one **price change scheduled** email per subscription with the new price and the day it starts, sent once per subscription when the move is scheduled or starts waiting (and not for a customer whose bill the run measured as unchanged). It is controlled by the `subscription.price_change_scheduled` setting of the billing entity. It is **on by default for billing entities created from Core 11.40.1**; a billing entity created earlier keeps its setting, which is off unless you turned it on. See [customer emails](/guides/settings/customer-emails). No email goes to a customer who has no email address.
+
+## Worked example
+
+Plan **Pro**: a 50 monthly base fee and 0.02 per unit (standard charge model). The scenario raises the base fee to 55 and the unit price to 0.025. One customer used 2,000, 3,000 and 1,000 units in August, September and October, and cost you 30, 45 and 15 in those months. (Illustrative round numbers.)
+
+| Month | Units | Billed and current plan | Scenario | Cost |
+|---|---|---|---|---|
+| August | 2,000 | 50 + 0.02 x 2,000 = 90 | 55 + 0.025 x 2,000 = 105 | 30 |
+| September | 3,000 | 50 + 0.02 x 3,000 = 110 | 55 + 0.025 x 3,000 = 130 | 45 |
+| October | 1,000 | 50 + 0.02 x 1,000 = 70 | 55 + 0.025 x 1,000 = 80 | 15 |
+| **Total** | | **270** | **315** | **90** |
+
+- The baseline gives 270, exactly what was billed: 100% of the amount and of the fees, so the state is `ok`.
+- Change: 315 - 270 = **+45**, which is +16.7% of 270. This customer is counted under **Customers paying more**.
+- Margin before: 270 - 90 = 180 (66.7%). Margin after: 315 - 90 = 225 (71.4%).
+- To apply it with 30 days of notice, the effective day must be at least 30 days from today. Because this customer pays more, Apply asks for the price increase confirmation first.
+
+## Known limits
+
+- Scenarios replay **closed** periods only. The period in progress and any usage not yet invoiced is not in the result.
+- A window is at most 12 months and a run prices at most 500 subscription periods from events.
+- Customer behaviour is not modelled. A price rise loses no customer in the result.
+- Pay-in-advance charges with tiers, interval changes on some meters, prorated fixed charges, new filters on the enriched event store, pricing-unit charges with a minimum and multi-period commitments are kept at the billed amount. They count against fidelity.
+- Changing the plan's currency is not supported (`currency_change_not_supported`).
+- Cost changes are not part of a scenario yet. Use a [margin simulation](/guides/margin/simulation) for cost and model questions.
+- Costs recorded in another currency than the plan's are shown as a note and not converted.
+- Subscriptions on custom pricing keep it.
+
+## GraphQL
+
+| Operation | Purpose |
+|---|---|
+| `pricingScenarios`, `pricingScenario(id)` | List and read scenarios with their runs (`latestRun`, `fidelity`, `coverage`, `totals`, `summary`, `stale`) |
+| `pricingScenarioRunResults`, `pricingScenarioRunCustomers` | One row per subscription and month, or per customer, of a run |
+| `pricingScenarioComparison` | Up to 5 runs side by side (`too_many_runs` above that) |
+| `createPricingScenario` | `basePlanId`, `name`, `planParams` (the shape of `updatePlan`), optional `couponChanges` and `migrationSelection` |
+| `updatePricingScenario` | Edit a draft |
+| `runPricingScenario` | `id`, `from`, `to` (at most 12 months, not in the future) |
+| `applyPricingScenario` | `id`, `effectiveAt`, `noticeDays` (default 0), `allowPriceIncrease` (default `false`) |
+
+A run's `fidelity.state` is `ok`, `low_fidelity`, `failed` or `no_data`; its `status` is `queued`, `running`, `succeeded`, `failed` or `failed_fidelity`. A failed run has `errorCode`: `timeout` (try a shorter window) or `replay_error` (a shorter window will not help). For what each part of a plan version migration does after Apply, see [plan versioning](/guides/billing/plan-versions). To see where revenue is heading before you change a price, see the [forecast](/guides/margin/forecast).
