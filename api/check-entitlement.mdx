@@ -131,7 +131,7 @@ From Engine 2.34.0, `/can` also checks the [spend limits](/guides/entitlements/s
 - A hard limit refuses once `spent` plus `held` reaches `limit`, not before: `/can` does not predict whether the next call will fit. A soft limit never refuses; its `status` still turns `warning` and `exceeded`.
 - `budget` has the same fields as [List Customer Budgets](/api/list-customer-budgets#response). When the call is allowed it is the tightest limit covering the feature, so you can warn before the cap.
 - A plain `/can` is check-then-call. Calls already in flight, and the few seconds before usage is counted (`as_of`), can take the spend past a hard limit. For an exact cap, reserve the call's spend with a [budget hold](/guides/entitlements/spend-limits#exact-caps-with-budget-holds).
-- A subscription no spend limit applies to reads no budget and gets no `budget`. A new limit refuses calls within a minute, and from Engine 2.38.0 counts the spend since the period start within about 5 minutes (`counted_from`).
+- A subscription no spend limit applies to reads no budget and gets no `budget`. A new limit refuses calls within about a second (within a minute before Engine 2.57.0), and from Engine 2.38.0 counts the spend since the period start within about 5 minutes (`counted_from`).
 
 ## Errors
 
