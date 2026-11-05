@@ -124,7 +124,7 @@ Preview, look at the flagged items, then send the same request with `allow_price
 
 ## The price change email
 
-When a move changes the subscriber's plan amount, Nozle emails the customer before the new price applies. The event is `subscription.price_change_scheduled`. It is off until you add it to the billing entity's `email_settings`.
+When a move changes the subscriber's plan amount, Nozle emails the customer before the new price applies. The event is `subscription.price_change_scheduled`. It is on by default for billing entities created from Core 11.40.1. For an older billing entity it is off until you add it to the billing entity's `email_settings`.
 
 - **When:** as the migration schedules the move for a subscription, once per subscription per migration. A rerun does not send it again. It is skipped, and the move still happens, when the setting is off or the customer has no email.
 - **What it says:** the customer's new price and the old one, the day it starts, and how it will be charged.
