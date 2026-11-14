@@ -7,7 +7,7 @@ info:
     **Legacy key names, removed in Core 6.0.0.** REST responses, webhook payloads and CSV exports carry only the Nozle names: `nozle_id` and the plain `<key>` names such as `customer_id` and `invoice_id`. The former-prefix keys, the former EU tax codes, the former CSV id columns and the former webhook headers are gone. Webhook deliveries carry `webhook-id`, `webhook-timestamp` and `webhook-signature`. nozle-js and nozle-python older than 0.10.0 and nozle-go older than 0.9.1 cannot read a credit system id from Core 6.0.0.
 
     **Live and sandbox (unreleased).** Live and sandbox use the same servers. The API key decides the environment: live keys start with `sk_nozle_` or `pk_nozle_`, sandbox keys with `sk_nozle_test_` or `pk_nozle_test_`, and each only reaches its own organization's data. A key whose prefix does not match its organization's environment, or a key of a reset sandbox, is refused with `401`. Every response to an accepted key, Core and Engine, carries the header `X-Nozle-Livemode: true` (live) or `false` (sandbox); browsers can read it. Webhook payloads carry `livemode` the same way. See https://docs.nozle.dev/guides/getting-started/sandbox.
-  version: 1.60.0
+  version: 1.61.0
   license:
     name: AGPLv3
     url: https://github.com/nozle-dev/core/blob/main/LICENSE
@@ -5210,7 +5210,7 @@ paths:
       description: |-
         This endpoint is used for voiding an invoice.
         • When no body parameters are provided, the invoice can be voided only if it is in a `finalized` status and its payment status is NOT `succeeded`.
-        • When `generate_credit_note` is provided (optionally with `refund_amount` and/or `credit_amount`), this validation is bypassed: the invoice is forcibly voided and a credit note is generated. If the specified refund/credit amounts do not cover the full invoice total, the remainder is issued on a second credit note that is created and immediately voided.
+        • When `generate_credit_note` is provided (optionally with `refund_amount`, `out_of_band_refund_amount` and/or `credit_amount`), this validation is bypassed: the invoice is forcibly voided and a credit note is generated. If the specified refund/credit amounts do not cover the full invoice total, the remainder is issued on a second credit note that is created and immediately voided.
       parameters:
         - $ref: '#/components/parameters/invoice_id'
       requestBody:
@@ -16687,6 +16687,9 @@ webhooks:
                 credit_amount_cents: 919
                 refund_amount_cents: 0
                 offset_amount_cents: 0
+                out_of_band_refund_amount_cents: 0
+                out_of_band_refund_reference: null
+                out_of_band_refunded_at: null
                 coupons_adjustment_amount_cents: 0
                 taxes_rate: 0.0
                 created_at: '2026-10-13T03:57:48Z'
@@ -16878,6 +16881,9 @@ webhooks:
                 credit_amount_cents: 919
                 refund_amount_cents: 0
                 offset_amount_cents: 0
+                out_of_band_refund_amount_cents: 0
+                out_of_band_refund_reference: null
+                out_of_band_refunded_at: null
                 coupons_adjustment_amount_cents: 0
                 taxes_rate: 0.0
                 created_at: '2026-10-13T03:57:48Z'
@@ -28732,6 +28738,7 @@ components:
         - credit_amount_cents
         - refund_amount_cents
         - offset_amount_cents
+        - out_of_band_refund_amount_cents
         - balance_amount_cents
         - taxes_amount_cents
         - taxes_rate
@@ -28861,6 +28868,23 @@ components:
           type: integer
           description: The ofsetted amount (deducted from the invoice balance) of the credit note, expressed in cents.
           example: 0
+        out_of_band_refund_amount_cents:
+          type: integer
+          description: The part of `refund_amount_cents` the merchant paid back outside any payment provider, for example by bank transfer or in cash, expressed in cents. It is never sent to a provider. A credit note refunded only out of band has `refund_status` `succeeded` at once. 0 when everything was refunded online.
+          example: 0
+        out_of_band_refund_reference:
+          type:
+            - string
+            - 'null'
+          description: The merchant's reference for the out-of-band refund, for example a bank transfer ID.
+          example: null
+        out_of_band_refunded_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: When the out-of-band refund was made. `null` without an out-of-band refund.
+          example: null
         coupons_adjustment_amount_cents:
           type: integer
           description: The pro-rated amount of the coupons applied to the source invoice.
@@ -28972,7 +28996,10 @@ components:
               type:
                 - integer
                 - 'null'
-              description: The total amount to be refunded immediately to the payment method used by the customer. For a total or partial refund, credit or offset, the amount in cents must include both the item amount and the applicable tax. The refunded, credited and offsetted amounts should always balance. The total, including taxes, cannot exceed the invoice’s total fees.”
+              description: |-
+                The total amount to be refunded to the customer. For a total or partial refund, credit or offset, the amount in cents must include both the item amount and the applicable tax. The refunded, credited and offsetted amounts should always balance. The total, including taxes, cannot exceed the invoice’s total fees.
+
+                It includes `out_of_band_refund_amount_cents`. The rest, the online part, goes to the invoice's succeeded payments through Stripe, GoCardless, Adyen or Razorpay, oldest first, split into one provider refund per payment when one payment cannot take it all. When those payments cannot take the online part, the credit note is refused with `manual_refund_required` (paid with a manual payment or only marked paid), `provider_refund_unsupported` (Cashfree, Flutterwave, Moneyhash) or `insufficient_refundable_amount` on this field, and nothing is created.
               example: 500
             offset_amount_cents:
               type:
@@ -28980,6 +29007,26 @@ components:
                 - 'null'
               description: The total amount to be immediately deducted from the invoice balance. For a total or partial refund, credit or offset, the amount in cents must include both the item amount and the applicable tax. The refunded, credited and offsetted amounts should always balance. The total, including taxes, cannot exceed the invoice’s total fees.”
               example: 200
+            out_of_band_refund_amount_cents:
+              type:
+                - integer
+                - 'null'
+              description: The part of `refund_amount_cents` you already paid back yourself, outside any payment provider, for example by bank transfer or in cash. Nozle records it as refunded and never sends it to a provider. Use it for an invoice paid with a manual payment, only marked paid, or paid through a provider Nozle cannot refund through. 0 by default. Above `refund_amount_cents` it is refused with `higher_than_refund_amount`.
+              example: 0
+            out_of_band_refund_reference:
+              type:
+                - string
+                - 'null'
+              maxLength: 255
+              description: Your reference for the out-of-band refund, for example a bank transfer ID.
+              example: TRX-2026-0042
+            out_of_band_refunded_at:
+              type:
+                - string
+                - 'null'
+              format: date-time
+              description: When you made the out-of-band refund. The time the credit note is created when left out.
+              example: '2026-11-14T10:00:00Z'
             items:
               type: array
               items:
@@ -34606,6 +34653,11 @@ components:
           type: integer
           description: Portion of the invoice amount (in cents) to be refunded to the customer in the generated credit note.
           example: 2000
+          minimum: 0
+        out_of_band_refund_amount:
+          type: integer
+          description: The part of `refund_amount` (in cents) you already paid back yourself outside any payment provider. It becomes the credit note's `out_of_band_refund_amount_cents` and is never sent to a provider. Use it to void a manually paid invoice with a refund.
+          example: 0
           minimum: 0
         credit_amount:
           type: integer

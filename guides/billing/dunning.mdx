@@ -90,6 +90,7 @@ _Core 11.42.0 and 11.45.0._ When a customer wins a card dispute (a chargeback) o
 
 Ways to settle it:
 
+- The customer pays what is owed online. _Core 11.46.0._ A payment URL (`POST /invoices/{id}/payment_url`) or an invoice checkout through Stripe or Razorpay works again for such an invoice, and a payment of what is owed is recorded against it. Before, it was refunded as a duplicate payment. The invoice is never charged again automatically, and the payment the dispute took back is never applied again, even when its success event is replayed.
 - Record a manual payment of the money you recovered another way, up to what is owed.
 - Issue a credit note with an offset, up to what is owed. A credit to the customer's balance does not lower what is owed, because the customer keeps that credit for other invoices.
 - Void the invoice.
@@ -97,6 +98,10 @@ Ways to settle it:
 When what is owed reaches 0, the block lifts with one `resolved` step, as for a payment. The dunning emails of such an invoice ask the customer to settle with you instead of linking to a pay page.
 
 An invoice with a lost dispute cannot be refunded. Its refundable amount is 0, and a refund credit note is refused with `higher_than_remaining_invoice_amount`. A plan change is held back by it only while something is still owed. See [Outstanding invoices and lost disputes](/api/subscription-management#outstanding-invoices-and-lost-disputes).
+
+Only the first loss counts. _Core 11.46.0._ `invoice.payment_dispute_lost` is sent, and the dunning policy started, only the first time a payment, or an invoice for the manual lose-dispute action, is lost. A repeat, such as a retried job or the provider sending the outcome again, changes nothing and sends nothing.
+
+Before a dispute is lost, you hear about it through the [`invoice.payment_dispute_updated`](/api/webhook-events#invoices) webhook. Razorpay disputes send it, and from Core 11.46.0 Stripe disputes do too, when a dispute is opened or updated. Nothing is owed until the dispute is lost. An existing Stripe connection needs its webhook endpoint refreshed to send the new events. See [Stripe webhook setup](/integrations/stripe#webhook-setup).
 
 A dispute lost before Core 11.45.0 has no recorded amount. Nozle counts what the invoice's provider payments recorded before the dispute still held (all its payments when it has no provider payment). An invoice with no payment before the dispute counts its whole total less the offsets issued before the dispute.
 

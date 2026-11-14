@@ -61,7 +61,7 @@ _Core 11.44.0._ Every Nozle plan issues a payment receipt for each successful pa
 
 ## Refunds
 
-You refund a paid invoice with a credit note, in the dashboard or the API. The refund goes back to the original payment method. When nothing can be refunded, the dashboard's credit note form says why (dashboard 2.21.0). It shows one of these reasons.
+You refund a paid invoice with a credit note, in the dashboard or the API. The refund goes back to the original payment method, or you record money you already paid back yourself (see [Refunded outside Nozle](#refunded-outside-nozle)). When nothing can be refunded, the dashboard's credit note form says why (dashboard 2.21.0). It shows one of these reasons.
 
 - The invoice was below the payment provider's minimum charge and was [carried forward](/guides/billing/invoices#amounts-below-the-provider-minimum) to the next invoice. Nothing was charged.
 - The invoice has not been paid.
@@ -69,3 +69,44 @@ You refund a paid invoice with a credit note, in the dashboard or the API. The r
 - No refundable payment is recorded yet. If the invoice was just paid, choose **Refresh** in a moment.
 
 In the first three cases the form suggests crediting the amount to the customer's balance instead. The form also shows the most that can be refunded, and flags a refund above it.
+
+### Where an online refund goes
+
+_Core 11.46.0._ The online part of a refund (`refund_amount_cents` minus `out_of_band_refund_amount_cents`) goes to the invoice's succeeded payments through Stripe, GoCardless, Adyen or Razorpay, oldest first. Duplicate payments are skipped. Each payment takes at most what it still holds, so a refund larger than one payment is split into one provider refund per payment. When the invoice was paid through a payment request and has no payment of its own, the request's payments are used.
+
+- The refund is `succeeded` once every part succeeded, and `failed` once one part failed.
+- If the payments cannot take the online part, the credit note is refused and nothing is sent. The error code, `manual_refund_required`, `provider_refund_unsupported` or `insufficient_refundable_amount`, says why. See [Refund errors](/api/errors#refund-errors).
+- A credit note Nozle creates itself, when a subscription is terminated, is not refused. If no payment can take its refund, its `refund_status` is `failed` at once, nothing is sent and the `credit_note.refund_failure` webhook names the error code.
+
+Before Core 11.46.0 a refund went to the invoice's newest payment of any kind. A newer manual or failed payment left the refund pending, and a refund larger than the newest payment was rejected by the provider.
+
+### When a refund fails
+
+_Core 11.46.0._ A refund that fails at the payment provider gives the amount back to the invoice, so you can refund it again, for example out of band. The invoice's `refundable_amount_cents` and the amounts left to credit no longer count it. The parts that did not fail and the out-of-band part still count.
+
+- You get the `credit_note.refund_failure` webhook. See [Webhook events](/api/webhook-events#credit_noterefund_failure).
+- A refund the provider rejects at once, for example an amount above what the Stripe payment still holds, takes nothing from the invoice either.
+- The dashboard shows the credit note as **Refund failed**, with a note that the amount can be refunded again (dashboard 2.22.0).
+
+### Refunded outside Nozle
+
+_Core 11.46.0, dashboard 2.22.0._ Use this when you paid the customer back yourself, for example by bank transfer or in cash. Nozle records the amount as refunded and never sends it to a payment provider. It is the way to refund an invoice that:
+
+- was paid with a manual payment, or was only marked paid. An invoice marked paid with no payment recorded can be refunded this way up to its total. Before, it had nothing to refund.
+- was paid through Cashfree, Flutterwave or Moneyhash, which Nozle cannot send refunds to.
+
+On a credit note, three fields record it:
+
+| Field | Meaning |
+|---|---|
+| `out_of_band_refund_amount_cents` | The part of `refund_amount_cents` you paid back yourself. 0 by default, and at most `refund_amount_cents`. |
+| `out_of_band_refund_reference` | Your own reference, for example a bank transfer ID. Optional, up to 255 characters. |
+| `out_of_band_refunded_at` | When you paid it back. The time the credit note is created when you send none. |
+
+A credit note refunded only out of band has `refund_status` `succeeded` at once. The fields are on the credit note in the API and in the credit note webhooks.
+
+In the dashboard, the credit note form has **Refunded outside Nozle** next to **Refund to the original payment method**, with an optional reference and the day of the refund (today by default, never a future day). When the invoice has no succeeded payment through Stripe, GoCardless, Adyen or Razorpay, the form hides the original payment method field and says why.
+
+To void a paid invoice with a refund, send `generate_credit_note: true`, `refund_amount` and `out_of_band_refund_amount` to `POST /invoices/{id}/void`. It is the out-of-band part of the refund on the credit note the void creates. A manually paid invoice is voided with a refund this way.
+
+An invoice [carried forward](/guides/billing/invoices#amounts-below-the-provider-minimum) because it was below the provider's minimum charge has nothing to refund, online or out of band.
