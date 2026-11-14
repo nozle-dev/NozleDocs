@@ -5,7 +5,24 @@ description: Grace, retries, reminders and the block of a customer whose invoice
 
 A dunning policy decides what happens to one of your customers while an invoice stays unpaid: when Nozle retries the charge, when it reminds the customer, and what it does when the grace ends. This page is about your customers. For what your own workspace pays Nozle, see [Workspace billing](/guides/getting-started/workspace-billing).
 
-Automatic dunning is part of every [Nozle plan](/guides/getting-started/nozle-plans#premium-features), Starter included (from Core 11.41.2). Open **Billing > Dunning** in the dashboard to create a campaign. A workspace that has no Nozle plan sees "Dunning is not available". A customer excluded from dunning is never dunned.
+Dunning works for every workspace, on every [Nozle plan](/guides/getting-started/nozle-plans#premium-features). From Core 11.42.0 it is no longer a paid add-on, and a new workspace starts with a [default policy](#the-default-policy), so a customer who does not pay is blocked once the grace ends without any setup from you. Open **Billing > Dunning** in the dashboard to change it or create other campaigns. A customer excluded from dunning is never dunned.
+
+## The default policy
+
+_Core 11.42.0._ Every new workspace, and every new sandbox, gets one dunning campaign when it is created:
+
+| Setting | Value |
+|---|---|
+| Code and name | `default`, "Default dunning policy" |
+| End action | `block` |
+| Threshold | 0, in the currency of your default billing entity |
+| Applied to | Your default billing entity |
+| Customer email | `dunning.step` is switched on for the default billing entity |
+
+So an unpaid invoice of any customer of the default billing entity follows the [timeline](#the-timeline) below, and the customer is blocked when the grace of the plan ends (7 days unless the plan sets another). Edit the campaign like any other, or apply another campaign to a plan, a customer or a billing entity.
+
+- A sandbox blocks as live does, but never emails a customer.
+- Workspaces created before Core 11.42.0 do not get the default policy automatically. Turn on a policy yourself as described below.
 
 ## Turn the policy on
 
@@ -14,6 +31,7 @@ A policy is a dunning campaign with an **end action**. Today the only end action
 - A campaign without an end action keeps the attempt cadence it has today (days between attempts, maximum attempts). Nothing changes for it.
 - Set the end action in the dashboard on the campaign's **End action** (**Classic cadence** or **Block after the plan's grace**), or with the GraphQL field `endAction` (`DunningCampaignEndActionEnum`, value `block`) on `createDunningCampaign` or `updateDunningCampaign`. `null` (the default, **Classic cadence**) means no policy.
 - The grace comes from the plan: `unpaid_invoice_grace_days`, 0 to 90 days, 7 by default. See [Grace days on a plan](/guides/billing/plans#grace-days-and-dunning).
+- A policy honours the campaign's thresholds, per currency (Core 11.42.0). An invoice is dunned only when what the customer owes in its currency reaches one of the campaign's thresholds in that currency. Below it no step is sent and no block is set, and a block already set is lifted. A currency for which the campaign has no threshold is still dunned. The default policy's threshold of 0 duns every unpaid invoice.
 
 ### Which campaign an invoice follows
 
@@ -25,6 +43,8 @@ Each unpaid invoice follows the first campaign found in this order:
 4. The campaign of your default billing entity.
 
 The policy applies when that campaign has an end action. A customer with several subscriptions has one timeline per unpaid invoice, each with the grace of the plan behind that invoice. An invoice without a plan uses 7 days. The invoice of a plan change bills the replaced plan and the new one: it follows the campaign and grace of the new plan.
+
+An unpaid prepaid credit top-up is never dunned (Core 11.42.0). It granted no credits, so it does not block the customer.
 
 An invoice whose amount due is below the payment provider's minimum charge is never dunned: its amount is carried to the customer's next invoice. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
 
@@ -57,6 +77,28 @@ The block clears as soon as no invoice past its grace is owed and not being debi
 - or an automatic debit of it is in flight (the block comes back if that debit fails).
 
 The `resolved` step is sent once the invoice no longer needs paying.
+
+## Lost disputes
+
+_Core 11.42.0 and 11.45.0._ When a customer wins a card dispute (a chargeback) on a paid invoice, the bank takes the money back. Nozle treats what the dispute took as owed again, so your dunning policy can collect it and block the customer again until it is settled.
+
+- **Only the disputed amount is owed.** A 100.00 dispute on a 300.00 payment makes 100.00 owed, not 300.00. A refund made before the dispute and a payment the dispute did not take back are not owed again.
+- **The policy runs at once.** Losing the dispute runs the customer's dunning policy straight away, not at the next hourly run. A blocked customer stays blocked, and gets no "All good" email, until the owed amount is settled.
+- **`total_due_amount_cents` is what is owed again.** It is what the disputes took, plus anything still due before, less payments recorded since and offset credit notes, and never below 0. The REST API, GraphQL, the invoice webhooks, [`dunning.step`](#the-dunningstep-webhook), the dunning emails and the plan change check all use this one number. Before Core 11.45.0 it was 0 on such an invoice.
+- **`disputed_amount_cents`** is new on the invoice (0 without a lost dispute) and on the payment (`null` when no dispute was lost). It is what lost disputes took back.
+- **`total_paid_amount_cents` stays gross.** After a recovery it can be higher than `total_amount_cents`. A 300.00 invoice that was paid, fully disputed and paid again reads 600.00.
+
+Ways to settle it:
+
+- Record a manual payment of the money you recovered another way, up to what is owed.
+- Issue a credit note with an offset, up to what is owed. A credit to the customer's balance does not lower what is owed, because the customer keeps that credit for other invoices.
+- Void the invoice.
+
+When what is owed reaches 0, the block lifts with one `resolved` step, as for a payment. The dunning emails of such an invoice ask the customer to settle with you instead of linking to a pay page.
+
+An invoice with a lost dispute cannot be refunded. Its refundable amount is 0, and a refund credit note is refused with `higher_than_remaining_invoice_amount`. A plan change is held back by it only while something is still owed. See [Outstanding invoices and lost disputes](/api/subscription-management#outstanding-invoices-and-lost-disputes).
+
+A dispute lost before Core 11.45.0 has no recorded amount. Nozle counts what the invoice's provider payments recorded before the dispute still held (all its payments when it has no provider payment). An invoice with no payment before the dispute counts its whole total less the offsets issued before the dispute.
 
 ## The blocked customer
 
@@ -119,12 +161,14 @@ Each step sends `dunning.step` (object key `dunning_step`). It carries the invoi
 | `deadline_at` | When the end action runs: `started_at` plus `grace_days`. |
 | `next_action` | The next step (`reminder`, `final_reminder`, `end_action` or `retry`). `retry` only when the last decline is retried (a soft decline); after a hard decline or one that needs the customer, the next message step. `null` after the last one and on `resolved`. |
 | `next_action_at` | When `next_action` runs. |
-| `total_due_amount_cents`, `currency` | What is still owed on the invoice. |
+| `total_due_amount_cents`, `currency` | What is still owed on the invoice. After a [lost dispute](#lost-disputes), what is owed again (Core 11.45.0). |
 
 `resolved` is sent once, when a dunned invoice no longer needs paying. `dunning_campaign.finished` is unchanged and still belongs to campaigns without an end action. See the [full payload](/api/webhook-events#dunningstep).
 
 ## Customer emails
 
-The billing entity email `dunning.step` (off until you turn it on, in the entity's `email_settings`) sends the customer one email per step, in your brand, with the amount, the invoice number, the deadline and the pay link. The wording escalates from the failed payment to the final reminder and the block. See [Customer emails](/guides/settings/customer-emails).
+The billing entity email `dunning.step` sends the customer an email at each step, in your brand. It is on for the default billing entity of a workspace created from Core 11.42.0 (see [the default policy](#the-default-policy)) and off elsewhere until you turn it on in the entity's `email_settings`. The wording escalates from the failed payment to the final reminder and the block. See [Customer emails](/guides/settings/customer-emails).
+
+From Core 11.42.0 a customer gets one email per step, not one per invoice. It has a row for each invoice at that step (number, what it is for, amount; past three invoices the last row counts the rest) and the total still owed. With one invoice, the button opens its pay page, or your customer billing page when the invoice cannot be paid online. With several, it opens your customer billing page. When the billing page is needed and you have not set one, the email has no button. The `dunning.step` webhook is still sent per invoice. The "All good" email is sent once, when no owed invoice of the customer is left in a dunning timeline.
 
 The customer gets one email on day 0, not two: when `dunning.step` is on, the failed payment email (`invoice.payment_failure`) is not sent for an invoice a dunning policy runs on. It is still sent for other invoices, and the `invoice.payment_failure` webhook is unchanged.

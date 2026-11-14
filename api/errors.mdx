@@ -119,6 +119,17 @@ _Unreleased._ These come from a [sandbox](/guides/getting-started/sandbox), most
 | `403` `live_organization_only` | Members, invitations, roles, sign-in methods and SSO, your Nozle plan and billing, or AI onboarding, from a sandbox. | Switch to live. |
 | `429` `sandbox_reset_rate_limited` | The sandbox was reset more than once in 10 minutes or 5 times in a day. | Wait and reset again. |
 
+## Invitation errors
+
+_Core 11.44.0._ These come from inviting someone to your workspace and from accepting an invitation, in the dashboard. See [Team access](/guides/settings/team-access). The code is in `extensions.code`, or for a validation error under its field in `extensions.details`.
+
+| Status and `code` | What happened | What to do |
+|---|---|---|
+| `422` `email: email_already_used` (invite) | The email already has a Nozle account, in any workspace. Only an email with no account can be invited. No invitation is created. | Invite another address. |
+| `422` `email: email_already_used` (accept) | The email got a Nozle account after the invitation was sent. Nothing is created or changed, and the invitation stays pending. | Revoke the invitation and invite another address. |
+| `422` `invite_expired` | The invitation was sent more than seven days ago. Reading or accepting it is refused. | Invite the email again. The expired invitation is revoked and a new one is sent. |
+| `403` `invite_expired` | Changing the roles of an expired invitation. | Invite the email again. |
+
 ## Workspace billing errors
 
 _Unreleased._ These errors are about your own workspace's account with Nozle, not about your customers. They are always on. A sandbox key gets the same errors as the live organization it belongs to. See [Workspace billing](/guides/getting-started/workspace-billing).

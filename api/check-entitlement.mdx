@@ -30,7 +30,7 @@ A subscription on an override plan (a plan made from a catalog plan for one cust
 Without `subscription_id` or `entity_id`, `/can` evaluates the customer's only current subscription. A customer with several current subscriptions is evaluated on its own subscription (not owned by an Entity) when there is exactly one; otherwise the answer is `allowed: false` with the reason `subscription_required`. Before Engine 2.0.0, the most recently started subscription was used. See [which subscription is checked](/guides/entitlements/can-endpoint#which-subscription-is-checked).
 
 <ParamField query="model" type="string">
-  Model the call will use. When the organization's `uncosted_model_action` is `deny` and the organization has no cost rule for the model, the answer is `allowed: false` with `reason: "uncosted_model_denied"`. Without `model`, no price check is made. See [refuse calls to unpriced models](/guides/ai/token-billing#refuse-calls-to-unpriced-models).
+  Model the call will use. When the organization's `uncosted_model_action` is `deny` and the model has neither an organization cost rule nor a shared price, the answer is `allowed: false` with `reason: "uncosted_model_denied"`. Without `model`, no price check is made. See [refuse calls to unpriced models](/guides/ai/token-billing#refuse-calls-to-unpriced-models).
 </ParamField>
 
 <ParamField query="provider" type="string">
@@ -94,7 +94,7 @@ The `economics.status` value is `estimated`, `not_configured`, `unavailable`, or
 | `usage_limit_exceeded` | A hard limit is reached. A soft limit never denies; it sets `overage` to `true`. |
 | `economic_policy_denied` | A margin policy in `deny` mode rejected the estimated cost or margin. The `policy` object has the detail. |
 | `budget_exceeded` | Engine 2.34.0. A hard spend limit covering the feature is used up: the period's spend plus open budget holds reached the limit. The `budget` object is that limit. |
-| `uncosted_model_denied` | The call names a `model`, `uncosted_model_action` is `deny`, and nothing prices the model. The response adds `model` and `message`. |
+| `uncosted_model_denied` | The call names a `model`, `uncosted_model_action` is `deny`, and neither a cost rule of yours nor the shared price list prices the model. The response adds `model` and `message`. |
 
 A denial is an HTTP `200` response with `allowed: false`. The order is: the usage limit, then spend limits, then the margin policy. `uncosted_model_denied` is decided before the entitlement is evaluated.
 

@@ -5,6 +5,56 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Dunning on by default; lost disputes owed again (Core 11.42.0, Core 11.45.0, dashboard 2.21.0)
+
+_November 14, 2026_
+
+- **Default dunning policy.** Every new workspace and every new sandbox starts with a dunning campaign `default` (end action `block`, threshold 0 in the default billing entity's currency), applied to the default billing entity with the `dunning.step` email on. A customer who does not pay is blocked once the grace of their plan ends. Workspaces created before are not changed automatically. See [the default policy](/guides/billing/dunning#the-default-policy).
+- **Not a paid add-on.** Dunning works for every workspace, whatever its plan. The dashboard shows the dunning pages, the plan's dunning policy and the Payment receipt switch to every workspace (dashboard 2.21.0).
+- **Thresholds.** A dunning policy honours the campaign's thresholds per currency. Below the threshold no step is sent and no block is set. A currency without a threshold is still dunned.
+- **One email per step.** The dunning email is sent once per customer and step, with a row per invoice and the total still owed. The `dunning.step` webhook is still sent per invoice and no longer carries `variant`, `deadline_on` or `dunning_key`. The "All good" email is sent once, when no owed invoice is left in a dunning timeline.
+- **Credit top-ups.** An unpaid prepaid credit top-up no longer blocks the customer.
+- **Lost disputes.** A paid invoice whose payment is lost in a dispute is owed again for what the dispute took, and the customer's dunning policy runs at once. From Core 11.45.0 only the disputed amount is owed (a 100.00 dispute on a 300.00 payment makes 100.00 owed), `total_due_amount_cents` is that owed amount instead of 0, and `disputed_amount_cents` is new on invoices and payments. `total_paid_amount_cents` stays gross. Offset credit notes are accepted up to what is owed, and a refund after a lost dispute is refused with `higher_than_remaining_invoice_amount`. A plan change is held back only while something is still owed. See [Lost disputes](/guides/billing/dunning#lost-disputes).
+- **Payment emails** name what the payment is for, such as a plan and its period, a credit top-up, usage or one-off charges.
+- **OpenAPI 1.60.0.** `disputed_amount_cents` on the invoice and payment objects, and the shared price descriptions below.
+
+### Payment receipts on every plan (Core 11.44.0)
+
+_November 14, 2026_
+
+- **Every plan.** A successful payment creates a payment receipt on Starter and Growth too. Before, receipts needed Scale.
+- **On by default.** The receipt email (`payment_receipt.created`) is on for a billing entity created from Core 11.44.0. Existing billing entities keep their setting. Switch it in **Settings > Customer emails**. See [Payment receipts](/guides/billing/payments#payment-receipts).
+
+### Invitations for new emails only, and expiry (Core 11.41.4, Core 11.44.0, dashboard 2.21.0)
+
+_November 14, 2026_
+
+- **Only new emails.** An invitation can only be sent to an email that has no Nozle account. Otherwise it is refused with `email_already_used`. Accepting is refused the same way when the email got an account after the invitation was sent, and nothing is created or changed. A person with an account cannot join a second workspace through an invitation.
+- **Expiry.** An invitation expires seven days after it was sent, and accepting it answers `invite_expired`. Inviting the email again revokes the expired invitation and sends a new one.
+- **Security fix (Core 11.41.4).** Accepting an invitation for an email that already has an account no longer signs anyone in without that account's password. `Invite.token` is always `null` and deprecated.
+- **Clearer messages (dashboard 2.21.0).** The dashboard explains an email that already has an account and an expired invitation. See [Team access](/guides/settings/team-access) and [Invitation errors](/api/errors#invitation-errors).
+
+### Shared prices back on, imported from models.dev (Core 11.43.0, Engine 2.58.0, dashboard 2.20.0)
+
+_November 14, 2026_
+
+- **Always on.** A model without a price of your own is costed from the shared price list, with no adopt step. Your own price still wins, bucket by bucket. Adopting stays optional, to keep a price as your own. `shared_price_available` reports the list again, and `/can`, the LLM proxy and `model_swap` simulations count a shared price.
+- **models.dev.** The list imports OpenAI, Anthropic and Gemini models it does not have yet from models.dev at 03:30, 11:30 and 19:30 UTC. A price change is a new revision, and past events keep the price they were costed at. Prices start on the day they were read, so older events are not repriced.
+- **Dashboard.** **Settings > Shared prices** is back, and the model pickers list shared price models. See [Shared prices](/guides/margin/shared-prices).
+
+### Refund form explains why nothing can be refunded (dashboard 2.21.0, Core 11.44.0)
+
+_November 14, 2026_
+
+- **Reasons.** The credit note form shows the most that can be refunded, and says why when nothing can be. The invoice was carried forward below the minimum card charge, it is unpaid, nothing more can be refunded, or the payment is not recorded yet (with **Refresh**). See [Refunds](/guides/billing/payments#refunds).
+- **Fix.** A draft credit note no longer lowers an invoice's refundable amount. Only finalized credit notes count.
+
+### `margin.forecast` removed from the SDKs (Node 0.40.0, Python 0.38.0, Go v0.38.0)
+
+_November 13, 2026_
+
+- `margin.forecast()` (Node and Python) and `MarginForecast` (Go) are removed with their types. The Engine route they called was removed in Engine 2.52.0, so every call failed with `404`. Remove the call and use the [revenue and margin forecast](/guides/margin/forecast) (`GET /revenue/forecast`) instead.
+
 ### Guides for pricing scenarios, MRR and the forecast
 
 _November 5, 2026_
