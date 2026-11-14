@@ -5,6 +5,72 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Refunds split across payments, refunds made outside Nozle, Stripe dispute updates (Core 11.46.0, dashboard 2.22.0)
+
+_November 14, 2026_
+
+- **Refunds go to every payment that can take them.** The online part of a refund goes to the invoice's succeeded payments through Stripe, GoCardless, Adyen or Razorpay, oldest first, each for at most what it still holds. A refund larger than one payment is split into one provider refund per payment. Before, it went to the newest payment of any kind, so a newer manual or failed payment left it pending, and a refund larger than that payment was rejected by the provider. See [Where an online refund goes](/guides/billing/payments#where-an-online-refund-goes).
+- **Refused instead of stuck.** A credit note whose online refund no payment can take is refused with `manual_refund_required`, `provider_refund_unsupported` or `insufficient_refundable_amount`, and nothing is created. A credit note Nozle creates itself on termination gets `refund_status` `failed` at once and the `credit_note.refund_failure` webhook instead. See [Refund errors](/api/errors#refund-errors).
+- **A failed refund gives the amount back.** The amount of a refund that fails at the provider can be refunded again, and a refund the provider rejects at once takes nothing from the invoice. Razorpay now applies a refund failure that arrives after the refund was processed, as the other providers do. See [When a refund fails](/guides/billing/payments#when-a-refund-fails).
+- **Refunded outside Nozle.** A credit note records what you paid back yourself, for example by bank transfer, with `out_of_band_refund_amount_cents` (part of `refund_amount_cents`), `out_of_band_refund_reference` and `out_of_band_refunded_at`. It is never sent to a provider. An invoice paid manually or only marked paid, or paid through Cashfree, Flutterwave or Moneyhash, is refunded this way. An invoice only marked paid can be refunded up to its total. `POST /invoices/{id}/void` takes `out_of_band_refund_amount`. The dashboard's credit note form has **Refunded outside Nozle** with a reference and a date, and a credit note shows **Refund failed** when its refund failed (dashboard 2.22.0). See [Refunded outside Nozle](/guides/billing/payments#refunded-outside-nozle).
+- **Carried-forward invoices.** An invoice carried forward because it was below the provider's minimum charge has nothing to refund.
+- **Stripe dispute updates.** Stripe `charge.dispute.created`, `charge.dispute.updated` and `charge.dispute.funds_withdrawn` send `invoice.payment_dispute_updated`, as Razorpay disputes do. New Stripe endpoints subscribe to the three events. Refresh an existing endpoint to get them (self-hosted, run `payment_providers:refresh_stripe_webhook_events APPLY=1`). See [Stripe webhook setup](/integrations/stripe#webhook-setup).
+- **Lost disputes.** An invoice owed again after a lost dispute can be paid online through a payment URL or checkout. `invoice.payment_dispute_lost` is sent, and dunning started, only the first time a payment is lost. See [Lost disputes](/guides/billing/dunning#lost-disputes).
+- **Nozle invoices.** A workspace that loses a dispute on a Nozle invoice owes it again. It gets the past-due emails, is suspended at the end of the grace, and resumes once a member pays through the pay link or **Nozle invoices**. The card is never charged again automatically. See [A lost dispute on a Nozle invoice](/guides/getting-started/workspace-billing#a-lost-dispute-on-a-nozle-invoice).
+- **Resend works.** **Resend** on a pending invitation sends the same invitation again, with the same link, and restarts its seven days. It was refused before, so nothing was sent. An invitation can be sent once a minute (`invite_resend_too_soon`). The members page shows when each invitation was last sent and when it expires, from the server (dashboard 2.22.0). See [Team access](/guides/settings/team-access#invitations).
+- **One account per email.** An email matches an account whatever the case of its letters. A second sign-up with the same email in another case, or at the same moment, is refused with `user_already_exists` (sign-up, Google, Okta) or `email_already_used` (accepting an invitation) instead of creating a second account.
+- **OpenAPI 1.61.0.** The three out-of-band fields on the credit note object and the create input, and `out_of_band_refund_amount` on the void input.
+
+### Dunning on by default; lost disputes owed again (Core 11.42.0, Core 11.45.0, dashboard 2.21.0)
+
+_November 14, 2026_
+
+- **Default dunning policy.** Every new workspace and every new sandbox starts with a dunning campaign `default` (end action `block`, threshold 0 in the default billing entity's currency), applied to the default billing entity with the `dunning.step` email on. A customer who does not pay is blocked once the grace of their plan ends. Workspaces created before are not changed automatically. See [the default policy](/guides/billing/dunning#the-default-policy).
+- **Not a paid add-on.** Dunning works for every workspace, whatever its plan. The dashboard shows the dunning pages, the plan's dunning policy and the Payment receipt switch to every workspace (dashboard 2.21.0).
+- **Thresholds.** A dunning policy honours the campaign's thresholds per currency. Below the threshold no step is sent and no block is set. A currency without a threshold is still dunned.
+- **One email per step.** The dunning email is sent once per customer and step, with a row per invoice and the total still owed. The `dunning.step` webhook is still sent per invoice and no longer carries `variant`, `deadline_on` or `dunning_key`. The "All good" email is sent once, when no owed invoice is left in a dunning timeline.
+- **Credit top-ups.** An unpaid prepaid credit top-up no longer blocks the customer.
+- **Lost disputes.** A paid invoice whose payment is lost in a dispute is owed again for what the dispute took, and the customer's dunning policy runs at once. From Core 11.45.0 only the disputed amount is owed (a 100.00 dispute on a 300.00 payment makes 100.00 owed), `total_due_amount_cents` is that owed amount instead of 0, and `disputed_amount_cents` is new on invoices and payments. `total_paid_amount_cents` stays gross. Offset credit notes are accepted up to what is owed, and a refund after a lost dispute is refused with `higher_than_remaining_invoice_amount`. A plan change is held back only while something is still owed. See [Lost disputes](/guides/billing/dunning#lost-disputes).
+- **Payment emails** name what the payment is for, such as a plan and its period, a credit top-up, usage or one-off charges.
+- **OpenAPI 1.60.0.** `disputed_amount_cents` on the invoice and payment objects, and the shared price descriptions below.
+
+### Payment receipts on every plan (Core 11.44.0)
+
+_November 14, 2026_
+
+- **Every plan.** A successful payment creates a payment receipt on Starter and Growth too. Before, receipts needed Scale.
+- **On by default.** The receipt email (`payment_receipt.created`) is on for a billing entity created from Core 11.44.0. Existing billing entities keep their setting. Switch it in **Settings > Customer emails**. See [Payment receipts](/guides/billing/payments#payment-receipts).
+
+### Invitations for new emails only, and expiry (Core 11.41.4, Core 11.44.0, dashboard 2.21.0)
+
+_November 14, 2026_
+
+- **Only new emails.** An invitation can only be sent to an email that has no Nozle account. Otherwise it is refused with `email_already_used`. Accepting is refused the same way when the email got an account after the invitation was sent, and nothing is created or changed. A person with an account cannot join a second workspace through an invitation.
+- **Expiry.** An invitation expires seven days after it was sent, and accepting it answers `invite_expired`. Inviting the email again revokes the expired invitation and sends a new one.
+- **Security fix (Core 11.41.4).** Accepting an invitation for an email that already has an account no longer signs anyone in without that account's password. `Invite.token` is always `null` and deprecated.
+- **Clearer messages (dashboard 2.21.0).** The dashboard explains an email that already has an account and an expired invitation. See [Team access](/guides/settings/team-access) and [Invitation errors](/api/errors#invitation-errors).
+
+### Shared prices back on, imported from models.dev (Core 11.43.0, Engine 2.58.0, dashboard 2.20.0)
+
+_November 14, 2026_
+
+- **Always on.** A model without a price of your own is costed from the shared price list, with no adopt step. Your own price still wins, bucket by bucket. Adopting stays optional, to keep a price as your own. `shared_price_available` reports the list again, and `/can`, the LLM proxy and `model_swap` simulations count a shared price.
+- **models.dev.** The list imports OpenAI, Anthropic and Gemini models it does not have yet from models.dev at 03:30, 11:30 and 19:30 UTC. A price change is a new revision, and past events keep the price they were costed at. Prices start on the day they were read, so older events are not repriced.
+- **Dashboard.** **Settings > Shared prices** is back, and the model pickers list shared price models. See [Shared prices](/guides/margin/shared-prices).
+
+### Refund form explains why nothing can be refunded (dashboard 2.21.0, Core 11.44.0)
+
+_November 14, 2026_
+
+- **Reasons.** The credit note form shows the most that can be refunded, and says why when nothing can be. The invoice was carried forward below the minimum card charge, it is unpaid, nothing more can be refunded, or the payment is not recorded yet (with **Refresh**). See [Refunds](/guides/billing/payments#refunds).
+- **Fix.** A draft credit note no longer lowers an invoice's refundable amount. Only finalized credit notes count.
+
+### `margin.forecast` removed from the SDKs (Node 0.40.0, Python 0.38.0, Go v0.38.0)
+
+_November 13, 2026_
+
+- `margin.forecast()` (Node and Python) and `MarginForecast` (Go) are removed with their types. The Engine route they called was removed in Engine 2.52.0, so every call failed with `404`. Remove the call and use the [revenue and margin forecast](/guides/margin/forecast) (`GET /revenue/forecast`) instead.
+
 ### Guides for pricing scenarios, MRR and the forecast
 
 _November 5, 2026_

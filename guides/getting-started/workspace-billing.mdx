@@ -76,6 +76,15 @@ For another grace, the reminder falls on `round(grace × 3 / 7)`, the final remi
 - Paying before the deadline means the workspace is never suspended.
 - The **Pay** link opens the Nozle card page in pay mode when the workspace card is handled by Nozle's card page: you pay the invoice there and, for a card issued in India, the bank registers the mandate in the same step. Otherwise it opens the payment provider's hosted page.
 
+## A lost dispute on a Nozle invoice
+
+_Core 11.46.0._ If a card payment of a Nozle invoice is disputed and Nozle loses the dispute, the bank takes the money back and the workspace owes that amount again. It is followed up like an unpaid Nozle invoice.
+
+- The invoice is owed again for what the dispute took, and day 0 starts at once.
+- The grace of your plan applies, and every member gets the day 0, reminder, final reminder and suspension emails, worded for a disputed payment.
+- At the end of the grace the workspace is suspended, as in [Suspension](#suspension).
+- Nozle never charges the card again automatically, not even after you save a new card. A member pays what is owed through the **Pay** link in the emails or the **Nozle invoices** page. The workspace then resumes, and every member gets the "all good" email (the "service resumed" wording when it was suspended).
+
 ## While past due
 
 While a Nozle invoice is past due:

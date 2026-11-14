@@ -11,6 +11,8 @@ Open **Settings** and choose **Members** to see who has access to your workspace
 2. Enter their work email.
 3. Pick at least one [role](/guides/settings/roles). An invitation without a role is refused.
 
+Only an email that has no Nozle account yet can be invited. If any Nozle account already uses the email, in any workspace and whatever the case of its letters, the invitation is refused with `email_already_used` and nothing is sent. Ask the person for another address. A person who already has an account cannot join a second workspace through an invitation.
+
 Inviting needs settings access. A member gets the union of the capabilities of all their roles. Choosing **Admin** selects only Admin, because it already grants every capability.
 
 ## Invitations
@@ -23,9 +25,12 @@ Inviting needs settings access. A member gets the union of the capabilities of a
 | Revoked | You cancelled it. |
 | Delivery failed | The email provider reported a bounce or a rejected address. |
 
-- **Expiry.** An invitation expires seven days after it was last sent.
-- **Resend.** Sends the same invitation again and refreshes the expiry. It does not create a second invitation. After a send you wait about a minute before resending. Accepted and revoked invitations cannot be resent.
+The list shows when each invitation was **Last sent** and when it **Expires** (or **Expired**).
+
+- **Resend.** _Core 11.46.0, dashboard 2.22.0._ **Resend** on a pending invitation sends the same invitation email again. The link stays the same, so a link from an earlier email keeps working. The seven days restart from this send, and the roles are the ones on the invitation. You can resend an invitation once a minute. A second send within that minute is refused with `invite_resend_too_soon`, and the button shows how many seconds are left. Inviting an email that already has a pending invitation does the same as **Resend**, with the roles you pick.
+- **Expiry.** An invitation expires seven days after it was last sent. Accepting an expired invitation is refused with `invite_expired`. To let the person in, choose **Resend** or invite the email again. Nozle revokes the expired invitation and sends a new one in its place, with a new link.
 - **Revoke.** The emailed link stops working. You can invite the address again at any time.
+- **Accepting.** If the email has a Nozle account by the time the person accepts, accepting is refused with `email_already_used`, whichever way they sign in. The invitation stays pending and no account is created or changed.
 
 ## Change roles
 

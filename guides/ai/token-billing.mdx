@@ -40,7 +40,7 @@ Usage counts towards the current period as soon as the event is processed. Reven
 
 1. **Create a cost model from the AI tokens template** (**Usage → Cost models → New**, cost path **Detailed Cost Event**). It creates the Cost Event Meter `ai_tokens` (sum of `tokens`, filtered by `provider`, `model` and `type`). Enter your rate for each token type: input, output, and optionally cached input, cache write and reasoning.
 2. **Link it to the usage Feature.** Set **Linked feature** to your token Feature (for example `llm_tokens`) and the composition to **Detailed events only**, then publish. With **Linked feature** set to none, each token cost event is still rated on its own meter and attributed to the customer, subscription and Feature of the usage event it points to, and counts in margin; the usage event itself stays uncosted with `missing_cost_composition`. A cost event for another customer than its parent is uncosted as `parent_customer_mismatch`, and one whose parent never resolved as `parent_attribution_failed`. Cost events recorded before this behavior are not rated again by themselves: replay the parent usage event, then its cost events. Linking a Feature is still the way to get a composition and the `can()` estimate.
-3. **One cost model per provider and model you use.** The template's conditions must equal the `provider` and `model` values the capture sends (`provider` is the response format: `openai`, `anthropic` or `gemini`). A model without a matching rule is listed as uncosted with `no_matching_cost_rule`.
+3. **One cost model per provider and model you use.** The template's conditions must equal the `provider` and `model` values the capture sends (`provider` is the response format: `openai`, `anthropic` or `gemini`). A model without a matching rule is costed from the [shared price list](/guides/margin/shared-prices) when the list has it, and otherwise listed as uncosted with `no_matching_cost_rule`.
 4. **Turn on cost events in capture.** Set `costMeterCode: "ai_tokens"` (Node.js), `cost_meter_code="ai_tokens"` (Python) or `CostMeterCode: "ai_tokens"` (Go). Each response then also sends one cost event per token type, linked to its usage event.
 5. **Check for uncosted events** in the cost intelligence report or the Uncosted queue after the first calls. See [cost models](/guides/margin/cost-models).
 
@@ -104,7 +104,7 @@ The option to waive billing for aborted streams is not available yet. Aborted st
 
 ## Uncosted models
 
-When an LLM call is rated and no cost rule prices it, Nozle records the provider, model and token bucket. An LLM call is an event whose `properties.model` is a non-empty string. The call is still accepted and billed, and its cost counts as zero in margin until a price exists. Nozle records three cases:
+When an LLM call is rated and no cost rule prices it, Nozle records the provider, model and token bucket. An LLM call is an event whose `properties.model` is a non-empty string. The call is still accepted and billed, and its cost counts as zero in margin until a price exists. A model the [shared price list](/guides/margin/shared-prices) prices is rated from that list when none of your rules matches, so it is not uncosted for events from the price's start date. Nozle records three cases:
 
 | Source | When |
 |---|---|
@@ -120,19 +120,19 @@ Calls are counted per key, not stored one by one. A later priced call of the sam
 |---|---|
 | `warn` (default) | Record, show in the dashboard, and notify. |
 | `ignore` | Record and show in the dashboard. No notification. |
-| `deny` | Refuse a call to a model that no cost rule of yours prices: `GET /can` with `model` answers `uncosted_model_denied`, and the [LLM proxy](/api/llm-proxy) answers `403 uncosted_model_denied` before the provider is called. See [refuse calls to unpriced models](#refuse-calls-to-unpriced-models). |
+| `deny` | Refuse a call to a model that no cost rule of yours and no [shared price](/guides/margin/shared-prices) prices: `GET /can` with `model` answers `uncosted_model_denied`, and the [LLM proxy](/api/llm-proxy) answers `403 uncosted_model_denied` before the provider is called. See [refuse calls to unpriced models](#refuse-calls-to-unpriced-models). |
 
 **Notification.** With `warn`, admins and members with `cost_intelligence:manage` get an in-app and an email notification, once per model per UTC day. At most 20 per organization per day are sent; the rest fold into one digest. No webhook is sent.
 
-**API.** `GET /api/v1/cost-intelligence/uncosted-models` lists keys (`status` `open`, `resolved`, `dismissed` or `all`; `limit`; `cursor`) and needs `analytic:read`. `POST /api/v1/cost-intelligence/uncosted-models/dismiss` with `{provider, model, token_type, source}` dismisses one and needs `analytic:write`. Each row has `shared_price_available`, kept for compatibility and always `false`: Nozle does not price models for you. The [cost report](/api/cost-intelligence-report) has a new field `uncosted_models` with the top 50 open keys.
+**API.** `GET /api/v1/cost-intelligence/uncosted-models` lists keys (`status` `open`, `resolved`, `dismissed` or `all`; `limit`; `cursor`) and needs `analytic:read`. `POST /api/v1/cost-intelligence/uncosted-models/dismiss` with `{provider, model, token_type, source}` dismisses one and needs `analytic:write`. Each row has `shared_price_available`, true when the shared price list prices the model now. The [cost report](/api/cost-intelligence-report) has a new field `uncosted_models` with the top 50 open keys.
 
 **Dashboard.** The list is under **Usage → Margin**, tab **Uncosted**.
 
-To fix a key, add a price for the model in your [cost model](/guides/margin/cost-models). Then [reprocess](/guides/margin/reprocess) the events recorded before the price existed. Dismiss a key you do not want to price.
+To fix a key, add a price for the model in your [cost model](/guides/margin/cost-models), or wait for the [shared price list](/guides/margin/shared-prices) to list it. Then [reprocess](/guides/margin/reprocess) the events recorded before the price existed. Dismiss a key you do not want to price.
 
 ### Refuse calls to unpriced models
 
-Set `uncosted_model_action` to `deny` to stop calls to a model that none of your cost rules prices.
+Set `uncosted_model_action` to `deny` to stop calls to a model that none of your cost rules prices and the [shared price list](/guides/margin/shared-prices) does not list. A model on the shared list is not refused.
 
 - **`GET /can`.** Send the optional `model` and `provider` query parameters. A refused call answers `allowed: false`, `reason: "uncosted_model_denied"`, with `model` and `message`. Without `model` nothing is checked. See [Check an entitlement](/api/check-entitlement).
 - **LLM proxy.** The model is read from the request body. A refused call answers `403` with code `uncosted_model_denied` and the provider is not called. See [LLM proxy errors](/api/llm-proxy#errors).

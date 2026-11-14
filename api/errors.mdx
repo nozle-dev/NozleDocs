@@ -119,6 +119,31 @@ _Unreleased._ These come from a [sandbox](/guides/getting-started/sandbox), most
 | `403` `live_organization_only` | Members, invitations, roles, sign-in methods and SSO, your Nozle plan and billing, or AI onboarding, from a sandbox. | Switch to live. |
 | `429` `sandbox_reset_rate_limited` | The sandbox was reset more than once in 10 minutes or 5 times in a day. | Wait and reset again. |
 
+## Invitation errors
+
+_Core 11.44.0._ These come from inviting someone to your workspace and from accepting an invitation, in the dashboard. See [Team access](/guides/settings/team-access). The code is in `extensions.code`, or for a validation error under its field in `extensions.details`.
+
+| Status and `code` | What happened | What to do |
+|---|---|---|
+| `422` `email: email_already_used` (invite) | The email already has a Nozle account, in any workspace and in any case. Only an email with no account can be invited. No invitation is created. | Invite another address. |
+| `422` `email: email_already_used` (accept) | The email got a Nozle account after the invitation was sent. Nothing is created or changed, and the invitation stays pending. | Revoke the invitation and invite another address. |
+| `422` `invite_expired` | The invitation was sent more than seven days ago. Reading or accepting it is refused. | Invite the email again. The expired invitation is revoked and a new one is sent. |
+| `403` `invite_expired` | Changing the roles of an expired invitation. | Invite the email again. |
+| `422` `invite: invite_resend_too_soon` (Core 11.46.0) | The invitation was sent less than a minute ago, by inviting the email or with **Resend**. Nothing is sent. | Wait a minute, then resend. The link in the last email still works. |
+
+From Core 11.46.0 an email matches an account whatever the case of its letters, so `email_already_used` also covers `Name@example.com` when `name@example.com` has an account. Inviting an email that has a pending invitation sends that invitation again instead of answering `invite_already_exists`, which is no longer returned. See [Resend](/guides/settings/team-access#invitations).
+
+## Refund errors
+
+_Core 11.46.0._ These come from creating a credit note with a refund (`POST /credit_notes`, or the dashboard's credit note form). All are `422` with `code: validation_errors`, and the key in `error_details` comes before the colon. Nothing is created and nothing is sent to a payment provider. Each of them means that the online part of the refund, `refund_amount_cents` minus `out_of_band_refund_amount_cents`, cannot go back to the original payment method. See [Refunds](/guides/billing/payments#refunds).
+
+| Status and `code` | What happened | What to do |
+|---|---|---|
+| `422` `refund_amount_cents: manual_refund_required` | The invoice was paid outside Nozle, in whole or in part. It was paid with a manual payment, or only marked paid, and the provider payments do not cover the online part. | Refund the customer yourself, then record it in `out_of_band_refund_amount_cents`. |
+| `422` `refund_amount_cents: provider_refund_unsupported` | The invoice was paid through a payment provider Nozle cannot refund through (Cashfree, Flutterwave, Moneyhash). | Refund the customer at that provider, then record it in `out_of_band_refund_amount_cents`. |
+| `422` `refund_amount_cents: insufficient_refundable_amount` | The invoice's provider payments still hold less than the online part, for example because earlier refunds took part of them. | Lower the online part, or record the rest in `out_of_band_refund_amount_cents`. |
+| `422` `out_of_band_refund_amount_cents: higher_than_refund_amount` | The out-of-band part is higher than `refund_amount_cents`. | Keep it within `refund_amount_cents`. It is a part of the refund, not an extra amount. |
+
 ## Workspace billing errors
 
 _Unreleased._ These errors are about your own workspace's account with Nozle, not about your customers. They are always on. A sandbox key gets the same errors as the live organization it belongs to. See [Workspace billing](/guides/getting-started/workspace-billing).

@@ -88,9 +88,9 @@ An endpoint with no `event_types` receives every type, and gets every type Nozle
 
 | Event | Object key | When it fires |
 |---|---|---|
-| `credit_note.created` | `credit_note` | A credit note is created, including the one made when a draft invoice is refreshed and finalized. |
+| `credit_note.created` | `credit_note` | A credit note is created, including the one made when a draft invoice is refreshed and finalized. From Core 11.46.0 the credit note carries `out_of_band_refund_amount_cents`, `out_of_band_refund_reference` and `out_of_band_refunded_at`. See [Refunded outside Nozle](/guides/billing/payments#refunded-outside-nozle). |
 | `credit_note.generated` | `credit_note` | The PDF of a credit note has been generated. `file_url` is set. |
-| `credit_note.refund_failure` | `credit_note_payment_provider_refund_error` | Refunding a credit note at the payment provider fails. Endpoints that subscribed with the former name `credit_note.provider_refund_failure` receive it under this name. |
+| `credit_note.refund_failure` | `credit_note_payment_provider_refund_error` | Refunding a credit note at the payment provider fails, or (Core 11.46.0) no payment of the invoice can take the refund of a credit note Nozle created itself. The failed amount can be refunded again. See [When a refund fails](/guides/billing/payments#when-a-refund-fails). Endpoints that subscribed with the former name `credit_note.provider_refund_failure` receive it under this name. |
 
 ### Dunning Campaigns
 
@@ -140,8 +140,8 @@ An endpoint with no `event_types` receives every type, and gets every type Nozle
 | `invoice.generated` | `invoice` | The PDF of an invoice has been generated. `file_url` is set. |
 | `invoice.drafted` | `invoice` | An invoice is created as a draft, while it is in its grace period or has been refreshed. |
 | `invoice.voided` | `invoice` | An invoice is voided. |
-| `invoice.payment_dispute_lost` | `payment_dispute_lost` | A payment dispute on an invoice is lost. The payload wraps the invoice in `payment_dispute_lost` with the provider reason. |
-| `invoice.payment_dispute_updated` | `payment_dispute_updated` | A payment dispute on an invoice is opened, needs a response, is under review or is won (Razorpay). The payload holds the `invoice` and a `dispute` with `id`, `event`, `status`, `reason_code`, `phase` and `respond_by`. The invoice does not change. |
+| `invoice.payment_dispute_lost` | `payment_dispute_lost` | A payment dispute on an invoice is lost. The payload wraps the invoice in `payment_dispute_lost` with the provider reason. From Core 11.45.0 the invoice's `total_due_amount_cents` is what is owed again and `disputed_amount_cents` is what the dispute took back. From Core 11.46.0 it is sent only the first time a payment is lost. A repeat, such as the provider sending the outcome again, sends nothing. See [Lost disputes](/guides/billing/dunning#lost-disputes). |
+| `invoice.payment_dispute_updated` | `payment_dispute_updated` | A payment dispute on an invoice is opened, needs a response, is under review or is won (Razorpay), or is opened, updated or funded from your balance (Stripe `charge.dispute.created`, `charge.dispute.updated` and `charge.dispute.funds_withdrawn`, from Core 11.46.0). The payload holds the `invoice` and a `dispute` with `id`, `event`, `status`, `reason_code`, `phase` (`null` for Stripe) and `respond_by`. The invoice does not change. An existing Stripe endpoint needs a refresh to send the Stripe events. See [Stripe webhook setup](/integrations/stripe#webhook-setup). |
 | `invoice.payment_status_updated` | `invoice` | The payment status of an invoice changes (pending, succeeded, failed). |
 | `invoice.payment_overdue` | `invoice` | An unpaid invoice passes its due date and is marked overdue. |
 | `invoice.payment_failure` | `payment_provider_invoice_payment_error` | A payment attempt for an invoice fails at the provider, or a duplicate payment, or a payment on a voided invoice, is refunded. `provider_error.error_code` says why, for example `duplicate_payment_refunded`, `voided_invoice_payment_refunded` or, when the provider refuses the refund and you must refund by hand, `duplicate_payment_refund_failed` or `voided_invoice_payment_refund_failed`. |
@@ -335,7 +335,7 @@ _Engine 2.34.0, Core 11.23.0._ `budget.threshold_reached`, `budget.exceeded` and
 
 ### `dunning.step`
 
-Sent for each step of the [dunning policy](/guides/billing/dunning) of an unpaid invoice: `payment_failed` on day 0, `reminder`, `final_reminder`, `end_action` on the last day of the grace, and `resolved` once when the invoice no longer needs paying. Only campaigns with an end action send it; `dunning_campaign.finished` is unchanged for the others. `next_action` is the next step of the timeline (`retry` included) and is `null` after the last one and on `resolved`. The invoice and customer ids are left out of this example; the Dunning Campaigns webhook reference lists every key.
+Sent for each step of the [dunning policy](/guides/billing/dunning) of an unpaid invoice: `payment_failed` on day 0, `reminder`, `final_reminder`, `end_action` on the last day of the grace, and `resolved` once when the invoice no longer needs paying. Only campaigns with an end action send it; `dunning_campaign.finished` is unchanged for the others. `next_action` is the next step of the timeline (`retry` included) and is `null` after the last one and on `resolved`. `total_due_amount_cents` is what is still owed on the invoice; after a [lost dispute](/guides/billing/dunning#lost-disputes) it is what is owed again (Core 11.45.0). The webhook is sent per invoice, even when the customer gets one email for several invoices. The invoice and customer ids are left out of this example; the Dunning Campaigns webhook reference lists every key.
 
 ```json
 {
@@ -367,7 +367,7 @@ Sent once when a paid plan change cannot be applied: the intent goes to review a
 
 ### `credit_note.refund_failure`
 
-Sent when refunding a credit note at the payment provider fails:
+Sent when refunding a credit note at the payment provider fails. From Core 11.46.0 the failed amount can be refunded again, online or out of band. When Nozle sends nothing because no payment of the invoice can take the refund of a credit note it created itself, `provider_error` is an object with `message` and `error_code` (`manual_refund_required`, `provider_refund_unsupported` or `insufficient_refundable_amount`) instead of a string:
 
 ```json
 {
