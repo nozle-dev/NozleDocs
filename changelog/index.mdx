@@ -5,6 +5,17 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Archive a plan without ending its subscriptions (Core 11.51.0)
+
+_Unreleased_
+
+- **Archive means grandfathering.** `POST /plans/{code}/archive` stops a plan, every version of its code, from taking new subscriptions. Existing subscriptions keep billing with their entitlements, credit grant rules, spend limits and scheduled starts. `POST /plans/{code}/unarchive` undoes it. Archiving an archived plan, or unarchiving an active one, returns `200` and changes nothing. See [Archive vs delete](/guides/billing/plan-versions#archive-vs-delete).
+- **Refused on an archived plan.** `POST /subscriptions`, checkout, quotes, previews and billing state imports return `422` with `plan_code: [plan_archived]`. A self-serve plan change is refused with the code `plan_archived`. Subscriptions already on the plan can still be updated, and version migrations between its versions still work. See [Subscription management](/api/subscription-management).
+- **New fields and filter.** A plan has `status` (`active` or `archived`) and `archived_at`. `GET /plans?status=active|archived` filters the list. A secret key gets both without it; a publishable key never receives archived plans. See [Public plan catalog](/api/list-plans).
+- **Family slot freed.** An archived plan frees its plan family slot for its interval and currency. `unarchive` is refused with `422` when another plan has taken it.
+- **Webhooks.** `plan.archived` and `plan.unarchived` carry the plan. See [Webhook events](/api/webhook-events).
+- **Delete is unchanged.** `DELETE /plans/{code}` still terminates active subscriptions and cancels pending ones. Use archive to keep them billing.
+
 ### Event ingest refuses events without an id or in an invoiced period (Engine 2.59.0)
 
 _Unreleased_
