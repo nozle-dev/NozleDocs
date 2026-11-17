@@ -35,7 +35,7 @@ Every delivery has the same envelope. `webhook_type` is the event type, `object_
 
 - The object under `object_type` is the same object the REST API returns for that resource, so you can use one parser for both. A few events wrap it, for example `invoice.payment_dispute_lost` holds `{ "invoice": {...}, "provider_error": "..." }` under `payment_dispute_lost`.
 - Payloads carry only the Nozle key names (`nozle_id` and the plain `<key>` names). From Core 6.0.0 the former-prefix keys are gone: see [legacy key names](/api/api-standards#legacy-key-names-removed-in-core-600).
-- `livemode` is _Unreleased_. A sandbox delivery's `organization_id` is the sandbox's own organization ID. If one receiver takes both, check `livemode` before acting on an event.
+- A sandbox delivery's `organization_id` is the sandbox's own organization ID. If one receiver takes both, check `livemode` before acting on an event.
 - Examples are captured from Core with real identifiers replaced by placeholders.
 
 ## Choose the events you receive
@@ -176,6 +176,9 @@ An endpoint with no `event_types` receives every type, and gets every type Nozle
 | `payment.requires_action` | `payment` | A payment needs the customer to act, for example 3D Secure authentication. `next_action` has the details. |
 | `payment.scheduled` | `payment` | Nozle will debit a payment automatically from the customer's saved card or mandate. The payload is the payment plus `scheduled_at` (ISO 8601, UTC) and `method_type` (`card`, `upi` or `bank`). It is sent once per `scheduled_at`; a changed time sends it again. Nozle sends it for Stripe card payments that the bank debits after its notice, and for Razorpay card and UPI debits when the debit is scheduled (not for a bank eMandate, and not when `pre_debit_notice` is off). |
 | `payment.schedule_cancelled` | `payment` | An automatic debit announced by `payment.scheduled` will not happen. The payload is the payment plus `scheduled_at` (the announced time) and `reason`: `mandate_changed`, `invoice_paid`, `invoice_voided`, `notice_failed` or `other`. It has no `method_type`, and it is sent only after `payment.scheduled` was sent for the payment. |
+| `payment_method.created` | `payment_method` | A payment method (an auto-pay mandate) is saved for a customer. Sent when a Razorpay mandate is registered; `status` is `pending` until the bank confirms it. |
+| `payment_method.updated` | `payment_method` | The status of a payment method changes, for example a bank mandate is confirmed (`active`), paused or rejected. Sent for Razorpay mandates. |
+| `payment_method.deleted` | `payment_method` | A payment method is removed and will no longer be charged. Sent when a Razorpay mandate is cancelled; `status` is `cancelled`. |
 | `payment_provider.error` | `payment_provider_error` | A payment provider connection reports an error, for example when Nozle cannot register its webhook at Stripe. |
 | `payment_request.created` | `payment_request` | A payment request is created, by dunning or automatically for an invoice that Core did not charge (`automatic` is `true`). |
 | `payment_request.payment_failure` | `payment_provider_payment_request_payment_error` | A payment attempt for a payment request fails, or its Pay link cannot be built. `provider_error` says why, for example `payment_request_invoices_changed`. |

@@ -19616,6 +19616,192 @@ webhooks:
       responses:
         '200':
           description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
+  payment_method_created:
+    post:
+      operationId: paymentMethodCreated
+      summary: A payment method was saved
+      description: A payment method (an auto-pay mandate) has been saved for a customer. Nozle sends it when a Razorpay mandate is registered; `status` is `pending` until the bank confirms it.
+      parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
+        - $ref: '#/components/parameters/webhook_signature'
+      requestBody:
+        description: The payment method
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - livemode
+                - payment_method
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - payment_method.created
+                object_type:
+                  type: string
+                  enum:
+                    - payment_method
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
+                payment_method:
+                  $ref: '#/components/schemas/PaymentMethodObject'
+            example:
+              webhook_type: payment_method.created
+              object_type: payment_method
+              organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
+              payment_method:
+                nozle_id: 00000000-0000-4000-8000-000000000002
+                is_default: false
+                payment_provider_code: razorpay_prod
+                payment_provider_name: Razorpay
+                payment_provider_type: razorpay
+                provider_method_id: token_00000000000001
+                external_customer_id: customer_0001
+                type: upi
+                status: pending
+                max_amount_cents: 1500000
+                expires_at: '2036-01-21T00:00:00Z'
+                created_at: '2026-11-17T10:00:00Z'
+      responses:
+        '200':
+          description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
+  payment_method_updated:
+    post:
+      operationId: paymentMethodUpdated
+      summary: The status of a payment method changed
+      description: The status of a payment method has changed, for example a bank mandate was confirmed (`active`), paused or rejected. Sent for Razorpay mandates.
+      parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
+        - $ref: '#/components/parameters/webhook_signature'
+      requestBody:
+        description: The payment method
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - livemode
+                - payment_method
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - payment_method.updated
+                object_type:
+                  type: string
+                  enum:
+                    - payment_method
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
+                payment_method:
+                  $ref: '#/components/schemas/PaymentMethodObject'
+            example:
+              webhook_type: payment_method.updated
+              object_type: payment_method
+              organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
+              payment_method:
+                nozle_id: 00000000-0000-4000-8000-000000000002
+                is_default: true
+                payment_provider_code: razorpay_prod
+                payment_provider_name: Razorpay
+                payment_provider_type: razorpay
+                provider_method_id: token_00000000000001
+                external_customer_id: customer_0001
+                type: upi
+                status: active
+                max_amount_cents: 1500000
+                expires_at: '2036-01-21T00:00:00Z'
+                created_at: '2026-11-17T10:00:00Z'
+      responses:
+        '200':
+          description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
+  payment_method_deleted:
+    post:
+      operationId: paymentMethodDeleted
+      summary: A payment method was removed
+      description: A payment method has been removed and will no longer be charged. Sent when a Razorpay mandate is cancelled; `status` is `cancelled`.
+      parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
+        - $ref: '#/components/parameters/webhook_signature'
+      requestBody:
+        description: The payment method
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - livemode
+                - payment_method
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - payment_method.deleted
+                object_type:
+                  type: string
+                  enum:
+                    - payment_method
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
+                payment_method:
+                  $ref: '#/components/schemas/PaymentMethodObject'
+            example:
+              webhook_type: payment_method.deleted
+              object_type: payment_method
+              organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
+              payment_method:
+                nozle_id: 00000000-0000-4000-8000-000000000002
+                is_default: false
+                payment_provider_code: razorpay_prod
+                payment_provider_name: Razorpay
+                payment_provider_type: razorpay
+                provider_method_id: token_00000000000001
+                external_customer_id: customer_0001
+                type: upi
+                status: cancelled
+                max_amount_cents: 1500000
+                expires_at: '2036-01-21T00:00:00Z'
+                created_at: '2026-11-17T10:00:00Z'
+      responses:
+        '200':
+          description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
   payment_provider_error:
     post:
       operationId: paymentProviderError
@@ -32501,6 +32687,42 @@ components:
           type: string
           description: Unique identifier of the payment method within the payment provider.
           example: pm_1N8ZQX2eZvKYlo2CkL9Y8XYZ
+        external_customer_id:
+          type:
+            - string
+            - 'null'
+          description: The external ID of the customer the payment method belongs to.
+          example: hooli_1234
+        type:
+          type:
+            - string
+            - 'null'
+          description: The kind of payment method at the provider, for example `card`, `upi` or `bank_debit` (a bank eMandate).
+          example: upi
+        status:
+          type: string
+          description: The status of the payment method. A removed payment method is `cancelled`.
+          enum:
+            - pending
+            - active
+            - paused
+            - cancelled
+            - rejected
+            - inactive
+          example: active
+        max_amount_cents:
+          type:
+            - integer
+            - 'null'
+          description: For an auto-pay mandate, the largest amount the provider allows per debit, in cents.
+          example: 1500000
+        expires_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: For an auto-pay mandate, when it expires.
+          example: '2036-01-21T00:00:00Z'
         created_at:
           type: string
           format: date-time
@@ -39490,6 +39712,9 @@ components:
                   - payment.requires_action
                   - payment.scheduled
                   - payment.schedule_cancelled
+                  - payment_method.created
+                  - payment_method.updated
+                  - payment_method.deleted
                   - payment_provider.error
                   - payment_receipt.created
                   - payment_receipt.generated
@@ -39610,6 +39835,9 @@ components:
                   - payment.requires_action
                   - payment.scheduled
                   - payment.schedule_cancelled
+                  - payment_method.created
+                  - payment_method.updated
+                  - payment_method.deleted
                   - payment_provider.error
                   - payment_receipt.created
                   - payment_receipt.generated
