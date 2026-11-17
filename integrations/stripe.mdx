@@ -64,7 +64,7 @@ To link a customer that already exists in Stripe from code, pass the Stripe cust
 
 On a later upsert or update of a linked customer, Nozle sends Stripe only the name, email, phone and address that the request changed. A changed address line sends the whole address, because Stripe replaces the address as a whole. A repeated upsert, an upsert without `billing_configuration`, and an upsert that only links a `cus_…` leave the Stripe customer's email, phone and address as they are, so edits made in Stripe are kept. Nozle never clears a Stripe customer field: a field sent as `null` or blank is cleared on the Nozle customer only.
 
-Credit top-ups and payment links do not assign a customer. The customer must already be assigned and linked to a Stripe customer. See [Credit top-ups](#credit-top-ups).
+_Unreleased._ A credit top-up or payment link for a customer without a payment connection uses the workspace's [default payment connection](/integrations#default-payment-connection) and creates the Stripe customer at that moment. Without a default, the customer must already be assigned. See [Credit top-ups](#credit-top-ups).
 
 ### Payment methods
 
