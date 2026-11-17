@@ -5,6 +5,18 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### API rate limits, sign-in security, portal Pay, default payment connection (Core, Engine, dashboard)
+
+_Unreleased_
+
+- **API rate limits.** Core's REST API (`/api/v1/*`) accepts 6,000 requests per minute per API key and per IP address. Over the limit it answers `429` `rate_limited` with a `Retry-After` header. Wait that long, then retry with backoff. See [Rate limits](/api/errors#rate-limits).
+- **Sign-in limits.** Dashboard sign-in accepts 10 attempts per email in 15 minutes and 100 per IP address. Password-reset requests accept 5 per email per hour and 30 per IP address. See [Sign-in limits](/guides/settings/account-security#sign-in-limits).
+- **Sessions and password resets.** A new password signs out your other sessions. A session ends 7 days after sign-in. A reset request answers the same way whether or not the email has an account, and each new reset link cancels the earlier ones. See [Account security](/guides/settings/account-security#password).
+- **Pay from the customer portal.** Customers can pay a finalized unpaid invoice with **Pay** in the hosted portal. They return to the portal afterwards, where the invoice shows as confirming until the payment settles. When online payment is not set up, the portal says so. See [Pay from the customer portal](/guides/billing/invoices#pay-from-the-customer-portal).
+- **Default payment connection.** A customer without a payment connection pays through the workspace's only connection, or the default you choose under **Settings > Billing settings > Integrations**, at checkout, through a pay link or with portal **Pay**. Automatic charges never use the default. Without one, checkout answers `422` `payment_provider_required` with a message that names the fix. See [Default payment connection](/integrations#default-payment-connection).
+- **Stripe connections.** Connecting the same Stripe account again keeps your customers' Stripe IDs and saved cards. A connection's secret key can be replaced with a key of the same account and mode; another account is refused with `stripe_account_mismatch`. See [Replace the secret key](/integrations/stripe#replace-the-secret-key).
+- **Engine `POST /customers`** forwards `billing_configuration` to Core, so it can assign the customer's payment connection. See [Engine `POST /customers`](/api/create-customer#engine-post-customers).
+
 ### Refunds split across payments, refunds made outside Nozle, Stripe dispute updates (Core 11.46.0, dashboard 2.22.0)
 
 _November 14, 2026_
