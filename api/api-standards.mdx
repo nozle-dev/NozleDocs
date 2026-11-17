@@ -41,7 +41,7 @@ Prefer stable external identifiers from your own system when an endpoint accepts
 
 For metered events and credit operations, generate a unique transaction or idempotency identifier and reuse it when retrying the same logical operation. Do not generate a new identifier after a timeout unless you intend to create a second operation.
 
-Retry transient network failures and HTTP `429` or `5xx` responses with exponential backoff and jitter. Do not automatically retry validation or authorization failures.
+Retry transient network failures and HTTP `429` or `5xx` responses with exponential backoff and jitter. Do not automatically retry validation or authorization failures. A `429` `rate_limited` carries a `Retry-After` header: wait at least that long first. See [Rate limits](/api/errors#rate-limits).
 
 The Node.js, Python, and Go SDKs do not retry unless you turn it on (`maxRetries`, `max_retries`, `WithMaxRetries`); the setting retries only requests that are safe to repeat. To retry in your own code, do it only after a network error, a `429`, or a `5xx`, and send the same idempotency key with the same request, including its timestamp.
 

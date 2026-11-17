@@ -47,6 +47,37 @@ Do not parse human-readable text when a machine-readable `code` is available.
 - Honor `Retry-After` when returned.
 - Do not retry validation, authorization, or insufficient-credit decisions without changing the underlying state.
 
+## Rate limits
+
+_Unreleased._ Core's REST API (`https://api.nozle.app/core/api/v1`) counts requests per API key and per client IP address, each in a fixed one-minute window.
+
+| Requests | Limit |
+|---|---|
+| Core REST API, per API key | 6,000 per minute |
+| Core REST API, per IP address | 6,000 per minute |
+
+Every server that uses the same key shares its limit. Requests the Engine makes to Core on your behalf are not counted against your key.
+
+A request over the limit answers `429` with a `Retry-After` header, in seconds until the window ends, and this body:
+
+```json
+{
+  "status": 429,
+  "error": "Too Many Requests",
+  "code": "rate_limited"
+}
+```
+
+The request did nothing. To back off:
+
+- Wait at least the `Retry-After` seconds, then retry. If the retry is refused again, double the wait each time and add random jitter, so your servers do not all retry at the same moment.
+- Retry a mutation with the same `Idempotency-Key` and the same body.
+- Spread large jobs, such as imports or backfills, over several minutes instead of sending them in one burst.
+
+The Node.js, Python and Go SDKs retry a `429` only when you turn retries on (see [API standards](/api/api-standards)).
+
+The dashboard also limits sign-in and password-reset requests. See [Account security](/guides/settings/account-security#sign-in-limits).
+
 ## Common failures
 
 Match on the status and `code`, not on the message text.
