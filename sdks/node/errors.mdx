@@ -63,7 +63,7 @@ try {
 
 ## Customer payment overdue
 
-_Unreleased (0.23.0, needs Engine 2.22.0)._ One of your customers whose unpaid invoices are past the grace of their plan is blocked by your [dunning policy](/guides/billing/dunning) with HTTP `402` `customer_payment_overdue`. This is about that customer, not your workspace.
+From Node 0.23.0, with Engine 2.22.0. One of your customers whose unpaid invoices are past the grace of their plan is blocked by your [dunning policy](/guides/billing/dunning) with HTTP `402` `customer_payment_overdue`. This is about that customer, not your workspace.
 
 - `can()` does not throw. It returns `{ allowed: false, reason: 'customer_payment_overdue', used: 0, limit: null, remaining: null }`, so you can ask the customer to pay. `createBillingHandler`'s entitlement route, and so React `useEntitlement`, returns the same denial as data.
 - `track()`, `usage.check()` and `usage.track()` throw `NozleApiError` with `code` `customer_payment_overdue` (the `CUSTOMER_PAYMENT_OVERDUE` constant). Nothing is tracked.
