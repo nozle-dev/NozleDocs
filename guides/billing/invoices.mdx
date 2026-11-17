@@ -55,6 +55,26 @@ Where the amount is carried instead of charged:
 - **Payment requests** (dunning, or created through the API or the dashboard) carry their invoices below the minimum and ask for the others. When none is left, `POST /payment_requests` answers `422` `invoices_carried_forward` and nothing is created.
 - **Automatic charges** and retries carry the invoice instead of failing with `amount_below_provider_minimum`.
 
+## Pay from the customer portal
+
+_Unreleased._ The hosted customer portal (the `portal_url` of [`GET /customers/{external_id}/portal_url`](/api-reference/customers/get-a-customer-portal-url)) shows **Pay** next to each invoice the customer still owes online: a finalized invoice whose payment is pending or failed, with an amount due, and no lost dispute.
+
+1. **Pay** opens the payment provider's page for that invoice in the same tab, like a [pay link](/guides/billing/checkout#pay-links).
+2. After paying, the customer returns to the portal. Cancelling returns there too, and the invoice stays as it was.
+3. The invoice shows **Payment received, confirming…** until the provider's webhook settles the payment, then shows as paid. If that takes longer than about 30 seconds, it shows **Your payment is being confirmed. This can take a few minutes.**
+
+When the customer cannot pay online, **Pay** says why instead of opening a page:
+
+| Reason | What the portal says |
+|---|---|
+| No payment connection for the customer and no [default connection](/integrations#default-payment-connection) | Online payment isn't set up for your account. Contact your provider to pay this invoice. |
+| A Razorpay connection and an invoice not in INR | This invoice's currency can't be paid online. Contact your provider to pay it. |
+| The amount due is below the provider's minimum | This amount is too small to charge on its own. It moves to your next invoice. |
+| An automatic debit of the invoice is processing | A payment for this invoice is already processing. Check back in a few minutes. |
+| The invoice was paid or voided meanwhile | This invoice can't be paid online anymore. Refresh to see its latest status. |
+
+The portal's return address is built by Nozle. Pay links you create yourself, and the links in emails, keep their own return URL.
+
 ## React applications
 
 The current React SDK does not fetch customer invoices. Expose a narrow merchant endpoint and render the returned fields in your application.
