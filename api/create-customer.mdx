@@ -54,7 +54,7 @@ Send customer attributes under the `customer` key:
 </ParamField>
 
 <Note>
-`tax_identification_type` and the response fields below are available from Core 11.31.0. The SDKs send them from Node 0.35.0, Python 0.33.0 and Go v0.33.0, which ship after Core. The Engine `/customers` proxy does not forward address or billing configuration. The SDKs call Core directly. See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
+`tax_identification_type` and the response fields below are available from Core 11.31.0. The SDKs send them from Node 0.35.0, Python 0.33.0 and Go v0.33.0, which ship after Core. The [Engine `POST /customers`](#engine-post-customers) does not forward address or tax fields. The SDKs call Core directly. See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
 </Note>
 
 ### Response
@@ -123,6 +123,26 @@ A bad tax ID answers `422` with `code: validation_errors`:
 | `tax_identification_type: ["value_is_invalid"]` | The type is not in the list. |
 | `tax_identification_number: ["value_is_mandatory"]` | A type without a number. |
 | `tax_identification_number: ["invalid_format"]` | An `eu_vat` number that is not well formed, or an `in_gst` number that is not 15 letters and digits. |
+
+## Engine `POST /customers`
+
+`POST https://api.nozle.app/engine/api/v1/customers` (permission `customer:write`) upserts a customer through Core with a smaller body, without the `customer` wrapper:
+
+```json
+{
+  "external_id": "workspace_123",
+  "name": "Example workspace",
+  "email": "billing@example.com",
+  "billing_configuration": {
+    "payment_provider": "stripe",
+    "payment_provider_code": "stripe_live"
+  }
+}
+```
+
+`external_id` is required (`400` `external_id is required` without it). `name`, `email` and `billing_configuration` are sent to Core only when the request has them, so a field you leave out keeps its value. _Unreleased:_ `billing_configuration` is forwarded as sent and Core validates it, as on Core's `POST /customers`: use it to assign the customer's payment connection (`payment_provider`, `payment_provider_code`). Before, the Engine dropped it. Address and tax fields are not forwarded: send them to Core's endpoint above.
+
+The response is `{"external_id", "name", "email"}`. A Core error, such as `422` `validation_errors`, is returned as Core sent it.
 
 ## Recheck a tax ID
 
