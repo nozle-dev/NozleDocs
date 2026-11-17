@@ -22,7 +22,7 @@ Connect Stripe in the Nozle dashboard under **Settings > Billing settings > Inte
 |---|---|
 | **Name** | A label for the connection. Enter one: Nozle rejects a blank name, although the form marks it optional |
 | **Code** | A stable identifier. It must be unused by every other payment connection in your organization. You use it when you assign this connection to a customer, and it is part of the webhook URL |
-| **Secret key** | `sk_test_...` or `sk_live_...`. Stored encrypted and shown masked. It cannot be edited: to use another key, create a new connection |
+| **Secret key** | `sk_test_...` or `sk_live_...`. Stored encrypted and shown masked. _Unreleased:_ it can be replaced with another key of the same Stripe account and mode, for example a rolled key. See [Replace the secret key](#replace-the-secret-key) |
 | **Support 3DSecure** | Optional, off by default. See [Saved payment methods and automatic charging](#saved-payment-methods-and-automatic-charging) |
 | **Publishable key** | Optional. `pk_test_...` or `pk_live_...`, in the same mode as the secret key (a mismatch is refused). Find it in the Stripe dashboard under **Developers > API keys**. It is not a secret. With it, cards are saved on a Nozle-hosted card page that can register an e-mandate for cards issued in India. See [Indian cards and automatic payments](#indian-cards-and-automatic-payments) |
 | **Mandate maximum** | Optional, for Indian cards only: a headroom multiplier over the plan price (3 by default), and a floor and a ceiling in the smallest unit of the mandate currency (defaults per currency). See [How big the mandate is](#how-big-the-mandate-is) |
@@ -34,13 +34,21 @@ Nozle checks the key with Stripe when you connect. A key Stripe rejects fails wi
 
 The connect form has no success redirect URL. After you connect, use **Add redirect URL** on the connection to set one. Nozle sends the customer there after a payment on a hosted Stripe page, which covers credit top-ups and payment links. Without it the customer lands on `https://stripe.com/`. The URL must be valid and at most 1,024 characters. An embedded checkout uses the `return_url` of the checkout request instead.
 
-To edit a connection, change its name, code, **Support 3DSecure**, redirect URL, publishable key and mandate maximum settings. The same fields are on the GraphQL `addStripePaymentProvider` and `updateStripePaymentProvider` mutations as `publishableKey`, `mandateCapMultiplier`, `mandateCapFloorCents`, `mandateCapCeilingCents` and `upcomingDebitEmail`. Changing the code updates the customers assigned to it and updates the webhook endpoint URL in Stripe. Until that update finishes, Stripe events sent to the previous code's URL are still accepted. If the connection had no webhook endpoint, the rename registers one, and if the key may not edit webhook endpoints Nozle sends the `payment_provider.error` webhook.
+To edit a connection, change its name, code, **Support 3DSecure**, redirect URL, publishable key and mandate maximum settings, and (_Unreleased_) the [secret key](#replace-the-secret-key). The same fields are on the GraphQL `addStripePaymentProvider` and `updateStripePaymentProvider` mutations as `publishableKey`, `mandateCapMultiplier`, `mandateCapFloorCents`, `mandateCapCeilingCents` and `upcomingDebitEmail`. Changing the code updates the customers assigned to it and updates the webhook endpoint URL in Stripe. Until that update finishes, Stripe events sent to the previous code's URL are still accepted. If the connection had no webhook endpoint, the rename registers one, and if the key may not edit webhook endpoints Nozle sends the `payment_provider.error` webhook.
 
 To disconnect, use **Disconnect**. Customers assigned to the connection lose their assignment. Nozle also deletes the webhook endpoint it created for the connection in Stripe.
 
+_Unreleased:_ connecting the same Stripe account in the same mode again brings its customers back. They keep their Stripe customer IDs (`cus_…`) and their saved cards and mandates, so automatic charges work again without asking customers for a card. Customers that have no connection by then are assigned to the new connection.
+
+### Replace the secret key
+
+_Unreleased._ When you roll or revoke the secret key in Stripe, enter the new key in **Secret key** on the connection's edit form (**Edit**), or send `secretKey` with the GraphQL `updateStripePaymentProvider` mutation. Leave the field blank to keep the current key.
+
+The new key must belong to the same Stripe account and the same mode (test or live) as the connection, because the connection's Stripe customers, saved cards, mandates and webhook endpoint belong to that account. A key of another account, or of the other mode, is refused with `stripe_account_mismatch` and the connection keeps its key. To use another Stripe account, add a new connection.
+
 ### Assign the connection to customers
 
-Checkout charges only through the connection assigned to the customer. Nozle never picks another connection for you. A customer with no assigned connection, or whose connection code matches no Stripe connection, gets `422 payment_provider_required`, and nothing is created in Stripe or Nozle.
+Checkout charges through the connection assigned to the customer. _Unreleased:_ a customer with no assigned connection pays through the workspace's [default payment connection](/integrations#default-payment-connection) at checkout, a pay link or **Pay** in the customer portal, and is assigned to it. Automatic charges never use the default. A customer with no assigned connection and no default, or whose connection code matches no Stripe connection, gets `422 payment_provider_required`, and nothing is created in Stripe or Nozle.
 
 To assign a connection yourself, select it in the customer's **Payment provider** setting in the dashboard, which lists connections as name and code. The same section has:
 
@@ -497,7 +505,7 @@ Checkout errors that are specific to Stripe. See [Create checkout](/api/create-c
 
 | Status | Code | Cause |
 |---|---|---|
-| `422` | `payment_provider_required` | The organization has no Stripe connection and the customer is not on Razorpay |
+| `422` | `payment_provider_required` | The customer has no connection and the workspace has no [default connection](/integrations#default-payment-connection), or the customer's connection code matches no Stripe connection. The `message` names the fix |
 | `422` | `validation_errors` | `error_details.base` is `amount_below_provider_minimum`: the amount left to pay on the invoice is under Stripe's minimum charge |
 | `422` | `stripe_customer_required` | Nozle could not create the customer in Stripe. A `customer.payment_provider_error` webhook carries the Stripe error |
 | `409` | `subscription_checkout_in_progress` | A new-subscription checkout for this customer on a different plan is still being paid. See [Retry a new-subscription checkout](#retry-a-new-subscription-checkout) |
@@ -507,14 +515,14 @@ Checkout errors that are specific to Stripe. See [Create checkout](/api/create-c
 | `404` | `checkout_session_not_found` | Unknown upgrade ID, or a status call without the customer and subscription scope |
 | `500` | none | An invoice checkout reused an `Idempotency-Key` with a different body. Stripe's idempotency error is not handled today. Send the same body with the same key |
 
-Connecting Stripe can fail with `500 stripe_account_already_connected` (message `Internal error`), or with `422 third_party_error` and Stripe's message when Stripe rejects the secret key or no key is given.
+Connecting Stripe can fail with `500 stripe_account_already_connected` (message `Internal error`), or with `422 third_party_error` and Stripe's message when Stripe rejects the secret key or no key is given. _Unreleased:_ replacing the secret key with a key of another Stripe account or mode fails with `stripe_account_mismatch`.
 
 ## Limits
 
 - Every Stripe checkout is a Stripe-hosted page (`checkout.stripe.com`, valid until `expires_at`; 24 hours for credit top-ups, invoice payment URLs and overdue invoices). Nozle returns no card form and no client secret.
 - A saved card is charged first. Only when it cannot be charged does a page open.
 - An upgrade session lasts 35 minutes. A new-subscription, single Entity or bulk Entity checkout lasts 23 hours. See [Entity Subscriptions](/api/entity-subscriptions#purchase-multiple-entity-plans-together).
-- One connection per Stripe account and mode (test or live) in an organization. The secret key of a connection cannot change.
+- One connection per Stripe account and mode (test or live) in an organization. _Unreleased:_ the secret key of a connection can change only to another key of the same account and mode.
 - Nozle manages the webhook signing secret. You cannot enter it in the dashboard.
 - Bank transfers through `customer_balance` support USD, GBP, JPY, MXN and EUR. For EUR the customer or your billing entity must be in Belgium, Germany, Spain, France, Ireland or the Netherlands.
 - Nozle does not restrict the payment methods of a Checkout Session. Which methods appear depends on your Stripe settings.
@@ -526,7 +534,7 @@ Connecting Stripe can fail with `500 stripe_account_already_connected` (message 
 | Customer paid in Stripe but the plan is not active | The webhook endpoint exists in your Stripe account, shows the URL above, and lists the eight events. Check its delivery attempts. For an upgrade, check the status for `needs_review` |
 | Stripe shows `400` for webhook deliveries | The endpoint URL carries a code that no connection has any more, or the endpoint was recreated in Stripe so its signing secret no longer matches the one Nozle stored |
 | No webhook endpoint in Stripe | Registration failed. Check the key's permissions, the 16 test-endpoint limit and that your public Nozle API URL is a host Stripe accepts, then disconnect and connect again. The `payment_provider.error` webhook carries Stripe's message |
-| `payment_provider_required` | The organization has no Stripe connection |
+| `payment_provider_required` | The customer has no connection and there is no default connection: connect Stripe, or with several connections choose the [default](/integrations#default-payment-connection). Or the customer's connection code matches no Stripe connection |
 | `stripe_customer_required` | Nozle could not create the Stripe customer. Check the `customer.payment_provider_error` webhook for the reason |
 | Customer lands on stripe.com after a top-up | Add a success redirect URL to the connection |
 | An upgrade shows `expired` | The session ended. Start the upgrade again. If Stripe expired the session early, the new call returns `409 plan_upgrade_checkout_in_progress` until the upgrade's 35 minutes pass |
