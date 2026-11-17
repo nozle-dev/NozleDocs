@@ -5,6 +5,13 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Event ingest refuses events without an id or in an invoiced period (Engine 2.59.0)
+
+_Unreleased_
+
+- **`transaction_id` is required.** `POST /events` and `POST /events/batch` refuse an event without a `transaction_id` with `422` and `transaction_id: ["value_is_mandatory"]`. Before, Nozle generated an id for each request, so a retry after a timeout was billed twice. The Node.js, Python and Go SDKs already create one and reuse it on retries. See [Events](/api/events).
+- **Late events in an invoiced period.** An event whose `timestamp` falls in a billing period that already has a finalized invoice is refused with `409 period_invoiced` and is not stored. Before, it was accepted and never billed, so the usage chart and the invoice disagreed. Resend it with a current `timestamp`, or bill it with a one-off invoice. Late events in a period that is still open, or whose invoice is still a draft, are billed as before. See [Late events](/api/events#late-events).
+
 ### API rate limits, sign-in security, portal Pay, default payment connection (Core, Engine, dashboard)
 
 _Unreleased_

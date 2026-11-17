@@ -29,7 +29,7 @@ See [Node.js event tracking](/sdks/node/tracking-events), [Python event tracking
 
 | Field | Required | Description |
 |---|---|---|
-| `transaction_id` | no | Organization-wide identifier for the logical event. Nozle generates and returns a version 7 universally unique identifier when omitted. Preserve the identifier and complete payload on retries. |
+| `transaction_id` | yes | Organization-wide identifier for the logical event, created once by your code, for example your own request id. Preserve the identifier and complete payload on retries. The SDKs create one when you omit it and reuse it on every retry. |
 | `external_subscription_id` | one of the two | Subscription the event is billed to. When it is given, `external_customer_id` is ignored. |
 | `external_customer_id` | one of the two | Used only when `external_subscription_id` is blank: the event is billed to the customer's single active subscription. |
 | `code` | yes | Feature code. |
@@ -40,7 +40,7 @@ A Feature that aggregates a property (`sum`, `max`, `latest`, `weighted_sum` or 
 
 An event needs `external_subscription_id` or `external_customer_id`. With only the customer, Nozle looks up that customer's active subscription and stores the event with its `external_subscription_id`, as the SDKs do. The customer must have exactly one active subscription; with several, send `external_subscription_id`.
 
-For direct HTTP ingestion, send this envelope to `POST https://api.nozle.app/engine/api/v1/events` with a secret key. Send batches of 1–5000 events to `POST https://api.nozle.app/engine/api/v1/events/batch` using an `events` array, as plain JSON or gzipped with `Content-Encoding: gzip`. The valid events of a batch are stored even when others are refused (Engine 2.28.0; before, the limit was 100 and one invalid event refused the whole batch). Event reads and fee estimates use the Core API. Prefer the SDKs so subscription lookup, UUID generation, timeout handling, and errors remain consistent.
+For direct HTTP ingestion, send this envelope to `POST https://api.nozle.app/engine/api/v1/events` with a secret key. Send batches of 1–5000 events to `POST https://api.nozle.app/engine/api/v1/events/batch` using an `events` array, as plain JSON or gzipped with `Content-Encoding: gzip`. The valid events of a batch are stored even when others are refused (Engine 2.28.0; before, the limit was 100 and one invalid event refused the whole batch). Event reads and fee estimates use the Core API. Prefer the SDKs so subscription lookup, `transaction_id` creation, timeout handling, and errors remain consistent.
 
 <Note>
 For retry safety, preserve the complete event payload, including `timestamp`, and reuse the same `transaction_id`. Never reuse a `transaction_id` for a different event: on the standard event store the first accepted event owns that identifier, the same event returns the stored one, and a different one (another code, subscription, properties or sent `timestamp`) gets `409 transaction_id_conflict`. On the high-volume event store the repeat is accepted with `200`, which does not tell you how it is counted; a repeat is deduplicated only when `transaction_id` and `timestamp` both match. Without a `timestamp`, each attempt is stamped when it arrives, so send one and reuse it. See [deduplication](/guides/billing/event-pipeline#2-ingest-and-deduplicate).
@@ -54,10 +54,12 @@ For retry safety, preserve the complete event payload, including `timestamp`, an
 | Batch size | 1 to 5000 events. An empty array returns `422` with `events: ["no_events"]`, and more than 5000 returns `422` with `events: ["too_many_events"]`; nothing is stored. |
 | Batch body | Plain JSON, or gzip with `Content-Encoding: gzip`. A body over 16 MiB, decoded, returns `413 payload_too_large`; a body that is not valid gzip returns `400`. |
 | Some events of a batch refused | `200`. The valid events are stored and returned in `events`. Each refused event is listed in `error_details` by its position in the array, with the same codes a single event gets, for example `{"3": {"external_customer_id": ["active_subscription_ambiguous"]}}`. A blocked customer's event is listed with `external_customer_id: ["customer_payment_overdue"]` or `["customer_blocked"]`. |
-| Every event of a batch refused | Nothing is stored. `402` when every refusal is a blocked customer (`customer_blocked` if any is blocked by staff, otherwise `customer_payment_overdue`), otherwise `422 validation_errors`. `error_details` lists every event by position. |
+| Every event of a batch refused | Nothing is stored. `402` when every refusal is a blocked customer (`customer_blocked` if any is blocked by staff, otherwise `customer_payment_overdue`), `409 period_invoiced` when every event falls in an invoiced period, otherwise `422 validation_errors`. `error_details` lists every event by position. |
 | A `transaction_id` already used, same payload | Standard event store: `200` with the stored event, and nothing new is stored. High-volume event store: `200`, and billing removes the repeat. |
 | A `transaction_id` already used, different payload | Standard event store: `409 transaction_id_conflict` with `error_details` `{"transaction_id": ["value_already_exist"]}`, and nothing is stored. High-volume event store: `200`, and billing counts one copy. See [deduplication](/guides/billing/event-pipeline#2-ingest-and-deduplicate). |
 | The same `transaction_id` twice in one batch, or a reused one with a different payload | Standard event store: that event is refused with `transaction_id: ["value_already_exist"]` in `error_details`, and the others are stored. High-volume event store: `200`. |
+| No `transaction_id` | `422 validation_errors` with `transaction_id: ["value_is_mandatory"]`. In a batch, only that event is refused. Engine 2.59.0; before, Nozle generated an identifier for each request, so a retry after a timeout was stored twice. |
+| A `timestamp` in a billing period that is already invoiced | `409 period_invoiced` with `error_details` `{"timestamp": ["period_invoiced"]}`, and nothing is stored. In a batch, that event is listed with `timestamp: ["period_invoiced"]` and the others are stored. See [late events](#late-events). Engine 2.59.0. |
 | A `timestamp` that is not a number | `422` with `timestamp: ["invalid_format"]`. |
 | Neither `external_subscription_id` nor `external_customer_id` | `422 validation_errors` with `external_subscription_id: ["value_is_mandatory"]`. |
 | Only `external_customer_id`, and the customer is unknown or has no active subscription | `422 active_subscription_not_found` with `error_details` `{"external_customer_id": ["active_subscription_not_found"]}`. |
@@ -65,7 +67,21 @@ For retry safety, preserve the complete event payload, including `timestamp`, an
 | A `pk_` key | `403 publishable_key_not_allowed`. |
 | No key, or an unknown key | `401`. |
 
-Nozle does not reject events for being old or in the future. A feature code that matches no feature is accepted but never counted, so check the event name against the feature code.
+A feature code that matches no feature is accepted but never counted, so check the event name against the feature code.
+
+## Late events
+
+Nozle bills an event in the billing period of its `timestamp`. An event that arrives late is accepted and billed while that period is still open, and while its invoice is still a draft in the invoice grace period. Once the period's invoice is finalized, its amount is fixed, so an event dated in that period would never be billed. Nozle refuses it with `409 period_invoiced` instead of storing it, so the usage chart and the invoice always agree. A progressive billing or in-advance charge invoice does not close the period: its later usage is still billed by the period's own invoice.
+
+The refused event is not stored and its `transaction_id` stays free. Choose what to do with it:
+
+- **Bill it in the current period.** Send it again with the same `transaction_id` and a current `timestamp`. It appears on the next invoice, at the current plan's price. If the subscription has ended, there is no next invoice: use a one-off invoice.
+- **Bill it now as a separate charge.** Create a one-off invoice for the late usage.
+- **Let it go.** Do nothing. The customer is not billed for it.
+
+Retrying an event that was already stored before the invoice was finalized still returns `200` with the stored event.
+
+Nozle does not otherwise reject events for being old or in the future.
 
 ## Retrying
 
