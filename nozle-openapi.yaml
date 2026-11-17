@@ -3381,7 +3381,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          description: 'Standard (PostgreSQL) event store only. The `transaction_id` is already used in the organization by an event with a different payload (feature code, subscription, `properties`, `precise_total_amount_cents`, or `timestamp` when sent). Nothing is stored; the first event keeps the ID. The same payload returns `200` with the stored event. A `transaction_id` that was voided with `POST /events/{transaction_id}/void` is also refused with `409` and `code: transaction_voided`; send the corrected event with a new `transaction_id`. Organizations on the high-volume (ClickHouse) event store get `200` for any repeat: billing removes repeats when usage is read.'
+          description: 'Engine 2.59.0, both event stores: `period_invoiced` when the event''s `timestamp` falls in a billing period its subscription already has a finalized periodic or terminating invoice for. The event would never be billed, so it is not stored and its `transaction_id` stays free: resend it with a current `timestamp`, or bill it with a one-off invoice. See [late events](/api/events#late-events). Standard (PostgreSQL) event store only: `transaction_id_conflict` when the `transaction_id` is already used in the organization by an event with a different payload (feature code, subscription, `properties`, `precise_total_amount_cents`, or `timestamp` when sent). Nothing is stored; the first event keeps the ID. The same payload returns `200` with the stored event. A `transaction_id` that was voided with `POST /events/{transaction_id}/void` is also refused with `409` and `code: transaction_voided`; send the corrected event with a new `transaction_id`. Organizations on the high-volume (ClickHouse) event store get `200` for any repeat: billing removes repeats when usage is read.'
           content:
             application/json:
               schema:
@@ -3394,7 +3394,7 @@ paths:
                   transaction_id:
                     - value_already_exist
         '422':
-          description: 'The event was not stored. `validation_errors` for an invalid field, including `external_subscription_id: [value_is_mandatory]` when neither `external_subscription_id` nor `external_customer_id` is sent. `active_subscription_not_found` or `active_subscription_ambiguous` when only `external_customer_id` is sent and the customer has no active subscription (or is unknown) or several.'
+          description: 'The event was not stored. `validation_errors` for an invalid field, including `transaction_id: [value_is_mandatory]` when it is missing (Engine 2.59.0) and `external_subscription_id: [value_is_mandatory]` when neither `external_subscription_id` nor `external_customer_id` is sent. `active_subscription_not_found` or `active_subscription_ambiguous` when only `external_customer_id` is sent and the customer has no active subscription (or is unknown) or several.'
           content:
             application/json:
               schema:
@@ -3519,7 +3519,7 @@ paths:
         required: true
       responses:
         '200':
-          description: 'Events received. The stored events are returned in `events`. Refused events are listed in `error_details` by their position, with the codes a single event gets: an invalid event or a `transaction_id` already stored with other values (Engine 2.28.0), or a customer blocked by its [dunning policy](/guides/billing/dunning) (Engine 2.22.0).'
+          description: 'Events received. The stored events are returned in `events`. Refused events are listed in `error_details` by their position, with the codes a single event gets: an invalid event or a `transaction_id` already stored with other values (Engine 2.28.0), a customer blocked by its [dunning policy](/guides/billing/dunning) (Engine 2.22.0), or a `timestamp` in an invoiced billing period with `timestamp: [period_invoiced]` (Engine 2.59.0).'
           content:
             application/json:
               schema:
@@ -3544,6 +3544,20 @@ paths:
                       - customer_payment_overdue
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          description: 'Engine 2.59.0. Every event of the batch has a `timestamp` in a billing period that is already invoiced. Nothing is stored. `code` is `period_invoiced` and `error_details` lists each event by its position. See [late events](/api/events#late-events).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+              example:
+                status: 409
+                error: The billing period of this event's timestamp is already invoiced, so it would never be billed. Resend it with a current timestamp, or bill it with a one-off invoice.
+                code: period_invoiced
+                error_details:
+                  '0':
+                    timestamp:
+                      - period_invoiced
         '413':
           description: 'The body is over 16 MiB, decoded. Nothing is stored. `code` is `payload_too_large`.'
         '422':
@@ -32850,6 +32864,7 @@ components:
     EventInputObject:
       type: object
       required:
+        - transaction_id
         - code
       properties:
         transaction_id:
@@ -32857,8 +32872,8 @@ components:
           maxLength: 255
           example: transaction_1234567890
           description: |
-            Organization-wide identifier for one logical Feature Event and all of its retries.
-            If omitted, Nozle generates a version 7 universally unique identifier and returns it in the response.
+            Organization-wide identifier for one logical Feature Event and all of its retries, created once by your code.
+            Required since Engine 2.59.0: without it the response is `422 validation_errors` with `transaction_id: [value_is_mandatory]`. The SDKs create one when you omit it and reuse it on retries.
             Reusing an identifier with a different subscription, timestamp, code, or properties is a conflict rather than a new event.
         external_subscription_id:
           type: string
