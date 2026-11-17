@@ -19,4 +19,17 @@ Connect a provider in the dashboard under **Settings > Billing settings > Integr
 | **Renewals** | Automatic charge on the saved card | Automatic only with an auto-pay mandate (UPI, card or bank debit) |
 | **Refunds and disputes** | Credit-note refunds and lost disputes | Credit-note refunds and lost disputes |
 
-A customer pays through the provider connection assigned to that customer. At plan checkout, a customer who is not assigned to Razorpay is assigned to a Stripe connection automatically. See [Checkout](/guides/billing/checkout) for the flow that both providers share, and [Payments](/guides/billing/payments) for how payment events update invoices and subscriptions.
+A customer pays through the provider connection assigned to that customer. A customer without one can pay through the [default payment connection](#default-payment-connection). See [Checkout](/guides/billing/checkout) for the flow that both providers share, and [Payments](/guides/billing/payments) for how payment events update invoices and subscriptions.
+
+## Default payment connection
+
+_Unreleased._ When a customer with no payment connection pays, Nozle uses the workspace's default connection:
+
+- With one connection, that connection is the default.
+- With several, choose the default under **Settings > Billing settings > Integrations**, in **Default payment connection**. Until you choose one, there is no default.
+
+The default applies only when the customer starts the payment: [checkout](/guides/billing/checkout), [pay links](/guides/billing/checkout#pay-links), **Pay** in the [customer portal](/guides/billing/invoices#pay-from-the-customer-portal) and credit top-up purchases. Nozle assigns the customer to the default connection at that moment and creates the customer in the provider. Customers with their own connection keep it.
+
+Automatic charges never use the default. A customer without a connection is not charged automatically, so you can bill some customers outside Nozle.
+
+Without a connection for the customer and without a default, checkout answers `422` `payment_provider_required`. Its `message` names the fix: connect a payment provider, choose the default connection, or set the customer's `billing_configuration.payment_provider_code`.

@@ -275,7 +275,7 @@ Every error body carries `error` and `code`. Core's errors also carry `status`, 
 | `409` | `plan_change_quote_changed` | The quote no longer matches the subscription. Preview again. |
 | `409` | `subscription_change_pending` | The subscription has a scheduled cancellation or plan change, or an upgrade payment in progress. Withdraw the change, or wait for the payment, then preview again. |
 | `422` | `checkout_not_required` | The plan needs no up-front payment (free, trial, or billed in arrears) and the customer has no subscription. Use `subscribe`. |
-| `422` | `payment_provider_required` | The customer is not assigned to Razorpay and the organization has no Stripe connection. |
+| `422` | `payment_provider_required` | The customer is not assigned to Razorpay and has no Stripe connection, and (_Unreleased_) the workspace has no [default payment connection](/integrations#default-payment-connection). The `message` names the fix. |
 | `422` | `stripe_customer_required` | Nozle could not create the customer in Stripe. A customer that is not in Stripe yet normally gets one at checkout, so this code appears only when that creation fails. See the [Stripe integration](/integrations/stripe#errors). |
 | `422` | `razorpay_requires_inr` | A Razorpay checkout for an invoice that is not in INR. See the [Razorpay integration](/integrations/razorpay#errors). |
 | `422` | `plan_already_active` | The customer, or Entity, is already on this plan, including right after a late upgrade payment for it was applied. |

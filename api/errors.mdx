@@ -47,6 +47,37 @@ Do not parse human-readable text when a machine-readable `code` is available.
 - Honor `Retry-After` when returned.
 - Do not retry validation, authorization, or insufficient-credit decisions without changing the underlying state.
 
+## Rate limits
+
+_Unreleased._ Core's REST API (`https://api.nozle.app/core/api/v1`) counts requests per API key and per client IP address, each in a fixed one-minute window.
+
+| Requests | Limit |
+|---|---|
+| Core REST API, per API key | 6,000 per minute |
+| Core REST API, per IP address | 6,000 per minute |
+
+Every server that uses the same key shares its limit. Requests the Engine makes to Core on your behalf are not counted against your key.
+
+A request over the limit answers `429` with a `Retry-After` header, in seconds until the window ends, and this body:
+
+```json
+{
+  "status": 429,
+  "error": "Too Many Requests",
+  "code": "rate_limited"
+}
+```
+
+The request did nothing. To back off:
+
+- Wait at least the `Retry-After` seconds, then retry. If the retry is refused again, double the wait each time and add random jitter, so your servers do not all retry at the same moment.
+- Retry a mutation with the same `Idempotency-Key` and the same body.
+- Spread large jobs, such as imports or backfills, over several minutes instead of sending them in one burst.
+
+The Node.js, Python and Go SDKs retry a `429` only when you turn retries on (see [API standards](/api/api-standards)).
+
+The dashboard also limits sign-in and password-reset requests. See [Account security](/guides/settings/account-security#sign-in-limits).
+
 ## Common failures
 
 Match on the status and `code`, not on the message text.
@@ -73,7 +104,7 @@ Match on the status and `code`, not on the message text.
 | `422` `tax_identification: eu_tax_not_applicable` (Core 11.31.0) | `POST /customers/{external_id}/tax_identification/recheck` for a billing entity without EU tax management, or a tax ID that is not `eu_vat`. | Nothing to recheck. |
 | `422` `customer_tax_location_required` (Core 11.31.0) | Checkout for a billing entity with `customer_location_required` on, and the customer has no country or no `address_line1`, `city` or `zipcode`. `error_details.customer` is `country_missing` or `address_missing`. | Upsert the customer with the address, then retry. |
 | `409` `customer_tax_check_pending` (Core 11.31.0) | Checkout while a VIES check holds the customer. The body has `retry_after_seconds`. | Wait that long, or call `waitForTaxCheck` first, then retry. |
-| `422` `payment_provider_required` | The customer's payment provider is not connected. | Connect it, or assign one to the customer. See [checkout](/guides/billing/checkout). |
+| `422` `payment_provider_required` | The customer's payment provider is not connected, or (_Unreleased_) the customer has none and the workspace has no [default payment connection](/integrations#default-payment-connection). The `message` names the fix. | Connect a provider, choose the default connection, or assign one to the customer. See [checkout](/guides/billing/checkout). |
 | `422` `payment_already_processing` in `error_details.base` (pay link, invoice checkout) | An automatic debit of the invoice is waiting for the bank to settle (for example an Indian card during the bank's notice), or a payment of its last Checkout Session is processing. Paying now would charge twice. | Wait for the `invoice.payment_status_updated` webhook. If the debit fails, ask for a pay link again. |
 | `422` `invoice_carried_forward` in `error_details.base` (pay link, invoice checkout, Core 11.16.0) | The amount due is below the payment provider's minimum charge, so it was carried to the customer's next invoice. The invoice is settled. | Nothing to pay now. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum). |
 | `422` `invoices_carried_forward` (`POST /payment_requests`, Core 11.16.0) | Every invoice of the payment request is below the payment provider's minimum charge and was carried to the next invoice. Nothing is created. | Nothing to collect now. |
@@ -109,7 +140,7 @@ Available from Core 11.10.0. These come from plans sold in several currencies. A
 
 ## Sandbox errors
 
-_Unreleased._ These come from a [sandbox](/guides/getting-started/sandbox), mostly from the dashboard.
+These come from a [sandbox](/guides/getting-started/sandbox), mostly from the dashboard.
 
 | Status and `code` | What happened | What to do |
 |---|---|---|
@@ -146,7 +177,7 @@ _Core 11.46.0._ These come from creating a credit note with a refund (`POST /cre
 
 ## Workspace billing errors
 
-_Unreleased._ These errors are about your own workspace's account with Nozle, not about your customers. They are always on. A sandbox key gets the same errors as the live organization it belongs to. See [Workspace billing](/guides/getting-started/workspace-billing).
+These errors are about your own workspace's account with Nozle, not about your customers. They are always on. A sandbox key gets the same errors as the live organization it belongs to. See [Workspace billing](/guides/getting-started/workspace-billing).
 
 | Status and `code` | What happened | What to do |
 |---|---|---|

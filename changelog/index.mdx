@@ -5,6 +5,18 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### API rate limits, sign-in security, portal Pay, default payment connection (Core, Engine, dashboard)
+
+_Unreleased_
+
+- **API rate limits.** Core's REST API (`/api/v1/*`) accepts 6,000 requests per minute per API key and per IP address. Over the limit it answers `429` `rate_limited` with a `Retry-After` header. Wait that long, then retry with backoff. See [Rate limits](/api/errors#rate-limits).
+- **Sign-in limits.** Dashboard sign-in accepts 10 attempts per email in 15 minutes and 100 per IP address. Password-reset requests accept 5 per email per hour and 30 per IP address. See [Sign-in limits](/guides/settings/account-security#sign-in-limits).
+- **Sessions and password resets.** A new password signs out your other sessions. A session ends 7 days after sign-in. A reset request answers the same way whether or not the email has an account, and each new reset link cancels the earlier ones. See [Account security](/guides/settings/account-security#password).
+- **Pay from the customer portal.** Customers can pay a finalized unpaid invoice with **Pay** in the hosted portal. They return to the portal afterwards, where the invoice shows as confirming until the payment settles. When online payment is not set up, the portal says so. See [Pay from the customer portal](/guides/billing/invoices#pay-from-the-customer-portal).
+- **Default payment connection.** A customer without a payment connection pays through the workspace's only connection, or the default you choose under **Settings > Billing settings > Integrations**, at checkout, through a pay link, with portal **Pay** or when buying credits. Automatic charges never use the default. Without one, checkout answers `422` `payment_provider_required` with a message that names the fix. See [Default payment connection](/integrations#default-payment-connection).
+- **Stripe connections.** Connecting the same Stripe account again keeps your customers' Stripe IDs and saved cards. A connection's secret key can be replaced with a key of the same account and mode; another account is refused with `stripe_account_mismatch`. See [Replace the secret key](/integrations/stripe#replace-the-secret-key).
+- **Engine `POST /customers`** forwards `billing_configuration` to Core, so it can assign the customer's payment connection. See [Engine `POST /customers`](/api/create-customer#engine-post-customers).
+
 ### Refunds split across payments, refunds made outside Nozle, Stripe dispute updates (Core 11.46.0, dashboard 2.22.0)
 
 _November 14, 2026_
@@ -381,7 +393,7 @@ _October 28, 2026_
 - **Failed-payment retries skip reasons that cannot succeed** (authentication or a mandate needed, hard declines) and the customer gets the pay link at once. A payment that is processing no longer starts the failed-payment clock. See [Indian cards and automatic payments](/integrations/stripe#indian-cards-and-automatic-payments) and [Workspace billing](/guides/getting-started/workspace-billing#india-cards).
 ### Sandbox mode (Core 11.7.0, Engine 2.18.0)
 
-_Unreleased_
+_October 28, 2026_
 
 - **One sandbox per workspace.** A separate organization linked to your live one, with its own customers, plans, subscriptions, invoices, events, API keys, webhook endpoints and payment connections. An admin creates it by switching to **Sandbox** in the workspace switcher; after that every member can open it, with their live role. It starts empty and copies only your live billing settings. See [Sandbox mode](/guides/getting-started/sandbox).
 - **Test keys.** Sandbox keys start with `sk_nozle_test_` and `pk_nozle_test_` and use the same API URLs. The key's organization decides the environment: a test key on a live organization, a live key on a sandbox, or a key of a reset sandbox is refused with `401`. Every response to an accepted key carries `X-Nozle-Livemode: true` or `false`, readable from browsers. See [Live and sandbox keys](/api/authentication#live-and-sandbox-keys).
@@ -401,7 +413,7 @@ _October 28, 2026_
 
 ### Breaking: Stripe checkout is hosted only (Core 11.5.0, Engine 2.13.0)
 
-_Unreleased_
+_October 28, 2026_
 
 - **Breaking: every Stripe checkout is a Stripe-hosted Checkout Session.** A new subscription's first invoice, an invoice checkout, a paid plan change, the Entity subscription batch and the retry of a first invoice (`POST /invoices/{id}/retry_payment`) answer `{"type": "hosted", "url", "payment_url", "checkout_id", "invoice_id" or "plan_upgrade_intent_id", "amount_cents", "currency", "expires_at"}`. Redirect the customer to `url`. Embedded Stripe Checkout, the `stripe` result type and every `client_secret` and `clientSecret` are removed. No Stripe publishable key and no Stripe.js are needed on your page. A saved card is still charged first (`completed`, `processing` and `scheduled` results are unchanged), and Razorpay is unchanged. See [Checkout](/guides/billing/checkout#stripe) and [Create checkout](/api/create-checkout#hosted-stripe-result).
 - **`cancel_url` and `{CHECKOUT_SESSION_ID}`.** `POST /checkout` accepts `cancel_url`, validated like `return_url` and defaulting to it. The Entity subscription endpoints take `return_url` only. A return URL may contain the literal `{CHECKOUT_SESSION_ID}`, which Stripe replaces with the Checkout Session ID. A refused `cancel_url` answers `400 invalid_return_url`.
@@ -411,7 +423,7 @@ _Unreleased_
 
 ### Workspace billing: card at onboarding, failed payments, suspension on day 7 (Core 11.5.0, Engine 2.13.0)
 
-_Unreleased_
+_October 28, 2026_
 
 - **Every workspace adds a card at onboarding.** The card is verified on a Stripe-hosted page and nothing is charged. There is no rollout switch: it is always on, and existing workspaces are flagged within the hour. The card page is Stripe-hosted, cards only, with Stripe's reuse agreement text, and a lost webhook is recovered by a server-side check. After the card the AI onboarding opens. Until a card is verified, the dashboard and every API key call (Core REST, account MCP, Engine API, LLM proxy, event ingestion) answer `402` `card_required`. See [Workspace billing](/guides/getting-started/workspace-billing).
 - **Automatic upgrades run every hour** and charge the prorated invoice to the saved card at once. Members get emails at 50%, 80%, 90% and 100% of the included events or MRR limit.
@@ -422,7 +434,7 @@ _Unreleased_
 
 ### Know when top-up credits can be spent (Core 11.1.0, Engine 2.12.0)
 
-_Unreleased_
+_October 27, 2026_
 
 - **New webhook `credit_top_up_purchase.fulfilled`.** Sent once per paid top-up purchase, after the credits are granted and can be spent. Until now nothing told you when that happened: the invoice is paid a moment before the grant. See [Webhook events](/api/webhook-events#credit_top_up_purchasefulfilled).
 - **`GET /api/v1/credit-top-up-purchases/{id}` on the Engine.** Returns the purchase with `fulfillment_status` (`pending`, then `fulfilled`) and `fulfilled_at`. Poll it after checkout if you do not use the webhook. Purchases in webhooks and in Core's `GET /credit-top-up-purchases/{id}` carry the same fields.
@@ -431,30 +443,21 @@ _Unreleased_
 
 ### Razorpay payment failures reach your webhook (Core 11.0.3)
 
-_Unreleased_
+_October 27, 2026_
 
 - **A declined Razorpay payment in the modal or on a payment link sends `invoice.payment_failure`** (`payment_request.payment_failure` for the link of overdue invoices), once per Razorpay payment, with Razorpay's error in `provider_error`. The order or link and the invoice stay payable. See [Razorpay](/integrations/razorpay#status).
 - **The payment link for overdue invoices returns the customer to the connection's success redirect URL** when one is set.
 
-### Know when top-up credits can be spent (Core 11.1.0, Engine 2.12.0)
-
-_Unreleased_
-
-- **New webhook `credit_top_up_purchase.fulfilled`.** Sent once per paid top-up purchase, after the credits are granted and can be spent. Until now nothing told you when that happened: the invoice is paid a moment before the grant. See [Webhook events](/api/webhook-events#credit_top_up_purchasefulfilled).
-- **`GET /api/v1/credit-top-up-purchases/{id}` on the Engine.** Returns the purchase with `fulfillment_status` (`pending`, then `fulfilled`) and `fulfilled_at`. Poll it after checkout if you do not use the webhook. Purchases in webhooks and in Core's `GET /credit-top-up-purchases/{id}` carry the same fields.
-- **Razorpay checkout status for a top-up** reports `fulfillment_status: succeeded` only once the credits are granted, not when the payment reaches Nozle.
-- Docs: [Paid Credit Top-ups](/guides/credits/top-ups#know-when-the-credits-can-be-spent) now tells you to wait for the webhook or poll the purchase instead of refreshing on a paid invoice.
-
 ### Plan version migrations ask before raising a price (Core)
 
-_Unreleased_
+_October 27, 2026_
 
 - **A migration that raises a price needs `allow_price_increase`.** The preview now returns `price_change`, `price_increase` and `mandate_cap_exceeded` for each subscription. Starting a migration where a subscription would pay more, or pass its auto-pay limit, returns `422 price_increase_not_allowed` with `price_increase_count` and `mandate_cap_exceeded_count`, unless the request has `allow_price_increase: true` (GraphQL: `allowPriceIncrease`). Migrations that raise no price are not affected.
 - **New customer email `subscription.price_change_scheduled`.** Opt in through the billing entity's `email_settings`. It tells the customer the new price, the day it starts and how it will be charged, once per subscription per migration. See [Plan Versions and Migrations](/api/plan-versions#price-increases-need-your-consent).
 
 ### Breaking Core releases: CORS, voided invoices, plan change default, no former-prefix names, API key display (Core 5.0.0 to 7.0.0)
 
-_Unreleased_
+_October 26, 2026_
 
 - **Core 5.0.0, breaking: browser calls are allowed only from listed origins.** Core answered every origin with `Access-Control-Allow-Origin: *`. It now answers only the exact origins in `CORS_ALLOWED_ORIGINS` (default: the origin of the dashboard URL) and nothing else, preflight included. The customer portal keeps working on any site: `POST /graphql` with a `customer-portal-token` header is allowed from any origin. Server-to-server calls are not affected. See the Core environment variables and [Authentication](/api/authentication#browser-access-cors).
 - **Core 5.1.0: a voided invoice can no longer be paid.** Open Stripe Checkout Sessions and Razorpay orders and links are expired when an invoice is voided, marked as paid, partly paid or reduced by a credit note offset. A payment that still lands on a voided invoice is refunded in full (Stripe and Razorpay), and you get `invoice.payment_failure` with `voided_invoice_payment_refunded`, or `voided_invoice_payment_refund_failed` when the provider refuses the refund. Invoice checkout answers `422 validation_errors` with `amount_below_provider_minimum` when the amount left is under the provider's minimum charge. See [Stripe](/integrations/stripe#checkout-flow) and [Razorpay](/integrations/razorpay#refunds-and-disputes).
@@ -465,7 +468,7 @@ _Unreleased_
 
 ### Checkout return, LLM proxy delivery, credits plus money (Engine 2.9.0)
 
-_Unreleased_
+_October 26, 2026_
 
 - **Checkout return URLs are decided per organization.** The Engine no longer has an allowlist or a default return URL of its own (`CHECKOUT_RETURN_URL` and `CHECKOUT_RETURN_URL_ALLOWED_ORIGINS` are removed from the Engine). `POST /checkout` and `POST /manage-payment-method` send `return_url` to Core, which checks it against your organization's `checkout_return_origins` and uses `checkout_default_return_url` when none is sent. A refused URL answers `400 invalid_return_url`. Before you upgrade, register every origin that only the Engine list allowed. Set both in the dashboard under **Developers > Checkout return**. See [Return URLs](/guides/billing/checkout#return-urls-and-your-organizations-origins).
 - **LLM proxy usage is delivered durably.** Each event is stored before the response returns, retried with backoff for about five hours when Nozle's billing service is down, and recorded once per transaction ID. Events are sent with your organization's secret key, not the request's `X-Nozle-Key`. See [LLM Proxy](/api/llm-proxy).
@@ -474,7 +477,7 @@ _Unreleased_
 
 ### Plan versioning (API 4.1.0, Engine 2.7.0, Node 0.16.0, React 0.15.0, Python 0.16.0, Go 0.15.0)
 
-_Unreleased_
+_October 23, 2026_
 
 - **Changed for every organization:** changing what a plan bills or grants while customers pay for it saves the plan's next version under the same code. Existing subscribers keep their version and price; new subscriptions get the current version. Before, the change applied to existing subscribers from their next invoice; to keep doing that, send `disable_version: true` with the edit. Plans have `version` and `is_current`, and `GET /plans` returns current versions only. See [Plan versioning](/guides/billing/plan-versions).
 - `PUT /plans/{code}` takes `disable_version` (change the current version for everyone) and `force_version`. An edit of an older version is refused with `409 plan_version_not_current`.

@@ -21,7 +21,7 @@ Every key belongs to one organization. A [sandbox](/guides/getting-started/sandb
 
 ## Live and sandbox keys
 
-_Unreleased._ Live and sandbox use the same API URLs. The key's organization decides which data a request reaches; the prefix must agree with it:
+Live and sandbox use the same API URLs. The key's organization decides which data a request reaches; the prefix must agree with it:
 
 - A `sk_nozle_test_` or `pk_nozle_test_` key that belongs to a live organization, or a key without `_test_` that belongs to a sandbox, is refused with `401`.
 - After a [sandbox reset](/guides/getting-started/sandbox#reset-the-sandbox), every key of the old sandbox is refused with `401`.
@@ -38,7 +38,7 @@ Only members with the **Admin** role can create, rotate or delete secret keys in
 
 ## Store your key when you create it
 
-The dashboard (and the GraphQL `createApiKey` and `rotateApiKey` mutations) show the full key once, when you create or rotate it (Core 7.0.0 and later). After that every read shows it masked, as `••••••••` and the last 3 characters, in the dashboard and in GraphQL (`apiKeys`, `apiKey(id)`, `updateApiKey`, `destroyApiKey`). A sandbox key keeps its prefix, for example `sk_nozle_test_••••••••a1b`. Nozle cannot show it again. Copy it into your secret manager straight away. If you lose a key, rotate it and update your backend with the new one. Rotating gives the new key the same permissions as the old one.
+The dashboard (and the GraphQL `createApiKey` and `rotateApiKey` mutations) show the full key once, when you create or rotate it (Core 7.0.0 and later). After that every read shows it masked, as `••••••••` and the last 3 characters, in the dashboard and in GraphQL (`apiKeys`, `apiKey(id)`, `updateApiKey`, `destroyApiKey`). A sandbox key keeps its prefix, for example `sk_nozle_test_••••••••a1b`. Nozle cannot show it again. Copy it into your secret manager straight away. If you lose a key, rotate it and update your backend with the new one. Rotating gives the new key the same permissions as the old one. When you rotate a key in the dashboard, choose how long the old key keeps working so you can deploy the new one first: it can stop at once, or after 1 hour, 24 hours or 7 days. GraphQL `rotateApiKey` takes the same choice as `expiresAt`; without it the old key stops at once.
 
 Send server credentials as a Bearer token:
 
