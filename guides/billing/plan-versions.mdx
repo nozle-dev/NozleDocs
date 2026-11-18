@@ -84,8 +84,27 @@ A grant whose period ends with the billing period (the usual monthly case) has a
 - **Plan families.** Each interval plan of a family (monthly, yearly) has its own versions. A family-wide feature change saves a version of each plan that has subscribers. A switch from an older version to another interval of the family is a normal plan change.
 - **Transition policies** follow the current version: a re-price moves them to the new version, and a subscriber on an older version uses them too.
 - **Coupons** that apply to a plan code apply to every version of it.
-- **Deleting a plan** deletes every version and unschedules every pending move.
+- **Deleting a plan** deletes every version and unschedules every pending move. See [Archive vs delete](#archive-vs-delete).
+- **Archiving a plan** archives every version. See [Archive vs delete](#archive-vs-delete).
 - **Webhooks.** `plan.version_created` is sent when a change saves a version. Subscriptions carry `plan_version`, `previous_plan_version`, `next_plan_version` and `plan_version_migration_id`.
+
+## Archive vs delete
+
+Archive a plan to stop selling it and keep billing the customers who are on it. This is grandfathering. Delete a plan to end it.
+
+| | Archive | Delete |
+|---|---|---|
+| New subscriptions | Refused with `plan_archived` | Refused |
+| Existing subscriptions | Keep billing, with their entitlements, credit grant rules and spend limits | Terminated. Pending ones are cancelled |
+| Undo | Unarchive | None |
+| Endpoint | `POST /plans/{code}/archive` | `DELETE /plans/{code}` |
+
+- Archiving covers every version of the code. Passing an older version or the code archives the whole code.
+- Version migrations between the versions of an archived plan still work. A new version of an archived plan stays archived.
+- An archived plan keeps its code. It frees its plan family slot, so a new plan can take that interval and currency.
+- `POST /plans/{code}/unarchive` makes the plan sellable again. It is refused with `422` if another plan now holds the family slot.
+- `GET /plans` returns archived plans to a secret key, with `status: "archived"`. Use `status=active` or `status=archived` to filter. A publishable key never receives them.
+- `plan.archived` and `plan.unarchived` webhooks fire on each change.
 
 ## SDKs
 

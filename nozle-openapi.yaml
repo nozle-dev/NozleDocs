@@ -5543,7 +5543,7 @@ paths:
 
         With a `pk_` key you receive a trimmed plan, still with `charges`, `taxes`, `minimum_commitment`, `usage_thresholds`, `entitlements`, `credit_grant_rules`, `credit_pool_policies` and `metadata`. Invoice names, internal ids, margin settings, grant policies and timestamps are left out, and plans pending deletion are not returned. A secret key receives the whole plan.
 
-        - All top-level plans of the organization are returned, newest first. There is no listed or public flag. Plans with a trial (`trial_period`) and pay-in-arrears plans (`pay_in_advance: false`) are included. Plans pending deletion (`pending_deletion: true`) are included for a secret key only. Per-customer override plans (`parent_id` set) are not.
+        - All top-level plans of the organization are returned, newest first. There is no listed or public flag. Plans with a trial (`trial_period`) and pay-in-arrears plans (`pay_in_advance: false`) are included. Plans pending deletion (`pending_deletion: true`) are included for a secret key only. Archived plans (`status: archived`) are included for a secret key unless `status` filters them out; a publishable key never receives them. Per-customer override plans (`parent_id` set) are not.
         - Items do not include `fixed_charges`; use `GET /plans/{code}` for those.
         - The Engine host serves this list at `https://api.nozle.app/engine/api/v1/plans` with the same body. Engine forwards `page` and `per_page` to Core.
         - A publishable key, or a secret key with `include_hidden=false`, does not receive the plans of plan families hidden from the pricing table, and `families[].features` leaves out hidden features. Hiding is a listing setting only: every plan carries all its entitlements and charges, including those of hidden features.
@@ -5564,6 +5564,16 @@ paths:
           schema:
             type: boolean
             example: false
+        - name: status
+          in: query
+          description: Secret keys only. `active` lists plans that can be sold. `archived` lists plans that are archived, which take no new subscriptions while their existing subscriptions keep billing. Without it, a secret key receives both. A publishable key ignores it and never receives archived plans.
+          required: false
+          schema:
+            type: string
+            enum:
+              - active
+              - archived
+            example: active
       responses:
         '200':
           description: Plans
@@ -5591,6 +5601,8 @@ paths:
                         bill_fixed_charges_monthly: null
                         parent_id: null
                         pending_deletion: false
+                        status: active
+                        archived_at: null
                         charges: []
                         entitlements: []
                         usage_thresholds: []
@@ -5613,6 +5625,8 @@ paths:
                         bill_fixed_charges_monthly: null
                         parent_id: null
                         pending_deletion: false
+                        status: active
+                        archived_at: null
                         charges:
                           - nozle_id: 00000000-0000-4000-8000-000000000003
                             feature_id: 00000000-0000-4000-8000-000000000004
@@ -5714,7 +5728,7 @@ paths:
 
         **Publishable keys.** A publishable `pk_` key may call this endpoint and `GET /plans`, and nothing else. It returns the same body as a secret key: the whole plan, including `charges`, `fixed_charges`, `taxes`, `minimum_commitment`, `usage_thresholds`, `entitlements`, `credit_grant_rules`, `credit_pool_policies` and `metadata`. Anyone who has the key can read all of it.
 
-        This endpoint also returns a plan with a trial or pay-in-arrears billing, and, to a secret key, a plan that is pending deletion (`pending_deletion: true`). An unknown code, the code of a per-customer override plan, or a plan pending deletion read with a publishable key returns `404` with the code `plan_not_found`.
+        This endpoint also returns a plan with a trial or pay-in-arrears billing, and an archived plan (`status: archived`). To a secret key it also returns a plan that is pending deletion (`pending_deletion: true`). An unknown code, the code of a per-customer override plan, or a plan pending deletion read with a publishable key returns `404` with the code `plan_not_found`.
 
         A publishable key receives a plan of a family hidden from the pricing table, or whose family was deleted, so the SDK can describe a subscriber's own plan. The plan carries all its entitlements and charges, including those of features hidden from the pricing table. From Core 11.10.0, such a plan comes without `family` and `prices` for a publishable key, so the codes of the hidden family's other plans are not revealed.
 
@@ -5758,6 +5772,8 @@ paths:
                       bill_fixed_charges_monthly: null
                       parent_id: null
                       pending_deletion: false
+                      status: active
+                      archived_at: null
                       charges:
                         - nozle_id: 00000000-0000-4000-8000-000000000002
                           feature_id: 00000000-0000-4000-8000-000000000003
@@ -5926,7 +5942,10 @@ paths:
       tags:
         - Plans
       summary: Delete a plan
-      description: This endpoint deletes a specific plan. Note that this plan could be associated with active subscriptions.
+      description: |-
+        This endpoint deletes a plan, every version of its code and its per-customer override plans. **It terminates every active subscription on the plan and cancels every pending one.** Customers on the plan stop being billed.
+
+        To stop selling a plan while its existing subscriptions keep billing, use `POST /plans/{code}/archive` instead. See [Archive vs delete](/guides/billing/plan-versions#archive-vs-delete).
       operationId: destroyPlan
       responses:
         '200':
@@ -5939,6 +5958,78 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /plans/{code}/archive:
+    parameters:
+      - name: code
+        in: path
+        description: Code of the existing plan.
+        required: true
+        schema:
+          type: string
+          example: startup
+    post:
+      tags:
+        - Plans
+      summary: Archive a plan
+      description: |-
+        This endpoint archives a plan so that it takes no new subscriptions. Existing subscriptions keep billing as they do today, with their entitlements, credit grant rules, spend limits and scheduled starts. This is grandfathering. To end the subscriptions, use `DELETE /plans/{code}`.
+
+        - Archiving applies to the plan code. Every version of the code is archived, whichever version or code you pass. A per-customer override plan cannot be archived on its own and returns `404`.
+        - An archived plan takes no new subscription, checkout or self-serve plan change. These return `422` with `plan_code: [plan_archived]` or the refusal code `plan_archived`. Subscriptions already on the plan can still be updated, and version migrations between its versions still work.
+        - The plan stays readable with `GET /plans/{code}` and keeps its code. It is left out of `GET /plans` for a publishable key.
+        - An archived plan frees its plan family slot for its interval and currency. A new plan can take that slot.
+        - A plan that is pending deletion cannot be archived and returns `422` with `plan_pending_deletion`.
+        - Archiving a plan that is already archived returns `200` and changes nothing. No webhook is sent.
+
+        Sends the `plan.archived` webhook. Needs the `plans:update` permission. Core 11.51.0.
+      operationId: archivePlan
+      responses:
+        '200':
+          description: Plan archived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /plans/{code}/unarchive:
+    parameters:
+      - name: code
+        in: path
+        description: Code of the existing plan.
+        required: true
+        schema:
+          type: string
+          example: startup
+    post:
+      tags:
+        - Plans
+      summary: Unarchive a plan
+      description: |-
+        This endpoint makes an archived plan sellable again. Every version of the code is unarchived.
+
+        - Unarchiving a plan that is not archived returns `200` and changes nothing. No webhook is sent.
+        - If another plan now holds the plan family slot for this interval and currency, the call returns `422` and the plan stays archived. Archive or delete the other plan first.
+
+        Sends the `plan.unarchived` webhook. Needs the `plans:update` permission. Core 11.51.0.
+      operationId: unarchivePlan
+      responses:
+        '200':
+          description: Plan unarchived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /plans/{code}/entitlements:
     parameters:
       - name: code
@@ -6617,7 +6708,7 @@ paths:
         - Subscriptions
       summary: Assign a plan to a customer
       description: |-
-        This endpoint assigns a plan to a customer, creating or modifying a subscription. Ideal for initial subscriptions or plan changes (upgrades/downgrades). `usage_thresholds` and `plan_overrides.usage_thresholds` need progressive billing (Growth, Scale and Enterprise Nozle plans); without it a non-empty list answers `422` with `feature_not_available` in `error_details.usage_thresholds`, and nothing is saved. A plan that is pending deletion (`pending_deletion: true`) cannot start a subscription or receive a plan change; the call returns `422` with `plan_code: [plan_pending_deletion]`. Posting the plan the subscription is already on still works.
+        This endpoint assigns a plan to a customer, creating or modifying a subscription. Ideal for initial subscriptions or plan changes (upgrades/downgrades). `usage_thresholds` and `plan_overrides.usage_thresholds` need progressive billing (Growth, Scale and Enterprise Nozle plans); without it a non-empty list answers `422` with `feature_not_available` in `error_details.usage_thresholds`, and nothing is saved. A plan that is pending deletion (`pending_deletion: true`) cannot start a subscription or receive a plan change; the call returns `422` with `plan_code: [plan_pending_deletion]`. Posting the plan the subscription is already on still works. An archived plan (`status: archived`) takes no new subscriptions either: the call returns `422` with `plan_code: [plan_archived]`. A subscription already on the archived plan code can still be updated.
       operationId: createSubscription
       requestBody:
         description: Subscription payload
@@ -9414,7 +9505,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingEngineOrCoreError'
         '422':
-          description: 'Core `validation_errors`, for example `credit_action: [not_supported_for_pay_in_arrears]`, `expected_effective_at: [only_for_end_of_period_cancellation]`, `idempotency_key: [idempotency_key_reused]`. Refused in the current state: Core refused the transition, for example `externally_billed_subscription`, `target_plan_is_not_a_downgrade`, `subscription_is_not_canceling`, `subscription_cancellation_already_effective`, `plan_transition_policy_required`, `plan_code: [plan_pending_deletion]` (the target plan is being deleted).'
+          description: 'Core `validation_errors`, for example `credit_action: [not_supported_for_pay_in_arrears]`, `expected_effective_at: [only_for_end_of_period_cancellation]`, `idempotency_key: [idempotency_key_reused]`. Refused in the current state: Core refused the transition, for example `externally_billed_subscription`, `target_plan_is_not_a_downgrade`, `subscription_is_not_canceling`, `subscription_cancellation_already_effective`, `plan_transition_policy_required`, `plan_code: [plan_pending_deletion]` (the target plan is being deleted), `plan_code: [plan_archived]` (the target plan is archived).'
           content:
             application/json:
               schema:
@@ -9536,7 +9627,7 @@ paths:
                 error: Conflict
                 code: subscription_cancellation_date_changed
         '422':
-          description: 'Core `validation_errors`, for example `credit_action: [not_supported_for_pay_in_arrears]`, `expected_effective_at: [only_for_end_of_period_cancellation]`, `idempotency_key: [idempotency_key_reused]`. Refused in the current state: Core refused the transition, for example `externally_billed_subscription`, `target_plan_is_not_a_downgrade`, `subscription_is_not_canceling`, `subscription_cancellation_already_effective`, `plan_transition_policy_required`, `plan_code: [plan_pending_deletion]` (the target plan is being deleted), `payment_required` (an immediate downgrade leaves an amount due; the customer pays it first through `POST /checkout`).'
+          description: 'Core `validation_errors`, for example `credit_action: [not_supported_for_pay_in_arrears]`, `expected_effective_at: [only_for_end_of_period_cancellation]`, `idempotency_key: [idempotency_key_reused]`. Refused in the current state: Core refused the transition, for example `externally_billed_subscription`, `target_plan_is_not_a_downgrade`, `subscription_is_not_canceling`, `subscription_cancellation_already_effective`, `plan_transition_policy_required`, `plan_code: [plan_pending_deletion]` (the target plan is being deleted), `plan_code: [plan_archived]` (the target plan is archived), `payment_required` (an immediate downgrade leaves an amount due; the customer pays it first through `POST /checkout`).'
           content:
             application/json:
               schema:
@@ -9771,7 +9862,7 @@ paths:
 
         The migration runs in the background in chunks and records one item per subscription, so the response has `status: running`; read it again with `GET /plans/{code}/version-migrations/{id}`. Subscriptions are skipped, with a `skip_reason`, when they are on custom pricing, billed by another system, not started, canceling at the end of their period, in a trial the new version would change, already on the target version, waiting on another plan change, have an open checkout, or when the two versions bill on another interval, currency or billing time. Running it again is safe: moved subscriptions are not moved twice and failed ones are retried.
 
-        One migration of a plan code runs at a time: another one returns `409` with `plan_version_migration_running`. `422` with `to_version: same_version` when both versions are the same, or `to_version: plan_pending_deletion` when the target is being deleted.
+        One migration of a plan code runs at a time: another one returns `409` with `plan_version_migration_running`. `422` with `to_version: same_version` when both versions are the same, or `to_version: plan_pending_deletion` when the target is being deleted. Archived plans still migrate between their versions.
 
         **Price increases need your consent.** When any subscription would pay more, or the new amount is above its auto-pay limit, nothing is started: the response is `422` with `code: price_increase_not_allowed`, `price_increase_count` and `mandate_cap_exceeded_count`. Review the preview, then send the same request with `allow_price_increase: true`. When a move changes a subscriber's plan amount, the customer gets the `subscription.price_change_scheduled` email if the billing entity has it on. Secret keys only.
       operationId: createPlanVersionMigration
@@ -20291,6 +20382,8 @@ webhooks:
                 bill_fixed_charges_monthly: null
                 parent_id: null
                 pending_deletion: false
+                status: active
+                archived_at: null
                 plan_family_code: issue11_llm_plan
                 charges:
                   - nozle_id: 00000000-0000-4000-8000-000000000003
@@ -20380,6 +20473,8 @@ webhooks:
                 bill_fixed_charges_monthly: null
                 parent_id: null
                 pending_deletion: false
+                status: active
+                archived_at: null
                 plan_family_code: issue11_llm_plan
                 charges:
                   - nozle_id: 00000000-0000-4000-8000-000000000003
@@ -20433,6 +20528,8 @@ webhooks:
                   type: string
                   enum:
                     - plan.version_created
+                    - plan.archived
+                    - plan.unarchived
                 object_type:
                   type: string
                   enum:
@@ -20448,6 +20545,150 @@ webhooks:
                   example: true
                 plan:
                   $ref: '#/components/schemas/PlanObject'
+      responses:
+        '200':
+          description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
+  plan_archived:
+    post:
+      operationId: planArchived
+      summary: A plan has been archived
+      description: A plan is archived. It takes no new subscriptions; its existing subscriptions keep billing. Sent once per archive, not when an archived plan is archived again.
+      parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
+        - $ref: '#/components/parameters/webhook_signature'
+      requestBody:
+        description: Details of the plan
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - livemode
+                - plan
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - plan.archived
+                object_type:
+                  type: string
+                  enum:
+                    - plan
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
+                plan:
+                  $ref: '#/components/schemas/PlanObject'
+            example:
+              webhook_type: plan.archived
+              object_type: plan
+              organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
+              plan:
+                nozle_id: 00000000-0000-4000-8000-000000000002
+                name: Issue11 LLM plan
+                invoice_display_name: null
+                created_at: '2026-10-17T02:02:31Z'
+                code: issue11_llm_plan
+                interval: monthly
+                description: null
+                amount_cents: 0
+                amount_currency: USD
+                trial_period: null
+                pay_in_advance: false
+                bill_charges_monthly: null
+                bill_fixed_charges_monthly: null
+                parent_id: null
+                pending_deletion: false
+                status: archived
+                archived_at: '2026-11-17T09:00:00Z'
+                plan_family_code: issue11_llm_plan
+                charges: []
+                entitlements: []
+                usage_thresholds: []
+                taxes: []
+      responses:
+        '200':
+          description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
+  plan_unarchived:
+    post:
+      operationId: planUnarchived
+      summary: A plan has been unarchived
+      description: An archived plan is sellable again. Sent once per unarchive.
+      parameters:
+        - $ref: '#/components/parameters/webhook_id'
+        - $ref: '#/components/parameters/webhook_timestamp'
+        - $ref: '#/components/parameters/webhook_signature'
+      requestBody:
+        description: Details of the plan
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - webhook_type
+                - object_type
+                - organization_id
+                - livemode
+                - plan
+              properties:
+                webhook_type:
+                  type: string
+                  enum:
+                    - plan.unarchived
+                object_type:
+                  type: string
+                  enum:
+                    - plan
+                organization_id:
+                  type: string
+                  format: uuid
+                  description: Unique identifier of the organization, created by Nozle.
+                  example: 1a901a90-1a90-1a90-1a90-1a901a901a90
+                livemode:
+                  type: boolean
+                  description: '`true` for a live organization, `false` for a [sandbox](/guides/getting-started/sandbox) organization (test mode).'
+                  example: true
+                plan:
+                  $ref: '#/components/schemas/PlanObject'
+            example:
+              webhook_type: plan.unarchived
+              object_type: plan
+              organization_id: 00000000-0000-4000-8000-000000000001
+              livemode: true
+              plan:
+                nozle_id: 00000000-0000-4000-8000-000000000002
+                name: Issue11 LLM plan
+                invoice_display_name: null
+                created_at: '2026-10-17T02:02:31Z'
+                code: issue11_llm_plan
+                interval: monthly
+                description: null
+                amount_cents: 0
+                amount_currency: USD
+                trial_period: null
+                pay_in_advance: false
+                bill_charges_monthly: null
+                bill_fixed_charges_monthly: null
+                parent_id: null
+                pending_deletion: false
+                status: active
+                archived_at: null
+                plan_family_code: issue11_llm_plan
+                charges: []
+                entitlements: []
+                usage_thresholds: []
+                taxes: []
       responses:
         '200':
           description: Return a 2xx status within 30 seconds to acknowledge the delivery. Any other status, a timeout or a connection error is a failed attempt; Nozle makes up to 3 attempts.
@@ -20513,6 +20754,8 @@ webhooks:
                 bill_fixed_charges_monthly: null
                 parent_id: null
                 pending_deletion: false
+                status: active
+                archived_at: null
                 plan_family_code: issue11_llm_plan
                 charges:
                   - nozle_id: 00000000-0000-4000-8000-000000000003
@@ -20682,6 +20925,8 @@ webhooks:
                   bill_fixed_charges_monthly: null
                   parent_id: null
                   pending_deletion: false
+                  status: active
+                  archived_at: null
                   plan_family_code: issue11_llm_plan
                   charges:
                     - nozle_id: 00000000-0000-4000-8000-000000000005
@@ -20852,6 +21097,8 @@ webhooks:
                   bill_fixed_charges_monthly: null
                   parent_id: null
                   pending_deletion: false
+                  status: active
+                  archived_at: null
                   plan_family_code: issue11_llm_plan
                   charges:
                     - nozle_id: 00000000-0000-4000-8000-000000000005
@@ -21022,6 +21269,8 @@ webhooks:
                   bill_fixed_charges_monthly: null
                   parent_id: null
                   pending_deletion: false
+                  status: active
+                  archived_at: null
                   plan_family_code: issue11_llm_plan
                   charges:
                     - nozle_id: 00000000-0000-4000-8000-000000000005
@@ -21193,6 +21442,8 @@ webhooks:
                   bill_fixed_charges_monthly: null
                   parent_id: null
                   pending_deletion: false
+                  status: active
+                  archived_at: null
                   plan_family_code: issue11_llm_plan
                   charges:
                     - nozle_id: 00000000-0000-4000-8000-000000000005
@@ -21364,6 +21615,8 @@ webhooks:
                   bill_fixed_charges_monthly: null
                   parent_id: null
                   pending_deletion: false
+                  status: active
+                  archived_at: null
                   plan_family_code: issue11_llm_plan
                   charges:
                     - nozle_id: 00000000-0000-4000-8000-000000000005
@@ -21534,6 +21787,8 @@ webhooks:
                   bill_fixed_charges_monthly: null
                   parent_id: null
                   pending_deletion: false
+                  status: active
+                  archived_at: null
                   plan_family_code: issue11_llm_plan
                   charges:
                     - nozle_id: 00000000-0000-4000-8000-000000000005
@@ -21704,6 +21959,8 @@ webhooks:
                   bill_fixed_charges_monthly: null
                   parent_id: null
                   pending_deletion: false
+                  status: active
+                  archived_at: null
                   plan_family_code: issue11_llm_plan
                   charges:
                     - nozle_id: 00000000-0000-4000-8000-000000000005
@@ -21874,6 +22131,8 @@ webhooks:
                   bill_fixed_charges_monthly: null
                   parent_id: null
                   pending_deletion: false
+                  status: active
+                  archived_at: null
                   plan_family_code: issue11_llm_plan
                   charges:
                     - nozle_id: 00000000-0000-4000-8000-000000000005
@@ -22044,6 +22303,8 @@ webhooks:
                   bill_fixed_charges_monthly: null
                   parent_id: null
                   pending_deletion: false
+                  status: active
+                  archived_at: null
                   plan_family_code: issue11_llm_plan
                   charges:
                     - nozle_id: 00000000-0000-4000-8000-000000000005
@@ -36109,6 +36370,8 @@ components:
         - bill_fixed_charges_monthly
         - parent_id
         - pending_deletion
+        - status
+        - archived_at
       properties:
         provider_tax_code:
           type:
@@ -36287,6 +36550,20 @@ components:
           type: boolean
           description: '`true` when deletion of the plan was requested and is still being processed in the background. The plan is going away and should not be offered to new customers; `GET /plans` still lists it until the deletion finishes. Filter on `pending_deletion` when you build a pricing page.'
           example: false
+        status:
+          type: string
+          enum:
+            - active
+            - archived
+          description: '`archived` when the plan is archived (Core 11.51.0). An archived plan takes no new subscriptions, and its existing subscriptions keep billing. `active` otherwise. Filter `GET /plans` with `status`.'
+          example: active
+        archived_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: When the plan was archived, or `null` when `status` is `active`.
+          example: null
         minimum_commitment:
           description: Minimum commitment of the plan. The key is omitted, not `null`, when the plan has no minimum commitment.
           $ref: '#/components/schemas/MinimumCommitmentObject'
@@ -39527,6 +39804,8 @@ components:
               - plan.created
               - plan.updated
               - plan.version_created
+              - plan.archived
+              - plan.unarchived
               - plan.deleted
               - plan_upgrade_intent.needs_review
               - quote.created
@@ -39743,6 +40022,8 @@ components:
                   - plan.created
                   - plan.updated
                   - plan.version_created
+                  - plan.archived
+                  - plan.unarchived
                   - plan.deleted
                   - plan_upgrade_intent.needs_review
                   - quote.created
@@ -39866,6 +40147,8 @@ components:
                   - plan.created
                   - plan.updated
                   - plan.version_created
+                  - plan.archived
+                  - plan.unarchived
                   - plan.deleted
                   - plan_upgrade_intent.needs_review
                   - quote.created
