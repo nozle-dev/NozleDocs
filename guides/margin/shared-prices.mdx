@@ -17,11 +17,40 @@ Each entry is one revision of one provider model and has:
 Prices come from two places:
 
 - **Provider pricing pages.** Nozle staff read them and maintain these revisions in the admin console.
-- **models.dev.** Three times a day, at 03:30, 11:30 and 19:30 UTC, Nozle imports from [models.dev](https://models.dev) the OpenAI, Anthropic and Gemini models the list does not have yet. A model is imported only when every price models.dev lists maps to a token bucket and its only output is text. Models with prompt-size tiers, image or audio output, or no price are left out. models.dev has no batch or 1 hour cache write rates, so imported revisions have no `batch_input`, `batch_output` or `cache_write_1h`. Each imported revision cites models.dev as its source.
+- **models.dev.** Three times a day, at 03:30, 11:30 and 19:30 UTC, Nozle imports the models of every provider [models.dev](https://models.dev) lists (Core 11.52.0; before, only OpenAI, Anthropic and Gemini). Each provider is imported under its models.dev provider id, for example `groq`, `openrouter`, `togetherai`, `amazon-bedrock`, `azure` or `google-vertex`; Google AI Studio is `gemini`. A model that several providers list is stored once per provider, each at that provider's price. A model is imported only when every price models.dev lists maps to a token bucket and its only output is text. Models with prompt-size tiers, image or audio output, or no price are left out. models.dev has no batch or 1 hour cache write rates, so imported revisions have no `batch_input`, `batch_output` or `cache_write_1h`. Each imported revision cites models.dev as its source.
 
 Your workspace cannot change the list.
 
-Open **Settings > Shared prices** in the dashboard, or query `nozleSharedProviderPrices` (GraphQL, `cost_intelligence:view`). Prices are shown per one million tokens in the dashboard and per token in the API.
+Open **Settings > Shared prices** in the dashboard. The list is paged: choose a provider and type the start of a model name to find a price. Through GraphQL (`cost_intelligence:view`), `nozleSharedProviderPrices` takes `page` and `limit`, filters by an exact `provider` and by `modelPrefix` (the start of the model name, ignoring case), and answers `collection` and `metadata` like other lists. `nozleSharedProviderPriceProviders` lists the provider names. Before Core 11.52.0, `nozleSharedProviderPrices` answered the whole list at once. Prices are shown per one million tokens in the dashboard and per token in the API.
+
+## Which provider prices a call
+
+A call is priced at the vendor that bills it, named by the API host it went to (Core 11.52.0, Engine 2.60.0).
+
+Usage capture reports the API format as `provider` (`openai`, `anthropic` or `gemini`) and the host the request went to as `provider_host`. A call to Groq, Together, OpenRouter, DeepSeek, Mistral, xAI, Fireworks or Azure made with the OpenAI client reports `openai`, and a Bedrock or Vertex call made with the Anthropic client reports `anthropic`. Nozle reads the host to find the real vendor:
+
+1. The host is lowercased and its port dropped.
+2. An exact entry for the host wins. Otherwise the longest suffix entry that matches wins, when its prefix matches too: `bedrock-runtime.us-east-1.amazonaws.com` is `amazon-bedrock`, `*.openai.azure.com` is `azure` and `*-aiplatform.googleapis.com` is `google-vertex`.
+3. With no entry, the reported `provider` stays.
+
+Nozle keeps the host list. It is filled from the base URL of every models.dev provider whose host no other provider uses, plus a list Nozle maintains for the main vendors.
+
+The vendor found this way chooses the shared price, decides whether a [provider is required](#when-the-call-names-no-provider), and names the provider of an [uncosted model](/guides/ai/token-billing#uncosted-models) row, so the dashboard shows the real vendor. A call without `provider_host` keeps its reported provider. Uncosted rows recorded before Engine 2.60.0 keep the reported provider, for example `openai` for a Groq call.
+
+<Note>
+Your own prices and Cost Sheet conditions still match the `provider` the call reported, not the vendor from the host. To price a Groq call made with the OpenAI client yourself, the condition's `provider` is `openai` and its `model` is the Groq model name.
+</Note>
+
+## When the call names no provider
+
+A call that reports no `provider` (an SDK event without it, for example) is matched against the model in every provider's list.
+
+- When every provider that lists the model, by name or alias at the call's time, has the same prices, that price applies.
+- When their prices differ, there is no shared price: `gpt-4o` is listed by `openai` and by other providers that resell it at another price. The call is uncosted with the reason `provider_required` (the `failure_code` of the Cost or Feature Event, and the `last_failure_code` of the uncosted model row). The dashboard shows it as **Provider needed**. Adopting the shared price of such a row is refused with `model: ["provider_required"]`.
+
+To fix it, send `provider` (and `provider_host`) with the event, or [add your own price](#add-your-own-price) for the model. Then [reprocess](/guides/margin/reprocess): reprocessing an uncosted model also re-rates its `provider_required` events.
+
+Your own prices are matched the same way: a call without a provider matches your own price of the model under any provider (Core 11.52.0).
 
 ## When a price changes
 
@@ -45,7 +74,7 @@ Within one list, an exact model name beats an alias, then the later start date w
 The shared list never overrides a rate you have. It rates an event only when none of your cost rules matches it. See [shared price fallback](#shared-price-fallback).
 </Note>
 
-You can read the resolved price of a model, bucket by bucket with where each rate comes from (`organization` or `shared`), with `nozleResolvedProviderPrice(provider, model)`.
+You can read the resolved price of a model, bucket by bucket with where each rate comes from (`organization` or `shared`), with `nozleResolvedProviderPrice(provider, model)`. Pass `providerHost` to resolve the vendor from the host as a call would.
 
 ## Shared price fallback
 
@@ -58,6 +87,15 @@ When an LLM event has no matching cost rule of yours, Nozle rates it from the sh
 - In the [Uncosted models](/guides/ai/token-billing#uncosted-models) list, `shared_price_available` is true on a row when the list prices that model now.
 
 The fallback does not copy anything into your catalog.
+
+## Add your own price
+
+Your own price always wins over the shared list. Add one when a model is missing from the list, when a call names no provider and the shared prices of its model differ, or when you pay a negotiated rate.
+
+- **A Cost Sheet.** Create a cost model with the provider, the model and a rate per token bucket. See [cost models](/guides/margin/cost-models) and [set up AI token billing](/guides/ai/token-billing#2-record-the-cost-of-tokens-and-see-margin). The conditions match the `provider` the call reports.
+- **From the shared list.** In the Uncosted queue, adopt the shared price, below, and publish it as your own.
+
+Then [reprocess](/guides/margin/reprocess) the events that were recorded before the price existed.
 
 ## Adopt a shared price
 

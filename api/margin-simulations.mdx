@@ -34,7 +34,7 @@ Replays the realized margin of a window with up to 20 changes: price, markup, co
 | `cost_change_percent` | `value` | cost x (1 + value / 100) |
 | `price_per_unit_absolute` | `params.unit_price` | revenue = quantity x unit price x 100 for groups with a quantity. The scope needs `feature_code`, `customer_id` or `plan_id`. |
 | `target_margin_percent` | `params.margin_percent` | Output only (`targets`). |
-| `model_swap` | `params.from_model`, `to_model`, `share_percent`, optional `to_model_prices` | Cost of matching groups = cost x (1 - share) + the share's tokens re-costed at the `to_model` prices. |
+| `model_swap` | `params.from_model`, `to_model`, `share_percent`, optional `to_model_prices` and `to_provider` | Cost of matching groups = cost x (1 - share) + the share's tokens re-costed at the `to_model` prices. |
 | `provider_price_change` | `params.model`, `params.price_change_percent` | cost x (1 + p / 100) for groups of that model. |
 | `limit_impact` | `params.limit_kind`, `limit_amount`, `period` | Output only (`limit_impacts`). |
 
@@ -46,6 +46,7 @@ Replays the realized margin of a window with up to 20 changes: price, markup, co
 | `margin_percent` | 0 to 99.99. |
 | `share_percent` | 0 to 100. |
 | `to_model_prices` | Price per 1,000,000 tokens in major units of the simulation currency, by bucket: `input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`. Optional: without it the [shared price list](/guides/margin/shared-prices) is used (per token). |
+| `to_provider` | Engine 2.60.0. The provider whose shared price prices `to_model`, as the shared price list names it. Needed without `to_model_prices` when several providers list `to_model` at different prices. |
 | `price_change_percent` | `-100` to `1000000`. |
 | `limit_kind` | `spend_cents` (the customer's usage revenue) or `quantity`. |
 | `limit_amount` | Above 0. |
@@ -139,7 +140,7 @@ Only `cost_change_percent` accepts it. Every other kind answers `400 invalid_req
 
 `model_swap` is an approximation: tokens are summed per group and re-costed with the same bucket split the cost rating uses, the share that stays is assumed to cost in proportion to its current cost, and batch-tier prices are not modelled. See the [guide](/guides/margin/simulation).
 
-Errors, with body `{"code": "...", "error": "..."}`: `400 invalid_request`, `400 invalid_date_range`, `400 model_price_unavailable` (a `model_swap` target with no `to_model_prices` and no shared price), `400 price_currency_mismatch` (its shared price is in another currency than the simulation and no `to_model_prices` was given), `503 analytics_unavailable`.
+Errors, with body `{"code": "...", "error": "..."}`: `400 invalid_request`, `400 invalid_date_range`, `400 model_price_unavailable` (a `model_swap` target with no `to_model_prices` and no shared price, or one several providers list at different prices without `to_provider`), `400 price_currency_mismatch` (its shared price is in another currency than the simulation and no `to_model_prices` was given), `503 analytics_unavailable`.
 
 ## Back-test
 
