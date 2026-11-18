@@ -12878,6 +12878,8 @@ paths:
         - On an override, `amount_cents: null` turns the plan's limit for that Feature (or the total) off for the subscription.
         - A limit with an amount is refused with `422 spend_limit_unrateable_charges` when a usage charge it covers cannot be rated per event; the body lists them in `charges`. Rateable: the charge models `standard`, `package`, `graduated`, `volume`, `dynamic` and `percentage` (without a per-transaction minimum or maximum, in the charge or its filters), on a Feature that is not recurring and aggregates with `count_agg`, `sum_agg`, `max_agg`, `latest_agg` or `unique_count_agg`.
 
+        - `invoice_cap: true` (Core 11.55.0) also caps the invoices: the usage billed for a billing period is at most `amount_cents`, and usage past it is not billed. Only on a limit without `feature_code` and with `period: billing_period`; otherwise `422` with `invoice_cap: [invalid_scope]` or `invoice_cap: [invalid_period]`. See [Cap an invoice](/guides/entitlements/spend-limits#cap-an-invoice).
+
         The Engine counts spend from the events it processes once the limit exists: usage before that is not counted, and a new limit refuses calls within a minute.
 
         With API key permissions, the key needs `plan:write` for a plan limit and `subscription:write` for an override. Editing a limit never creates a plan version. See [Spend limits and budgets](/guides/entitlements/spend-limits).
@@ -12897,6 +12899,15 @@ paths:
                     amount_cents: 50000
                     period: billing_period
                     mode: hard
+              plan_invoice_cap:
+                summary: Plan default that caps the usage billed per period
+                value:
+                  spend_limit:
+                    plan_code: pro
+                    amount_cents: 50000
+                    period: billing_period
+                    mode: soft
+                    invoice_cap: true
               subscription_feature:
                 summary: Subscription override on one Feature
                 value:
@@ -12933,7 +12944,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorNotFound'
         '422':
-          description: '`validation_errors` (for example `base: one_of_plan_or_subscription_required`, `currency: currencies_does_not_match`, `feature_id: value_already_exist` for a second limit on the same plan or subscription and Feature, `amount_cents: value_is_mandatory` on a plan limit, `thresholds: value_is_invalid`, or `period` or `mode: value_is_invalid`), `plan_is_an_override` (`plan_code` names a per-customer override plan), or `spend_limit_unrateable_charges` with the charges.'
+          description: '`validation_errors` (for example `base: one_of_plan_or_subscription_required`, `currency: currencies_does_not_match`, `feature_id: value_already_exist` for a second limit on the same plan or subscription and Feature, `amount_cents: value_is_mandatory` on a plan limit, `thresholds: value_is_invalid`, `period` or `mode: value_is_invalid`, `invoice_cap: invalid_scope` for a cap on a Feature limit, or `invoice_cap: invalid_period` for a cap on a period other than `billing_period`), `plan_is_an_override` (`plan_code` names a per-customer override plan), or `spend_limit_unrateable_charges` with the charges.'
           content:
             application/json:
               schema:
@@ -12984,7 +12995,7 @@ paths:
       tags:
         - Spend Limits
       summary: Update a spend limit
-      description: 'Core 11.23.0. Changes `amount_cents`, `period`, `mode` or `thresholds`; the plan or subscription, Feature and currency stay. A key sent as `null` is ignored, except `amount_cents`, where `null` turns an override off (a plan limit needs an amount). The period''s spend is kept, because it does not belong to the limit, and the new amount is compared with it: a threshold already sent this period is not sent again. Changing `period` starts a new count. The charges are checked again as on create (`422 spend_limit_unrateable_charges`). With API key permissions, the key needs `plan:write` for a plan limit and `subscription:write` for an override.'
+      description: 'Core 11.23.0. Changes `amount_cents`, `period`, `mode`, `thresholds` or `invoice_cap` (Core 11.55.0); the plan or subscription, Feature and currency stay. A key sent as `null` is ignored, except `amount_cents`, where `null` turns an override off (a plan limit needs an amount). The period''s spend is kept, because it does not belong to the limit, and the new amount is compared with it: a threshold already sent this period is not sent again. Changing `period` starts a new count. The charges are checked again as on create (`422 spend_limit_unrateable_charges`). With API key permissions, the key needs `plan:write` for a plan limit and `subscription:write` for an override.'
       operationId: updateSpendLimit
       requestBody:
         required: true
@@ -13014,7 +13025,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
-          description: '`validation_errors` (for example `currency: currencies_does_not_match`, `amount_cents: value_is_mandatory` on a plan limit, `thresholds: value_is_invalid`) or `spend_limit_unrateable_charges` with the charges.'
+          description: '`validation_errors` (for example `currency: currencies_does_not_match`, `amount_cents: value_is_mandatory` on a plan limit, `thresholds: value_is_invalid`, `invoice_cap: invalid_scope` or `invoice_cap: invalid_period`) or `spend_limit_unrateable_charges` with the charges.'
           content:
             application/json:
               schema:
@@ -17571,6 +17582,7 @@ webhooks:
                 fees_amount_cents: 30584
                 taxes_amount_cents: 0
                 progressive_billing_credit_amount_cents: 0
+                usage_cap_amount_cents: 0
                 coupons_amount_cents: 0
                 credit_notes_amount_cents: 0
                 sub_total_excluding_taxes_amount_cents: 30584
@@ -17807,6 +17819,7 @@ webhooks:
                 fees_amount_cents: 500
                 taxes_amount_cents: 0
                 progressive_billing_credit_amount_cents: 0
+                usage_cap_amount_cents: 0
                 coupons_amount_cents: 0
                 credit_notes_amount_cents: 0
                 sub_total_excluding_taxes_amount_cents: 500
@@ -17995,6 +18008,7 @@ webhooks:
                 fees_amount_cents: 2500
                 taxes_amount_cents: 0
                 progressive_billing_credit_amount_cents: 0
+                usage_cap_amount_cents: 0
                 coupons_amount_cents: 0
                 credit_notes_amount_cents: 0
                 sub_total_excluding_taxes_amount_cents: 2500
@@ -18181,6 +18195,7 @@ webhooks:
                 fees_amount_cents: 30584
                 taxes_amount_cents: 0
                 progressive_billing_credit_amount_cents: 0
+                usage_cap_amount_cents: 0
                 coupons_amount_cents: 0
                 credit_notes_amount_cents: 0
                 sub_total_excluding_taxes_amount_cents: 30584
@@ -18315,6 +18330,7 @@ webhooks:
                 fees_amount_cents: 0
                 taxes_amount_cents: 0
                 progressive_billing_credit_amount_cents: 0
+                usage_cap_amount_cents: 0
                 coupons_amount_cents: 0
                 credit_notes_amount_cents: 0
                 sub_total_excluding_taxes_amount_cents: 0
@@ -18549,6 +18565,7 @@ webhooks:
                 fees_amount_cents: 25
                 taxes_amount_cents: 0
                 progressive_billing_credit_amount_cents: 0
+                usage_cap_amount_cents: 0
                 coupons_amount_cents: 0
                 credit_notes_amount_cents: 0
                 sub_total_excluding_taxes_amount_cents: 25
@@ -18740,6 +18757,7 @@ webhooks:
                   fees_amount_cents: 30584
                   taxes_amount_cents: 0
                   progressive_billing_credit_amount_cents: 0
+                  usage_cap_amount_cents: 0
                   coupons_amount_cents: 0
                   credit_notes_amount_cents: 0
                   sub_total_excluding_taxes_amount_cents: 30584
@@ -18870,6 +18888,7 @@ webhooks:
                   fees_amount_cents: 30584
                   taxes_amount_cents: 0
                   progressive_billing_credit_amount_cents: 0
+                  usage_cap_amount_cents: 0
                   coupons_amount_cents: 0
                   credit_notes_amount_cents: 0
                   sub_total_excluding_taxes_amount_cents: 30584
@@ -19011,6 +19030,7 @@ webhooks:
                 fees_amount_cents: 30584
                 taxes_amount_cents: 0
                 progressive_billing_credit_amount_cents: 0
+                usage_cap_amount_cents: 0
                 coupons_amount_cents: 0
                 credit_notes_amount_cents: 0
                 sub_total_excluding_taxes_amount_cents: 30584
@@ -19200,6 +19220,7 @@ webhooks:
                 fees_amount_cents: 30584
                 taxes_amount_cents: 0
                 progressive_billing_credit_amount_cents: 0
+                usage_cap_amount_cents: 0
                 coupons_amount_cents: 0
                 credit_notes_amount_cents: 0
                 sub_total_excluding_taxes_amount_cents: 30584
@@ -20093,6 +20114,7 @@ webhooks:
                     fees_amount_cents: 300
                     taxes_amount_cents: 30
                     progressive_billing_credit_amount_cents: 0
+                    usage_cap_amount_cents: 0
                     coupons_amount_cents: 0
                     credit_notes_amount_cents: 0
                     sub_total_excluding_taxes_amount_cents: 300
@@ -20299,6 +20321,7 @@ webhooks:
                     fees_amount_cents: 300
                     taxes_amount_cents: 30
                     progressive_billing_credit_amount_cents: 0
+                    usage_cap_amount_cents: 0
                     coupons_amount_cents: 0
                     credit_notes_amount_cents: 0
                     sub_total_excluding_taxes_amount_cents: 300
@@ -22912,6 +22935,7 @@ webhooks:
                 fees_amount_cents: 30584
                 taxes_amount_cents: 0
                 progressive_billing_credit_amount_cents: 0
+                usage_cap_amount_cents: 0
                 coupons_amount_cents: 0
                 credit_notes_amount_cents: 0
                 sub_total_excluding_taxes_amount_cents: 30584
@@ -26747,7 +26771,8 @@ components:
                 - coupon
                 - credit_note
                 - invoice
-              description: The type of credit applied. Possible values are `coupon`, `credit_note` or `invoice` (for `progressive_billing` invoice).
+                - usage_cap
+              description: The type of credit applied. Possible values are `coupon`, `credit_note`, `invoice` (for `progressive_billing` invoice) or `usage_cap` (Core 11.55.0, usage past the invoice cap; `item_id` is the spend limit and `code` is `usage_cap`).
               example: coupon
             code:
               type: string
@@ -30310,6 +30335,10 @@ components:
           type: integer
           description: The usage already billed in previous invoices. Only apply to `progressive_billing` and `subscription` invoices.
           example: 0
+        usage_cap_amount_cents:
+          type: integer
+          description: Core 11.55.0. Usage not billed because of the subscription's invoice cap, in cents, taken off before coupons and taxes. It is also listed in `credits` as an item of type `usage_cap`. Invoice previews (`POST /invoices/preview` and plan change previews) apply the cap too. `0` without a cap. See [Cap an invoice](/guides/entitlements/spend-limits#cap-an-invoice).
+          example: 0
         total_amount_cents:
           type: integer
           description: The sum of the amount and taxes amount on the invoice, expressed in cents. It calculates the total financial value of the invoice, including both the original amount and any applicable taxes.
@@ -32583,6 +32612,10 @@ components:
           type: integer
           description: The amount in cents, tax excluded.
           example: 123
+        usage_cap_amount_cents:
+          type: integer
+          description: Core 11.55.0, current usage only. The part of `amount_cents` past the subscription's invoice cap, which the invoice will not bill. `taxes_amount_cents` and `total_amount_cents` are computed on the capped usage; each charge keeps its amount. `0` without a cap, and on a usage filtered to a charge or a group. See [Cap an invoice](/guides/entitlements/spend-limits#cap-an-invoice).
+          example: 0
         taxes_amount_cents:
           type: integer
           description: The tax amount in cents.
@@ -32857,10 +32890,18 @@ components:
           type: integer
           description: The amount in cents, tax excluded.
           example: 123
+        usage_cap_amount_cents:
+          type: integer
+          description: Core 11.55.0. The part of `amount_cents` past the subscription's invoice cap, which the invoice will not bill. `taxes_amount_cents` and `total_amount_cents` are computed on the capped usage; each charge keeps its amount. `0` without a cap. See [Cap an invoice](/guides/entitlements/spend-limits#cap-an-invoice).
+          example: 0
         projected_amount_cents:
           type: integer
           description: The projected amount in cents, tax excluded.
           example: 256
+        projected_usage_cap_amount_cents:
+          type: integer
+          description: Core 11.55.0. The part of `projected_amount_cents` past the subscription's invoice cap. `0` without a cap.
+          example: 0
         taxes_amount_cents:
           type: integer
           description: The tax amount in cents.
@@ -45721,6 +45762,7 @@ components:
         - period
         - mode
         - thresholds
+        - invoice_cap
         - created_at
         - updated_at
       properties:
@@ -45797,6 +45839,10 @@ components:
             - 80
             - 90
             - 100
+        invoice_cap:
+          type: boolean
+          description: Core 11.55.0. `true` when the invoices of a billing period bill at most `amount_cents` of usage. Only on a limit without `feature_code` and with `period` `billing_period`. See [Cap an invoice](/guides/entitlements/spend-limits#cap-an-invoice).
+          example: false
         created_at:
           type: string
           format: date-time
@@ -45858,6 +45904,10 @@ components:
                 minimum: 1
                 maximum: 100
               description: Percentages that notify, each from 1 to 100, without repeats. Default `[50, 80, 90, 100]`.
+            invoice_cap:
+              type: boolean
+              default: false
+              description: 'Core 11.55.0. Cap the usage billed per billing period at `amount_cents`. Only without `feature_code` and with `period` `billing_period`; otherwise `422` with `invoice_cap: [invalid_scope]` or `[invalid_period]`. A subscription override without the cap, or without an amount, turns the plan''s cap off.'
     SpendLimitUpdateInput:
       type: object
       required:
@@ -45895,6 +45945,9 @@ components:
                 type: integer
                 minimum: 1
                 maximum: 100
+            invoice_cap:
+              type: boolean
+              description: Core 11.55.0. Turn the invoice cap on or off. Same rules as on create.
     SpendLimitUnrateableChargesError:
       type: object
       description: 'Core 11.23.0. A usage charge the limit covers cannot be rated per event by the Engine, so its spend could not be counted. Change the charge, or put the limit on a Feature whose charges can be rated.'
