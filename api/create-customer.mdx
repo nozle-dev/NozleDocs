@@ -210,14 +210,16 @@ The call answers `202` with the customer, `erased_at` set. The erasure runs in t
 
 - Every personal field of the customer: names, legal name and number, email, phone, URL, logo, billing and shipping address, and tax ID. The name becomes `Erased customer`.
 - Its metadata, its accounting and CRM links, and its change history.
-- Its payment methods and payment provider customers. At Stripe, the saved payment methods are detached and the Stripe customer is deleted; its past charges stay in your Stripe account. Razorpay cannot delete a customer, so its name, email and phone there are overwritten.
+- Its payment methods and payment provider customers. At Stripe, the saved payment methods are detached and the Stripe customer is deleted; its past charges stay in your Stripe account. Razorpay cannot delete a customer, so its name, email and phone there are overwritten. Its Razorpay mandates are cancelled, so nothing can be debited later; no `payment_method.deleted` webhook is sent for them.
+- The name, email and phone Nozle sent with its Razorpay requests. The IDs, amounts, currency, status and errors of those requests stay for accounting.
 - The email address on payment requests and on the customer emails Nozle sent.
 - Copies of the customer in earlier webhooks (including their stored messages) and in activity logs.
-- In the Engine: the names and metadata of the customer's Entities, and every property of its LLM cost and margin records except the model, provider and token counts that price and analyse them.
+- In the Engine: the names and metadata of the customer's Entities, and every property of its LLM cost and margin records except the model, provider, service tier and token counts that price and analyse them. The cost and margin views change shortly after the erasure finishes.
 - The customer is deleted as `DELETE /customers/{external_id}` does, if it was not already.
 
 **What is kept.**
 
 - The external ID. Do not use an email address or another personal value as an external ID.
-- Invoices, credit notes, payments and receipts. An issued document keeps the billing name, address and tax ID it showed: a PDF or e-invoice generated again after the erasure still shows them, but no longer the customer's email.
+- Invoices, credit notes, payments and receipts. An issued document keeps the billing name, email, address and tax ID it showed: a PDF or e-invoice generated again after the erasure still shows them. The customer itself (API, dashboard, webhooks) shows none of them.
 - Usage events and the properties you sent with them. They are your data, so Nozle does not change them. Do not send personal data in event properties.
+- API request logs, which are not kept per customer, so an erasure cannot find the customer in them. From Core 11.54.0 they are deleted after 90 days.

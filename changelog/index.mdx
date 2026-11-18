@@ -11,10 +11,11 @@ _Unreleased_
 
 - **`POST /customers/{external_id}/erase`.** Erases a customer's personal data, for example on a GDPR request. Irreversible. It answers `202` with `erased_at` set, runs in the background and ends with the new `customer.erased` webhook. See [Erase a customer](/api/create-customer#erase-a-customer).
 - **Refused while business is open.** `422` with `error_details.customer` listing `has_active_subscriptions`, `has_draft_invoices` and `has_unpaid_invoices`, every one that applies.
-- **Erased.** Names, email, phone, addresses, tax ID, metadata, accounting and CRM links, payment methods and change history. The Stripe customer is deleted; Razorpay's name, email and phone are overwritten. The Engine erases Entity names and metadata, and the non-usage properties of its LLM cost records.
-- **Kept.** The external ID, invoices, credit notes, payments and receipts. Issued documents keep the billing name, address and tax ID they showed. Event properties you sent are kept. Do not use an email address as an external ID.
+- **Erased.** Names, email, phone, addresses, tax ID, metadata, accounting and CRM links, payment methods and change history. The Stripe customer is deleted; Razorpay's name, email and phone are overwritten and its mandates cancelled, and the details Nozle sent with Razorpay requests are removed. The Engine erases Entity names and metadata, and the non-usage properties of its LLM cost and margin records.
+- **Kept.** The external ID, invoices, credit notes, payments and receipts. Issued documents keep the billing name, email, address and tax ID they showed, also when generated again. Event properties you sent are kept. Do not use an email address as an external ID.
 - **`DELETE /customers/{external_id}` is not an erasure.** It is a soft delete that keeps the customer's data. Its reference now says so.
 - **New field.** `erased_at` on the customer object.
+- **API request logs kept 90 days.** Older request logs are deleted. They are not kept per customer, so this bounds how long a request naming an erased customer stays.
 
 ### Payment connection health (Core 11.53.0, dashboard 2.26.0)
 
