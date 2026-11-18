@@ -2011,7 +2011,7 @@ paths:
         - Customers
       summary: Erase a customer
       description: |-
-        Core 11.54.0. Erases a customer's personal data, for example on a GDPR request. **Irreversible.** The call stamps `erased_at` and answers `202`; the erasure runs in the background and ends with the `customer.erased` webhook.
+        Core 11.52.0. Erases a customer's personal data, for example on a GDPR request. **Irreversible.** The call stamps `erased_at` and answers `202`; the erasure runs in the background and ends with the `customer.erased` webhook.
 
         - Erasing a customer that is already erased answers `202` and does nothing.
         - A customer that was already deleted can be erased: the current customer of the external ID first, else the last one deleted.
@@ -16247,7 +16247,7 @@ webhooks:
     post:
       operationId: customerErased
       summary: A customer has been erased
-      description: Core 11.54.0. The background erasure started by `POST /customers/{external_customer_id}/erase` has finished. The payload is the erased customer, with `erased_at` set, its personal fields `null` and the name `Erased customer`. Sent once per erasure.
+      description: Core 11.52.0. The background erasure started by `POST /customers/{external_customer_id}/erase` has finished. The payload is the erased customer, with `erased_at` set, its personal fields `null` and the name `Erased customer`. Sent once per erasure.
       parameters:
         - $ref: '#/components/parameters/webhook_id'
         - $ref: '#/components/parameters/webhook_timestamp'
@@ -29285,7 +29285,7 @@ components:
             - string
             - 'null'
           format: date-time
-          description: Core 11.54.0. When the customer was erased with `POST /customers/{external_customer_id}/erase`. `null` for a customer that was not erased.
+          description: Core 11.52.0. When the customer was erased with `POST /customers/{external_customer_id}/erase`. `null` for a customer that was not erased.
           example: null
         billing_configuration:
           $ref: '#/components/schemas/CustomerBillingConfiguration'

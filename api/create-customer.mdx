@@ -174,7 +174,7 @@ To let customers hold objects in several currencies, set the organization settin
 ## Erase a customer
 
 <Note>
-Available from Core 11.54.0 and Engine 2.61.0.
+Available from Core 11.52.0 and Engine 2.60.0.
 </Note>
 
 `POST https://api.nozle.app/core/api/v1/customers/{external_id}/erase` erases a customer's personal data, for example when the customer asks under GDPR. Use a secret key; with [API key permissions](/api/authentication#key-permissions) it needs `customer:write`. The dashboard has no erase action; use the API.
@@ -222,4 +222,4 @@ The call answers `202` with the customer, `erased_at` set. The erasure runs in t
 - The external ID. Do not use an email address or another personal value as an external ID.
 - Invoices, credit notes, payments and receipts. An issued document keeps the billing name, email, address and tax ID it showed: a PDF or e-invoice generated again after the erasure still shows them. The customer itself (API, dashboard, webhooks) shows none of them.
 - Usage events and the properties you sent with them. They are your data, so Nozle does not change them. Do not send personal data in event properties.
-- API request logs, which are not kept per customer, so an erasure cannot find the customer in them. From Core 11.54.0 they are deleted after 90 days.
+- API request logs, which are not kept per customer, so an erasure cannot find the customer in them. From Core 11.52.0 they are deleted after 90 days.
