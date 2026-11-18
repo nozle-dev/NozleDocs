@@ -27,7 +27,7 @@ Available from Core 11.23.0 and Engine 2.34.0. Usage limits in units (an entitle
 Spend is the gross metered usage charges of the subscription in the period: what its usage charges price, before tax, coupons, wallet credits and credits. The subscription fee and fixed charges are not counted. The limit protects against runaway usage whoever ends up paying for it.
 
 - A Feature paid with Nozle credits through a $0 charge adds no spend. Its balance is already a hard cap (`insufficient_credits`).
-- An invoice paid in arrears is not changed: the limit stops the usage, it does not cap the invoice after the fact.
+- By default an invoice is not changed: the limit stops the usage, it does not cap the invoice after the fact. To cap the invoice too, see [Cap an invoice](#cap-an-invoice).
 
 ## What can be limited
 
@@ -81,11 +81,40 @@ curl -X POST https://api.nozle.app/core/api/v1/spend_limits \
 ```
 
 - `GET /spend_limits?plan_code=pro` or `?external_subscription_id=sub_pro_123` lists limits. `GET`, `PUT` and `DELETE /spend_limits/{id}` read, change and remove one.
-- An update changes `amount_cents`, `period`, `mode` or `thresholds`. The period's spend is kept (it belongs to the subscription, Feature and period, not to the limit), so raising a limit mid-period lets the customer continue at once, and a threshold already sent this period is not sent again. Changing `period` starts a new count, which the Engine fills with the spend already made in the new period (see [Limits added mid-period](#limits-added-mid-period)).
+- An update changes `amount_cents`, `period`, `mode`, `thresholds` or `invoice_cap`. The period's spend is kept (it belongs to the subscription, Feature and period, not to the limit), so raising a limit mid-period lets the customer continue at once, and a threshold already sent this period is not sent again. Changing `period` starts a new count, which the Engine fills with the spend already made in the new period (see [Limits added mid-period](#limits-added-mid-period)).
 - Deleting an override brings the plan's limit back. Deleting a plan or a Feature removes its limits.
 - One limit per plan or subscription and Feature: a second answers `422` with `feature_id: value_already_exist`.
 
-The responses carry `nozle_id`, `plan_code`, `external_subscription_id`, `feature_code` (`null` for the total), `amount_cents`, `currency`, `period`, `mode` and `thresholds`.
+The responses carry `nozle_id`, `plan_code`, `external_subscription_id`, `feature_code` (`null` for the total), `amount_cents`, `currency`, `period`, `mode`, `thresholds` and `invoice_cap`.
+
+## Cap an invoice
+
+<Note>
+Available from Core 11.53.0.
+</Note>
+
+A spend limit can also cap what the customer is billed for usage in a billing period. Set `invoice_cap: true` on a limit on the total of the usage charges (no `feature_code`) with `period: billing_period`. The invoices of each billing period then bill at most the limit's amount of usage. In the dashboard, switch on **Cap the invoice at this amount** on the limit.
+
+```bash
+curl -X POST https://api.nozle.app/core/api/v1/spend_limits \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"spend_limit": {"plan_code": "pro", "amount_cents": 50000, "period": "billing_period", "mode": "soft", "invoice_cap": true}}'
+```
+
+- **Usage only, before tax.** The cap applies to the gross usage charges, before tax, coupons and credits. The subscription fee, fixed charges and taxes come on top. Coupons, taxes and wallet credits then apply to the capped amount.
+- **Usage past the cap keeps working and is not billed.** With `mode: soft` the customer keeps using the product and you absorb the cost past the cap. With `mode: hard` calls are also refused once the limit is used up, as before.
+- **Plan default, subscription override.** A plan's limit with the cap is the default of its subscriptions. A subscription override replaces it: an override without `invoice_cap`, or without an amount, turns the cap off for that subscription.
+- **Usage already billed in the period counts.** Progressive billing invoices and pay-in-advance usage fees of the period count toward the cap. Each pay-in-advance invoice bills only what the cap leaves. Once the cap is reached, no more progressive billing invoice is issued for the period, and no `subscription.usage_threshold_reached` webhook is sent, unless the cap is raised.
+- **Changing the cap mid-period.** A raised cap bills the usage it capped before, taxed like any usage. A cap lowered below the usage already billed caps the rest of the period; nothing billed is taken back.
+- **Previews and usage apply the cap.** An invoice preview and a plan change preview show the usage cap line, so they match the invoice that will be issued. The current and projected usage (`GET /customers/{external_id}/current_usage` and `.../projected_usage`) return `usage_cap_amount_cents` and compute `total_amount_cents` and taxes on the capped usage; the projected usage also returns `projected_usage_cap_amount_cents`. Each charge keeps its amount, and a usage filtered to a charge or a group shows no cap.
+- **Prepaid wallets.** A wallet's ongoing balance counts only the usage the cap leaves to bill, so usage past the cap does not drain it.
+- **Same currency only.** A cap in another currency than the invoice is not applied. A plan's currency cannot change while its spend limits are in another currency: the update answers `422` with `amount_currency: ["spend_limits_currency_mismatch"]`. A subscription with a currency override gets the plan's limits, but their cap is not applied.
+- A limit without `invoice_cap`, which is every limit created before Core 11.53.0, changes no invoice, preview, usage or wallet balance.
+
+Any other limit with `invoice_cap: true` is refused with `422 validation_errors`: `invoice_cap: ["invalid_scope"]` on a Feature limit, `invoice_cap: ["invalid_period"]` on a `calendar_month` or `lifetime` limit.
+
+**On the invoice.** The usage past the cap is a credit before taxes named **Usage cap**. Every fee keeps its real amount, so the customer sees the usage it made. The invoice has `usage_cap_amount_cents`, and `credits` lists an item of type `usage_cap` whose `item_id` is the spend limit. The PDF shows a **Usage cap** line.
 
 ## How spend is measured
 
