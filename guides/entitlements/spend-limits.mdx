@@ -108,8 +108,9 @@ curl -X POST https://api.nozle.app/core/api/v1/spend_limits \
 - **Usage already billed in the period counts.** Progressive billing invoices and pay-in-advance usage fees of the period count toward the cap. Each pay-in-advance invoice bills only what the cap leaves. Once the cap is reached, no more progressive billing invoice is issued for the period, and no `subscription.usage_threshold_reached` webhook is sent, unless the cap is raised.
 - **Changing the cap mid-period.** A raised cap bills the usage it capped before, taxed like any usage. A cap lowered below the usage already billed caps the rest of the period; nothing billed is taken back.
 - **Previews and usage apply the cap.** An invoice preview and a plan change preview show the usage cap line, so they match the invoice that will be issued. The current and projected usage (`GET /customers/{external_id}/current_usage` and `.../projected_usage`) return `usage_cap_amount_cents` and compute `total_amount_cents` and taxes on the capped usage; the projected usage also returns `projected_usage_cap_amount_cents`. Each charge keeps its amount, and a usage filtered to a charge or a group shows no cap.
-- **Same currency only.** A cap in another currency than the invoice is not applied.
-- A limit without `invoice_cap`, which is every limit created before Core 11.55.0, changes no invoice.
+- **Prepaid wallets.** A wallet's ongoing balance counts only the usage the cap leaves to bill, so usage past the cap does not drain it.
+- **Same currency only.** A cap in another currency than the invoice is not applied. A plan's currency cannot change while its spend limits are in another currency: the update answers `422` with `amount_currency: ["spend_limits_currency_mismatch"]`. A subscription with a currency override gets the plan's limits, but their cap is not applied.
+- A limit without `invoice_cap`, which is every limit created before Core 11.55.0, changes no invoice, preview, usage or wallet balance.
 
 Any other limit with `invoice_cap: true` is refused with `422 validation_errors`: `invoice_cap: ["invalid_scope"]` on a Feature limit, `invoice_cap: ["invalid_period"]` on a `calendar_month` or `lifetime` limit.
 
