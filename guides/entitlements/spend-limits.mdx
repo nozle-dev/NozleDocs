@@ -90,7 +90,7 @@ The responses carry `nozle_id`, `plan_code`, `external_subscription_id`, `featur
 ## Cap an invoice
 
 <Note>
-Available from Core 11.55.0.
+Available from Core 11.53.0.
 </Note>
 
 A spend limit can also cap what the customer is billed for usage in a billing period. Set `invoice_cap: true` on a limit on the total of the usage charges (no `feature_code`) with `period: billing_period`. The invoices of each billing period then bill at most the limit's amount of usage. In the dashboard, switch on **Cap the invoice at this amount** on the limit.
@@ -110,7 +110,7 @@ curl -X POST https://api.nozle.app/core/api/v1/spend_limits \
 - **Previews and usage apply the cap.** An invoice preview and a plan change preview show the usage cap line, so they match the invoice that will be issued. The current and projected usage (`GET /customers/{external_id}/current_usage` and `.../projected_usage`) return `usage_cap_amount_cents` and compute `total_amount_cents` and taxes on the capped usage; the projected usage also returns `projected_usage_cap_amount_cents`. Each charge keeps its amount, and a usage filtered to a charge or a group shows no cap.
 - **Prepaid wallets.** A wallet's ongoing balance counts only the usage the cap leaves to bill, so usage past the cap does not drain it.
 - **Same currency only.** A cap in another currency than the invoice is not applied. A plan's currency cannot change while its spend limits are in another currency: the update answers `422` with `amount_currency: ["spend_limits_currency_mismatch"]`. A subscription with a currency override gets the plan's limits, but their cap is not applied.
-- A limit without `invoice_cap`, which is every limit created before Core 11.55.0, changes no invoice, preview, usage or wallet balance.
+- A limit without `invoice_cap`, which is every limit created before Core 11.53.0, changes no invoice, preview, usage or wallet balance.
 
 Any other limit with `invoice_cap: true` is refused with `422 validation_errors`: `invoice_cap: ["invalid_scope"]` on a Feature limit, `invoice_cap: ["invalid_period"]` on a `calendar_month` or `lifetime` limit.
 
