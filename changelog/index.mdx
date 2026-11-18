@@ -5,6 +5,16 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Cap the usage billed per period (Core 11.55.0, dashboard 2.27.0)
+
+_Unreleased_
+
+- **Invoice cap.** A spend limit on the total of the usage charges with `period: billing_period` takes `invoice_cap: true`. The invoices of each billing period then bill at most the limit's amount of usage, before tax. Usage past the cap keeps working and is not billed; a `hard` limit still refuses calls as before. The subscription fee, fixed charges and taxes come on top. See [Cap an invoice](/guides/entitlements/spend-limits#cap-an-invoice).
+- **Plan default and override.** A plan's capped limit is the default of its subscriptions. A subscription override without the cap, or without an amount, turns it off.
+- **On the invoice.** The usage past the cap is a credit before taxes named "Usage cap": `usage_cap_amount_cents` on the invoice and a `credits` item of type `usage_cap`. Every fee keeps its real amount. Progressive billing and pay-in-advance usage of the period count toward the cap. Once the cap is reached, no progressive billing invoice and no `subscription.usage_threshold_reached` webhook is sent for the period, unless the cap is raised. A raised cap bills the usage it capped before; a lowered cap takes back nothing already billed.
+- **Previews and usage.** Invoice previews and plan change previews apply the cap. The current and projected usage return `usage_cap_amount_cents` (and `projected_usage_cap_amount_cents`) and compute their totals and taxes on the capped usage.
+- **Validation.** `422` with `invoice_cap: ["invalid_scope"]` on a Feature limit and `invoice_cap: ["invalid_period"]` on a `calendar_month` or `lifetime` limit. Existing limits have `invoice_cap: false` and change no invoice.
+
 ### Archive a plan without ending its subscriptions (Core 11.51.0, dashboard 2.24.0)
 
 _November 18, 2026_
