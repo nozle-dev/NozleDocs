@@ -54,9 +54,9 @@ The connection lists the reasons in plain words, with the time the last event ar
 | Reason | Status | Cause and fix |
 |---|---|---|
 | `credentials_rejected` | Not working | The provider refuses the saved key. Edit the connection and enter a valid key. |
-| `webhook_not_registered` | Not working | Stripe only. Nozle could not create its webhook endpoint. Fix the cause, then disconnect and connect again. See [Stripe webhook setup](/integrations/stripe#webhook-setup). |
-| `webhook_missing` | Not working | Stripe only. The endpoint Nozle created was deleted in Stripe. Disconnect and connect again so Nozle creates a new one. |
-| `webhook_disabled` | Not working | Stripe only. The endpoint is disabled in Stripe. Enable it in the Stripe dashboard. |
+| `webhook_not_registered` | Not working | Stripe only. Nozle could not create its webhook endpoint. Fix the cause, then save the connection again: Nozle creates the endpoint in the background. Select **Check now** after a few seconds. See [Stripe webhook setup](/integrations/stripe#webhook-setup). |
+| `webhook_missing` | Not working | Stripe only. The endpoint Nozle created was deleted in Stripe. Save the connection again and Nozle creates a new one in the background, then select **Check now**. |
+| `webhook_disabled` | Not working | Stripe only. The endpoint is disabled in Stripe. Save the connection again and Nozle turns it back on in the background, then select **Check now**. |
 | `signature_rejected` | Not working | An event with a bad signature arrived after the last valid one, so the webhook secret does not match. For Razorpay, make the secret in Razorpay and on the connection the same. |
 | `events_failing` | Needs attention | Provider events failed to process in the last 24 hours. They are retried automatically. Open **Show events** to see which. |
 | `no_events_yet` | Needs attention | Razorpay only. No validly signed event has arrived yet. See [Razorpay webhook setup](/integrations/razorpay#webhook-setup). |
