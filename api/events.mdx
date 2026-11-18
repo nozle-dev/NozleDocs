@@ -81,6 +81,8 @@ The refused event is not stored and its `transaction_id` stays free. Choose what
 
 Retrying an event that was already stored before the invoice was finalized still returns `200` with the stored event.
 
+From Engine 2.60.0, credit usage gets the same check. [`POST /usage/track`](/api/usage-track#late-usage) and [finalizing a credit or budget hold](/api/finalize-usage-hold#errors) refuse a `timestamp` in an invoiced period with `409 period_invoiced`, spend nothing and keep the hold open. Before, such usage spent credits and its event was never billed.
+
 Nozle does not otherwise reject events for being old or in the future.
 
 ## Retrying

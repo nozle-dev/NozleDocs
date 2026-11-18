@@ -170,3 +170,54 @@ From Core 11.9.0 a plan change never switches currency. Moving a subscription to
 A fixed amount coupon in another currency than the invoice is not applied, and is reported with `not_applicable_reason: "currency_mismatch"`.
 
 To let customers hold objects in several currencies, set the organization setting `allow_multiple_currencies_per_customer` to `true` (default `false`) with `PUT /api/v1/organizations` or the GraphQL `updateOrganization` mutation. A plan change still keeps the subscription's currency.
+
+## Erase a customer
+
+<Note>
+Available from Core 11.54.0 and Engine 2.61.0.
+</Note>
+
+`POST https://api.nozle.app/core/api/v1/customers/{external_id}/erase` erases a customer's personal data, for example when the customer asks under GDPR. Use a secret key; with [API key permissions](/api/authentication#key-permissions) it needs `customer:write`. The dashboard has no erase action; use the API.
+
+<Warning>
+Erasure is irreversible. `DELETE /customers/{external_id}` is not an erasure: it is a soft delete that stops listing and billing the customer and keeps all of its data.
+</Warning>
+
+The call answers `202` with the customer, `erased_at` set. The erasure runs in the background, and the [`customer.erased`](/api/webhook-events) webhook is sent when it has finished.
+
+- Erasing a customer that is already erased answers `202` and does nothing.
+- A customer that was already deleted can still be erased: the current customer of the external ID first, else the last one deleted.
+- An unknown external ID answers `404`.
+
+**Refused while the customer still has business with you.** The call answers `422 validation_errors` and erases nothing. `error_details.customer` lists every reason that applies:
+
+| Code | Cause |
+|---|---|
+| `has_active_subscriptions` | An active or pending subscription. Terminate it first. |
+| `has_draft_invoices` | An invoice not issued yet: draft, generating, pending or failed. Finalize it, or wait until it is issued. |
+| `has_unpaid_invoices` | A finalized invoice with an amount still due, partly paid included. Settle it, or void it. |
+
+```json
+{
+  "status": 422,
+  "error": "Unprocessable Entity",
+  "code": "validation_errors",
+  "error_details": { "customer": ["has_active_subscriptions", "has_unpaid_invoices"] }
+}
+```
+
+**What is erased.**
+
+- Every personal field of the customer: names, legal name and number, email, phone, URL, logo, billing and shipping address, and tax ID. The name becomes `Erased customer`.
+- Its metadata, its accounting and CRM links, and its change history.
+- Its payment methods and payment provider customers. At Stripe, the saved payment methods are detached and the Stripe customer is deleted; its past charges stay in your Stripe account. Razorpay cannot delete a customer, so its name, email and phone there are overwritten.
+- The email address on payment requests and on the customer emails Nozle sent.
+- Copies of the customer in earlier webhooks (including their stored messages) and in activity logs.
+- In the Engine: the names and metadata of the customer's Entities, and every property of its LLM cost and margin records except the model, provider and token counts that price and analyse them.
+- The customer is deleted as `DELETE /customers/{external_id}` does, if it was not already.
+
+**What is kept.**
+
+- The external ID. Do not use an email address or another personal value as an external ID.
+- Invoices, credit notes, payments and receipts. An issued document keeps the billing name, address and tax ID it showed: a PDF or e-invoice generated again after the erasure still shows them, but no longer the customer's email.
+- Usage events and the properties you sent with them. They are your data, so Nozle does not change them. Do not send personal data in event properties.
