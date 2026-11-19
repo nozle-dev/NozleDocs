@@ -91,7 +91,7 @@ except UsageLimitExceededError:
 
 ## Retry behavior
 
-By default the SDK does not retry, so a mutation is never replayed without application context. Set `max_retries` (and optionally `retry_delay`) to retry network errors, timeouts, `429` and `5xx` with backoff, or after `NozleAPIError.retry_after` seconds when the service sent `Retry-After`. Only requests that are safe to repeat are retried: reads, calls that carry an idempotency key (such as `usage.track`), event, cost event and customer writes, and the read-only usage check and transition preview. `subscribe`, `checkout` and other writes without a key are never retried.
+By default the SDK retries up to 2 times (`max_retries`, default `2` from `0.22.0`; before, `0`). It retries network errors, timeouts, `429` and `5xx` with backoff (`retry_delay`, default 0.5 seconds), or after `NozleAPIError.retry_after` seconds when the service sent `Retry-After`. Only requests that are safe to repeat are retried: reads, calls that carry an idempotency key (such as `usage.track`), event, cost event and customer writes, and the read-only usage check and transition preview. `subscribe`, `checkout` and other writes without a key are never retried.
 
 - For idempotent Entity, credit-transfer, and usage mutations, retry with the same idempotency key and payload.
 - For `track()`, retry the same event with the same transaction ID.

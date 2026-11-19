@@ -76,6 +76,26 @@ _ = err
 
 `WaitForTaxCheck` polls until the status is not `pending`. On timeout it returns `ErrTaxCheckPending`. A checkout call fails with `customer_tax_location_required` (422) or `customer_tax_check_pending` (409). `(*APIError).RetryAfterSeconds()` gives the wait. See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
 
+## Erase or delete a customer
+
+Available from `v0.41.0`, with Core 11.52.0. Both need a secret key and return the `Customer`.
+
+```go
+erased, err := client.EraseCustomer(ctx, "workspace_123")
+var apiErr *nozle.APIError
+if errors.As(err, &apiErr) && apiErr.HasCode(nozle.CodeHasUnpaidInvoices) {
+  // settle or void the unpaid invoices first
+}
+_ = erased.ErasedAt // set; the erasure finishes in the background
+```
+
+- `EraseCustomer(ctx, externalID)` calls `POST /customers/{external_id}/erase`. It erases the customer's personal data, irreversibly. A `422` lists `CodeHasActiveSubscriptions`, `CodeHasDraftInvoices` or `CodeHasUnpaidInvoices` in `error_details.customer`. Erasing an erased customer changes nothing.
+- `DeleteCustomer(ctx, externalID)` calls `DELETE /customers/{external_id}`. It deletes the customer and ends its subscriptions, and keeps its personal data.
+- Erase is not delete. To remove personal data, for example under GDPR, call `EraseCustomer`.
+- Neither is retried automatically.
+
+See [Erase a customer](/api/create-customer#erase-a-customer) for what is erased and what is kept.
+
 ## Read and update Entities
 
 ```go

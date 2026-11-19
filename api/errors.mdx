@@ -13,8 +13,8 @@ description: HTTP errors, validation failures, and retry guidance
 | `403` | Credential lacks permission or a publishable key attempted a protected operation. |
 | `404` | Resource was not found within the authenticated organization. |
 | `413` | The request body is too large: `payload_too_large`. An events batch is limited to 16 MiB, decoded. |
-| `402` | Payment required. `workspace_suspended` (or `card_required`): your workspace is blocked by Nozle, see [Workspace billing errors](#workspace-billing-errors). `customer_payment_overdue`: one of your customers is blocked by your dunning policy, see [Customer payment overdue](#customer-payment-overdue). `budget_exceeded` from the LLM proxy: a customer's hard spend limit is used up, see [Spend and usage limits](#spend-and-usage-limits). |
-| `409` | Idempotency key or resource-state conflict, such as another checkout in progress. Reload the state, then retry. |
+| `402` | Payment required. `workspace_suspended` (or `card_required`): your workspace is blocked by Nozle, see [Workspace billing errors](#workspace-billing-errors). `customer_payment_overdue`: one of your customers is blocked by your dunning policy, and `customer_blocked`: Nozle staff blocked one of your customers; see [Customer payment overdue](#customer-payment-overdue). `budget_exceeded` from the LLM proxy: a customer's hard spend limit is used up, see [Spend and usage limits](#spend-and-usage-limits). |
+| `409` | Idempotency key or resource-state conflict, such as another checkout in progress. Reload the state, then retry. Events and usage also answer `409` for a `transaction_id` already taken (`transaction_id_conflict`, `transaction_voided`) and for a period already invoiced (`period_invoiced`); see [Common failures](#common-failures). |
 | `422` | Request is syntactically valid but violates a product rule, or the resource's current state refuses it (for example a voided invoice). |
 | `429` | Request was rate limited, or (LLM proxy) `usage_limit_exceeded`: a customer's hard usage limit is reached, which is a refusal, not a rate limit. |
 | `500` | Unexpected server error. The body is still JSON with a `code`. |
@@ -74,7 +74,7 @@ The request did nothing. To back off:
 - Retry a mutation with the same `Idempotency-Key` and the same body.
 - Spread large jobs, such as imports or backfills, over several minutes instead of sending them in one burst.
 
-The Node.js, Python and Go SDKs retry a `429` only when you turn retries on (see [API standards](/api/api-standards)).
+The Node.js, Python and Go SDKs retry a `429` up to 2 times by default, after the `Retry-After` seconds, and only for requests that are safe to repeat (see [API standards](/api/api-standards)).
 
 The dashboard also limits sign-in and password-reset requests. See [Account security](/guides/settings/account-security#sign-in-limits).
 
@@ -91,6 +91,10 @@ Match on the status and `code`, not on the message text.
 | `422` `active_subscription_ambiguous` | The customer has more than one active subscription, so credit usage cannot pick one. | End all but one subscription. |
 | `409` `idempotency_key_reused` | The `Idempotency-Key` was used before with a different request. | Retry the identical request with the same key, including the same `timestamp`. Use a new key for a new operation. See [usage tracking](/api/usage-track). |
 | `409` `feature_billed_in_money` | `usage.check` or `usage.track` for a Feature that credits pay for and the plan also bills with a priced charge, which would bill the usage twice. | Set the charge to $0 so credits pay, or remove the credits so the charge bills. See [credits or money](/api/usage-track#credits-or-money-not-both). |
+| `409` `period_invoiced` with `error_details` `{"timestamp": ["period_invoiced"]}` (`POST /events` and `POST /events/batch` from Engine 2.59.0, `POST /usage/track` and hold finalize from Engine 2.60.0) | The `timestamp` falls in a billing period whose invoice is already finalized, so the usage would never be billed. Nothing is stored or spent, the `transaction_id` stays free, and a hold stays open. Voiding an event of an invoiced period answers the same code. | Resend with the same `transaction_id` and a current `timestamp`, or bill the usage with a one-off invoice. Finalize a hold again with a current `timestamp`, or release it. See [late events](/api/events#late-events). |
+| `409` `transaction_id_conflict` with `transaction_id: ["value_already_exist"]` | `POST /events` with a `transaction_id` that is already stored for a different event (another code, subscription, properties or `timestamp`), on the standard event store. Nothing is stored. | Reuse a `transaction_id` only to retry the identical event. Give a new event a new `transaction_id`. See [events](/api/events#responses-and-limits). |
+| `409` `transaction_voided` with `transaction_id: ["transaction_voided"]` (Engine 2.43.0) | `POST /events` with the `transaction_id` of an event that was voided. | Send the corrected event with a new `transaction_id`. See [void an event](/api/events#void-an-event). |
+| `409` `hold_already_resolved` | Finalizing a hold that was released or denied, sending other usage to a finalized hold, or releasing a finalized hold. | Do not retry. Read the hold with [`GET /usage/holds/{hold_id}`](/api/get-usage-hold), and create a new hold for new usage. |
 | `422` `feature_not_consumable` | The Feature is boolean or config, so there is no usage to consume. | Use a metered Feature. |
 | `422` `credit_usage_configuration_invalid` (`no effective credit rate`) | The event time is before the credit rate became effective. | Use a later time, or fix the rate. |
 | `200` with `error_details` from `POST /events/batch` (Engine 2.28.0) | Some events of the batch were refused, keyed by their position. The other events were stored. | Fix and resend only the listed events. Do not resend the whole batch. |
@@ -99,6 +103,8 @@ Match on the status and `code`, not on the message text.
 | `400` `invalid_return_url` | Core refused the checkout `return_url`: its origin is neither Nozle's nor one of your organization's `checkout_return_origins`. | Add the origin in the dashboard under **Developers > Checkout return**, or send a `return_url` on an allowed origin. Core's own checkout routes answer `422` `return_url: invalid_or_untrusted` for the same case. See [return URLs](/guides/billing/checkout#return-urls-and-your-organizations-origins) and [create checkout](/api/create-checkout). |
 | `422` `customer_currency_mismatch` on `currency` (Core 11.9.0) | A subscription, invoice, wallet, top-up or fixed coupon is in another currency than the customer's. | Use the customer's currency, or allow several currencies per customer. See [customer currency](/api/create-customer#customer-currency). |
 | `422` `customer_currency_locked` on `currency` (Core 11.9.0) | A customer update changed the currency while the customer has open subscriptions, unpaid invoices, wallet balance or credit left. | Keep the currency. See [customer currency](/api/create-customer#customer-currency). |
+| `422` `plan_archived` on `plan_code` (Core 11.51.0) | A subscription, checkout session, quote, preview or billing state import onto an archived plan, for a new subscription or a change from another plan. `error_details` is `{"plan_code": ["plan_archived"]}`. A self-serve plan change is refused with the code `plan_archived`. | Pick an active plan, for example from `GET /plans?status=active`. Subscriptions already on the archived plan keep billing and can still be updated. See [Archive vs delete](/guides/billing/plan-versions#archive-vs-delete). |
+| `402` `customer_blocked` (Engine 2.27.0) | Nozle staff blocked this customer. `GET /can`, `POST /usage/check`, `POST /usage/track`, the LLM proxy, `POST /events` and `POST /events/batch` refuse it. The text is `This customer is blocked. Contact support.` | Do not retry. Paying the customer's invoices does not lift it. Contact Nozle support. See [Customer payment overdue](#customer-payment-overdue). |
 | `422` `currencies_does_not_match` on `plan_code` (every plan change path from Core 11.9.0) | A plan change targets a plan in another currency. | Pick a plan in the subscription's currency. |
 | `422` `validation_errors` with `tax_identification_type: value_is_invalid`, `tax_identification_number: value_is_mandatory` or `tax_identification_number: invalid_format` (Core 11.31.0) | A customer write has an unknown tax ID type, a type without a number, or a number with a bad format. | Fix the tax ID. See [Tax IDs](/guides/billing/tax-ids#what-nozle-stores). |
 | `422` `tax_identification: eu_tax_not_applicable` (Core 11.31.0) | `POST /customers/{external_id}/tax_identification/recheck` for a billing entity without EU tax management, or a tax ID that is not `eu_vat`. | Nothing to recheck. |
@@ -222,7 +228,17 @@ The Engine answers `402` `customer_payment_overdue` for one of your customers wh
 | `POST /events/batch`, every event refused | `{"status": 402, "error": "<text>", "code": "customer_payment_overdue", "error_details": {"<index>": {"external_customer_id": ["customer_payment_overdue"]}}}` |
 | `POST /events/batch`, some events refused | `200` with the stored `events` and the refused ones in `error_details`, keyed by index. From Engine 2.28.0 invalid events are refused the same way, so a batch is no longer all or nothing. |
 
-The text is `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` Do not retry: the block lifts on the next request after the invoices are paid, voided or credited. Refused events are not queued.
+The text is `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` Do not retry: the block lifts on the next request after the invoices are paid, voided or credited. Refused events are not queued. To let the customer pay, see [Let a blocked customer pay](/guides/billing/dunning#let-a-blocked-customer-pay).
+
+### Customer blocked
+
+_Engine 2.27.0._ The Engine answers `402` `customer_blocked` for a customer that Nozle staff blocked. It is refused on the same surfaces and in the same bodies as `customer_payment_overdue`, with `customer_blocked` in place of `customer_payment_overdue` and the text `This customer is blocked. Contact support.` The reason for the block is never returned.
+
+- Paying the customer's invoices does not lift it. Only Nozle staff lift it, and the next request works again.
+- When a customer is blocked both by dunning and by staff, the code is `customer_blocked`.
+- In `POST /events/batch`, each refused event carries the code of its own customer. When every event is refused, the batch answers `customer_blocked` if any of them belongs to a customer blocked by staff.
+
+Do not retry. Refused events are not queued.
 
 ## Spend and usage limits
 

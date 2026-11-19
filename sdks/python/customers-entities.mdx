@@ -78,6 +78,28 @@ print(ready["tax_identification_status"])  # "valid", "invalid" or "unverified"
 
 `wait_for_tax_check` polls `customers.get` until the status is not `pending`, and raises `NozleValidationError` after the timeout. Both methods work on `Nozle` and `AsyncNozle`. A checkout call fails with `customer_tax_location_required` (422) or `customer_tax_check_pending` (409, see `retry_after_seconds`). See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
 
+## Erase or delete a customer
+
+Available from `0.41.0`, with Core 11.52.0, on `Nozle` and `AsyncNozle`. Both need a secret key and return the customer.
+
+```python
+from nozle import CustomerEraseErrorCode, NozleAPIError
+
+try:
+    erased = nozle.customers.erase("workspace_123")
+    print(erased["erased_at"])  # set; the erasure finishes in the background
+except NozleAPIError as error:
+    if error.has_code(CustomerEraseErrorCode.HAS_UNPAID_INVOICES):
+        ...  # settle or void the unpaid invoices first
+```
+
+- `customers.erase(external_id)` calls `POST /customers/{external_id}/erase`. It erases the customer's personal data, irreversibly. A `422` lists `has_active_subscriptions`, `has_draft_invoices` or `has_unpaid_invoices` in `error_details["customer"]` (`CustomerEraseErrorCode`). Erasing an erased customer changes nothing.
+- `customers.delete(external_id)` calls `DELETE /customers/{external_id}`. It deletes the customer and ends its subscriptions, and keeps its personal data.
+- Erase is not delete. To remove personal data, for example under GDPR, call `erase`.
+- Neither is retried automatically.
+
+See [Erase a customer](/api/create-customer#erase-a-customer) for what is erased and what is kept.
+
 ## Read Entities
 
 ```python

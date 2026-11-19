@@ -35,7 +35,7 @@ client := nozle.New(os.Getenv("NOZLE_SECRET_KEY"), nozle.WithHost("http://localh
 | `WithBaseURL` | `https://api.nozle.app/engine` | `Track`, `Meter`, `TrackUsage`, `CheckUsage`, `Can`, `TrackCostEvent`, `Ping`, `Plans`, `Checkout`, `CheckoutStatus`, `Subscribe`, `CancelSubscription`, subscription options, previews, transitions and withdrawal, credit balances, Entity get and upsert, and margin. |
 | `WithEventsURL` | `https://api.nozle.app/core` | Subscription lookup for `Track`, customer upsert, credit-system list, and Entity subscription calls: ensure, get, list, checkout, bulk checkout (`CheckoutEntitySubscriptions`), and change plan. From `v0.12.0` also invoices, alerts, `CurrentUsage` and `PastUsage`, Nozle's webhook public key for `VerifyWebhook`, and the Feature check of `WrapHTTPClient`. |
 | `WithTimeout` | 10 seconds | The budget of each attempt, including any retries inside a custom HTTP client. |
-| `WithMaxRetries` | 0 | Extra attempts after a network error, timeout, `429` or `5xx`. 0 never retries. |
+| `WithMaxRetries` | 2 | Extra attempts after a network error, timeout, `429` or `5xx`, for calls that are safe to repeat. 0 never retries. The default is 2 from v0.21.0 (before, 0). |
 | `WithRetryDelay` | 500 milliseconds | First retry delay. It doubles each retry up to 10 seconds, or `Retry-After` is used when sent, capped at 30 seconds. |
 | `WithHTTPClient` | default HTTP client | Inject an `*http.Client`, for example one that retries. |
 | `WithDebug` | off | Log `[nozle] METHOD url` for each request. |
@@ -46,7 +46,7 @@ All methods accept `context.Context`. Reuse one client and keep `sk_` credential
 
 `Plans` accepts `pk_` or `sk_`; all other operations require `sk_`. Wrong key types fail locally. A [sandbox](/guides/getting-started/sandbox) key (`sk_nozle_test_`, `pk_nozle_test_`) passes the same checks and reaches only the sandbox. A transport failure returns `TransportError`; a non-success HTTP response returns a structured `APIError`. See [Errors and retries](/sdks/go/errors).
 
-By default the SDK makes one HTTP attempt per request. Set `WithMaxRetries(n)` for the SDK's own retries (see [Errors and retries](/sdks/go/errors)), or pass an `*http.Client` whose transport retries. The SDK sets `GetBody` on each request, so the body can be replayed, and the `Idempotency-Key` header is sent again with every attempt:
+By default the SDK retries a call that is safe to repeat up to 2 times. Set `WithMaxRetries(n)` to change the SDK's own retries (see [Errors and retries](/sdks/go/errors)); `WithMaxRetries(0)` makes one HTTP attempt per request. You can also pass an `*http.Client` whose transport retries. The SDK sets `GetBody` on each request, so the body can be replayed, and the `Idempotency-Key` header is sent again with every attempt:
 
 ```go
 type retryTransport struct{ next http.RoundTripper }

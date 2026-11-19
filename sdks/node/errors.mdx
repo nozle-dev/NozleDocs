@@ -143,12 +143,12 @@ try {
 
 ## Retry behavior
 
-By default the SDK does not retry: every call is one request with a per-attempt timeout (`timeout`, default 10 seconds). Set `maxRetries` to retry network errors, timeouts, `429` and `5xx` with backoff, or after `NozleApiError.retryAfter` seconds when the service sent `Retry-After`:
+By default the SDK retries up to 2 times (`maxRetries`, default `2` from `0.24.0`; before, `0`). It retries network errors, timeouts, `429` and `5xx` with backoff, or after `NozleApiError.retryAfter` seconds when the service sent `Retry-After`. Each attempt has its own timeout (`timeout`, default 10 seconds). Set `maxRetries: 0` to make every call one request:
 
 ```ts
 import { Nozle } from '@nozle-js/node'
 
-const nozle = new Nozle({ maxRetries: 2, retryDelayMs: 500 })
+const nozle = new Nozle({ maxRetries: 0 })
 ```
 
 Only requests that are safe to repeat are retried: reads, calls that carry an idempotency key (such as `usage.track`), event, cost event and customer writes, and the read-only usage check and transition preview. `subscribe`, `checkout` and other writes without a key are never retried.
