@@ -57,8 +57,10 @@ A tax code tells Stripe what you sell. Use a code from [Stripe's tax code list](
   | Other countries | Nothing. |
 
   The error is `customer_tax_location_invalid`, with a message that names the missing field.
+
+  _Unreleased (Core 11.54.0)._ At checkout, a customer without these fields is sent to Nozle's [billing details step](/guides/billing/tax-ids#billing-details-step) first, which asks for the country and, for the US, Canada and India, the postal code or state. The invoice is then priced with them.
 - **`tax_exempt`.** Send `tax_exempt: true` on the customer (request and response, default `false`). Nozle sends the customer to Stripe Tax as exempt.
-- **Tax ID.** Nozle sends the customer's `tax_identification_type` and number to Stripe Tax, so Stripe can decide on reverse charge. A number without a type is not sent. See [Tax IDs](/guides/billing/tax-ids#what-nozle-stores) for the types.
+- **Tax ID.** Nozle sends the customer's `tax_identification_type` and number to Stripe Tax, so Stripe can decide on reverse charge. A number without a type is not sent. An EU VAT number that Nozle checks in VIES is sent once VIES confirmed it, and from Core 11.54.0 (_Unreleased_) also while VIES checks a well-formed number. An `invalid` number is not sent. See [Tax IDs](/guides/billing/tax-ids#what-nozle-stores) for the types.
 
 ## How it works
 
@@ -101,6 +103,8 @@ A cause you must fix sets `tax_status: failed` and the invoice `failed`. The Str
 Fix the cause, then use the existing invoice retry. See [Invoices](/guides/billing/invoices).
 
 If Stripe is down, the invoice stays `pending` and held while Nozle retries with backoff for about 25 hours. No invoice is lost. If Stripe still does not answer, the invoice fails with `tax_provider_unavailable`, and you use the same retry.
+
+_Unreleased (Core 11.54.0)._ An invoice never waits for its tax for ever. A calculation that stops on an unexpected error, or that was lost, fails the invoice with `tax_calculation_failed`. An hourly check fails any invoice still waiting for its tax 26 hours after its last change. Use the same invoice retry. While the tax is pending, no payment settles the invoice: a saved card is charged once the tax is applied, so a checkout cannot activate a subscription for free.
 
 ## Not supported
 
