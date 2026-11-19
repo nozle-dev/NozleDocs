@@ -86,6 +86,30 @@ console.log(ready.tax_identification_status) // 'valid', 'invalid' or 'unverifie
 
 `waitForTaxCheck` polls `customers.get` until the status is not `pending`, and throws after `timeoutMs`. A checkout call fails with `customer_tax_location_required` (422) or `customer_tax_check_pending` (409, `error.retryAfterSeconds`). See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
 
+## Erase or delete a customer
+
+Available from Node.js `0.43.0`, with Core 11.52.0. Both need a secret key and return the customer.
+
+```ts
+import { CustomerEraseErrorCode, NozleApiError } from '@nozle-js/node'
+
+try {
+  const erased = await nozle.customers.erase('workspace_123')
+  console.log(erased.erased_at) // set; the erasure finishes in the background
+} catch (error) {
+  if (error instanceof NozleApiError && error.hasCode(CustomerEraseErrorCode.HasUnpaidInvoices)) {
+    // settle or void the unpaid invoices first
+  }
+}
+```
+
+- `customers.erase(externalId)` calls `POST /customers/{external_id}/erase`. It erases the customer's personal data, irreversibly. A `422` lists `has_active_subscriptions`, `has_draft_invoices` or `has_unpaid_invoices` in `errorDetails.customer` (`CustomerEraseErrorCode`). Erasing an erased customer changes nothing.
+- `customers.delete(externalId)` calls `DELETE /customers/{external_id}`. It deletes the customer and ends its subscriptions, and keeps its personal data.
+- Erase is not delete. To remove personal data, for example under GDPR, call `erase`.
+- Neither is retried automatically.
+
+See [Erase a customer](/api/create-customer#erase-a-customer) for what is erased and what is kept.
+
 ## Read Entities
 
 ```ts
