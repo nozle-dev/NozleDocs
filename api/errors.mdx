@@ -228,7 +228,7 @@ The Engine answers `402` `customer_payment_overdue` for one of your customers wh
 | `POST /events/batch`, every event refused | `{"status": 402, "error": "<text>", "code": "customer_payment_overdue", "error_details": {"<index>": {"external_customer_id": ["customer_payment_overdue"]}}}` |
 | `POST /events/batch`, some events refused | `200` with the stored `events` and the refused ones in `error_details`, keyed by index. From Engine 2.28.0 invalid events are refused the same way, so a batch is no longer all or nothing. |
 
-The text is `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` Do not retry: the block lifts on the next request after the invoices are paid, voided or credited. Refused events are not queued.
+The text is `This customer's invoices are unpaid past their grace period. Usage resumes once they are paid.` Do not retry: the block lifts on the next request after the invoices are paid, voided or credited. Refused events are not queued. To let the customer pay, see [Let a blocked customer pay](/guides/billing/dunning#let-a-blocked-customer-pay).
 
 ### Customer blocked
 
