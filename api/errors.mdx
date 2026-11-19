@@ -74,7 +74,7 @@ The request did nothing. To back off:
 - Retry a mutation with the same `Idempotency-Key` and the same body.
 - Spread large jobs, such as imports or backfills, over several minutes instead of sending them in one burst.
 
-The Node.js, Python and Go SDKs retry a `429` only when you turn retries on (see [API standards](/api/api-standards)).
+The Node.js, Python and Go SDKs retry a `429` up to 2 times by default, after the `Retry-After` seconds, and only for requests that are safe to repeat (see [API standards](/api/api-standards)).
 
 The dashboard also limits sign-in and password-reset requests. See [Account security](/guides/settings/account-security#sign-in-limits).
 

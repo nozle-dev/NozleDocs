@@ -43,7 +43,7 @@ For metered events and credit operations, generate a unique transaction or idemp
 
 Retry transient network failures and HTTP `429` or `5xx` responses with exponential backoff and jitter. Do not automatically retry validation or authorization failures. A `429` `rate_limited` carries a `Retry-After` header: wait at least that long first. See [Rate limits](/api/errors#rate-limits).
 
-The Node.js, Python, and Go SDKs do not retry unless you turn it on (`maxRetries`, `max_retries`, `WithMaxRetries`); the setting retries only requests that are safe to repeat. To retry in your own code, do it only after a network error, a `429`, or a `5xx`, and send the same idempotency key with the same request, including its timestamp.
+The Node.js, Python, and Go SDKs retry up to 2 times by default (`maxRetries`, `max_retries`, `WithMaxRetries`; from Node 0.24.0, Python 0.22.0 and Go v0.21.0, before which the default was 0), and only requests that are safe to repeat. Set the option to 0 to turn retries off. To retry in your own code, do it only after a network error, a `429`, or a `5xx`, and send the same idempotency key with the same request, including its timestamp.
 
 ## Errors
 

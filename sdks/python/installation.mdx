@@ -35,7 +35,7 @@ nozle = Nozle(
 | `base_url` | `str` | `https://api.nozle.app/engine` | Engine API origin for `track()`, entitlements, credits, Entities, usage, and margin. Overrides the address derived from `host`. |
 | `events_url` | `str` | `https://api.nozle.app/core` | Core API origin for customer writes, billing resources, subscription discovery, credit-system discovery, and Entity subscriptions. Use `https://api.nozle.app/core` in production. Overrides the address derived from `host`. |
 | `timeout` | `float` | `10` | Per-attempt timeout in seconds. |
-| `max_retries` | `int` | `0` | Keyword-only. Extra attempts after a network error, timeout, `429` or `5xx`. `0` never retries. See [errors and retries](/sdks/python/errors). |
+| `max_retries` | `int` | `2` | Keyword-only. Extra attempts after a network error, timeout, `429` or `5xx`, for requests that are safe to repeat. `0` never retries. The default is `2` from `0.22.0` (before, `0`). See [errors and retries](/sdks/python/errors). |
 | `retry_delay` | `float` | `0.5` | Keyword-only. First retry delay in seconds. It doubles each retry up to 10 seconds, or the `Retry-After` header is used when sent. |
 
 The client defaults to the public service bases under `https://api.nozle.app`. For a local or self-hosted deployment behind one proxy, set `host`. Set `base_url` or `events_url` only when the two services live at unrelated addresses; each one you set wins over `host`. If you set only one of them, the other service still uses `host` (by default production), so set `host` too. Trailing slashes are removed automatically.
@@ -124,8 +124,8 @@ Usage reads, invoices, alerts, webhooks, `wrap_http_client()`, `capture_http_cli
 
 ## Transport behavior
 
-- Retries are off by default (`max_retries=0`), so a mutation executes at most once per SDK call.
-- With `max_retries` set, reads are retried, and a write is retried only when it is idempotent or carries an idempotency key.
+- Retries are on by default (`max_retries=2`). Reads are retried, and a write is retried only when it is idempotent or carries an idempotency key, so other mutations execute at most once per SDK call.
+- Pass `max_retries=0` to turn retries off.
 - Connection and timeout failures raise `NozleTransportError`.
 - Non-2xx responses raise structured `NozleAPIError`.
 - Sensitive values in API error payloads are redacted.
