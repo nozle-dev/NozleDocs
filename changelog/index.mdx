@@ -5,6 +5,40 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Shared prices for every provider, payment connection health, customer erasure (Core 11.52.0, dashboard 2.26.0)
+
+_Unreleased_
+
+- **Every provider on the shared price list.** The models.dev import now covers every provider, each under its models.dev id (`groq`, `openrouter`, `amazon-bedrock`, and so on), not only OpenAI, Anthropic and Gemini. A model listed by several providers is stored once per provider, at that provider's price. See [Shared prices](/guides/margin/shared-prices).
+- **Provider from the API host.** A call is priced at the vendor its `provider_host` names, so a Groq call made with the OpenAI client gets Groq's price, not OpenAI's. Nozle keeps the host list. See [Which provider prices a call](/guides/margin/shared-prices#which-provider-prices-a-call).
+- **`provider_required`.** A call without a provider gets the shared price of its model only when every provider lists it at the same price. Otherwise it is uncosted as `provider_required`, shown as **Provider needed**. Send `provider` with the event, or add your own price. See [When the call names no provider](/guides/margin/shared-prices#when-the-call-names-no-provider).
+- **Paged list.** GraphQL `nozleSharedProviderPrices` takes `page` and `limit`, filters by `provider` and `modelPrefix`, and answers `collection` and `metadata`. This breaks a client that reads the plain list. `nozleSharedProviderPriceProviders` lists the providers. The dashboard list is paged and searched by provider and model name.
+- **Fixed in shared prices.** A call without a provider now matches your own price of its model under any provider, so adopting the shared price of such an uncosted row no longer offers to copy it again. An unchanged models.dev price no longer adds a new revision on every import.
+- **Health on every connection.** Under **Settings > Billing settings > Integrations**, each Stripe or Razorpay connection shows **Working**, **Needs attention**, **Not working** or **Not checked**, the reasons in plain words, when the last event arrived, and **Check now**. Reasons: `credentials_rejected`, `webhook_not_registered`, `webhook_missing`, `webhook_disabled`, `signature_rejected`, `events_failing`, `no_events_yet`, `provider_unreachable`, `check_not_supported`. See [Connection health](/integrations#connection-health).
+- **Razorpay webhook setup.** A Razorpay connection shows whether the webhook is waiting for its first event, refused for a wrong secret, or working, with the URL, secret and events to enable.
+- **Provider events.** **Show events** lists the events the provider sent in the last 30 days, without their payload.
+- **Rejected signatures recorded.** A Stripe or Razorpay webhook refused for its signature now records the time on the connection, so a wrong webhook secret shows up. The request is still not stored.
+- **Connection health in GraphQL.** `paymentProviderHealth` and `paymentProviderEvents`, with the `organization:integrations:view` permission.
+- **`POST /customers/{external_id}/erase`.** Erases a customer's personal data, for example on a GDPR request. Irreversible. It answers `202` with `erased_at` set, runs in the background and ends with the new `customer.erased` webhook. See [Erase a customer](/api/create-customer#erase-a-customer).
+- **Refused while business is open.** `422` with `error_details.customer` listing `has_active_subscriptions`, `has_draft_invoices` and `has_unpaid_invoices`, every one that applies.
+- **Erased.** Names, email, phone, addresses, tax ID, metadata, accounting and CRM links, payment methods and change history. The Stripe customer is deleted; Razorpay's name, email and phone are overwritten and its mandates cancelled, and the details Nozle sent with Razorpay requests are removed. The Engine erases Entity names and metadata, and the non-usage properties of its LLM cost and margin records.
+- **Kept.** The external ID, invoices, credit notes, payments and receipts. Issued documents keep the billing name, email, address and tax ID they showed, also when generated again. Event properties you sent are kept. Do not use an email address as an external ID.
+- **`DELETE /customers/{external_id}` is not an erasure.** It is a soft delete that keeps the customer's data. Its reference now says so.
+- **New customer field.** `erased_at` on the customer object.
+- **API request logs kept 90 days.** Older request logs are deleted. They are not kept per customer, so this bounds how long a request naming an erased customer stays.
+
+### Late credit usage refused, pricing by API host, customer erasure (Engine 2.60.0)
+
+_Unreleased_
+
+- **Late credit usage.** `POST /usage/track` and finalizing a credit or budget hold refuse usage whose `timestamp` falls in a billing period that is already invoiced, with `409 period_invoiced`, as `POST /events` does since Engine 2.59.0. Before, such usage spent credits and was never billed. Nothing is spent, the hold stays open, and the same `Idempotency-Key` can be resent with a current `timestamp`. See [Late usage](/api/usage-track#late-usage).
+- **Shared prices by vendor.** The Engine prices the shared price of Cost Events, Feature Events and legacy Cost Models at the vendor the call's `provider_host` names, and records that vendor on uncosted model rows. Your own prices and Cost Sheet conditions still match the reported `provider`.
+- **`provider_required`.** A call without a provider whose model several providers list at different prices is uncosted with `failure_code` `provider_required`. Reprocessing an uncosted model re-rates these events too.
+- **Simulation.** A `model_swap` takes `params.to_provider` to choose whose shared price prices the target model. Without it, a target listed at different prices answers `400 model_price_unavailable`. The model split of a simulation also splits by `provider_host`. See [Simulate margin on real usage](/api/margin-simulations).
+- **Unpriced usage visible.** Margin rows a legacy Cost Model could not price are marked `unpriced`, and the cost coverage counts them with their revenue. The dashboard marks cost and margin totals **Incomplete** while models have no price. Margin totals are unchanged.
+- **Repricing watcher.** A price change flags only usage of the provider whose price changed. Before, a Groq price change flagged usage of the same model through another provider.
+- **Customer erasure.** Core's erasure job calls the Engine, which clears the customer's Entity names and metadata and keeps only the usage properties (model, provider, API host, service tier and token counts) of its LLM cost and margin records. See [Erase a customer](/api/create-customer#erase-a-customer).
+
 ### Archive a plan without ending its subscriptions (Core 11.51.0, dashboard 2.24.0)
 
 _November 18, 2026_

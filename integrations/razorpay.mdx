@@ -104,6 +104,8 @@ A valid request is queued and answered with `200`. Nozle de-duplicates on the ev
 
 Selecting every event in Razorpay is safe. Nozle ignores `payment_link.expired`, `payment_link.cancelled`, `payment_link.partially_paid`, `invoice.partially_paid` and `refund.speed_changed` and writes a log line. A Razorpay event whose handling fails is queued again every 15 minutes for its first two hours, then by the reconciliation clock, up to 96 attempts. After that Nozle marks it `failed` and logs an error.
 
+The connection in Nozle shows the webhook's setup state (Core 11.52.0, dashboard 2.26.0): **Waiting for the first event** until a validly signed event arrives (`no_events_yet`), then working. A wrong webhook secret shows `signature_rejected`. The connection also shows the webhook URL, the secret to use and the events to enable. Razorpay sends an event only when something happens, so a new connection waits until the first payment or refund. See [connection health](/integrations#connection-health).
+
 If the webhook is missing or blocked, Razorpay can capture the payment but Nozle is not told. A captured order then settles only when your backend calls verify or status, or when the reconciliation job that runs every five minutes reaches it. Dispute and mandate events are never received.
 
 ## Checkout flow
@@ -464,7 +466,9 @@ Checkout errors that are specific to Razorpay. See [Create checkout](/api/create
 
 | Symptom | Check |
 |---|---|
-| Webhooks never arrive, or Razorpay shows `400` | The URL is the one shown on the connection, the webhook secret matches exactly, and your Nozle public API URL is reachable |
+| A connection shows **Not working** or **Needs attention** | Read its reasons and fix the cause. See [connection health](/integrations#connection-health) |
+| Webhooks never arrive, or Razorpay shows `400` | The URL is the one shown on the connection, the webhook secret matches exactly (`signature_rejected` on the connection means it does not), and your Nozle public API URL is reachable |
+| `credentials_rejected` on the connection | Razorpay refuses the Key ID or key secret. Copy both again from the Razorpay dashboard and edit the connection |
 | Payment captured in Razorpay but the plan is not active | Call checkout status. It reconciles with Razorpay. Look for `needs_review`, and confirm the five payment events are enabled |
 | `payment_provider_required` | The customer's **Payment provider** is not set to a Razorpay connection, or the customer has no connection and (_Unreleased_) the workspace has no [default connection](/integrations#default-payment-connection) |
 | `razorpay_requires_inr` | The plan, invoice or top-up package currency is not INR |

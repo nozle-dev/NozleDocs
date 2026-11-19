@@ -41,7 +41,7 @@ A change has a `kind`, an optional `scope` (`feature_code`, `customer_id`, `plan
 | `cost_change_percent` | `value` | cost x (1 + value / 100) |
 | `price_per_unit_absolute` | `params.unit_price` | revenue = quantity x unit price x 100 |
 | `target_margin_percent` | `params.margin_percent` | Output only: the lowest price for that margin, in `targets` |
-| `model_swap` | `params.from_model`, `to_model`, `share_percent`, optional `to_model_prices` | Moves a share of one model's traffic to another and re-costs it |
+| `model_swap` | `params.from_model`, `to_model`, `share_percent`, optional `to_model_prices` and `to_provider` | Moves a share of one model's traffic to another and re-costs it |
 | `provider_price_change` | `params.model`, `price_change_percent` | cost x (1 + value / 100) for groups of that model |
 | `limit_impact` | `params.limit_kind`, `limit_amount`, `period` | Output only: who a limit would block, in `limit_impacts` |
 
@@ -86,7 +86,7 @@ Here `chat` costs 40.00 for 120000 units and earns 60.00 (a 33.33 percent margin
 }
 ```
 
-The cost of the groups on `from_model` becomes cost x (1 - share) plus the share's tokens re-costed at the `to_model` prices. `to_model_prices` is the price per 1,000,000 tokens in major units of the simulation currency, per bucket (`input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`). Without it the [shared price list](/guides/margin/shared-prices) is used (per token). With neither, the call is a `400 model_price_unavailable`; a shared price in another currency than the simulation gives `400 price_currency_mismatch`.
+The cost of the groups on `from_model` becomes cost x (1 - share) plus the share's tokens re-costed at the `to_model` prices. `to_model_prices` is the price per 1,000,000 tokens in major units of the simulation currency, per bucket (`input`, `cached_input`, `cache_write`, `cache_write_1h`, `output`, `reasoning`, `audio_input`, `audio_output`, `image_input`, `image_output`). Without it the [shared price list](/guides/margin/shared-prices) is used (per token). When several providers list the `to_model` at different prices, name the one to use in `to_provider` (Engine 2.60.0), for example `"to_provider": "openai"`; without it the call is a `400 model_price_unavailable` naming `params.to_provider`. With no price at all, the call is a `400 model_price_unavailable`; a shared price in another currency than the simulation gives `400 price_currency_mismatch`.
 
 This is an approximation. Tokens are summed per group and re-costed with the same bucket split the cost rating uses; the share that stays on `from_model` is assumed to cost in proportion to its current cost; batch-tier prices are not modelled. Groups of `from_model` without token data are left unchanged and listed as `no_token_data_groups`. Revenue sits on usage rows that may have no model, so per-model groups carry cost, while the by-customer and by-feature totals stay right.
 
