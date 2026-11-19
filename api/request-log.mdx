@@ -1,0 +1,74 @@
+---
+title: Request log
+description: Find the API calls your servers made to Nozle, with their status, duration, bodies and the service that answered them
+keywords: ["request log", "api logs", "api_logs", "developer logs", "source", "idempotency key", "debugging"]
+---
+
+The request log lists the API calls made with your workspace's API keys, so you can see what your servers sent and what Nozle answered. Open **Developers > Logs** in the dashboard and choose **API requests**, or read it with [`GET /api_logs`](/api-reference/api-logs/list-all-api-logs).
+
+## What is logged
+
+_Unreleased (Core 11.54.0 and Engine 2.61.0)._ The log now holds the calls of both Nozle services. Each row says which one answered it:
+
+| Service | `source` | Calls |
+|---|---|---|
+| **Billing API** | `core` | Calls to `https://api.nozle.app/core/api/v1`: customers, plans, subscriptions, invoices and the other billing resources. Writes only: `POST`, `PUT` and `DELETE`. |
+| **Usage and checkout API** | `engine` | Calls to `https://api.nozle.app/engine/api/v1`: `/can`, usage checks and tracking, holds, credits, checkout, the plan catalog, margin reads, the [LLM proxy](/api/llm-proxy) and event ingestion. Reads (`GET`) are logged too. |
+
+Rows logged before this release are all `core`.
+
+The Engine logs a call once its API key is accepted. It does not log:
+
+- Successful event ingestion: `POST /events`, `POST /events/batch`, `POST /usage/track` and finalizing a hold. Only their refusals (status `400` and above) are logged, so a rejected event or a [`429`](/api/rate-limits) shows up without your accepted traffic filling the log.
+- Calls refused because the API key is missing or invalid.
+- Calls Core makes to the Engine for you.
+
+## What a row shows
+
+| Field | Dashboard | Meaning |
+|---|---|---|
+| `http_method`, `request_path`, `http_status` | **Method**, **Path**, **Status** | What was called and how Nozle answered. |
+| `source` | **Service** | `core` (Billing API) or `engine` (Usage and checkout API). |
+| `duration_ms` | **Duration** | How long the call took, in milliseconds. |
+| `ip_address` | **Client IP** | The address the call came from. |
+| `idempotency_key` | **Idempotency-Key** | The `Idempotency-Key` header, when the call sent one. Use it to match a retry to its first attempt. |
+| `request_id` | **Request ID** | The ID Nozle returned in `X-Request-Id`. Quote it to support. |
+| `request_body`, `request_response` | **Request body**, **Response** | The query string and JSON body sent, and the JSON answered. |
+| `client` | **Client** | The SDK or `User-Agent` that made the call. |
+
+`duration_ms`, `ip_address` and `idempotency_key` are `null` when unknown or not sent, and on rows logged before this release.
+
+## What is never logged
+
+The Engine keeps secrets and model content out of the log:
+
+- **Headers are never logged**, so the `Authorization` header and your API key never appear.
+- **Credential fields are filtered.** A body field named like a credential (`password`, `secret`, `token`, `api_key`, `client_secret`, `card_number`, `cvc`, and names ending in `_secret`, `_token`, `_password` or `_api_key`) is replaced by `[FILTERED]`, at any depth.
+- **LLM proxy bodies are never logged.** Prompts and completions do not reach the log. The row shows `{"_omitted": "LLM proxy bodies are never logged"}` in place of each body.
+- **Large bodies are left out.** A body over 64 KB, a compressed body, or a body that is not a JSON object is logged as `{"_omitted": "<reason>"}`.
+
+Logging never slows down or fails a call. When the log cannot keep up, rows are dropped rather than holding your request.
+
+## Filter the log
+
+In the dashboard, filter by **Service**, **Method**, **Response**, **Date range**, **Request path** and **API key**.
+
+Through the API, [`GET /api_logs`](/api-reference/api-logs/list-all-api-logs) takes `sources[]` (`core`, `engine`) besides `http_methods[]`, `http_statuses[]`, `request_paths`, `from_date` and `to_date`:
+
+```bash
+curl -G https://api.nozle.app/core/api/v1/api_logs \
+  -H "Authorization: Bearer $NOZLE_SECRET_KEY" \
+  --data-urlencode "sources[]=engine" \
+  --data-urlencode "http_statuses[]=429"
+```
+
+GraphQL `apiLogs` takes `sources: [ApiLogSourceEnum!]`, and `ApiLog` has `source`, `durationMs`, `ipAddress` and `idempotencyKey`.
+
+## How long rows are kept
+
+| Rows | Kept |
+|---|---|
+| Read calls (`GET`, Engine only) | 30 days |
+| Every other call | 90 days |
+
+Older rows are deleted. Rows are not kept per customer, so these periods also bound how long a request naming an [erased customer](/api/create-customer#erase-a-customer) stays.

@@ -32,14 +32,23 @@ A session ends when its token expires, when you revoke it, or when you reset you
 
 ## Sign-in limits
 
-_Unreleased._ To slow down password guessing, the sign-in and password-reset forms accept a limited number of requests.
+_Unreleased._ To slow down password guessing and mass sign-ups, the sign-in, sign-up, invitation and password-reset forms accept a limited number of requests. The rows marked Core 11.54.0 are new in that release.
 
 | Request | Per email | Per IP address |
 |---|---|---|
 | Sign in | 10 per 15 minutes | 100 per 15 minutes |
+| Sign in with Google (Core 11.54.0) | | 100 per 15 minutes |
+| Start Okta sign-in (Core 11.54.0) | 10 per 15 minutes | 100 per 15 minutes |
+| Finish Okta sign-in (Core 11.54.0) | | 100 per 15 minutes |
+| Accept an invitation (Core 11.54.0) | 10 per 15 minutes | 100 per 15 minutes |
+| Accept an invitation with Google (Core 11.54.0) | | 100 per 15 minutes |
+| Accept an invitation with Okta (Core 11.54.0) | | 100 per 15 minutes |
+| Sign up (Core 11.54.0) | 10 per hour | 30 per hour |
+| Sign up with Google (Core 11.54.0) | | 30 per hour |
 | Password-reset request | 5 per hour | 30 per hour |
+| Set a new password from a reset link (Core 11.54.0) | | 30 per hour |
 
-Past a limit the form shows **Please wait before trying again**. Wait a few minutes, then try again. The limits apply whether or not the email has an account. The [API rate limits](/api/errors#rate-limits) are separate.
+Past a limit the form shows **Please wait before trying again**. Wait a few minutes, then try again. The limits apply whether or not the email has an account. A request that tries to do two of these at once is refused. The [API rate limits](/api/rate-limits) are separate.
 
 ## Sign-in history
 

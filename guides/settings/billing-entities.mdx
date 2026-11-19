@@ -11,7 +11,7 @@ Open **Settings** and choose **Billing entities**. You can also manage them with
 
 | Group | Fields |
 | --- | --- |
-| Identity | Name, code, billing email, logo (PNG or JPEG, up to 800 KB) |
+| Identity | Name, code, billing email, logo (PNG or JPEG, up to 800 KB). Invoice and receipt emails are sent from Nozle's address in the entity's name, and customer replies go to the billing email. Without a billing email, customers get no invoice or receipt emails. See [Customer emails](/guides/settings/customer-emails#sender-and-replies). |
 | Legal | Legal name, legal number, tax identification number |
 | Address | Address lines, city, state or region, postcode, country as a 2-letter code |
 | Currency and time | Currency, timezone |
@@ -19,7 +19,7 @@ Open **Settings** and choose **Billing entities**. You can also manage them with
 | Payment | Net payment term (days), invoice grace period (days) |
 | Issuing | Invoice issuing date anchor (Current period end or Next period start), issuing date adjustment (Align with finalization date or Keep anchor) |
 | Switches | Finalize zero-amount invoices, EU tax management, electronic invoicing (shown for countries that require it) |
-| API only | `customer_location_required` (default `false`, Core 11.31.0): checkout refuses a customer without country and address. See [Tax IDs](/guides/billing/tax-ids#checkout-checks). |
+| API only | `customer_location_required` (default `false`, Core 11.31.0): a customer without a country and address must give them before checkout. From Core 11.54.0 checkout sends that customer to Nozle's billing details step; before, it refused the checkout. See [Checkout and tax](/guides/billing/tax-ids#checkout-and-tax). |
 | API only | `tax_provider` (`nozle` or `stripe_tax`) and `provider_tax_code` (Core 11.32.0). See [Stripe Tax](/guides/billing/stripe-tax). |
 | Also | Customer emails, taxes, invoice custom sections |
 

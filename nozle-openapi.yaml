@@ -8,7 +8,7 @@ info:
 
     **Live and sandbox.** Live and sandbox use the same servers. The API key decides the environment: live keys start with `sk_nozle_` or `pk_nozle_`, sandbox keys with `sk_nozle_test_` or `pk_nozle_test_`, and each only reaches its own organization's data. A key whose prefix does not match its organization's environment, or a key of a reset sandbox, is refused with `401`. Every response to an accepted key, Core and Engine, carries the header `X-Nozle-Livemode: true` (live) or `false` (sandbox); browsers can read it. Webhook payloads carry `livemode` the same way. See https://docs.nozle.dev/guides/getting-started/sandbox.
 
-    **Rate limits (unreleased).** Core operations (`/api/v1/*`) are limited per API key and per client IP address, 6,000 requests per minute each. A request over a limit is refused with `429`, a `Retry-After` header in seconds, and `{"status": 429, "error": "Too Many Requests", "code": "rate_limited"}`. Wait at least `Retry-After` seconds, then retry with exponential backoff and jitter. See https://docs.nozle.dev/api/errors#rate-limits.
+    **Rate limits (unreleased).** Core operations (`/api/v1/*`) are limited per API key and per client IP address, 6,000 requests per minute each. A request over a limit is refused with `429`, a `Retry-After` header in seconds, and `{"status": 429, "error": "Too Many Requests", "code": "rate_limited"}`. Engine operations (Engine 2.61.0) are limited per workspace: 100 requests per second live and 25 in a sandbox, 5,000 events per second live and 500 in a sandbox for event ingestion and usage tracking (counted per event), and 50 requests in flight per API key. Over an Engine limit the answer is `429` `rate_limited` with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` and `error_details.limit` (`requests`, `events` or `concurrency`). Wait at least `Retry-After` seconds, then retry with exponential backoff and jitter. See https://docs.nozle.dev/api/rate-limits.
   version: 1.61.0
   license:
     name: AGPLv3
@@ -559,7 +559,7 @@ paths:
       tags:
         - API Logs
       summary: List all api logs
-      description: This endpoint retrieves all existing api logs that represent requests performed to Nozle's API.
+      description: 'This endpoint retrieves all existing api logs that represent requests performed to Nozle''s API. From Core 11.54.0 and Engine 2.61.0 the log also holds the calls the Engine answered (usage checks and tracking, credits, checkout, the LLM proxy and refused event ingestion), each with `source: engine`. Read calls (`get`), which only the Engine logs, are kept 30 days; every other call 90 days. See https://docs.nozle.dev/api/request-log.'
       operationId: findAllApiLogs
       parameters:
         - $ref: '#/components/parameters/page'
@@ -584,7 +584,7 @@ paths:
             example: '2022-08-09'
         - name: http_methods[]
           in: query
-          description: Filter results by HTTP methods
+          description: Filter results by HTTP methods. `get` rows come from the Engine (Engine 2.61.0).
           required: false
           explode: true
           schema:
@@ -592,6 +592,7 @@ paths:
             items:
               type: string
               enum:
+                - get
                 - post
                 - put
                 - delete
@@ -634,6 +635,20 @@ paths:
           schema:
             type: string
             example: /features/
+        - name: sources[]
+          in: query
+          description: 'Core 11.54.0. Filter results by the service that answered the call: `core` (the billing API) or `engine` (usage checks and tracking, credits, checkout, the LLM proxy and event ingestion).'
+          required: false
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - core
+                - engine
+            example:
+              - engine
       responses:
         '200':
           description: List of api logs
@@ -1917,6 +1932,22 @@ paths:
           schema:
             type: boolean
             example: true
+        - name: tax_identification_statuses[]
+          in: query
+          description: 'Core 11.54.0. Filter customers by the status of their tax ID check: `unverified`, `pending`, `valid` or `invalid`. A customer without a tax ID is `unverified`: add `has_tax_identification_number=true` to leave those out.'
+          required: false
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - unverified
+                - pending
+                - valid
+                - invalid
+            example:
+              - invalid
         - name: metadata[key]
           in: query
           description: Filter customers by metadata. Replace `key` with the actual metadata key you want to match, and provide the corresponding value. Providing empty value will search for customers without given metadata key. For example, `metadata[is_synced]=true&metadata[last_synced_at]=`.
@@ -3353,6 +3384,13 @@ paths:
       responses:
         '200':
           description: Stripe Billing Portal page, or Nozle's Razorpay auto-pay setup page
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -3392,6 +3430,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
   /events:
     post:
       servers:
@@ -3412,6 +3452,13 @@ paths:
       responses:
         '200':
           description: Event
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -3470,6 +3517,8 @@ paths:
                     error_details:
                       external_customer_id:
                         - active_subscription_ambiguous
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
       x-codeSamples:
         - lang: TypeScript
           label: Node.js
@@ -3572,6 +3621,13 @@ paths:
       responses:
         '200':
           description: 'Events received. The stored events are returned in `events`. Refused events are listed in `error_details` by their position, with the codes a single event gets: an invalid event or a `transaction_id` already stored with other values (Engine 2.28.0), a customer blocked by its [dunning policy](/guides/billing/dunning) (Engine 2.22.0), or a `timestamp` in an invoiced billing period with `timestamp: [period_invoiced]` (Engine 2.59.0).'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -3626,6 +3682,8 @@ paths:
                   '0':
                     external_customer_id:
                       - active_subscription_not_found
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
       x-codeSamples:
         - lang: Go
           label: Go
@@ -3750,6 +3808,13 @@ paths:
       responses:
         '202':
           description: Cost Event accepted for asynchronous processing
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -3762,6 +3827,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '503':
           description: Kafka could not durably acknowledge the Cost Event
       x-codeSamples:
@@ -3822,6 +3889,13 @@ paths:
       responses:
         '200':
           description: Shared cost allocation preview
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -3834,6 +3908,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
   /cost-intelligence/shared-costs/{id}/allocate:
     servers:
       - url: https://api.nozle.app/engine/api/v1
@@ -3865,6 +3941,13 @@ paths:
       responses:
         '200':
           description: Finalized allocation run
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -3879,6 +3962,8 @@ paths:
           description: The allocation period is still open
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
   /cost-intelligence/report:
     servers:
       - url: https://api.nozle.app/engine/api/v1
@@ -3922,6 +4007,13 @@ paths:
       responses:
         '200':
           description: Cost Intelligence report
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -3930,6 +4022,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: 'A publishable key, or `code: permission_denied` when API key permissions are enabled and the secret key lacks `analytic:read`.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: A report data source could not be queried
   /cost-intelligence/uncosted-models:
@@ -3972,6 +4066,13 @@ paths:
       responses:
         '200':
           description: Uncosted models
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -3989,6 +4090,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:read`.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
   /cost-intelligence/uncosted-models/dismiss:
     servers:
       - url: https://api.nozle.app/engine/api/v1
@@ -4022,10 +4125,19 @@ paths:
       responses:
         '200':
           description: The key is dismissed.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:write`.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
   /cost-intelligence/uncosted-models/reprocess:
     servers:
       - url: https://api.nozle.app/engine/api/v1
@@ -4067,12 +4179,26 @@ paths:
       responses:
         '202':
           description: A new job was queued.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UncostedReprocessStarted'
         '200':
           description: An unfinished job for the same key exists.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -4085,6 +4211,8 @@ paths:
           description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:write`.'
         '422':
           description: '`unsupported_source` for `legacy_cost_model` (priced at event time, nothing stored to replay), or `unsupported_key` for the overflow `other` row.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
     get:
       tags:
         - Cost Intelligence
@@ -4107,6 +4235,13 @@ paths:
       responses:
         '200':
           description: Jobs
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -4121,6 +4256,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:read`.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
   /cost-intelligence/uncosted-models/reprocess/{id}:
     servers:
       - url: https://api.nozle.app/engine/api/v1
@@ -4140,6 +4277,13 @@ paths:
       responses:
         '200':
           description: The job
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -4152,6 +4296,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown job, or a job of another organization.
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
   /cost-intelligence/uncosted-models/reprocess/{id}/cancel:
     servers:
       - url: https://api.nozle.app/engine/api/v1
@@ -4173,6 +4319,13 @@ paths:
       responses:
         '200':
           description: The job
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -4185,6 +4338,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Unknown job, or a job of another organization.
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
   /margin/simulations:
     servers:
       - url: https://api.nozle.app/engine/api/v1
@@ -4270,6 +4425,13 @@ paths:
       responses:
         '200':
           description: Simulation result
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -4281,6 +4443,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:read`.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '503':
           description: '`analytics_unavailable`.'
   /margin/simulations/backtest:
@@ -4316,6 +4480,13 @@ paths:
       responses:
         '200':
           description: Back-test result
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -4326,6 +4497,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: 'A publishable key, or `code: permission_denied` when the secret key lacks `analytic:read`.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '503':
           description: '`analytics_unavailable`.'
   /events/{transaction_id}:
@@ -4395,6 +4568,13 @@ paths:
       responses:
         '200':
           description: The void. `status` is `voided` for this call and `already_voided` for a repeat.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -4443,6 +4623,8 @@ paths:
               example:
                 error: reason_required
                 message: reason is required, 1 to 500 characters.
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
       x-codeSamples:
         - lang: TypeScript
           label: Node.js
@@ -8661,6 +8843,13 @@ paths:
       responses:
         '200':
           description: Active plan of the customer.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -8680,6 +8869,8 @@ paths:
           $ref: '#/components/responses/EngineForbidden'
         '404':
           $ref: '#/components/responses/EngineNotFound'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '503':
           $ref: '#/components/responses/EngineUnavailable'
   /subscriptions/current:
@@ -8711,6 +8902,13 @@ paths:
       responses:
         '200':
           description: Active plan of the customer.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -8730,6 +8928,8 @@ paths:
           $ref: '#/components/responses/EngineForbidden'
         '404':
           $ref: '#/components/responses/EngineNotFound'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '503':
           $ref: '#/components/responses/EngineUnavailable'
   /subscriptions/options:
@@ -8767,6 +8967,13 @@ paths:
       responses:
         '200':
           description: Plan-change state.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -8787,6 +8994,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Engine failed before or while calling Core. Body: `{"error": "failed to create billing request"}`.'
           content:
@@ -8843,6 +9052,13 @@ paths:
       responses:
         '200':
           description: Signed quote.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -8879,6 +9095,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '502':
           description: 'Engine could not reach Core, or Core returned an unusable response. Body: `{"error": "failed to reach billing service"}` or a similar message.'
           content:
@@ -8930,6 +9148,13 @@ paths:
       responses:
         '200':
           description: Subscription created, or the existing subscription with the same external ID.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -8956,6 +9181,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '502':
           description: Core could not be reached, the customer could not be verified, or Core's subscription response was unusable.
           content:
@@ -9024,6 +9251,13 @@ paths:
       responses:
         '200':
           description: Checkout result.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -9050,6 +9284,13 @@ paths:
                     transition_direction: downgrade
                     transition_policy: next_period
                     effective_at: '2026-11-01T00:00:00.000000Z'
+                billing_details:
+                  summary: Billing details needed for tax
+                  value:
+                    type: hosted
+                    step: billing_details
+                    url: https://api.nozle.app/core/checkout/billing_details?token=...
+                    customer_id: customer_123
         '400':
           description: 'Engine rejected the request with `code: invalid_request`: invalid JSON body, `subscription_id` with `invoice_id` or `external_entity_id`, neither `invoice_id` nor `plan_code` with a customer, or an Idempotency-Key longer than 255 bytes. Or Core refused the `return_url` (`code: invalid_return_url`: not an HTTPS URL on an origin allowed for the organization).'
           content:
@@ -9074,17 +9315,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '409':
-          description: 'Core: `subscription_selection_required`, `plan_upgrade_checkout_in_progress` (another upgrade checkout is open, or its time ran out while the provider reports a payment in progress or cannot be reached), `subscription_checkout_in_progress` or `entity_subscription_checkout_in_progress` (a payment for the abandoned new-subscription checkout on another plan is still processing, or it was paid; an abandoned checkout is otherwise replaced), `billing_anchor_checkout_in_progress`, `idempotency_key_reused` (quoted checkout), `plan_change_quote_changed`, `subscription_change_pending` (a paid upgrade while the subscription has a scheduled cancellation or plan change, or an upgrade payment in progress), `customer_tax_check_pending` (Core 11.31.0: a VIES check holds the customer; the body has `retry_after_seconds`).'
+          description: 'Core: `subscription_selection_required`, `plan_upgrade_checkout_in_progress` (another upgrade checkout is open, or its time ran out while the provider reports a payment in progress or cannot be reached), `subscription_checkout_in_progress` or `entity_subscription_checkout_in_progress` (a payment for the abandoned new-subscription checkout on another plan is still processing, or it was paid; an abandoned checkout is otherwise replaced), `billing_anchor_checkout_in_progress`, `idempotency_key_reused` (quoted checkout), `plan_change_quote_changed`, `subscription_change_pending` (a paid upgrade while the subscription has a scheduled cancellation or plan change, or an upgrade payment in progress), `customer_tax_check_pending` (Core 11.31.0: a VIES check holds the customer; the body has `retry_after_seconds`. From Core 11.54.0 only a paid plan change, an invoice checkout and a number without a type that is not a well-formed EU VAT number wait; a new subscription''s checkout is priced at once with the provisional tax of a valid number).'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
         '422':
-          description: 'Core: `customer_tax_location_required` (Core 11.31.0: the billing entity has `customer_location_required` on and the customer lacks a country or `address_line1`, `city` or `zipcode`; `error_details.customer` is `country_missing` or `address_missing`), `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active` (also right after a late upgrade payment for this plan was applied), `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`, or `base: [invalid_invoice_status_or_payment_status]` for an invoice checkout of an invoice that is paid, voided, draft, closed, failed or has nothing due, or `base: [payment_already_processing]` while a Stripe payment of the invoice''s last Checkout Session is processing or has succeeded, or from Core 11.16.0 while an automatic debit of the invoice is waiting for the bank, or `base: [invoice_carried_forward]` from Core 11.16.0 when the invoice''s amount due is below the provider''s minimum charge and was carried to the next invoice). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`).'
+          description: 'Core: `checkout_not_required`, `payment_provider_required`, `stripe_customer_required`, `plan_already_active` (also right after a late upgrade payment for this plan was applied), `subscription_and_idempotency_key_required`, `third_party_error`, `provider_error`, or `validation_errors` with `error_details` (for example `return_url: [invalid_or_untrusted]`, or `base: [invalid_invoice_status_or_payment_status]` for an invoice checkout of an invoice that is paid, voided, draft, closed, failed or has nothing due, or `base: [payment_already_processing]` while a Stripe payment of the invoice''s last Checkout Session is processing or has succeeded, or from Core 11.16.0 while an automatic debit of the invoice is waiting for the bank, or `base: [invoice_carried_forward]` from Core 11.16.0 when the invoice''s amount due is below the provider''s minimum charge and was carried to the next invoice). Refused in the current state: Core refused the plan change. `code` names the reason (for example `plan_transition_policy_required`, `plan_already_active`, `target_plan_is_not_a_downgrade`, `subscription_not_active`, `externally_billed_subscription`). `tax_calculation_failed` (Core 11.54.0): Stripe Tax refused to price the invoice of the checkout; the body has `tax_error` with Stripe''s error code (for example `customer_tax_location_invalid`), and the invoice fails as described in the Stripe Tax guide.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Engine failed before or while calling Core. Body: `{"error": "failed to create billing request"}`.'
           content:
@@ -9103,6 +9346,7 @@ paths:
                 error: failed to reach billing service
         '503':
           $ref: '#/components/responses/EngineUnavailable'
+          description: 'A dependency is busy or unavailable. Core 11.54.0: `tax_calculation_pending` when Stripe Tax did not price the checkout''s invoice within 5 seconds; the body has `retry_after_seconds` (10). Nothing is charged. Send the same request again (same `Idempotency-Key`) after that wait: it continues the same checkout once the tax is known.'
       x-codeSamples:
         - lang: TypeScript
           label: Node.js
@@ -9163,6 +9407,13 @@ paths:
       responses:
         '200':
           description: Checkout status.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -9189,6 +9440,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Engine failed before or while calling Core. Body: `{"error": "failed to create billing request"}`.'
           content:
@@ -9269,6 +9522,13 @@ paths:
       responses:
         '200':
           description: Checkout status.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -9302,6 +9562,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Engine failed before or while calling Core. Body: `{"error": "failed to create billing request"}`.'
           content:
@@ -9379,6 +9641,13 @@ paths:
       responses:
         '200':
           description: 'A downgrade returns the recorded transition, `{"subscription_transition": {...}}`. A free to free change returns Core''s `{"subscription": {...}}`.'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -9419,6 +9688,8 @@ paths:
               example:
                 error: payment_checkout_required
                 code: payment_checkout_required
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '502':
           description: 'Engine could not reach Core, or Core returned an unusable response. Body: `{"error": "failed to reach billing service"}` or a similar message.'
           content:
@@ -9460,6 +9731,13 @@ paths:
       responses:
         '200':
           description: 'A downgrade returns the recorded transition, `{"subscription_transition": {...}}`. A free to free change returns Core''s `{"subscription": {...}}`.'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -9500,6 +9778,8 @@ paths:
               example:
                 error: payment_checkout_required
                 code: payment_checkout_required
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '502':
           description: 'Engine could not reach Core, or Core returned an unusable response. Body: `{"error": "failed to reach billing service"}` or a similar message.'
           content:
@@ -9536,6 +9816,13 @@ paths:
       responses:
         '200':
           description: Preview.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -9562,6 +9849,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Engine failed before or while calling Core. Body: `{"error": "failed to validate subscription"}`.'
           content:
@@ -9648,6 +9937,13 @@ paths:
       responses:
         '200':
           description: Recorded transition.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -9684,6 +9980,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Engine failed before or while calling Core. Body: `{"error": "failed to validate subscription"}`.'
           content:
@@ -9770,6 +10068,13 @@ paths:
       responses:
         '200':
           description: Withdrawn.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -9804,6 +10109,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Engine failed before or while calling Core. Body: `{"error": "failed to create billing request"}`.'
           content:
@@ -11147,6 +11454,13 @@ paths:
       responses:
         '200':
           description: Invoices.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -11157,6 +11471,8 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Engine failed before or while calling Core. Body: `{"error": "failed to fetch invoices"}`.'
           content:
@@ -11240,6 +11556,13 @@ paths:
       responses:
         '200':
           description: The subscription.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -11266,6 +11589,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BillingCoreError'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Engine failed before or while calling Core. Body: `{"error": "failed to validate subscription"}`.'
           content:
@@ -11321,6 +11646,13 @@ paths:
       responses:
         '200':
           description: Balances of the customer.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -11370,6 +11702,8 @@ paths:
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`.
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -11436,6 +11770,13 @@ paths:
       responses:
         '200':
           description: Balance in the Credit System.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -11451,6 +11792,8 @@ paths:
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`, `credit_system_not_found`.
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -11515,6 +11858,13 @@ paths:
       responses:
         '200':
           description: A page of operations.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -11557,6 +11907,8 @@ paths:
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`.
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -11606,6 +11958,13 @@ paths:
       responses:
         '200':
           description: Balances of the Entity.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -11661,6 +12020,8 @@ paths:
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`, `entity_not_found`.
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -11701,6 +12062,13 @@ paths:
       responses:
         '200':
           description: Balance of the Entity in the Credit System.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -11716,6 +12084,8 @@ paths:
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`, `entity_not_found`, `credit_system_not_found`.
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -11758,6 +12128,13 @@ paths:
       responses:
         '200':
           description: A page of operations.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -11794,6 +12171,8 @@ paths:
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`, `entity_not_found`.
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -11865,6 +12244,13 @@ paths:
       responses:
         '200':
           description: A page of Entities.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -11894,6 +12280,8 @@ paths:
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`.
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -11952,6 +12340,13 @@ paths:
       responses:
         '200':
           description: The Entity.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -11968,6 +12363,8 @@ paths:
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: Not found. `code` is one of `customer_not_found`, `entity_not_found`.
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -12044,12 +12441,26 @@ paths:
       responses:
         '200':
           description: 'Updated, unchanged, or a replay of an earlier request (`replayed: true`).'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreditsEntityMutationResult'
         '201':
           description: 'Created (`action: created`, not a replay).'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -12074,6 +12485,8 @@ paths:
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
           description: '`code: entity_status_transition_invalid`: the status change is not allowed.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -12176,6 +12589,13 @@ paths:
       responses:
         '200':
           description: Result per Entity and counts by action.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -12196,6 +12616,8 @@ paths:
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
           description: '`code: entity_status_transition_invalid`: the status change is not allowed.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -12293,6 +12715,13 @@ paths:
       responses:
         '201':
           description: 'Transferred. A replay also returns `201` with `replayed: true`.'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -12337,6 +12766,8 @@ paths:
                   value:
                     code: entity_inactive
                     error: only an active Entity can receive allocated credits
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -12423,6 +12854,13 @@ paths:
       responses:
         '200':
           description: 'Transferred, or a replay (`replayed: true`).'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -12467,6 +12905,8 @@ paths:
                   value:
                     code: entity_inactive
                     error: only an active Entity can receive allocated credits
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -12542,12 +12982,26 @@ paths:
       responses:
         '200':
           description: 'Dry run (`dry_run: true`) or replay (`replayed: true`).'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreditsBalanceImportResponse'
         '201':
           description: Imported.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -12582,6 +13036,8 @@ paths:
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
           description: '`code` is `grant_rule_not_found`, `grant_amount_mismatch`, `mixed_grant_scopes`, `grant_scope_mismatch` or `subscription_not_eligible`.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -12626,6 +13082,13 @@ paths:
       responses:
         '200':
           description: The pending purchase with `payment_url` (from Core).
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -12673,6 +13136,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorUnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: The Engine could not build the Core request, or a Core server error passed through.
           content:
@@ -12712,6 +13177,13 @@ paths:
       responses:
         '200':
           description: The purchase.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -12778,6 +13250,8 @@ paths:
                 oneOf:
                   - *id001
                   - $ref: '#/components/schemas/ApiErrorNotFound'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '502':
           description: Core could not be reached.
           content:
@@ -12807,6 +13281,13 @@ paths:
       responses:
         '200':
           description: The active wallet.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -12833,6 +13314,8 @@ paths:
                 no_wallet:
                   value:
                     error: no wallet found
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '503': *id018
   /credits/{customer_id}/transactions:
     get:
@@ -12853,6 +13336,13 @@ paths:
       responses:
         '200':
           description: Wallet transactions; an empty list when there are none (including an unknown customer).
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -12870,6 +13360,8 @@ paths:
         '403':
           $ref: '#/components/responses/EngineForbidden'
           description: 'The credential is not allowed. A publishable key is rejected; a secret key needs `credit_system:read`. The body has `error` only (no `code`). With trusted internal authentication and an `X-Nozle-Customer-Id` header that differs from the path, the body is `{"error": "customer_scope_mismatch"}` (the value is in `error`; there is no `code`).'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: The transactions could not be read.
           content:
@@ -13117,6 +13609,13 @@ paths:
       responses:
         '200':
           description: 'Advisory decision. `allowed: false` is a normal result.'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -13136,6 +13635,8 @@ paths:
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
           description: '`code` is `active_subscription_ambiguous` (several active subscriptions could pay and neither `subscription_id` nor `entity_id` picks one; the message names both), `feature_not_consumable` (a boolean or config Feature, which has no usage to consume), `feature_billed_in_money` (HTTP 409: the plan bills the Feature with a priced charge as well as credits, so the usage would be billed twice; set the charge to $0 or remove the credits), `entity_inactive`, `credit_pool_policy_not_configured` (Entity usage with no explicit pool policy), or `credit_usage_configuration_invalid` (unsupported aggregation or expression, missing or invalid metric value, amount precision, no effective credit rate at that time, or ambiguous Credit System); `error` then holds the detail.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -13228,6 +13729,13 @@ paths:
       responses:
         '200':
           description: Consume result. Check `allowed`.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -13250,6 +13758,8 @@ paths:
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
           description: '`code` is `active_subscription_ambiguous` (several active subscriptions could pay and neither `subscription_id` nor `entity_id` picks one; the message names both), `feature_not_consumable` (a boolean or config Feature, which has no usage to consume), `feature_billed_in_money` (HTTP 409: the plan bills the Feature with a priced charge as well as credits, so the usage would be billed twice; set the charge to $0 or remove the credits), `entity_inactive`, `credit_pool_policy_not_configured` (Entity usage with no explicit pool policy), or `credit_usage_configuration_invalid` (unsupported aggregation or expression, missing or invalid metric value, amount precision, no effective credit rate at that time, or ambiguous Credit System); `error` then holds the detail.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -13358,6 +13868,13 @@ paths:
       responses:
         '200':
           description: 'Hold result. Check `allowed`; `allowed: false` is a normal result.'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -13382,6 +13899,8 @@ paths:
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
           description: '`code` is `active_subscription_ambiguous`, `feature_not_consumable`, `entity_inactive`, `credit_pool_policy_not_configured` or `credit_usage_configuration_invalid`, as on `POST /usage/track`.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -13455,6 +13974,13 @@ paths:
       responses:
         '200':
           description: 'Finalize result. Check `allowed`.'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -13477,6 +14003,8 @@ paths:
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
           description: '`code` is `entity_inactive` or `credit_usage_configuration_invalid` (the actual usage cannot be priced, for example a missing metric value).'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'Unexpected server error. The body has `code: internal_error`.'
           content:
@@ -13523,6 +14051,13 @@ paths:
       responses:
         '200':
           description: The hold after the release.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -13539,6 +14074,8 @@ paths:
         '409':
           $ref: '#/components/responses/EngineConflict'
           description: '`code: hold_already_resolved`: the hold was finalized.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '503':
           description: 'Retry after `Retry-After`: `credit_usage_contention` or `credit_usage_temporarily_unavailable`.'
           headers:
@@ -13577,6 +14114,13 @@ paths:
       responses:
         '200':
           description: The hold.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -13590,6 +14134,8 @@ paths:
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: '`code: hold_not_found`.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
       x-codeSamples:
         - lang: TypeScript
           label: Node.js
@@ -13629,6 +14175,13 @@ paths:
       responses:
         '200':
           description: The customer's holds.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -13643,6 +14196,8 @@ paths:
         '404':
           $ref: '#/components/responses/EngineNotFound'
           description: '`code: customer_not_found`.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '503':
           description: '`code: credit_read_temporarily_unavailable`. Retry after `Retry-After`.'
           headers:
@@ -13694,6 +14249,13 @@ paths:
       responses:
         '200':
           description: The subscription's budgets. An empty `budgets` array when no spend limit applies.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -13711,6 +14273,8 @@ paths:
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
           description: '`code: active_subscription_ambiguous`: several current subscriptions and neither `subscription_id` nor `entity_id` picks one.'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '503':
           description: '`code: budget_unavailable`: the subscription or its budgets could not be read. Retry after `Retry-After`.'
           headers:
@@ -13780,6 +14344,12 @@ paths:
               schema:
                 type: string
                 example: '</api/v1/usage/track>; rel="successor-version"'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -13834,6 +14404,8 @@ paths:
               example:
                 code: idempotency_key_reused
                 error: Idempotency-Key was already used with a different request
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: The deduction failed, for example Core refused the wallet transaction. Nothing was deducted.
           content:
@@ -13900,6 +14472,13 @@ paths:
       responses:
         '200':
           description: Margin totals for the range.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -13927,6 +14506,8 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
@@ -13990,6 +14571,13 @@ paths:
       responses:
         '200':
           description: Margin by customer.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -14022,6 +14610,8 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
@@ -14085,6 +14675,13 @@ paths:
       responses:
         '200':
           description: Margin by metric.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -14117,6 +14714,8 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
@@ -14180,6 +14779,13 @@ paths:
       responses:
         '200':
           description: Margin by plan.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -14212,6 +14818,8 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
@@ -14275,6 +14883,13 @@ paths:
       responses:
         '200':
           description: Margin by model.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -14307,6 +14922,8 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
@@ -14382,6 +14999,13 @@ paths:
       responses:
         '200':
           description: Margin trend.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -14426,6 +15050,8 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
@@ -14499,6 +15125,13 @@ paths:
       responses:
         '200':
           description: Simulation result. All amounts are integer cents.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -14542,6 +15175,8 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: 'An unexpected failure. The body is `{"code": "internal_error", "error": "...", "request_id": "..."}`. When the analytics store cannot be reached or a query fails, the answer is `503` with code `analytics_unavailable` instead (Engine 1.4.0 and later), and when the analytics schema is missing, `503` with code `analytics_schema_missing`.'
           content:
@@ -14643,6 +15278,13 @@ paths:
       responses:
         '200':
           description: Entitlement decision. A denial is also a `200` with `allowed` set to `false`.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -14764,6 +15406,8 @@ paths:
                 error: "This customer's invoices are unpaid past their grace period. Usage resumes once they are paid."
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '503':
           description: 'A dependency is unavailable. With `code: usage_unavailable` the usage counter could not be read, or (Engine 2.34.0) lost usage counters are being rebuilt and the feature has a hard usage limit; retry after the `Retry-After` seconds and quote `request_id` to support. With `code: budget_unavailable` (Engine 2.34.0) the spend limits could not be read while a hard one may apply. Subscription access and API key verification failures return an `error` without a `code`.'
           headers:
@@ -14822,6 +15466,13 @@ paths:
       responses:
         '200':
           description: Engine database status.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -14841,6 +15492,8 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '503':
           $ref: '#/components/responses/EngineUnavailable'
       x-codeSamples:
@@ -14885,6 +15538,13 @@ paths:
       responses:
         '200':
           description: Core's plan list, passed through unchanged.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -14895,6 +15555,8 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '502':
           description: Engine could not reach Core.
           content:
@@ -15434,6 +16096,13 @@ paths:
       responses:
         '200':
           description: The created cost model.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -15456,6 +16125,8 @@ paths:
           $ref: '#/components/responses/EngineForbidden'
         '422':
           $ref: '#/components/responses/EngineUnprocessable'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: The cost model could not be stored.
           content:
@@ -15501,6 +16172,13 @@ paths:
       responses:
         '200':
           description: Cost models.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -15530,6 +16208,8 @@ paths:
           $ref: '#/components/responses/EngineUnauthorized'
         '403':
           $ref: '#/components/responses/EngineForbidden'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: The cost models could not be read.
           content:
@@ -15564,6 +16244,13 @@ paths:
       responses:
         '200':
           description: The cost model.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -15576,6 +16263,8 @@ paths:
           $ref: '#/components/responses/EngineForbidden'
         '404':
           $ref: '#/components/responses/EngineNotFound'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '503':
           $ref: '#/components/responses/EngineUnavailable'
     delete:
@@ -15595,6 +16284,13 @@ paths:
       responses:
         '200':
           description: The cost model was archived.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -15609,6 +16305,8 @@ paths:
           $ref: '#/components/responses/EngineForbidden'
         '404':
           $ref: '#/components/responses/EngineNotFound'
+        '429':
+          $ref: '#/components/responses/EngineRateLimited'
         '500':
           description: The cost model could not be archived.
           content:
@@ -25275,7 +25973,7 @@ components:
           type: boolean
           default: false
           example: false
-          description: When true, checkout for this billing entity's customers answers `422 customer_tax_location_required` unless the customer has a country, `address_line1`, `city` and `zipcode`.
+          description: 'When true, a checkout for this billing entity''s customer without a country, `address_line1`, `city` and `zipcode` sends the customer to Nozle''s billing details step first (`type: hosted`, `step: billing_details`; Core 11.54.0, before which it answered `422 customer_tax_location_required`).'
         invoice_footer:
           type:
             - string
@@ -25503,7 +26201,7 @@ components:
               type: boolean
               default: false
               example: false
-              description: When true, checkout for this billing entity's customers answers `422 customer_tax_location_required` unless the customer has a country, `address_line1`, `city` and `zipcode`.
+              description: 'When true, a checkout for this billing entity''s customer without a country, `address_line1`, `city` and `zipcode` sends the customer to Nozle''s billing details step first (`type: hosted`, `step: billing_details`; Core 11.54.0, before which it answered `422 customer_tax_location_required`).'
             billing_configuration:
               type: object
               properties:
@@ -25868,7 +26566,7 @@ components:
               type: boolean
               default: false
               example: false
-              description: When true, checkout for this billing entity's customers answers `422 customer_tax_location_required` unless the customer has a country, `address_line1`, `city` and `zipcode`.
+              description: 'When true, a checkout for this billing entity''s customer without a country, `address_line1`, `city` and `zipcode` sends the customer to Nozle''s billing details step first (`type: hosted`, `step: billing_details`; Core 11.54.0, before which it answered `422 customer_tax_location_required`).'
             billing_configuration:
               type: object
               properties:
@@ -26303,10 +27001,11 @@ components:
           type: string
           example: post
           enum:
+            - get
             - post
             - put
             - delete
-          description: This field represents the HTTP method of the request.
+          description: This field represents the HTTP method of the request. `get` rows come from the Engine (Engine 2.61.0).
         http_status:
           type: integer
           example: 200
@@ -26342,6 +27041,31 @@ components:
           type: string
           format: object
           example: '{ "nozle_id": "b9155544-e261-4e92-b54e-f65d7609294c", ... }'
+        source:
+          type: string
+          enum:
+            - core
+            - engine
+          example: engine
+          description: 'Core 11.54.0. The service that answered the call. Rows logged before Core 11.54.0 are `core`.'
+        duration_ms:
+          type:
+            - integer
+            - 'null'
+          example: 42
+          description: Core 11.54.0. How long the call took, in milliseconds. `null` for rows logged before.
+        ip_address:
+          type:
+            - string
+            - 'null'
+          example: 203.0.113.7
+          description: Core 11.54.0. The client IP address. `null` when unknown.
+        idempotency_key:
+          type:
+            - string
+            - 'null'
+          example: 3f2a7c1e-checkout-plan-pro
+          description: Core 11.54.0. The `Idempotency-Key` header of the call. `null` when none was sent.
     ApiLogsPaginated:
       type: object
       required:
@@ -29200,7 +29924,7 @@ components:
           type:
             - string
             - 'null'
-          description: The VIES consultation number. Always null for now.
+          description: 'Core 11.54.0. The consultation number VIES returned with the last valid check, kept as proof of the check. VIES returns one when the billing entity has its own EU VAT number, sent as requester. `null` before a valid check, without that number, or after the tax ID changes.'
         tax_treatment:
           $ref: '#/components/schemas/TaxTreatment'
         vies_check_pending:
@@ -40581,7 +41305,7 @@ components:
                   type:
                     - string
                     - 'null'
-                  description: Always null for now. Core 11.31.0.
+                  description: 'The consultation number VIES returned with a valid check (Core 11.54.0), when the billing entity has its own EU VAT number. `null` otherwise.'
                 error:
                   type: string
                   description: Set when the check failed.
@@ -41207,6 +41931,41 @@ components:
         request_id:
           type: string
           description: Request id to quote to support, when the Engine includes it.
+    EngineRateLimitError:
+      type: object
+      description: Engine 2.61.0. Body of a `429 rate_limited` answer, on every Engine route the LLM proxy included.
+      required:
+        - status
+        - code
+        - error
+        - error_details
+      properties:
+        status:
+          type: integer
+          example: 429
+        code:
+          type: string
+          enum:
+            - rate_limited
+        error:
+          type: string
+          description: Human-readable message naming the limit.
+        error_details:
+          type: object
+          required:
+            - limit
+            - limit_value
+          properties:
+            limit:
+              type: string
+              enum:
+                - requests
+                - events
+                - concurrency
+              description: '`requests` and `events` are per second for the workspace; `concurrency` is requests in flight for the API key.'
+            limit_value:
+              type: integer
+              example: 100
     OpenAIProxyError:
       type: object
       description: 'Engine 2.22.0. A refusal of an OpenAI route of the LLM proxy, in OpenAI''s error shape so the OpenAI SDK surfaces `error.code`. The top-level `code` is the same code. Before Engine 2.22.0 the body was `{"code", "error"}` with `error` a string.'
@@ -41616,7 +42375,7 @@ components:
       type: object
       required:
         - type
-      description: 'Result of a checkout. The fields present depend on `type`. `hosted` (Stripe): `url`, `payment_url` (the same value), `checkout_id` (the Stripe Checkout Session ID), `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. `hosted` (Razorpay mandate checkout, `register_mandate`): `payment_url` (Nozle''s auto-pay setup page), `checkout_id` (to poll), `amount_cents`, `currency`, `expires_at`, `invoice_id`. `razorpay`: `checkout_id`, `key_id`, `order_id`, `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. `processing`: `checkout_id` and `status`. `completed`: `status`, `payment_source`, `subscription_id`, `plan_code`, `invoice_id`, `amount_cents`, `currency` (an immediate configured downgrade instead carries the settlement fields of a transition result). `scheduled`: `status`, `subscription_id` (the pending subscription), `plan_code`, `transition_direction`, `transition_policy`, `effective_at`. Entity checkouts add `external_entity_id` and `external_subscription_id`. There is no `stripe` result and no client secret.'
+      description: 'Result of a checkout. The fields present depend on `type`. `hosted` (Stripe): `url`, `payment_url` (the same value), `checkout_id` (the Stripe Checkout Session ID), `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. `hosted` (Razorpay mandate checkout, `register_mandate`): `payment_url` (Nozle''s auto-pay setup page), `checkout_id` (to poll), `amount_cents`, `currency`, `expires_at`, `invoice_id`. `hosted` with `step: billing_details` (Core 11.54.0): `url` (Nozle''s billing details page, which asks for what tax needs and then continues to the provider) and `customer_id`. `razorpay`: `checkout_id`, `key_id`, `order_id`, `amount_cents`, `currency`, `expires_at`, and `invoice_id` or `plan_upgrade_intent_id`. `processing`: `checkout_id` and `status`. `completed`: `status`, `payment_source`, `subscription_id`, `plan_code`, `invoice_id`, `amount_cents`, `currency` (an immediate configured downgrade instead carries the settlement fields of a transition result). `scheduled`: `status`, `subscription_id` (the pending subscription), `plan_code`, `transition_direction`, `transition_policy`, `effective_at`. Entity checkouts add `external_entity_id` and `external_subscription_id`. There is no `stripe` result and no client secret.'
       properties:
         type:
           type: string
@@ -41632,7 +42391,12 @@ components:
         url:
           type: string
           format: uri
-          description: '`hosted` only: the Stripe-hosted Checkout page. Redirect the customer to it.'
+          description: '`hosted` only: the Stripe-hosted Checkout page, or with `step: billing_details` Nozle''s billing details page. Redirect the customer to it.'
+        step:
+          type: string
+          enum:
+            - billing_details
+          description: 'Core 11.54.0. Present on a `hosted` result when the customer lacks what the billing entity''s tax needs (a country, the postal code or state Stripe Tax needs, or the address the entity requires). `url` is then a Nozle page that asks for those details, saves them to the customer, and continues the same checkout to the provider. The link expires after 24 hours. See https://docs.nozle.dev/guides/billing/tax-ids#checkout-and-tax.'
         checkout_id:
           type: string
           description: For `hosted`, the Stripe Checkout Session ID (`cs_...`); it is not a status ID (poll a paid upgrade with `plan_upgrade_intent_id`). For Razorpay, the operation ID (UUID), used with `GET /checkout/{id}` and `POST /checkout/{id}/verify`.
@@ -41644,7 +42408,7 @@ components:
           description: Razorpay order ID.
         customer_id:
           type: string
-          description: Razorpay customer ID. Only on orders of earlier mandate checkouts; a mandate checkout now answers `hosted`.
+          description: 'With `step: billing_details`, your `external_id` of the customer. Otherwise the Razorpay customer ID, only on orders of earlier mandate checkouts; a mandate checkout now answers `hosted`.'
         recurring:
           type: boolean
         mandate_max_amount_cents:
@@ -46438,6 +47202,22 @@ components:
           type: string
           enum:
             - hard
+  headers:
+    X-RateLimit-Limit:
+      description: 'Engine 2.61.0. The limit this call was counted against: requests per second for the workspace, or events per second on an ingestion call (`/events`, `/events/batch`, `/usage/track`, hold finalize). On a `429` for `concurrency`, the requests one API key may have in flight. Absent on calls made with the internal service secret, and while the limiter cannot reach its store. See https://docs.nozle.dev/api/rate-limits.'
+      schema:
+        type: integer
+        example: 100
+    X-RateLimit-Remaining:
+      description: Engine 2.61.0. How many requests (or events) can still be sent now without waiting.
+      schema:
+        type: integer
+        example: 97
+    X-RateLimit-Reset:
+      description: Engine 2.61.0. Seconds until the limit is fully available again.
+      schema:
+        type: integer
+        example: 1
   responses:
     Unauthorized:
       description: 'Missing, unknown or expired API key, or a key refused by its environment: a sandbox key (`sk_nozle_test_`, `pk_nozle_test_`) on a live organization, a live key on a sandbox, or a key of a reset sandbox. The body does not say which. A `401` carries no `X-Nozle-Livemode` header.'
@@ -46557,11 +47337,13 @@ components:
               code: customer_payment_overdue
             code: customer_payment_overdue
     OpenAIProxyUsageLimitExceeded:
-      description: '`usage_limit_exceeded`: the customer reached a hard usage limit of the Feature; the provider is not called. A refusal, not a rate limit: do not retry until the limit or the period changes. In the OpenAI error shape.'
+      description: '`usage_limit_exceeded`: the customer reached a hard usage limit of the Feature; the provider is not called. A refusal, not a rate limit: do not retry until the limit or the period changes. In the OpenAI error shape. From Engine 2.61.0 a `429` can also be `rate_limited`: the workspace sent more than its requests per second. That answer is not in the provider''s shape: it is `{"status": 429, "code": "rate_limited", "error": ..., "error_details": {"limit": "requests", "limit_value": ...}}` with `Retry-After`, and it is worth retrying after that wait. See https://docs.nozle.dev/api/rate-limits.'
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/OpenAIProxyError'
+            oneOf:
+              - $ref: '#/components/schemas/OpenAIProxyError'
+              - $ref: '#/components/schemas/EngineRateLimitError'
           example:
             error:
               message: the customer's hard usage limit is reached
@@ -46644,11 +47426,13 @@ components:
               code: customer_payment_overdue
             code: customer_payment_overdue
     AnthropicProxyUsageLimitExceeded:
-      description: '`usage_limit_exceeded`: the customer reached a hard usage limit of the Feature; the provider is not called. A refusal, not a rate limit: do not retry until the limit or the period changes. In the Anthropic error shape.'
+      description: '`usage_limit_exceeded`: the customer reached a hard usage limit of the Feature; the provider is not called. A refusal, not a rate limit: do not retry until the limit or the period changes. In the Anthropic error shape. From Engine 2.61.0 a `429` can also be `rate_limited`: the workspace sent more than its requests per second. That answer is not in the provider''s shape: it is `{"status": 429, "code": "rate_limited", "error": ..., "error_details": {"limit": "requests", "limit_value": ...}}` with `Retry-After`, and it is worth retrying after that wait. See https://docs.nozle.dev/api/rate-limits.'
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/AnthropicProxyError'
+            oneOf:
+              - $ref: '#/components/schemas/AnthropicProxyError'
+              - $ref: '#/components/schemas/EngineRateLimitError'
           example:
             type: error
             error:
@@ -46695,6 +47479,31 @@ components:
               message: 'subscription lookup is unavailable'
               code: unavailable
             code: unavailable
+    EngineRateLimited:
+      description: 'Engine 2.61.0. `rate_limited`: the workspace sent more requests or events per second than its limit, or the API key has too many requests in flight. `error_details.limit` names which: `requests` (100 per second live, 25 in a sandbox), `events` (5,000 events per second live, 500 in a sandbox, counted per event) or `concurrency` (50 requests in flight per API key; event ingestion and the LLM proxy hold no slot). Nothing was done. Wait at least `Retry-After` seconds, then retry with the same `Idempotency-Key` or `transaction_id`. See https://docs.nozle.dev/api/rate-limits.'
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying, at least 1.
+          schema:
+            type: integer
+            example: 1
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/EngineRateLimitError'
+          example:
+            status: 429
+            code: rate_limited
+            error: 'Too many requests for this workspace: at most 100 per second. Retry after the Retry-After header.'
+            error_details:
+              limit: requests
+              limit_value: 100
     EngineUnavailable:
       description: A dependency is busy or unavailable. Retry after the Retry-After seconds when the header is present.
       content:

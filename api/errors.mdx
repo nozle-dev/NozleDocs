@@ -16,7 +16,7 @@ description: HTTP errors, validation failures, and retry guidance
 | `402` | Payment required. `workspace_suspended` (or `card_required`): your workspace is blocked by Nozle, see [Workspace billing errors](#workspace-billing-errors). `customer_payment_overdue`: one of your customers is blocked by your dunning policy, and `customer_blocked`: Nozle staff blocked one of your customers; see [Customer payment overdue](#customer-payment-overdue). `budget_exceeded` from the LLM proxy: a customer's hard spend limit is used up, see [Spend and usage limits](#spend-and-usage-limits). |
 | `409` | Idempotency key or resource-state conflict, such as another checkout in progress. Reload the state, then retry. Events and usage also answer `409` for a `transaction_id` already taken (`transaction_id_conflict`, `transaction_voided`) and for a period already invoiced (`period_invoiced`); see [Common failures](#common-failures). |
 | `422` | Request is syntactically valid but violates a product rule, or the resource's current state refuses it (for example a voided invoice). |
-| `429` | Request was rate limited, or (LLM proxy) `usage_limit_exceeded`: a customer's hard usage limit is reached, which is a refusal, not a rate limit. |
+| `429` | Request was rate limited (`rate_limited`, see [Rate limits](/api/rate-limits)), or (LLM proxy) `usage_limit_exceeded`: a customer's hard usage limit is reached, which is a refusal, not a rate limit. |
 | `500` | Unexpected server error. The body is still JSON with a `code`. |
 | `502` | A service Nozle depends on did not answer: `upstream_unavailable`. Safe to retry. |
 | `503` | Temporary dependency, lock, or service failure. |
@@ -49,34 +49,7 @@ Do not parse human-readable text when a machine-readable `code` is available.
 
 ## Rate limits
 
-_Unreleased._ Core's REST API (`https://api.nozle.app/core/api/v1`) counts requests per API key and per client IP address, each in a fixed one-minute window.
-
-| Requests | Limit |
-|---|---|
-| Core REST API, per API key | 6,000 per minute |
-| Core REST API, per IP address | 6,000 per minute |
-
-Every server that uses the same key shares its limit. Requests the Engine makes to Core on your behalf are not counted against your key.
-
-A request over the limit answers `429` with a `Retry-After` header, in seconds until the window ends, and this body:
-
-```json
-{
-  "status": 429,
-  "error": "Too Many Requests",
-  "code": "rate_limited"
-}
-```
-
-The request did nothing. To back off:
-
-- Wait at least the `Retry-After` seconds, then retry. If the retry is refused again, double the wait each time and add random jitter, so your servers do not all retry at the same moment.
-- Retry a mutation with the same `Idempotency-Key` and the same body.
-- Spread large jobs, such as imports or backfills, over several minutes instead of sending them in one burst.
-
-The Node.js, Python and Go SDKs retry a `429` up to 2 times by default, after the `Retry-After` seconds, and only for requests that are safe to repeat (see [API standards](/api/api-standards)).
-
-The dashboard also limits sign-in and password-reset requests. See [Account security](/guides/settings/account-security#sign-in-limits).
+A `429` with the code `rate_limited` means a rate limit was reached. Core's REST API accepts 6,000 requests per minute per API key and per IP address. _Unreleased (Engine 2.61.0):_ the Engine API accepts 100 requests per second for a live workspace (25 in a sandbox), 5,000 events per second (500 in a sandbox), and 50 requests in flight per API key. The Engine's refusal names the limit in `error_details.limit` and carries `Retry-After` and `X-RateLimit-*` headers. Wait at least `Retry-After` seconds, then retry. See [Rate limits](/api/rate-limits).
 
 ## Common failures
 
@@ -108,8 +81,10 @@ Match on the status and `code`, not on the message text.
 | `422` `currencies_does_not_match` on `plan_code` (every plan change path from Core 11.9.0) | A plan change targets a plan in another currency. | Pick a plan in the subscription's currency. |
 | `422` `validation_errors` with `tax_identification_type: value_is_invalid`, `tax_identification_number: value_is_mandatory` or `tax_identification_number: invalid_format` (Core 11.31.0) | A customer write has an unknown tax ID type, a type without a number, or a number with a bad format. | Fix the tax ID. See [Tax IDs](/guides/billing/tax-ids#what-nozle-stores). |
 | `422` `tax_identification: eu_tax_not_applicable` (Core 11.31.0) | `POST /customers/{external_id}/tax_identification/recheck` for a billing entity without EU tax management, or a tax ID that is not `eu_vat`. | Nothing to recheck. |
-| `422` `customer_tax_location_required` (Core 11.31.0) | Checkout for a billing entity with `customer_location_required` on, and the customer has no country or no `address_line1`, `city` or `zipcode`. `error_details.customer` is `country_missing` or `address_missing`. | Upsert the customer with the address, then retry. |
-| `409` `customer_tax_check_pending` (Core 11.31.0) | Checkout while a VIES check holds the customer. The body has `retry_after_seconds`. | Wait that long, or call `waitForTaxCheck` first, then retry. |
+| `422` `customer_tax_location_required` (Core 11.31.0 to 11.53.0) | Checkout for a billing entity with `customer_location_required` on, and the customer has no country or no `address_line1`, `city` or `zipcode`. From Core 11.54.0 (_Unreleased_) the checkout answers the [billing details step](/guides/billing/tax-ids#billing-details-step) instead. | Upsert the customer with the address, then retry, or redirect to the step's `url`. |
+| `409` `customer_tax_check_pending` (Core 11.31.0) | Checkout while a VIES check holds the customer. The body has `retry_after_seconds`. From Core 11.54.0 a new subscription's checkout no longer waits for a well-formed EU VAT number. | Wait that long, or call `waitForTaxCheck` first, then retry. |
+| `503` `tax_calculation_pending` (Core 11.54.0) | A checkout of a Stripe Tax invoice whose tax Stripe did not price within 5 seconds. Nothing is charged. | Send the same request with the same `Idempotency-Key` after `retry_after_seconds`. |
+| `422` `tax_calculation_failed` (Core 11.54.0) | Stripe Tax refused to price a checkout's invoice. `tax_error` has Stripe's code. | Fix the customer's address or tax ID, then retry the invoice. See [Stripe Tax](/guides/billing/stripe-tax#when-tax-fails). |
 | `422` `payment_provider_required` | The customer's payment provider is not connected, or (_Unreleased_) the customer has none and the workspace has no [default payment connection](/integrations#default-payment-connection). The `message` names the fix. | Connect a provider, choose the default connection, or assign one to the customer. See [checkout](/guides/billing/checkout). |
 | `422` `payment_already_processing` in `error_details.base` (pay link, invoice checkout) | An automatic debit of the invoice is waiting for the bank to settle (for example an Indian card during the bank's notice), or a payment of its last Checkout Session is processing. Paying now would charge twice. | Wait for the `invoice.payment_status_updated` webhook. If the debit fails, ask for a pay link again. |
 | `422` `invoice_carried_forward` in `error_details.base` (pay link, invoice checkout, Core 11.16.0) | The amount due is below the payment provider's minimum charge, so it was carried to the customer's next invoice. The invoice is settled. | Nothing to pay now. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum). |

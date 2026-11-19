@@ -22,6 +22,12 @@ _Core 11.23.0._ **Spending limit almost reached** (`budget.threshold_reached`), 
 
 _Core 11.44.0._ **Payment receipt** (`payment_receipt.created`) works on every Nozle plan. It is on by default for a billing entity created from Core 11.44.0. Billing entities created before keep the setting they had. Switch it off here, or remove it from the billing entity's `email_settings`. **Send test** sends a sample of an email to you.
 
+## Sender and replies
+
+Every customer email is sent from Nozle's address, with the billing entity's name as the sender name. The entity's billing email is the Reply-To, so when a customer answers an invoice or a receipt, the reply reaches you. The billing entity settings say so next to **Billing email**, and warn when it is empty.
+
+_Unreleased (Core 11.54.0)._ Invoice, credit note, payment receipt and payment request emails follow this rule too in every workspace. Before, a workspace with a custom sender sent them from the billing entity's own email, which mail servers could reject because Nozle is not allowed to send for that domain (SPF and DMARC). A saved custom sender is kept but no longer used.
+
 ## Customer billing page
 
 **Customer billing page** is the address the buttons in your emails open. Enter a full address that starts with `https://`. Emails marked **Billing page** have no button until you set it, except Credits used up, which falls back to the hosted portal. Payment buttons open the payment provider's page first.
