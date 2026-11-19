@@ -89,6 +89,19 @@ The invoice has `tax_status`: `pending`, `succeeded` or `failed`. `tax_details` 
 
 `transaction_id` is `null` until the transaction is recorded after finalization. An invoice calculated in slices also has `calculation_ids` and `transaction_ids`, in order; `calculation_id` and `transaction_id` are the first of each.
 
+## At checkout
+
+_Unreleased (Core 11.54.0)._ A checkout that takes a payment up front (a new subscription, a resumed checkout, an invoice checkout) prices its invoice with Stripe Tax while the customer waits, as Stripe Checkout does. The saved card is charged, or the provider checkout opens, for the amount with its tax. Before, such a checkout answered `422` with `invalid_invoice_status_or_payment_status`, because the invoice was still waiting for its tax.
+
+Stripe gets 5 seconds. Nothing is ever charged without its tax:
+
+| Answer | When | What to do |
+| --- | --- | --- |
+| `503` `tax_calculation_pending` | Stripe Tax did not answer in 5 seconds, or is down. The body has `retry_after_seconds` (10). | Send the same request again, with the same `Idempotency-Key`, after that wait. It continues the same checkout once the tax is known. Nozle keeps calculating in the background. |
+| `422` `tax_calculation_failed` | Stripe refused the calculation. `tax_error` has Stripe's code, for example `customer_tax_location_invalid`. | Fix the cause (see the table below), then retry the invoice. |
+
+A customer without the country, or the postal code or state their country needs, gets the [billing details step](/guides/billing/tax-ids#billing-details-step) before any of this.
+
 ## When tax fails
 
 A cause you must fix sets `tax_status: failed` and the invoice `failed`. The Stripe error code is in the error details, and Nozle sends the [`customer.tax_provider_error`](/api/webhook-events) webhook.

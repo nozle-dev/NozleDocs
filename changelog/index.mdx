@@ -5,7 +5,7 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
-### Billing details at checkout, VAT numbers priced while VIES checks, Engine calls in the request log, billing emails from Nozle (Core 11.54.0, dashboard 2.28.0)
+### Billing details and Stripe Tax at checkout, VAT numbers priced while VIES checks, Engine calls in the request log, billing emails from Nozle (Core 11.54.0, dashboard 2.28.0)
 
 _Unreleased_
 
@@ -18,6 +18,7 @@ _Unreleased_
 - **Engine calls in the request log.** Each request log row has `source`: `core` (shown as **Billing API**) or `engine` (**Usage and checkout API**), and `duration_ms`, `ip_address` and `idempotency_key`. Filter with `sources[]` on `GET /api_logs` or `sources` on GraphQL `apiLogs`, or with **Service** under **Developers > Logs**. Read calls, which only the Engine logs, are kept 30 days; the others 90 days. See [Request log](/api/request-log).
 - **Billing emails from Nozle's address.** Invoice, credit note, payment receipt and payment request emails are always sent from Nozle's address in the billing entity's name, with the entity's billing email as the Reply-To. Before, a custom sender sent them from the entity's own email, which mail servers could reject. A billing entity without a billing email gets no such emails: the billing entity settings now say who emails come from and warn when the billing email is empty. See [Sender and replies](/guides/settings/customer-emails#sender-and-replies).
 - **More sign-in limits.** Google and Okta sign-in, accepting an invitation (by password, Google or Okta), sign-up (by password or Google) and setting a new password from a reset link are now rate limited per IP address, and per email where the form takes one. See [Sign-in limits](/guides/settings/account-security#sign-in-limits).
+- **Stripe Tax priced at checkout.** A checkout that takes a payment up front prices its invoice with Stripe Tax while the customer waits, so the card is charged, or the provider checkout opens, for the amount with its tax. Before, it answered `422 invalid_invoice_status_or_payment_status`. When Stripe does not answer within 5 seconds the checkout answers `503 tax_calculation_pending` with `retry_after_seconds`; send the same request again. A calculation Stripe refuses answers `422 tax_calculation_failed`. See [Stripe Tax at checkout](/guides/billing/stripe-tax#at-checkout).
 - **No invoice waits for its tax for ever.** A Stripe Tax calculation that stops on an unexpected error or was lost fails the invoice with `tax_calculation_failed`, and an hourly check fails invoices still waiting 26 hours after their last change. Use the invoice retry. See [When tax fails](/guides/billing/stripe-tax#when-tax-fails).
 - **Fixed.** A Stripe Tax invoice whose tax was still pending could be settled at 0, so a checkout with a saved card activated the subscription for free. The payment now waits for the tax. Credit note lists load the taxes of their invoices once, instead of once per credit note.
 
