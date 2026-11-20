@@ -89,7 +89,7 @@ The responses carry `nozle_id`, `plan_code`, `external_subscription_id`, `featur
 
 ## How spend is measured
 
-Spend is counted live by the Engine, from the same usage events that are billed. An event reaches the count a few seconds after it happens, once it is processed; `as_of` in a budget is the time of the latest event counted. Each event is counted exactly once, even when it is retried or processed again.
+Spend is counted live by the Engine, from the same usage events that are billed. An event reaches the count a few seconds after it happens, once it is processed; `as_of` in a budget is the time of the latest event counted. Each event is counted exactly once, even when it is retried or processed again or the Engine restarts.
 
 Read a subscription's budgets with [List Customer Budgets](/api/list-customer-budgets):
 
@@ -107,13 +107,46 @@ Read a subscription's budgets with [List Customer Budgets](/api/list-customer-bu
   "mode": "hard",
   "status": "warning",
   "as_of": "2026-11-14T09:30:12.418Z",
+  "reconciled_at": "2026-11-14T09:25:04Z",
   "counted_from": "2026-11-01T00:00:00Z"
 }
 ```
 
 Amounts are decimal strings in major units of `currency` (dollars, not cents). `held` is spend reserved by open [budget holds](#exact-caps-with-budget-holds), and `remaining` is `limit` minus `spent` and `held`. `status` is `ok`, `warning` once a threshold below 100 is reached, or `exceeded` once `spent` plus `held` reaches the limit. `counted_from` (Engine 2.38.0) is when `spent` starts: `period_start` once the period's spend has been counted in full, see below.
 
-The Engine records the exact spend of every priced event. Each night it recounts every budget from those records and corrects a count that stays off, so `spent` matches the billed usage over time.
+### How fresh `spent` is
+
+Three fields tell you how current a budget is:
+
+| Field | Meaning |
+|---|---|
+| `as_of` | The time of the latest usage event counted into `spent`. |
+| `reconciled_at` | Engine 2.62.0. When Nozle last re-added the period's recorded usage events and confirmed `spent`, or corrected it. `null` until the first check, which comes within minutes of a limit's first spend. |
+| `counted_from` | Whether the period's earlier usage is included: `period_start` once it is. See [Limits added mid-period](#limits-added-mid-period). |
+
+The Engine records the exact spend of every priced event, and checks each budget against those records:
+
+- **Every 5 minutes**, it re-adds the usage of every budget that counted usage or was adjusted since its last check. A difference is corrected within minutes.
+- **Every night**, it checks every budget, whether or not it changed.
+- **When a billing period closes**, the nightly run compares the period's spend with its invoice. Nozle is alerted to a difference; this check changes nothing.
+
+A difference smaller than 0.5 % of the spend (at least one minor unit, such as one cent) is left alone. A larger one is corrected only when it is the same on two reads about 90 seconds apart, so usage still being counted is never added twice.
+
+**Voided usage.** Voiding a usage event with [`POST /events/{transaction_id}/void`](/api/events#void-an-event) takes its spend off every budget it was counted in within seconds, once, even when the void is retried. Before Engine 2.62.0 the spend stayed until the nightly check, so a customer could be refused or warned too early.
+
+A budget can still be a few seconds behind the latest usage. Budget holds remain the way to hold an exact hard cap under concurrent calls: a hard limit compares `spent` plus open holds with the limit. See [Exact caps with budget holds](#exact-caps-with-budget-holds).
+
+### Adjustments
+
+Every change to a budget's `spent` other than counting usage is recorded as an adjustment, with the amount, the reason and the time. List them with [List Budget Corrections](/api/list-budget-corrections):
+
+| `reason` | What happened |
+|---|---|
+| `event_voided` | A usage event was voided and its spend taken off. `source_id` is the event's `transaction_id`. |
+| `reconciled` | `spent` differed from the recorded usage beyond the tolerance and was corrected. |
+| `seeded` | Usage from earlier in the period was counted, for a limit, period or subscription that started counting late. |
+
+In the dashboard, open the customer's subscription and use its **Budget** tab. Each spend limit shows **Last checked** with the time of its last check (**Not checked yet** before the first one), and the **Adjustments** list shows the date, limit, amount and reason of each change, newest first.
 
 ### Limits added mid-period
 
@@ -121,7 +154,7 @@ From Engine 2.38.0, a limit added during a period, or whose `period` changes, co
 
 When the earlier spend takes the budget past thresholds, only the highest threshold crossed is notified, as for any jump. For a hard limit already used up, `budget.exceeded` is sent and calls are refused.
 
-Exact per-event spend is recorded from Engine 2.38.0. A period that contains usage from before that release cannot be recounted: its budget keeps counting from when counting started, `counted_from` shows that time, and the nightly recount skips it. `billing_period` and `calendar_month` limits are recounted from their next period; a `lifetime` limit with older usage never is.
+Exact per-event spend is recorded from Engine 2.38.0. A period that contains usage from before that release cannot be recounted: its budget keeps counting from when counting started, `counted_from` shows that time, and the checks skip it. `billing_period` and `calendar_month` limits are recounted from their next period; a `lifetime` limit with older usage never is.
 
 ## Where a hard limit refuses
 
@@ -209,6 +242,7 @@ A hard usage limit in units (an entitlement `usage_limit` with a hard limit) sen
 ## Known limits
 
 - **A plain `/can` can overrun a hard limit.** Calls in flight and the few seconds before usage is counted can take the spend past the limit before the next call is refused. Use budget holds for an exact cap.
+- **`spent` can trail usage by a few seconds.** A difference from the recorded usage is corrected within minutes, and a voided event within seconds. See [How fresh `spent` is](#how-fresh-spent-is).
 - **A new limit takes a few minutes to count earlier spend.** A limit set mid-period, or whose `period` you change, counts the period's earlier spend within about 5 minutes; until then `spent` is only the spend since it was set. Periods with usage from before Engine 2.38.0 are not recounted. See [Limits added mid-period](#limits-added-mid-period). The Engine reloads which subscriptions have limits every minute, so a new limit refuses calls within a minute.
 - **Per subscription only.** A limit caps one subscription. There is no limit across a customer's subscriptions, and no currency conversion.
 - **Usage events are never refused.** Usage sent with `POST /events` is billed even past a hard limit. Only the calls that check (`/can`, the proxy, `/usage/check`, `/usage/track`, holds) are refused.
