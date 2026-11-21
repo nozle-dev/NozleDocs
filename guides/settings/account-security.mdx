@@ -1,6 +1,6 @@
 ---
 title: Account security
-description: Manage your profile, password, two-factor authentication and sign-in sessions.
+description: Manage your profile, password, two-factor authentication, sign-in links and sign-in sessions.
 ---
 
 These settings are personal. They apply to your own sign-in, not to the workspace.
@@ -58,6 +58,16 @@ Signing in with Google or Okta never asks for a Nozle code. Your identity provid
 
 The code step accepts 5 codes per account and 100 requests per IP address every 15 minutes. Past the limit, wait before trying again.
 
+## Sign in with an email link
+
+_Unreleased._ You can sign in without your password. On the sign-in page choose **Email link**, enter your work email and choose **Email me a sign-in link**. Open the link from the email to sign in.
+
+- **The link works once and expires after 15 minutes.** Asking for a new link cancels the earlier one, so use the link in the latest email. An expired or used link says so and sends you back to the sign-in page to ask for a new one.
+- **The same answer for every email.** The page says **Check your inbox** whether or not the email has a Nozle account. Only an account that can sign in with its email receives a link: one with an active membership in a workspace where email sign-in is allowed. A workspace that allows only Okta sends no link.
+- **It is an email sign-in.** The link signs you in as your password would, so the same rules apply: two-factor authentication still asks for your code, and a workspace that requires two-factor authentication still asks you to set it up. Anyone who can read your email can sign in with the link, as they could reset your password.
+- **Open it in the browser you used.** After sign-in Nozle continues to the page you were on, such as a coding agent's approval page. A link opened in another browser lands on the default start page.
+- Each request is recorded as `user.magic_link_requested` in the [security log](/guides/settings/audit-logs) of every workspace you belong to.
+
 ## Active sessions
 
 Every browser and device with a valid session is listed.
@@ -69,7 +79,7 @@ A session ends when its token expires, when you revoke it, or when you reset you
 
 ## Sign-in limits
 
-_Unreleased._ To slow down password guessing and mass sign-ups, the sign-in, sign-up, invitation and password-reset forms accept a limited number of requests. The rows marked Core 11.54.0 are new in that release.
+_Unreleased._ To slow down password guessing and mass sign-ups, the sign-in, sign-in link, sign-up, invitation and password-reset forms accept a limited number of requests. The rows marked Core 11.54.0 are new in that release.
 
 | Request | Per email | Per IP address |
 |---|---|---|
@@ -84,6 +94,8 @@ _Unreleased._ To slow down password guessing and mass sign-ups, the sign-in, sig
 | Sign up with Google (Core 11.54.0) | | 30 per hour |
 | Password-reset request | 5 per hour | 30 per hour |
 | Set a new password from a reset link (Core 11.54.0) | | 30 per hour |
+| Sign-in link request | 5 per hour | 30 per hour |
+| Sign in with an emailed link | | 30 per hour |
 
 Past a limit the form shows **Please wait before trying again**. Wait a few minutes, then try again. The limits apply whether or not the email has an account. A request that tries to do two of these at once is refused. The [API rate limits](/api/rate-limits) are separate.
 
