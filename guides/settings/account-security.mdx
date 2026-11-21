@@ -1,6 +1,6 @@
 ---
 title: Account security
-description: Manage your profile, password and sign-in sessions.
+description: Manage your profile, password, two-factor authentication and sign-in sessions.
 ---
 
 These settings are personal. They apply to your own sign-in, not to the workspace.
@@ -20,6 +20,43 @@ _Unreleased:_
 - **Only the newest link works.** A reset link is valid for 30 minutes. Asking for a new link cancels every earlier one, so use the link in the latest email.
 - **The same answer for every email.** A reset request, from this page or from the **Forgot your password?** page, answers the same way whether or not the email has a Nozle account. Only an email with an account receives a link.
 - **A new password signs out your other sessions.** Every browser and device signed in with the old password is signed out. The browser where you set the new password stays signed in.
+
+## Two-factor authentication
+
+_Unreleased._ With two-factor authentication on, signing in with your password also asks for a 6-digit code from an authenticator app such as Google Authenticator, Authy or 1Password. A stolen password alone then cannot open your account. It covers every workspace you belong to.
+
+### Turn it on
+
+1. Open **Your account** and choose **Set up** under **Two-factor authentication**.
+2. In your authenticator app, add an account and enter the setup key shown on the page. On a phone, **open the authenticator app directly** adds it for you.
+3. Enter the 6-digit code the app shows and choose **Turn on**.
+4. Save the ten backup codes: copy them or choose **Download**. They are shown only once.
+
+Nothing changes for your sign-in until step 3 succeeds.
+
+### Sign in
+
+After your email and password, enter the current code from your authenticator app, or one of your backup codes. Each backup code works once. The code step lasts 5 minutes; after that, sign in with your password again. Setting a new password from a reset link also asks for a code before it signs you in.
+
+A code is accepted for about 30 seconds either side of the time on your phone, and only once. If a code is refused, wait for the next one.
+
+### Backup codes
+
+Use a backup code when you cannot use your authenticator app. **Create new codes** replaces all of them; the old ones stop working. Both actions ask for a current code or a backup code.
+
+If you lose your authenticator app and your backup codes, ask an admin of your workspace to reset your two-factor authentication (see [Team access](/guides/settings/team-access#two-factor-authentication)).
+
+### Turn it off
+
+Choose **Turn off** and enter a code or a backup code. A workspace that requires two-factor authentication will ask you to set it up again.
+
+### Google and Okta
+
+Signing in with Google or Okta never asks for a Nozle code. Your identity provider protects those sign-ins, so turn on two-step verification there. They also count as protected in a workspace that requires two-factor authentication.
+
+### Sign-in limits for codes
+
+The code step accepts 5 codes per account and 100 requests per IP address every 15 minutes. Past the limit, wait before trying again.
 
 ## Active sessions
 

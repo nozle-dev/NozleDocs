@@ -45,3 +45,24 @@ A few guards protect you from locking yourself out:
 - The workspace owner always keeps administrator access and cannot be removed. Transfer ownership first.
 - You cannot remove the last administrator. Promote someone else first.
 - You cannot remove your own access or your own administrator access. Ask another administrator.
+
+## Two-factor authentication
+
+_Unreleased._ The members list shows **2FA on** or **2FA off** for each member: whether they sign in with a code from an authenticator app ([Account security](/guides/settings/account-security#two-factor-authentication)).
+
+### Require it for the workspace
+
+Open **Settings**, choose **Authentication** and turn on **Require two-factor authentication**, then **Save changes**. You need two-factor authentication on your own account first, so you cannot lock yourself out; otherwise the switch stays off and saving answers `mfa_required_for_actor`.
+
+While it is on:
+
+- A member who signs in with a password and has not set up two-factor authentication is taken to a setup page. They can set it up or sign out; the workspace stays closed to them until then. The API answers `mfa_setup_required` (HTTP 403) for anything else.
+- Members who sign in with Google or Okta are not asked: their identity provider protects the sign-in.
+- API keys are not affected.
+
+The setting belongs to the live workspace; its sandbox follows it.
+
+### Reset a member's two-factor authentication
+
+When a member lost their authenticator app and their backup codes, an admin can choose **Reset 2FA** next to them. It turns off their two-factor authentication and signs them out of every device. Two-factor authentication belongs to the person's account, so the reset applies in every Nozle workspace they belong to. Confirm who is asking before you reset it. The reset is recorded in the [audit log](/guides/settings/audit-logs) as `user.mfa_reset`.
+
