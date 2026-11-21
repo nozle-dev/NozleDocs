@@ -8,6 +8,17 @@ SDK release notes have their own pages: [Node.js](/sdks/node/changelog), [React]
 
 <Update label="November 2026">
 
+## Custom roles on every plan, Developer and Analyst roles (Core 11.57.0, dashboard 2.31.0)
+
+_Unreleased_
+
+- **Two more built-in roles.** **Developer** (`developer`) does integration work: developer settings, API keys and webhooks, plans, customers, features, charges, add-ons, pricing units, security and audit logs, with no workspace settings, payment methods, members, roles or billing. **Analyst** (`analyst`) only views: analytics, cost intelligence, the Data API, invoices, customers, plans, subscriptions, payments, credit notes, coupons, features and add-ons. Both can use the Copilot. See [Built-in roles](/guides/settings/roles#built-in-roles).
+- **Custom roles.** An Admin can create, edit and delete roles that hold exactly the capabilities picked, on every plan. A custom role never includes role management or admin rights, and it can only include capabilities its author holds (`permissions_not_held`). Names and codes of built-in roles are refused, a code never changes and is never reused, and a role held by a member or a pending invitation cannot be deleted (`role_assigned_to_members`, `role_assigned_to_invites`). See [Custom roles](/guides/settings/roles#custom-roles).
+- **No broader roles.** Inviting someone or changing a member's roles is refused with `cannot_grant_broader_role` when a role grants capabilities you do not hold. See [Change roles](/guides/settings/team-access#change-roles).
+- **Fixed.** A role's rights came from its name, so a custom role named after a built-in role got that role's rights. A custom role now holds only its own capabilities, whatever its name.
+- **Copilot.** The Copilot can create, change and delete custom roles and give members roles. Role changes wait for approval on a card.
+- **GraphQL.** `createRole`, `updateRole`, `destroyRole`, and `Membership.roleCodes` next to `roles` (names).
+
 ## Spend limits accurate within minutes, last check time, adjustments list (Engine 2.62.0, Core 11.56.0, dashboard 2.30.0)
 
 _Unreleased_
