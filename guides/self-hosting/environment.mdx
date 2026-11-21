@@ -72,6 +72,6 @@ The Engine has no checkout return settings. `CHECKOUT_RETURN_URL` and `CHECKOUT_
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `NOZLE_BUDGET_RECONCILE_INTERVAL` | `5m` | How often the light budget reconcile runs (a Go duration, for example `5m`). It re-adds the usage of every spend-limit budget that counted usage or was adjusted since its last check, and counts earlier usage for new limits. The nightly full run (02:30 UTC) is not affected. |
-| `NOZLE_VOID_EFFECT_WORKERS` | `1` | How many effects of voided usage events one Engine process applies at once. Each effect still runs once, in its own transaction. More workers take voids off spend limits sooner but add ClickHouse reads that compete with usage booking. |
+| `NOZLE_VOID_EFFECT_WORKERS` | `4` | How many effects of voided usage events one Engine process applies at once. Each effect still runs once, in its own transaction. Fewer workers keep entitlement checks faster during heavy voiding, but voids come off spend limits more slowly. |
 
 To run a budget reconcile by hand, start the Engine in the `budget-reconcile` mode: alone it does the nightly run, and with `-seed` the light run. Runs never overlap: a light run that finds another run going skips, and the nightly run waits for it. See [How fresh `spent` is](/guides/entitlements/spend-limits#how-fresh-spent-is).
