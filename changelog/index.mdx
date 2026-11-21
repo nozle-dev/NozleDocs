@@ -5,6 +5,16 @@ description: Product and developer-platform updates from Nozle
 
 ## November 2026
 
+### Spend limits accurate within minutes, last check time, adjustments list (Engine 2.62.0, Core 11.56.0, dashboard 2.30.0)
+
+_Unreleased_
+
+- **Voids leave spend limits within seconds.** Voiding a usage event takes its spend off every spend-limit budget it was counted in, seconds after the void, once even when retried. Before, the spend stayed until the nightly check, so a customer could be refused or warned too early for up to a day. See [How fresh `spent` is](/guides/entitlements/spend-limits#how-fresh-spent-is).
+- **Corrected within minutes.** The check every 5 minutes now re-adds the usage of every budget that counted usage or was adjusted since its last check, so a difference from the recorded usage is corrected within minutes instead of at night. The nightly check of every budget and the check of closed periods against their invoices are unchanged.
+- **`reconciled_at`.** Budgets in [List Customer Budgets](/api/list-customer-budgets) and the `budget` block of `/can`, `/usage/check`, `/usage/track`, budget holds and the LLM proxy carry `reconciled_at`: when `spent` was last confirmed or corrected against the recorded usage. `null` until the first check. GraphQL `NozleBudget` has `reconciledAt`.
+- **Adjustments list.** [`GET /customers/{customer_id}/budgets/corrections`](/api/list-budget-corrections) lists every change to a budget's `spent` other than counting usage, newest first, with the amount, `spent_after` and the reason: `event_voided`, `reconciled` or `seeded`. It needs `subscription:read`. GraphQL has `nozleCustomerBudgetCorrections`.
+- **Dashboard.** A subscription's **Budget** tab shows when each spend limit was last checked and an **Adjustments** list with the date, limit, amount and reason of each change.
+
 ### Billing details and Stripe Tax at checkout, VAT numbers priced while VIES checks, Engine calls in the request log, billing emails from Nozle (Core 11.54.0, dashboard 2.28.0)
 
 _Unreleased_

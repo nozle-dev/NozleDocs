@@ -1,0 +1,100 @@
+---
+title: List Budget Corrections
+api: "GET https://api.nozle.app/engine/api/v1/customers/{customer_id}/budgets/corrections"
+description: List every change to a customer's spend-limit budgets other than counting usage, newest first
+---
+
+Base URL: `https://api.nozle.app/engine/api/v1`. Available from Engine 2.62.0.
+
+**Auth:** secret key only. When your organization has API key permissions, the key requires `subscription:read`, as for [List Customer Budgets](/api/list-customer-budgets).
+
+Lists the adjustments of the customer's [spend limit](/guides/entitlements/spend-limits) budgets: each change to `spent` that did not come from counting usage, such as a voided usage event taken off or a correction to match the recorded usage. Use it to explain why a budget's `spent` went down or jumped. See [Adjustments](/guides/entitlements/spend-limits#adjustments).
+
+```http
+GET /customers/customer_123/budgets/corrections?subscription_id=sub_pro_123&limit=20
+Authorization: Bearer sk_nozle_...
+```
+
+<ParamField path="customer_id" type="string" required>
+  External customer ID.
+</ParamField>
+
+<ParamField query="subscription_id" type="string">
+  External subscription ID. Only that subscription's adjustments are listed. Without it, every subscription of the customer is listed.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Page size, 1 to 100.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  `next_cursor` from the previous page. Pass it unchanged.
+</ParamField>
+
+## Response
+
+```json
+{
+  "customer_id": "customer_123",
+  "corrections": [
+    {
+      "id": "4812",
+      "subscription_id": "sub_pro_123",
+      "feature_code": "llm_tokens",
+      "period": "billing_period",
+      "period_start": "2026-11-01",
+      "currency": "USD",
+      "amount": "-0.42",
+      "spent_after": "183.78",
+      "reason": "event_voided",
+      "source_id": "evt_20261114_0931",
+      "created_at": "2026-11-14T09:31:07Z"
+    },
+    {
+      "id": "4790",
+      "subscription_id": "sub_pro_123",
+      "feature_code": null,
+      "period": "billing_period",
+      "period_start": "2026-11-01",
+      "currency": "USD",
+      "amount": "1.25",
+      "spent_after": "211.9",
+      "reason": "reconciled",
+      "source_id": "6f1c2a8e-3d4b-4c5a-9e7f-0a1b2c3d4e5f",
+      "created_at": "2026-11-14T09:25:04Z"
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+Adjustments come newest first. `corrections` is empty when there are none, also for an unknown customer or subscription. Amounts are decimal strings in major units of `currency` (dollars, not cents).
+
+| Field | Description |
+|-------|-------------|
+| `id` | The adjustment's ID. |
+| `subscription_id` | External ID of the subscription whose budget changed. |
+| `feature_code` | The Feature the limit covers. `null` for the limit on the total of the usage charges. |
+| `period` | `billing_period`, `calendar_month` or `lifetime`. |
+| `period_start` | First day of the period the change applies to, as a date (`YYYY-MM-DD`). |
+| `currency` | The limit's currency. |
+| `amount` | Signed change of `spent`: negative when spend was taken off. |
+| `spent_after` | `spent` right after the change. |
+| `reason` | Why `spent` changed. See the table below. |
+| `source_id` | For `event_voided`, the voided event's `transaction_id`. Otherwise an ID that Nozle generates for the change. |
+| `created_at` | When the change was made. |
+| `next_cursor` | Cursor for the next page. `null` on the last page. |
+
+| `reason` | Meaning |
+|----------|---------|
+| `event_voided` | A usage event was [voided](/api/events#void-an-event) and its spend taken off. Each void changes a budget once, even when it is retried. |
+| `reconciled` | `spent` differed from the recorded usage events beyond the tolerance (0.5 %, at least one minor unit) and was corrected. |
+| `seeded` | Usage from earlier in the period was counted, for a limit, period or subscription that started counting late. See [Limits added mid-period](/guides/entitlements/spend-limits#limits-added-mid-period). |
+
+## Errors
+
+| Status | `code` | Meaning |
+|--------|--------|---------|
+| `400` | `invalid_request` | Empty or invalid customer ID, a `limit` that is not an integer from 1 to 100, or a `cursor` this endpoint did not return. |
+| `403` | `permission_denied` | The key lacks `subscription:read`. |
+| `503` | `budget_unavailable` | The adjustments could not be read. Retry after `Retry-After` (1 second). |
