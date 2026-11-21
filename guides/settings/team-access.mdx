@@ -15,7 +15,9 @@ Each member shows when they joined and when they were **Last active**. Last acti
 
 Only an email that has no Nozle account yet can be invited. If any Nozle account already uses the email, in any workspace and whatever the case of its letters, the invitation is refused with `email_already_used` and nothing is sent. Ask the person for another address. A person who already has an account cannot join a second workspace through an invitation.
 
-Inviting needs settings access. A member gets the union of the capabilities of all their roles. Choosing **Admin** selects only Admin, because it already grants every capability.
+Inviting needs settings access. Built-in and [custom roles](/guides/settings/roles#custom-roles) are both offered. A member gets the union of the capabilities of all their roles. Choosing **Admin** selects only Admin, because it already grants every capability.
+
+You can only invite with roles whose capabilities you hold yourself. A broader role is refused with `cannot_grant_broader_role`, and only an Admin can invite someone as Admin (`cannot_grant_admin`).
 
 ## Invitations
 
@@ -36,7 +38,13 @@ The list shows when each invitation was **Last sent** and when it **Expires** (o
 
 ## Change roles
 
-Changing a member's roles needs workspace admin access. Every member needs at least one role.
+Changing a member's roles needs workspace admin access. Every member needs at least one role, and the new roles replace the old ones.
+
+- You can only give roles whose capabilities you hold yourself. Otherwise the change is refused with `cannot_grant_broader_role` and the member keeps their roles.
+- Only an Admin can give someone the Admin role (`cannot_grant_admin`).
+- The last Admin keeps the Admin role, also when you switch them to a custom role (`last_admin`). Make another member an Admin first.
+
+Each change is recorded in the security log as `user.role_edited`. You can also ask the Copilot to give a member a role.
 
 ## Remove a member
 

@@ -1,28 +1,91 @@
 ---
 title: Roles and capabilities
-description: The built-in roles that decide what each member can see and change.
+description: The built-in roles, custom roles, and what each member can see and change.
 ---
 
-A role is a set of capabilities. You give each member one or more roles, and they get the union of what those roles allow. See [Team access](/guides/settings/team-access).
+A role is a set of capabilities, such as `customers:view` or `invoices:void`. You give each member one or more roles, and they get the union of what those roles allow. See [Team access](/guides/settings/team-access).
+
+Only an Admin sees and manages roles. Every workspace has the five built-in roles and can add custom roles, on every plan.
 
 ## Built-in roles
 
-Nozle ships three roles:
-
-| Role | Code | What it is |
+| Role | Code | What it can do |
 | --- | --- | --- |
-| Admin | `admin` | Administrator with all capabilities. |
-| Finance | `finance` | Manages financial data. |
-| Manager | `manager` | The predefined manager role. |
+| Admin | `admin` | Everything in the workspace: all 115 capabilities, including members, roles, payment methods, taxes, sign-in methods and emails. |
+| Finance | `finance` | Invoices, credit notes, payments, receipts, dunning, billing entities, invoice sections, workspace settings and integrations, analytics, cost intelligence and the Data API. Views customers, plans, subscriptions, add-ons, coupons, pricing units, quotes, orders and order forms. |
+| Manager | `manager` | Day-to-day customer work: customers, subscriptions, invoices, credit notes, payments and receipts, wallets (create, top up, terminate), quotes, orders and order forms, attaching coupons. Views plans, add-ons, billing entities and dunning. |
+| Developer | `developer` | Integration work: developer settings, API keys and webhooks, plans, customers, features, charges, add-ons and pricing units, security and audit logs. Views invoices, subscriptions and the workspace. No workspace settings, payment methods, members, roles or billing. |
+| Analyst | `analyst` | View only: analytics, cost intelligence, the Data API, invoices, customers, plans, subscriptions, payments, credit notes, coupons, features and add-ons. |
 
-These roles are fixed. You cannot edit or delete them, and you cannot create your own roles.
+Every built-in role can use the Copilot. The Copilot only does what the member's roles allow.
 
-## The roles page
+Built-in roles are fixed. You cannot edit or delete them (`predefined_role`). To start from one, duplicate it into a custom role.
 
-Open **Settings** and choose **Roles**. For each role the page shows:
+Only the Admin role holds these capabilities: `authentication_methods:update`, `authentication_methods:view`, `coupons:create`, `coupons:delete`, `coupons:update`, `credit_systems:archive`, `credit_systems:create`, `credit_systems:update`, `credit_systems:view`, `organization:emails:update`, `organization:emails:view`, `organization:members:create`, `organization:members:delete`, `organization:members:update`, `organization:members:view`, `organization:taxes:update`, `organization:taxes:view`, `payment_methods:create`, `payment_methods:delete`, `payment_methods:update`, `payment_methods:view`, `roles:create`, `roles:delete`, `roles:update`, `roles:view`.
 
-- its code,
-- how many capabilities it grants,
-- how many members hold it.
+<AccordionGroup>
+<Accordion title="Finance (51 capabilities)">
+`addons:view`, `analytics:view`, `billing_entities:create`, `billing_entities:delete`, `billing_entities:update`, `billing_entities:view`, `copilot:create`, `copilot:view`, `cost_intelligence:manage`, `cost_intelligence:view`, `coupons:view`, `credit_notes:create`, `credit_notes:export`, `credit_notes:send`, `credit_notes:update`, `credit_notes:view`, `credit_notes:void`, `customers:view`, `data_api:view`, `dunning_campaigns:create`, `dunning_campaigns:delete`, `dunning_campaigns:update`, `dunning_campaigns:view`, `invoice_custom_sections:create`, `invoice_custom_sections:delete`, `invoice_custom_sections:update`, `invoice_custom_sections:view`, `invoices:create`, `invoices:export`, `invoices:send`, `invoices:update`, `invoices:view`, `invoices:void`, `order_forms:view`, `orders:view`, `organization:integrations:create`, `organization:integrations:delete`, `organization:integrations:update`, `organization:integrations:view`, `organization:invoices:update`, `organization:invoices:view`, `organization:update`, `organization:view`, `payment_receipts:send`, `payment_receipts:view`, `payments:create`, `payments:view`, `plans:view`, `pricing_units:view`, `quotes:view`, `subscriptions:view`
+</Accordion>
+<Accordion title="Manager (48 capabilities)">
+`addons:view`, `billing_entities:view`, `copilot:create`, `copilot:view`, `coupons:attach`, `coupons:detach`, `coupons:view`, `credit_notes:create`, `credit_notes:export`, `credit_notes:send`, `credit_notes:update`, `credit_notes:view`, `credit_notes:void`, `customers:create`, `customers:delete`, `customers:update`, `customers:view`, `dunning_campaigns:view`, `invoices:create`, `invoices:export`, `invoices:send`, `invoices:update`, `invoices:view`, `invoices:void`, `order_forms:sign`, `order_forms:view`, `order_forms:void`, `orders:execute`, `orders:update`, `orders:view`, `payment_receipts:send`, `payment_receipts:view`, `payments:create`, `payments:view`, `plans:view`, `quotes:approve`, `quotes:clone`, `quotes:create`, `quotes:update`, `quotes:view`, `quotes:void`, `subscriptions:create`, `subscriptions:update`, `subscriptions:view`, `wallets:create`, `wallets:terminate`, `wallets:top_up`, `wallets:update`
+</Accordion>
+<Accordion title="Developer (31 capabilities)">
+`addons:create`, `addons:delete`, `addons:update`, `addons:view`, `audit_logs:view`, `charges:create`, `charges:delete`, `charges:update`, `copilot:create`, `copilot:view`, `customers:create`, `customers:delete`, `customers:update`, `customers:view`, `developers:keys:manage`, `developers:manage`, `features:create`, `features:delete`, `features:update`, `features:view`, `invoices:view`, `organization:view`, `plans:create`, `plans:delete`, `plans:update`, `plans:view`, `pricing_units:create`, `pricing_units:update`, `pricing_units:view`, `security_logs:view`, `subscriptions:view`
+</Accordion>
+<Accordion title="Analyst (14 capabilities)">
+`addons:view`, `analytics:view`, `copilot:create`, `copilot:view`, `cost_intelligence:view`, `coupons:view`, `credit_notes:view`, `customers:view`, `data_api:view`, `features:view`, `invoices:view`, `payments:view`, `plans:view`, `subscriptions:view`
+</Accordion>
+</AccordionGroup>
 
-Viewing the page needs the `settings:read` capability. Roles are assigned to people on the [Members page](/guides/settings/team-access).
+## Custom roles
+
+A custom role holds exactly the capabilities you pick, whatever its name. Use one when a job needs less than a built-in role, for example support staff who look up customers and top up wallets but never change plans.
+
+### Create a role
+
+1. Open **Settings** and choose **Roles**.
+2. Choose **New role**, or **Duplicate** on a built-in role to start from its capabilities.
+3. Give it a name, a code and, if you like, a description of up to 255 characters.
+4. Pick at least one capability. In the editor a write capability brings its read counterpart, so `customers:update` adds `customers:view`.
+5. Choose **Create role**.
+
+Example: a role named **Support** with code `support` and the capabilities `customers:view` and `wallets:top_up`. Its members can open customers and top up their wallets, and are refused anything else.
+
+### The rules
+
+- **Only an Admin manages roles.** Creating, editing and deleting roles needs the `roles:*` capabilities, which only the Admin role holds.
+- **No role management or admin rights in a custom role.** A custom role can never include `roles:create`, `roles:update`, `roles:delete` or `roles:view`, and it is never an administrator role.
+- **You grant only what you hold.** A role can only include capabilities the person creating or editing it holds. Otherwise it is refused with `permissions_not_held`.
+- **Names.** At most 100 characters, unique in the workspace whatever the case of its letters. The names of the built-in roles (Admin, Finance, Manager, Developer, Analyst) are refused.
+- **Codes.** Lowercase letters, digits and `_`, at most 100 characters. The codes `admin`, `finance`, `manager`, `developer` and `analyst` are refused. A code never changes after the role is created, and it is never reused, not even after the role is deleted, because pending invitations keep codes.
+- **Live workspace.** Roles belong to the live workspace. A role created while the sandbox is open is created on the live workspace and listed there.
+
+### Edit a role
+
+Choose **Edit** on a custom role. You can change its name, description and capabilities, not its code. Before you save, the editor says which capabilities members gain or lose. Every member who holds the role gets the change straight away.
+
+### Delete a role
+
+Choose **Delete** on a custom role. Nozle refuses while the role is still in use:
+
+- a member holds it: `role_assigned_to_members`. Give them another role first.
+- a pending invitation carries it: `role_assigned_to_invites`. Revoke or change the invitation first.
+
+A deleted role's code is never used again.
+
+### Audit
+
+Creating, editing and deleting a role is recorded in the security log as `role.created`, `role.updated` and `role.deleted`. Changing a member's roles is recorded as `user.role_edited`.
+
+## Assign roles
+
+You give roles on the [Members page](/guides/settings/team-access): to a member, or to an invitation. Custom roles are listed next to the built-in ones.
+
+## Roles in the Copilot
+
+The Copilot can list your roles and explain what each one allows. An Admin can ask it to create, change or delete a custom role, or to give a member a role. Creating, changing or deleting a role always waits for your approval on a card that says what members with the role can do. The rules above apply, and the Copilot tells you in plain words when Nozle refuses a change.
+
+## API keys
+
+Roles decide what people can do in the dashboard and the Copilot. API keys have their own permissions, so roles do not change what an API key can do.
