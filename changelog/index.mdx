@@ -1,11 +1,12 @@
 ---
 title: Changelog
 description: Product and developer-platform updates from Nozle
+rss: true
 ---
 
-## November 2026
+<Update label="November 2026">
 
-### Spend limits accurate within minutes, last check time, adjustments list (Engine 2.62.0, Core 11.56.0, dashboard 2.30.0)
+## Spend limits accurate within minutes, last check time, adjustments list (Engine 2.62.0, Core 11.56.0, dashboard 2.30.0)
 
 _Unreleased_
 
@@ -15,9 +16,11 @@ _Unreleased_
 - **Adjustments list.** [`GET /customers/{customer_id}/budgets/corrections`](/api/list-budget-corrections) lists every change to a budget's `spent` other than counting usage, newest first, with the amount, `spent_after` and the reason: `event_voided`, `reconciled` or `seeded`. It needs `subscription:read`. GraphQL has `nozleCustomerBudgetCorrections`.
 - **Dashboard.** A subscription's **Budget** tab shows when each spend limit was last checked and an **Adjustments** list with the date, limit, amount and reason of each change.
 
-### Billing details and Stripe Tax at checkout, VAT numbers priced while VIES checks, Engine calls in the request log, billing emails from Nozle (Core 11.54.0, dashboard 2.28.0)
+</Update>
 
-_November 19, 2026_
+<Update label="November 19, 2026">
+
+## Billing details and Stripe Tax at checkout, VAT numbers priced while VIES checks, Engine calls in the request log, billing emails from Nozle (Core 11.54.0, dashboard 2.28.0)
 
 - **Billing details step at checkout.** When the customer lacks what the billing entity's tax needs, `POST /checkout` answers `200` with `type: hosted`, `step: billing_details` and a `url` to a Nozle page. The page asks only for what tax needs: the country with EU tax management or Stripe Tax, the postal code of a US customer or the state or postal code of a Canadian or Indian one with Stripe Tax, and the full address when the entity has `customer_location_required`. A business can add its name, address and EU VAT number. The details are saved to the customer and the same checkout continues to Stripe or Razorpay. The link expires after 24 hours. See [Billing details step](/guides/billing/tax-ids#billing-details-step).
 - **Breaking for `customer_tax_location_required`.** Checkout no longer answers `422 customer_tax_location_required`: that customer gets the billing details step instead. Redirect to its `url` as for any hosted checkout.
@@ -32,17 +35,13 @@ _November 19, 2026_
 - **No invoice waits for its tax for ever.** A Stripe Tax calculation that stops on an unexpected error or was lost fails the invoice with `tax_calculation_failed`, and an hourly check fails invoices still waiting 26 hours after their last change. Use the invoice retry. See [When tax fails](/guides/billing/stripe-tax#when-tax-fails).
 - **Fixed.** A Stripe Tax invoice whose tax was still pending could be settled at 0, so a checkout with a saved card activated the subscription for free. The payment now waits for the tax. Credit note lists load the taxes of their invoices once, instead of once per credit note.
 
-### Rate limits and Engine calls in the request log (Engine 2.61.0)
-
-_November 19, 2026_
+## Rate limits and Engine calls in the request log (Engine 2.61.0)
 
 - **Rate limits.** The Engine API accepts, per workspace, 100 requests per second live and 25 in a sandbox, and 5,000 events per second live and 500 in a sandbox. Event ingestion, `POST /usage/track` and finalizing a hold count events, not requests: a batch counts its events. One API key can have 50 requests in flight; event ingestion and the LLM proxy hold no slot. The batch cap stays 5,000 events. See [Rate limits](/api/rate-limits).
 - **`429 rate_limited`.** Over a limit the call does nothing and answers `429` with `Retry-After` and `error_details.limit` set to `requests`, `events` or `concurrency`. Every counted call carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`, on success too. The LLM proxy answers this refusal in the Engine shape, not the provider's. The SDKs already retry a `429` after `Retry-After`.
 - **Engine calls in the request log.** The Engine writes the calls made with your API keys to the [request log](/api/request-log), with `source: engine`, duration, client IP and `Idempotency-Key`. Successful event ingestion is not logged, only its refusals, so a `429` shows up. Headers are never logged, credential-like body fields are replaced by `[FILTERED]`, LLM proxy prompts and completions are never logged, and bodies over 64 KB are left out.
 
-### Shared prices for every provider, payment connection health, customer erasure (Core 11.52.0, dashboard 2.26.0)
-
-_November 19, 2026_
+## Shared prices for every provider, payment connection health, customer erasure (Core 11.52.0, dashboard 2.26.0)
 
 - **Every provider on the shared price list.** The models.dev import now covers every provider, each under its models.dev id (`groq`, `openrouter`, `amazon-bedrock`, and so on), not only OpenAI, Anthropic and Gemini. A model listed by several providers is stored once per provider, at that provider's price. See [Shared prices](/guides/margin/shared-prices).
 - **Provider from the API host.** A call is priced at the vendor its `provider_host` names, so a Groq call made with the OpenAI client gets Groq's price, not OpenAI's. Nozle keeps the host list. See [Which provider prices a call](/guides/margin/shared-prices#which-provider-prices-a-call).
@@ -62,9 +61,7 @@ _November 19, 2026_
 - **New customer field.** `erased_at` on the customer object.
 - **API request logs kept 90 days.** Older request logs are deleted. They are not kept per customer, so this bounds how long a request naming an erased customer stays.
 
-### Late credit usage refused, pricing by API host, customer erasure (Engine 2.60.0)
-
-_November 19, 2026_
+## Late credit usage refused, pricing by API host, customer erasure (Engine 2.60.0)
 
 - **Late credit usage.** `POST /usage/track` and finalizing a credit or budget hold refuse usage whose `timestamp` falls in a billing period that is already invoiced, with `409 period_invoiced`, as `POST /events` does since Engine 2.59.0. Before, such usage spent credits and was never billed. Nothing is spent, the hold stays open, and the same `Idempotency-Key` can be resent with a current `timestamp`. See [Late usage](/api/usage-track#late-usage).
 - **Shared prices by vendor.** The Engine prices the shared price of Cost Events, Feature Events and legacy Cost Models at the vendor the call's `provider_host` names, and records that vendor on uncosted model rows. Your own prices and Cost Sheet conditions still match the reported `provider`.
@@ -74,9 +71,11 @@ _November 19, 2026_
 - **Repricing watcher.** A price change flags only usage of the provider whose price changed. Before, a Groq price change flagged usage of the same model through another provider.
 - **Customer erasure.** Core's erasure job calls the Engine, which clears the customer's Entity names and metadata and keeps only the usage properties (model, provider, API host, service tier and token counts) of its LLM cost and margin records. See [Erase a customer](/api/create-customer#erase-a-customer).
 
-### Archive a plan without ending its subscriptions (Core 11.51.0, dashboard 2.24.0)
+</Update>
 
-_November 18, 2026_
+<Update label="November 18, 2026">
+
+## Archive a plan without ending its subscriptions (Core 11.51.0, dashboard 2.24.0)
 
 - **Archive means grandfathering.** `POST /plans/{code}/archive` stops a plan, every version of its code, from taking new subscriptions. Existing subscriptions keep billing with their entitlements, credit grant rules, spend limits and scheduled starts. `POST /plans/{code}/unarchive` undoes it. Archiving an archived plan, or unarchiving an active one, returns `200` and changes nothing. See [Archive vs delete](/guides/billing/plan-versions#archive-vs-delete).
 - **Refused on an archived plan.** `POST /subscriptions`, checkout, quotes, previews and billing state imports return `422` with `plan_code: [plan_archived]`. A self-serve plan change is refused with the code `plan_archived`. Subscriptions already on the plan can still be updated, and version migrations between its versions still work. See [Subscription management](/api/subscription-management).
@@ -85,16 +84,16 @@ _November 18, 2026_
 - **Webhooks.** `plan.archived` and `plan.unarchived` carry the plan. See [Webhook events](/api/webhook-events).
 - **Delete is unchanged.** `DELETE /plans/{code}` still terminates active subscriptions and cancels pending ones. Use archive to keep them billing.
 
-### Event ingest refuses events without an id or in an invoiced period (Engine 2.59.0)
+</Update>
 
-_November 17, 2026_
+<Update label="November 17, 2026">
+
+## Event ingest refuses events without an id or in an invoiced period (Engine 2.59.0)
 
 - **`transaction_id` is required.** `POST /events` and `POST /events/batch` refuse an event without a `transaction_id` with `422` and `transaction_id: ["value_is_mandatory"]`. Before, Nozle generated an id for each request, so a retry after a timeout was billed twice. The Node.js, Python and Go SDKs already create one and reuse it on retries. See [Events](/api/events).
 - **Late events in an invoiced period.** An event whose `timestamp` falls in a billing period that already has a finalized invoice is refused with `409 period_invoiced` and is not stored. Before, it was accepted and never billed, so the usage chart and the invoice disagreed. Resend it with a current `timestamp`, or bill it with a one-off invoice. Late events in a period that is still open, or whose invoice is still a draft, are billed as before. See [Late events](/api/events#late-events).
 
-### API rate limits, sign-in security, portal Pay, default payment connection (Core, Engine, dashboard)
-
-_November 17, 2026_
+## API rate limits, sign-in security, portal Pay, default payment connection (Core, Engine, dashboard)
 
 - **API rate limits.** Core's REST API (`/api/v1/*`) accepts 6,000 requests per minute per API key and per IP address. Over the limit it answers `429` `rate_limited` with a `Retry-After` header. Wait that long, then retry with backoff. See [Rate limits](/api/errors#rate-limits).
 - **Sign-in limits.** Dashboard sign-in accepts 10 attempts per email in 15 minutes and 100 per IP address. Password-reset requests accept 5 per email per hour and 30 per IP address. See [Sign-in limits](/guides/settings/account-security#sign-in-limits).
@@ -104,9 +103,11 @@ _November 17, 2026_
 - **Stripe connections.** Connecting the same Stripe account again keeps your customers' Stripe IDs and saved cards. A connection's secret key can be replaced with a key of the same account and mode; another account is refused with `stripe_account_mismatch`. See [Replace the secret key](/integrations/stripe#replace-the-secret-key).
 - **Engine `POST /customers`** forwards `billing_configuration` to Core, so it can assign the customer's payment connection. See [Engine `POST /customers`](/api/create-customer#engine-post-customers).
 
-### Refunds split across payments, refunds made outside Nozle, Stripe dispute updates (Core 11.46.0, dashboard 2.22.0)
+</Update>
 
-_November 14, 2026_
+<Update label="November 14, 2026">
+
+## Refunds split across payments, refunds made outside Nozle, Stripe dispute updates (Core 11.46.0, dashboard 2.22.0)
 
 - **Refunds go to every payment that can take them.** The online part of a refund goes to the invoice's succeeded payments through Stripe, GoCardless, Adyen or Razorpay, oldest first, each for at most what it still holds. A refund larger than one payment is split into one provider refund per payment. Before, it went to the newest payment of any kind, so a newer manual or failed payment left it pending, and a refund larger than that payment was rejected by the provider. See [Where an online refund goes](/guides/billing/payments#where-an-online-refund-goes).
 - **Refused instead of stuck.** A credit note whose online refund no payment can take is refused with `manual_refund_required`, `provider_refund_unsupported` or `insufficient_refundable_amount`, and nothing is created. A credit note Nozle creates itself on termination gets `refund_status` `failed` at once and the `credit_note.refund_failure` webhook instead. See [Refund errors](/api/errors#refund-errors).
@@ -120,9 +121,7 @@ _November 14, 2026_
 - **One account per email.** An email matches an account whatever the case of its letters. A second sign-up with the same email in another case, or at the same moment, is refused with `user_already_exists` (sign-up, Google, Okta) or `email_already_used` (accepting an invitation) instead of creating a second account.
 - **OpenAPI 1.61.0.** The three out-of-band fields on the credit note object and the create input, and `out_of_band_refund_amount` on the void input.
 
-### Dunning on by default; lost disputes owed again (Core 11.42.0, Core 11.45.0, dashboard 2.21.0)
-
-_November 14, 2026_
+## Dunning on by default; lost disputes owed again (Core 11.42.0, Core 11.45.0, dashboard 2.21.0)
 
 - **Default dunning policy.** Every new workspace and every new sandbox starts with a dunning campaign `default` (end action `block`, threshold 0 in the default billing entity's currency), applied to the default billing entity with the `dunning.step` email on. A customer who does not pay is blocked once the grace of their plan ends. Workspaces created before are not changed automatically. See [the default policy](/guides/billing/dunning#the-default-policy).
 - **Not a paid add-on.** Dunning works for every workspace, whatever its plan. The dashboard shows the dunning pages, the plan's dunning policy and the Payment receipt switch to every workspace (dashboard 2.21.0).
@@ -133,80 +132,72 @@ _November 14, 2026_
 - **Payment emails** name what the payment is for, such as a plan and its period, a credit top-up, usage or one-off charges.
 - **OpenAPI 1.60.0.** `disputed_amount_cents` on the invoice and payment objects, and the shared price descriptions below.
 
-### Payment receipts on every plan (Core 11.44.0)
-
-_November 14, 2026_
+## Payment receipts on every plan (Core 11.44.0)
 
 - **Every plan.** A successful payment creates a payment receipt on Starter and Growth too. Before, receipts needed Scale.
 - **On by default.** The receipt email (`payment_receipt.created`) is on for a billing entity created from Core 11.44.0. Existing billing entities keep their setting. Switch it in **Settings > Customer emails**. See [Payment receipts](/guides/billing/payments#payment-receipts).
 
-### Invitations for new emails only, and expiry (Core 11.41.4, Core 11.44.0, dashboard 2.21.0)
-
-_November 14, 2026_
+## Invitations for new emails only, and expiry (Core 11.41.4, Core 11.44.0, dashboard 2.21.0)
 
 - **Only new emails.** An invitation can only be sent to an email that has no Nozle account. Otherwise it is refused with `email_already_used`. Accepting is refused the same way when the email got an account after the invitation was sent, and nothing is created or changed. A person with an account cannot join a second workspace through an invitation.
 - **Expiry.** An invitation expires seven days after it was sent, and accepting it answers `invite_expired`. Inviting the email again revokes the expired invitation and sends a new one.
 - **Security fix (Core 11.41.4).** Accepting an invitation for an email that already has an account no longer signs anyone in without that account's password. `Invite.token` is always `null` and deprecated.
 - **Clearer messages (dashboard 2.21.0).** The dashboard explains an email that already has an account and an expired invitation. See [Team access](/guides/settings/team-access) and [Invitation errors](/api/errors#invitation-errors).
 
-### Shared prices back on, imported from models.dev (Core 11.43.0, Engine 2.58.0, dashboard 2.20.0)
-
-_November 14, 2026_
+## Shared prices back on, imported from models.dev (Core 11.43.0, Engine 2.58.0, dashboard 2.20.0)
 
 - **Always on.** A model without a price of your own is costed from the shared price list, with no adopt step. Your own price still wins, bucket by bucket. Adopting stays optional, to keep a price as your own. `shared_price_available` reports the list again, and `/can`, the LLM proxy and `model_swap` simulations count a shared price.
 - **models.dev.** The list imports OpenAI, Anthropic and Gemini models it does not have yet from models.dev at 03:30, 11:30 and 19:30 UTC. A price change is a new revision, and past events keep the price they were costed at. Prices start on the day they were read, so older events are not repriced.
 - **Dashboard.** **Settings > Shared prices** is back, and the model pickers list shared price models. See [Shared prices](/guides/margin/shared-prices).
 
-### Refund form explains why nothing can be refunded (dashboard 2.21.0, Core 11.44.0)
-
-_November 14, 2026_
+## Refund form explains why nothing can be refunded (dashboard 2.21.0, Core 11.44.0)
 
 - **Reasons.** The credit note form shows the most that can be refunded, and says why when nothing can be. The invoice was carried forward below the minimum card charge, it is unpaid, nothing more can be refunded, or the payment is not recorded yet (with **Refresh**). See [Refunds](/guides/billing/payments#refunds).
 - **Fix.** A draft credit note no longer lowers an invoice's refundable amount. Only finalized credit notes count.
 
-### `margin.forecast` removed from the SDKs (Node 0.40.0, Python 0.38.0, Go v0.38.0)
+</Update>
 
-_November 13, 2026_
+<Update label="November 13, 2026">
+
+## `margin.forecast` removed from the SDKs (Node 0.40.0, Python 0.38.0, Go v0.38.0)
 
 - `margin.forecast()` (Node and Python) and `MarginForecast` (Go) are removed with their types. The Engine route they called was removed in Engine 2.52.0, so every call failed with `404`. Remove the call and use the [revenue and margin forecast](/guides/margin/forecast) (`GET /revenue/forecast`) instead.
 
-### Guides for pricing scenarios, MRR and the forecast
+</Update>
 
-_November 5, 2026_
+<Update label="November 5, 2026">
+
+## Guides for pricing scenarios, MRR and the forecast
 
 - **[Pricing scenarios](/guides/margin/pricing-scenarios).** How a plan change is replayed on your closed past invoices, the fidelity check (`ok`, `low_fidelity`, `failed`, `no_data`), what can and cannot be priced, and how Apply works with notice, who moves and the price increase confirmation.
 - **[Revenue metrics](/guides/margin/revenue-metrics).** How MRR is built from finalized invoices (net of discounts, excluding tax), ARR as MRR x 12, the trailing 12-month figure kept apart from ARR, movements, logo churn, NRR, GRR and cohorts, with the `/revenue/*` endpoints.
 - **[Revenue and margin forecast](/guides/margin/forecast).** How the Low, Expected and High range is built, the data gates behind "Not enough data yet", and the back-test that falls back to a no-change forecast.
 - The margin dashboard guide no longer describes the 30-day `GET /margin/forecast`, which Engine 2.52.0 removed.
 
-### Dunning on every Nozle plan; grace days on the plan page
+</Update>
 
-_November 4, 2026_
+<Update label="November 4, 2026">
+
+## Dunning on every Nozle plan; grace days on the plan page
 
 - **Starter includes dunning (Core 11.41.2).** Every Nozle plan can create [dunning campaigns](/guides/billing/dunning) for your customers, with the plan's grace days and the block end action. Before, it needed Growth, Scale or Enterprise.
 - **Grace days on the plan page (dashboard 2.19.6).** A plan's **Overview** tab shows an **Unpaid invoices** card with the grace days and the dunning policy. **Billing > Dunning** is back in the sidebar.
 - **No automatic-upgrade grace on your plans.** The plan form no longer offers `limit_grace_days`: an automatic upgrade at a limit exists only for Nozle's own workspaces, never for your customers. The API field is unchanged.
 - **Clearer timeline.** The first charge is tried as soon as an invoice is finalized. With a grace of 0 a successful charge never blocks, and a failed one blocks on day 0 with no retries.
 
-### Shared provider prices off; three-decimal currencies; pricing scenarios priced from events
-
-_November 4, 2026_
+## Shared provider prices off; three-decimal currencies; pricing scenarios priced from events
 
 - **Your own prices only.** Nozle no longer costs usage from its shared list of provider prices. A model without a price in your [cost model](/guides/margin/cost-models) is [uncosted](/guides/ai/token-billing#uncosted-models) until you add one. The Shared prices page and **Adopt shared price** are gone, and `shared_price_available` is always `false`. Cost lines rated before this change keep `price_source: shared`. With `uncosted_model_action: deny`, a model that only had a shared price is now refused.
 - **Margin simulation.** `model_swap` needs `to_model_prices`; without it the answer is `400 model_price_unavailable`.
 - **Three-decimal currencies.** Margin revenue in KWD, BHD, OMR, JOD and TND keeps its third decimal (1.234 KWD reads 1.234, not 1.23). Usage revenue of less than a cent per event is added up before rounding, so new usage totals can differ by a few cents from before. Existing rows are unchanged.
 - **Pricing scenarios.** Charges the invoice alone cannot price again (prorated, pricing unit, dynamic, custom, percentage with per-transaction rules, and new filters) are now priced from the period's usage events. At most 500 billing periods per run are priced this way; a period whose events no longer match what was billed is kept at the billed amount.
 
-### x402 readiness check and refunds
-
-_November 4, 2026_
+## x402 readiness check and refunds
 
 - **Readiness check.** An invoice's x402 requirements and public x402 URL are offered only when the connected Stripe account can record stablecoin payments. Otherwise they answer `503 x402_not_available`, so no agent pays into an account that cannot take the payment. See [x402](/guides/billing/agent-payments#x402-stablecoin).
 - **Refunds.** A credit note refund of an x402 payment is recorded and its status follows Stripe; Stripe sends the USDC back to the paying wallet. x402 payments are now linked to a Stripe customer (created if missing).
 
-### Agent payments (SPT, x402) and Stripe-chosen payment methods
-
-_November 4, 2026_
+## Agent payments (SPT, x402) and Stripe-chosen payment methods
 
 - **Shared Payment Tokens.** `POST /invoices/{id}/pay_with_agent_token` pays a finalized invoice with an `spt_...` token an AI agent gave you, charged on your own connected Stripe account. Expired, deactivated, other-currency and over-limit tokens are refused before charging. Behind the organization flag `stripe_agent_payment_token`. See [Agent payments](/guides/billing/agent-payments).
 - **x402, any client.** Every USD invoice has a public x402 URL (`resource.url` of `GET /invoices/{id}/x402_requirements`). Any x402 client pays it in USDC on Base: Nozle answers `402` with `PAYMENT-REQUIRED`, has the facilitator settle the signed payment, and records it with Stripe. `POST /invoices/{id}/pay_with_x402` still takes a transaction hash. Behind the organization flag `stripe_x402_payments`. See [x402](/guides/billing/agent-payments#x402-stablecoin).
@@ -214,25 +205,23 @@ _November 4, 2026_
 - **Stripe preview APIs** (`2026-09-30.preview` for SPT, `2026-05-27.preview` for x402) may change.
 - **OpenAPI 1.59.0.**
 
-### Stripe Tax: invoices over 100 lines, void after credit notes, address and activation checks
+</Update>
 
-_November 3, 2026_
+<Update label="November 3, 2026">
+
+## Stripe Tax: invoices over 100 lines, void after credit notes, address and activation checks
 
 - **More than 100 lines.** An invoice with more than 100 taxable lines is calculated in slices of 100, each its own Stripe Tax calculation and transaction. `tax_details` gains `calculation_ids` and `transaction_ids`; `calculation_id` and `transaction_id` stay and hold the first.
 - **Void after credit notes.** Voiding an invoice that already has credit notes reverses only the tax they left, line by line. Before, the full reversal could reverse the same tax twice.
 - **Address check.** A US address needs a postal code, a Canadian or Indian one a state or postal code. Without it the invoice fails before the Stripe call with `customer_tax_location_invalid` and a message that names the field.
 - **Activation check.** Setting `tax_provider` to `stripe_tax` is refused with `stripe_tax_not_activated` while Tax is not activated in the connected Stripe account. See [Stripe Tax](/guides/billing/stripe-tax).
 
-### Margin simulation: scope a cost change to one model
-
-_November 3, 2026_
+## Margin simulation: scope a cost change to one model
 
 - **`scope.model`.** The change `scope` of `POST /margin/simulations` and `POST /margin/simulations/backtest` takes an optional `model` (up to 200 characters). It matches only usage that carries the model: LLM proxy events do, an SDK event without a `model` property cannot be matched by model. Only `cost_change_percent` accepts it (in the back-test, only with `observed_kind: cost_change_percent`); every other kind answers `400 invalid_request`. The dashboard's Margin simulation has a model field for cost changes. See [scope a cost change to one model](/guides/margin/simulation#scope-a-cost-change-to-one-model).
 - **OpenAPI 1.58.1.**
 
-### Margin simulation: new kinds, coverage, back-test; shared price fallback; deny unpriced models; fixed fee revenue
-
-_November 3, 2026_
+## Margin simulation: new kinds, coverage, back-test; shared price fallback; deny unpriced models; fixed fee revenue
 
 - **Simulation kinds.** `POST /margin/simulations` takes `params` and five new kinds: `price_per_unit_absolute`, `target_margin_percent` (the lowest price for a margin), `model_swap`, `provider_price_change` and `limit_impact` (who a limit would block). The response adds `data_coverage` with warnings, `assumptions`, `change_notes`, `targets`, `limit_impacts` and `insights` (unprofitable customers, break-even price, cost concentration). See [margin simulation](/guides/margin/simulation).
 - **Coverage.** No run is blocked for lack of history. Warnings tell you when the window is under 30 days (less than one billing cycle) or 90 days (no seasonality), and list customers with under 14 days of data. We suggest at least one billing cycle and ideally 90 days; the window is at most 92 days.
@@ -243,18 +232,18 @@ _November 3, 2026_
 - **Fixed fee revenue.** Fixed subscription fees from finalized invoices now count in margin revenue, accrued per day over the billed period; voided invoices are reversed. Add-on, one-off and charge fees, taxes, discounts and credit notes are not counted. See [fixed fee revenue](/guides/margin/fixed-fee-revenue).
 - **OpenAPI 1.58.0.**
 
-### Billing entity API reference fixes
+</Update>
 
-_November 2, 2026_
+<Update label="November 2, 2026">
+
+## Billing entity API reference fixes
 
 - **Update body.** `PUT /billing_entities/{code}` takes its fields inside `billing_entity`, like create. The reference showed them at the top level.
 - **Responses.** Create and update return `{ "billing_entity": { ... } }`. The reference showed the bare object.
 - **`einvoicing`.** Now in the create and update bodies and the billing entity object. Only `country: FR` is supported; other countries answer `einvoicing: country_not_supported`, and none answers `einvoicing: country_must_be_present`.
 - **Path.** `{code}` is the billing entity code, not a UUID.
 
-### Stripe Tax calculation (Core 11.32.0)
-
-_November 2, 2026_
+## Stripe Tax calculation (Core 11.32.0)
 
 - **Billing entity.** `tax_provider` (`nozle` default, `stripe_tax`) and `provider_tax_code`. Stripe Tax needs a connected Stripe account (`stripe_account_required`) and excludes EU tax management in both directions (`conflicts_with_eu_tax_management`, `conflicts_with_stripe_tax`).
 - **Tax codes.** `provider_tax_code` on plans, charges, fixed charges and add-ons. Order: item, plan, billing entity, then `txcd_10103001`.
@@ -262,9 +251,7 @@ _November 2, 2026_
 - **Invoices.** `tax_status` and `tax_details` (`provider`, `calculation_id`, `transaction_id`, `taxability_reasons`). Stripe's per-line amounts are used as they are. Credit notes reverse per line, voids in full.
 - **Failures.** An unusable location, invalid tax ID or missing Stripe Tax access fails the invoice with the Stripe code and a `customer.tax_provider_error` webhook. A Stripe outage holds the invoice for about 25 hours, then fails it with `tax_provider_unavailable`. Use the invoice retry. See [Stripe Tax](/guides/billing/stripe-tax).
 
-### Shared prices, reprocess, margin simulation, proxy credit reserve (Engine 2.47.1, Core 11.33.0)
-
-_November 2, 2026_
+## Shared prices, reprocess, margin simulation, proxy credit reserve (Engine 2.47.1, Core 11.33.0)
 
 - **Shared prices.** Nozle keeps a price list of provider models, each price with its source page and the day it was read. Your own rates always win; adopt a shared price in one click from the Uncosted queue. See [shared prices](/guides/margin/shared-prices).
 - **Reprocess.** Price events recorded before you added a price, with progress and a safe default that skips invoiced periods. New: `POST /cost-intelligence/uncosted-models/reprocess` and job status and cancel. See [reprocess](/guides/margin/reprocess).
@@ -273,18 +260,18 @@ _November 2, 2026_
 - **Policy lookup failure.** When a margin policy cannot be read, `can()` and the proxy follow the last known policy's `on_unavailable`, and allow when none is known. See [when the policy cannot be read](/guides/margin/alerts#when-the-policy-cannot-be-read).
 - **Margin worked example.** [One call, two costs](/guides/margin/worked-example): revenue 0.10, cost 0.04 gives 60 percent; cost 0.08 gives 20 percent.
 
-### Token buckets, uncosted-model alert, aborted streams (Engine 2.46.0, Core 11.30.0, Node 0.35.0, Python 0.33.0, Go v0.33.0)
-
-_November 2, 2026_
+## Token buckets, uncosted-model alert, aborted streams (Engine 2.46.0, Core 11.30.0, Node 0.35.0, Python 0.33.0, Go v0.33.0)
 
 - **Token buckets.** Usage events carry cache write (1 hour), audio and image breakdowns and `service_tier`. The proxy sends one cost event per bucket when the request has `X-Nozle-Cost-Meter`. See [token buckets](/guides/ai/token-billing#token-buckets).
 - **Uncosted models.** An LLM model with no price is recorded by provider, model and bucket, and you get an in-app and email notification once per model per day. Set `uncosted_model_action` to `warn` or `ignore`; `deny` is not available yet. New: `GET /cost-intelligence/uncosted-models`, `POST .../dismiss`, and `uncosted_models` in the cost report.
 - **Aborted streams.** A stream cut before the final usage is billed what was delivered or an estimate (`ceil(UTF-8 bytes / 4)`), with `usage_source` and `stream_aborted`. Holds are finalized with it. Waiving this billing is not available yet.
 - **Docs fix.** An unpriced model is no longer described as always entering the Uncosted queue; every path now records it.
 
-### Tax IDs, reverse charge and VAT checks (Core 11.31.0, Node 0.35.0, Python 0.33.0, Go v0.33.0)
+</Update>
 
-_November 1, 2026_
+<Update label="November 1, 2026">
+
+## Tax IDs, reverse charge and VAT checks (Core 11.31.0, Node 0.35.0, Python 0.33.0, Go v0.33.0)
 
 - **Tax ID fields.** A customer has `tax_identification_type`, `tax_identification_status` (`unverified`, `pending`, `valid`, `invalid`), `tax_identification_checked_at` and a derived `tax_treatment`. `POST /customers` takes `tax_identification_type` and answers `422` for a bad type, a missing number or a bad format.
 - **VIES.** Nozle stores the VIES result. `POST /customers/{external_id}/tax_identification/recheck` asks for a new check. An invalid number is taxed as a consumer.
@@ -294,18 +281,14 @@ _November 1, 2026_
 - **SDKs.** `taxId`, `address`, `customers.get` and `waitForTaxCheck` (Python `tax_id`, `clear_tax_id`, `wait_for_tax_check`; Go `TaxID`, `ClearTaxID`, `WaitForTaxCheck`). The SDK releases ship after Core.
 - **Not available yet.** Stripe Tax calculation and a browser form for billing details. See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
 
-### Void a usage event (Engine, Node, Python, Go)
-
-_November 1, 2026_
+## Void a usage event (Engine, Node, Python, Go)
 
 - **Void.** `POST /api/v1/events/{transaction_id}/void` takes a `reason` and reverses the event, its usage counters, the credits it used, and its cost and margin. It is refused with `409 period_invoiced` when an invoice covers the event.
 - **No re-send.** A voided `transaction_id` is refused by `POST /events` with `409 transaction_voided`.
 - **SDKs.** `client.events.void(transactionId, { reason })` in Node, `client.events.void(transaction_id, reason=...)` in Python, `client.Events.Void(ctx, transactionID, reason)` in Go.
 - **Webhooks.** `subscription.trial_ending` is now listed with the other event types.
 
-### Extend a trial or convert it now (Core 11.28.0, Node 0.33.0, Python 0.31.0, Go v0.31.0)
-
-_November 1, 2026_
+## Extend a trial or convert it now (Core 11.28.0, Node 0.33.0, Python 0.31.0, Go v0.31.0)
 
 - **Change a trial.** `PUT /api/v1/subscriptions/{external_id}` takes `trial` with exactly one of `extend_days`, `ends_at` or `convert: true`, and an optional `reason` (up to 500 characters, kept in the activity log). An extension is at most 90 days, the total trial is at most 365 days, and extending is repeatable.
 - **Billing.** Extending bills nothing and leaves billing periods unchanged. Converting ends the trial now: a pay-in-advance plan gets its first invoice at once; a pay-in-arrears plan bills usage and the fee at period end, prorated from the conversion date.
@@ -314,18 +297,14 @@ _November 1, 2026_
 - **Webhooks.** An extension sends `subscription.updated`; a conversion sends `subscription.trial_ended` and `subscription.updated`. `subscription.trial_ending` is sent again for the new end. No new event types.
 - **SDKs and GraphQL.** Node `extendTrial` / `convertTrial`, Python `extend_trial` / `convert_trial`, Go `ExtendTrial` / `ConvertTrial`. GraphQL `updateSubscription` takes `trial`. See [Trials](/guides/billing/subscriptions#trials).
 
-### Margin policies for a plan or a customer (Core 11.25.1, Engine 2.40.0)
-
-_November 1, 2026_
+## Margin policies for a plan or a customer (Core 11.25.1, Engine 2.40.0)
 
 - **More targets.** A margin policy can apply to one catalog plan or one customer, besides the organization or one feature. `can()` takes the narrowest: the customer's policy, else the plan's, else the organization's; within one target a feature policy beats an all-features one. `policy.scope` in the answer says which one decided.
 - **Plan versions keep the policy.** Publishing a new plan version copies the plan's policies in effect, so subscribers who move keep the rule.
 - **Features with no Cost Rule.** `on_not_configured` (Core 11.24.0, Engine 2.39.0) decides them, default `allow`; `on_unavailable` now covers only real faults.
 - **Create them** through `nozleCreateMarginPolicy` with `planId` or `customerId` (not both). See [Margin policies and monitoring](/guides/margin/alerts#policies-per-plan-and-per-customer).
 
-### Spend limits count period-to-date spend (Engine 2.38.0)
-
-_November 1, 2026_
+## Spend limits count period-to-date spend (Engine 2.38.0)
 
 - **Limits added mid-period count earlier spend.** A spend limit added during a period, or whose `period` changes, now counts the spend already made since the period start. The Engine counts it within about 5 minutes, a few minutes more while usage is still arriving. Only the highest threshold already crossed is notified. See [Limits added mid-period](/guides/entitlements/spend-limits#limits-added-mid-period).
 - **`counted_from` on every budget.** The `budget` of `/can`, the `/usage/check` and `/usage/track` refusals, budget holds, the LLM proxy refusal and [List Customer Budgets](/api/list-customer-budgets) has `counted_from`: `period_start` once the period's spend is counted in full, the time counting started before that, and `null` when nothing is counted yet. OpenAPI 1.52.0.
@@ -333,9 +312,7 @@ _November 1, 2026_
 - **Nightly reconciliation.** The Engine records the exact spend of every priced event and recounts every budget from it each night, correcting a count that stays off. No new webhooks.
 - **Older usage.** Exact per-event spend is recorded from 2.38.0, so a period that contains usage from before the release is not recounted: its limit counts from when counting started. `billing_period` and `calendar_month` limits are recounted from their next period.
 
-### Buffered LLM capture and an async Python buffer (Node 0.31.0, Python 0.29.0, Go v0.28.0)
-
-_November 1, 2026_
+## Buffered LLM capture and an async Python buffer (Node 0.31.0, Python 0.29.0, Go v0.28.0)
 
 - **LLM capture through the event buffer.** Pass an event buffer to the LLM capture: `buffer` on `wrapOpenAI`, `wrapAnthropic` and `captureFetch` (Node), `buffer=` on `wrap_openai()`, `wrap_anthropic()`, `wrap_http_client()`, `capture_http_client()` and `capture_async_http_client()` (Python), and `Buffer` on `ProviderWrapOptions` and `CaptureOptions` (Go). Each usage event is then queued in the buffer and delivered by its `flush` or `close`, so it is no longer lost when a serverless handler returns or a process exits. Without it, nothing changes.
 - **Only usage events are buffered.** Cost events are still sent directly. The usage event keeps its `llm-<format>-<response id>` transaction ID, so a resend never bills twice. Node's `flush()` and `close()` first wait for responses still being read and for their cost events; Python and Go queue it as the response ends, so a flush right after reading the response includes it.
@@ -343,18 +320,14 @@ _November 1, 2026_
 - **Go logs through `slog`.** Without `OnError`, the Go event buffer and the LLM capture wrappers log undelivered events through `slog.Default()` at error level, with `code`, `count` and `error`, never the events or the API key. The buffer used the standard `log` package before, and the wrappers dropped the error.
 - See [Node.js](/sdks/node/llm-auto-capture#buffered-delivery), [Python](/sdks/python/llm-auto-capture#buffered-delivery), [Python async buffer](/sdks/python/tracking-events#async-event-buffer) and [Go](/sdks/go/llm-usage#buffered-delivery).
 
-### Margin policy in the SDKs (Go v0.29.0, Core 11.24.0, Engine 2.39.0; docs for Node, Python and Go)
-
-_November 1, 2026_
+## Margin policy in the SDKs (Go v0.29.0, Core 11.24.0, Engine 2.39.0; docs for Node, Python and Go)
 
 - **Typed margin policy in Go.** `CanResult.Policy` is a `*nozle.CanPolicy` (it was raw JSON): `Mode`, `OnUnavailable`, the thresholds, `MaximumSnapshotAgeSeconds`, `Decision` and `Reason`. `CanResult.MarginWarning()` is `true` when a policy in `warn` mode flagged an allowed call. Node and Python already typed `policy`.
 - **Documented in all three SDKs.** The entitlements pages explain `policy`, the `decision` and `reason` values, and that a `warn` leaves `allowed: true` while a `deny` is `economic_policy_denied`, with a code example each.
 - **Checked on production, 1 November.** With real cost data (a feature priced $0.10 with $0.04 and $0.08 cost rules) a policy with a 50% minimum margin allowed the 60% call and refused the 20% call with `minimum_margin_percentage_not_met`; `warn`, maximum cost, minimum margin amount, `on_unavailable` allow, warn and deny, a currency mismatch and a feature policy over an organization policy all behaved as documented, and `margin_policy.breached` was delivered for each refusal.
 - **Features with no Cost Rule.** A new policy setting, `on_not_configured` (`allow`, `warn` or `deny`, default `allow`), decides them; `on_unavailable` now covers only real faults. Before, an organization-wide `on_unavailable: deny` also refused features that have no costs. Set it through the API or GraphQL; it is on production for Core 11.24.0 and Engine 2.39.0. **Known limits.** A policy applies to an organization or a feature, not to a single customer.
 
-### Spend limits and budgets (Core 11.23.0 and 11.23.1, Engine 2.34.0, Node 0.30.0, Python 0.28.0, Go v0.27.0)
-
-_November 1, 2026_
+## Spend limits and budgets (Core 11.23.0 and 11.23.1, Engine 2.34.0, Node 0.30.0, Python 0.28.0, Go v0.27.0)
 
 - **Cap what usage may cost.** A spend limit caps the gross metered usage charges of a subscription per period (before tax, coupons, wallet credits and credits; no subscription fee). Set it on a plan, as the default of its subscriptions, or on one subscription as an override (`amount_cents: null` turns the plan's limit off). It covers the total or one Feature, per `billing_period`, `calendar_month` or `lifetime`, in `hard` or `soft` mode, with thresholds (default 50, 80, 90, 100). Core `POST`, `GET /spend_limits` and `GET`, `PUT`, `DELETE /spend_limits/{id}`, the plan's **Spend limits** panel and the subscription's **Budget** tab in the dashboard. See [Spend limits and budgets](/guides/entitlements/spend-limits).
 - **Only charges the Engine can price per event.** `standard`, `package`, `graduated`, `volume`, `dynamic` and `percentage` without per-transaction bounds, on `count_agg`, `sum_agg`, `max_agg`, `latest_agg` or `unique_count_agg` Features that are not recurring. A limit covering another charge fails with `422 spend_limit_unrateable_charges`, listing the charges, and saving a covered charge as one fails with `422 validation_errors` (`spend_limit_unrateable_charges`).
@@ -366,11 +339,11 @@ _November 1, 2026_
 - **SDKs.** `budgets.list` (Node, Python) and `ListBudgets` (Go); `budget` on `can`, usage check and track results; `RefusalReason` values; `BudgetExceededError` (402) and `UsageLimitExceededError` (429), which is no longer retried; budget holds on the holds methods. See [Node.js](/sdks/node/entitlements#spend-limits), [Python](/sdks/python/entitlements#spend-limits) and [Go](/sdks/go/entitlements#spend-limits).
 - **Known limits.** A plain `/can` can be overrun by calls in flight; a new limit counts spend from when it is set and refuses within a minute; limits are per subscription with no currency conversion; the LLM proxy lets calls through when budgets cannot be read. See [Known limits](/guides/entitlements/spend-limits#known-limits).
 
-## October 2026
+</Update>
 
-### Credit balance holds (Engine 2.34.0, Node 0.30.0, Python 0.28.0, Go v0.27.0)
+<Update label="October 31, 2026">
 
-_October 31, 2026_
+## Credit balance holds (Engine 2.34.0, Node 0.30.0, Python 0.28.0, Go v0.27.0)
 
 - **Reserve credits before the work.** `POST /usage/holds` takes the `/usage/track` body plus `ttl_seconds` (default 900, at most 86400) and reserves the credits on the sources a track would spend, under the same pool policy, without changing the balance. A short balance answers `200` with `allowed: false` and `insufficient_credits`. `Idempotency-Key` is required, and a retry gets the first answer, even for a customer a new hold would now refuse as overdue. Keys starting with `hold:` are reserved and answer `400 invalid_request`, on `/usage/track` too. See [Create a Credit Hold](/api/create-usage-hold).
 - **Finalize or release.** `POST /usage/holds/{hold_id}/finalize` spends the actual usage as one ordinary consume at the rate pinned by the hold and releases the rest. More than was held passes when the hold plus the free balance covers it; otherwise it answers `allowed: false`, charges nothing and keeps the hold open. Zero usage releases the hold (a retry replays that answer), and after expiry a finalize runs as a plain track (`hold_expired: true`). `POST /usage/holds/{hold_id}/release` is idempotent; a finalized hold answers `409 hold_already_resolved`. See [Finalize](/api/finalize-usage-hold) and [Release](/api/release-usage-hold).
@@ -379,9 +352,7 @@ _October 31, 2026_
 - **LLM proxy holds, opt-in.** Send `X-Nozle-Credit-Hold: <metric amount>` to reserve credits before the provider is called. A short balance answers `402 insufficient_credits`, the response carries `X-Nozle-Credit-Hold-Id`, and the call is paid from the hold with the usage the proxy reads, in place of its usage event. Usage above the hold and the free balance is paid as far as the credit covers it (the balance never goes negative), and the unpaid rest is sent as a usage event with `credit_overrun: true`, `credit_overrun_metric_amount`, `credit_hold_id` and `credit_operation_id` (sum metrics; a count metric sends the whole usage as a plain event). See [LLM proxy credit holds](/api/llm-proxy#credit-holds).
 - **`/check-and-deduct` accepts an optional `Idempotency-Key`.** A retry with the same key, customer and credits replays the first answer instead of deducting again; another request with the key answers `409 idempotency_key_reused`. Keys are kept 7 days. See [Check & Deduct Credits](/api/check-and-deduct#idempotency-key).
 - **SDKs.** `nozle.usage.holds.create/finalize/release/get/list` (Node 0.30.0), `client.usage.holds.*` (Python 0.28.0, sync and async) and `CreateCreditHold`, `FinalizeCreditHold`, `ReleaseCreditHold`, `GetCreditHold`, `ListCreditHolds` (Go v0.27.0), plus the `held` balance fields. See [When to hold credits](/guides/credits/usage-tracking#when-to-hold-credits) and the SDK credits pages: [Node.js](/sdks/node/credits#credit-holds), [Python](/sdks/python/credits#credit-holds), [Go](/sdks/go/credits#credit-holds).
-### Event buffer in the SDKs (Node 0.30.0, Python 0.28.0, Go v0.27.0)
-
-_October 31, 2026_
+## Event buffer in the SDKs (Node 0.30.0, Python 0.28.0, Go v0.27.0)
 
 - **Batch events as they happen.** `createEventBuffer()` (Node), `event_buffer()` (Python, `Nozle` only) and `NewEventBuffer` (Go) queue events in memory and send them through the batch call in the background. `track` returns the event's transaction ID at once, without a request, and every resend keeps that ID, so each event is billed once.
 - **When it sends.** When 500 events are waiting (`maxBatchSize`, 1 to 5000), every 5 seconds, on `flush` and on `close`. Node also flushes on `beforeExit`, and Python in an `atexit` handler with a 5 second timeout. Go has no exit hook: call `defer buf.Close(ctx)`.
@@ -389,9 +360,7 @@ _October 31, 2026_
 - **Backoff.** After a flush with failed events, automatic flushes pause for 1 second, doubling up to 60 seconds. An explicit `flush` or `close` does not wait.
 - **Serverless.** Flush or close the buffer before your handler returns. See [Node.js](/sdks/node/tracking-events#event-buffer), [Python](/sdks/python/tracking-events#event-buffer) and [Go](/sdks/go/tracking-events#event-buffer).
 
-### Event batches of 5000 with partial acceptance (Engine 2.28.0, Go v0.23.0, Node 0.26.0, Python 0.24.0)
-
-_October 31, 2026_
+## Event batches of 5000 with partial acceptance (Engine 2.28.0, Go v0.23.0, Node 0.26.0, Python 0.24.0)
 
 - **5000 events per batch.** `POST /events/batch` takes 1 to 5000 events (100 before) and accepts gzip bodies (`Content-Encoding: gzip`, 16 MiB once decoded). See [events](/api/events#responses-and-limits).
 - **Partial acceptance.** One bad event no longer refuses the batch: the valid events are stored, and the refused ones come back by position in `error_details` on a `200`. A batch with no stored event is still a `422`, or a `402` when every customer is blocked.
@@ -399,17 +368,17 @@ _October 31, 2026_
 - **SDK batch calls.** `TrackBatch` (Go), `trackBatch()` (Node) and `track_batch()` (Python) send gzipped requests of up to 5000 events and return one result per event: accepted, rejected or failed. See [Go](/sdks/go/tracking-events#batching-events), [Node.js](/sdks/node/tracking-events#batching-events) and [Python](/sdks/python/tracking-events#batching-events).
 - **Throughput.** In production, ingress accepted 175,000 events per second with no failures, and every test event was billed once.
 
-### Credit notes and refunds in the SDKs (Node 0.27.0, Python 0.25.0, Go v0.24.0)
-
-_October 31, 2026_
+## Credit notes and refunds in the SDKs (Node 0.27.0, Python 0.25.0, Go v0.24.0)
 
 - **Preview, issue, refund, list, read and void credit notes from the SDKs.** `creditNotes` (Node), `credit_notes` (Python, sync and async) and `PreviewCreditNote`, `CreateCreditNote`, `RefundCreditNote`, `ListCreditNotes`, `GetCreditNote`, `VoidCreditNote` (Go) call Core's `/credit_notes` routes with your secret key. Preview returns the total with taxes and what can be refunded. A refund goes back to the original payment method (Stripe or Razorpay), and a partial refund is fewer or smaller items; credit and offset amounts are supported too. See the SDK billing pages: [Node.js](/sdks/node/billing#credit-notes-and-refunds), [Python](/sdks/python/billing#credit-notes-and-refunds), [Go](/sdks/go/billing#credit-notes-and-refunds).
 - **Never retried:** the SDKs send no `Idempotency-Key` with credit note requests yet, so creating, refunding and voiding are not retried. Core accepts one on create since 11.22.0. Previews and reads are.
 - Needs a workspace with credit notes enabled (`403` `feature_unavailable` otherwise). Nozle stores only the provider's refund id and status.
 
-### Webhooks: the `standard` signature, 8 attempts and recovery (Core, Node 0.25.0, Python 0.23.0, Go v0.22.0)
+</Update>
 
-_October 30, 2026_
+<Update label="October 30, 2026">
+
+## Webhooks: the `standard` signature, 8 attempts and recovery (Core, Node 0.25.0, Python 0.23.0, Go v0.22.0)
 
 - **`standard` signature scheme, the only scheme.** Webhooks follow the Standard Webhooks specification: `webhook-id`, `webhook-timestamp` and `webhook-signature` (`v1,<base64>`, HMAC-SHA256 with the endpoint's `whsec_` secret). Verification rejects a timestamp more than 5 minutes off. Endpoints have no signature choice any more, and the `X-Nozle-Signature*` and `X-Nozle-Unique-Key` headers and the webhook public key endpoints are removed. See [Receive Nozle webhooks](/api/receive-webhooks).
 - **Secret rotation.** `POST /webhook_endpoints/{id}/rotate_secret` keeps the previous secret valid for 24 hours and sends both signatures meanwhile. Endpoints return `secret`, `previous_secret_expires_at` and `disabled_at`.
@@ -418,9 +387,11 @@ _October 30, 2026_
 - **Private addresses are refused.** Endpoint URLs that point to private, loopback, link-local or metadata addresses are rejected when saved and when sent.
 - **SDKs.** `webhooks.verify()` takes the endpoint secret in Node 0.25.0 (`secret`, `toleranceSeconds`), Python 0.23.0 (`webhook_secret`, `tolerance_seconds`) and Go v0.22.0 (`WithWebhookSecrets`, `WithWebhookTolerance`). A failed check has the same code in all three: `missing_signature`, `missing_secret`, `invalid_timestamp`, `invalid_signature` or `invalid_payload`.
 
-### No card at onboarding, plan grace days and the dunning policy (Core 11.16.0, Engine 2.22.0, dashboard 2.4.0, Node 0.23.0, React 0.24.0)
+</Update>
 
-_October 29, 2026_
+<Update label="October 29, 2026">
+
+## No card at onboarding, plan grace days and the dunning policy (Core 11.16.0, Engine 2.22.0, dashboard 2.4.0, Node 0.23.0, React 0.24.0)
 
 - **No card at onboarding.** A new workspace is not asked for a card. While no payment method can be charged, the usage notices (50%, 80%, 90%, 100%) ask you to add one, a daily reminder does from 50%, and overage is billed at the end of the billing period. `card_required` is no longer set. See [Workspace billing](/guides/getting-started/workspace-billing).
 - **Automatic upgrade at the MRR limit** runs with or without a payment method, and waits while a plan change checkout you started is open.
@@ -438,17 +409,17 @@ _October 29, 2026_
 - **Fixed:** the plan change preview's `renewal_at` for a plan paid in arrears is the next renewal, not the start of the billed period (in the past).
 - **Billing alignment** is documented: see [Subscriptions](/guides/billing/subscriptions#billing-alignment).
 
-### Card page: Link recognises the customer, wallets (Core 11.15.0)
-
-_October 29, 2026_
+## Card page: Link recognises the customer, wallets (Core 11.15.0)
 
 - **Link on the card page.** Nozle gives Stripe the customer's email, so Link can recognise a returning customer, send its code and fill the saved card, as in Stripe Checkout.
 - **Apple Pay and Google Pay.** When you save a publishable key, Nozle registers the card page's host with your Stripe account so Stripe can show the wallets. See [The publishable key](/integrations/stripe#the-publishable-key-why-with-it-without-it).
 - **Your own card form** is not supported: Nozle must create the intent with the mandate options for an Indian card. See [Your own card form](/integrations/stripe#your-own-card-form).
 
-### Card page in your app, upcoming payment notices, mandate ceiling (Core 11.8.0, React 0.20.0)
+</Update>
 
-_October 28, 2026_
+<Update label="October 28, 2026">
+
+## Card page in your app, upcoming payment notices, mandate ceiling (Core 11.8.0, React 0.20.0)
 
 - **Show the card page in a frame.** Add `embed=1` to the card page `url` to keep the customer in your app. Framing is allowed only from the origin of the `return_url` you passed when you created the link. The page posts `{source: "nozle", type: "card_setup", status, mode}` to your page (`status` is `ready`, `succeeded`, `processing`, `failed` or `error`). `POST /customers/{customer_id}/payment-method/manage` now returns the card page when the connection has a publishable key and the customer pays by card only, otherwise the Stripe Billing Portal. If Stripe rejects the publishable key, the page sends the customer to Stripe Checkout. See [Show the card page in your app](/integrations/stripe#show-the-card-page-in-your-app) and [Manage payment method](/api/manage-payment-method).
 - **React `NozleCardSetup` and `mountCardSetup`**, available from `@nozle-js/react` 0.20.0, show the page in a frame with callbacks and a redirect fallback. See [NozleCardSetup](/sdks/react/components/nozle-card-setup).
@@ -457,9 +428,7 @@ _October 28, 2026_
 - **Mandate maximum ceiling.** A Stripe connection can lower the ceiling but not raise it above what Indian banks accept: USD 2,800, EUR 2,600, GBP 2,200, INR 2.5 lakh. See [How big the mandate is](/integrations/stripe#how-big-the-mandate-is).
 - **Razorpay debit timing.** The card or UPI debit is sent after the notice window (UPI 26 hours 30 minutes, card 37 hours, plus a 5 minute buffer) and shows `processing` meanwhile. A bank mandate is debited at once. See [Razorpay](/integrations/razorpay#mandate-limits-and-automatic-debits).
 
-### Razorpay mandate limits, dispute events and payment hardening (Core 11.8.0)
-
-_October 28, 2026_
+## Razorpay mandate limits, dispute events and payment hardening (Core 11.8.0)
 
 - **RBI limits on Razorpay mandates.** The mandate maximum sent to Razorpay is your connection's maximum lowered to the limit of the chosen method: UPI INR 25,000, card INR 15,000, bank mandate INR 10 lakh. A mandate registration for an invoice above that limit is refused with `amount_exceeds_method_limit`.
 - **Card and UPI debits above INR 15,000 go to the Pay link.** Nozle does not debit them silently. The mandate stays, and you receive `invoice.payment_failure` with `provider_error.error_code` `amount_above_auto_debit_ceiling`.
@@ -470,17 +439,13 @@ _October 28, 2026_
 - **Stripe minimum charge.** An off-session charge below Stripe's minimum fails with `amount_below_provider_minimum` and now sends the payment error webhook. Rate-limited or timed-out payment-request charges are retried. A Stripe event delivered twice is stored once, and a failed one is queued again hourly. See [Stripe](/integrations/stripe#saved-payment-methods-and-automatic-charging).
 - **Invoice pay links for customers from India.** With a publishable key on the Stripe connection, the pay link of an invoice opens the Nozle card page and registers the card mandate in the same authentication. See [Indian cards and automatic payments](/integrations/stripe#indian-cards-and-automatic-payments).
 
-### Indian cards: e-mandates and a Nozle card page (Core 11.8.0)
-
-_October 28, 2026_
+## Indian cards: e-mandates and a Nozle card page (Core 11.8.0)
 
 - **Optional Stripe publishable key and mandate maximum on the Stripe connection.** `publishableKey` (`pk_test_` or `pk_live_`, same mode as the secret key, not a secret) and `mandateCapMultiplier`, `mandateCapFloorCents`, `mandateCapCeilingCents` on the GraphQL `addStripePaymentProvider` and `updateStripePaymentProvider` mutations. New Stripe endpoints subscribe to `mandate.updated`; self-hosters run `payment_providers:refresh_stripe_webhook_events` for existing ones.
 - **A Nozle-hosted card page** replaces Stripe Checkout for saving a card when the connection has a publishable key and the customer pays by card (or Link) only. It registers an e-mandate for cards issued in India with one bank OTP and does nothing special for other cards. Card details go to Stripe's fields, never to Nozle. The result shape is unchanged: the card setup link and `customer.checkout_url_generated` carry a `url` on Nozle's domain instead of stripe.com. The customer returns to your return URL with `nozle_card=succeeded|processing|failed`. Saving a card while paying a first invoice still uses Stripe Checkout, and the `payment-method/manage` endpoint opens the Nozle page under the conditions in the entry above (it opened the Stripe Billing Portal in earlier builds of this release).
 - **Automatic charges of Indian cards use the mandate.** A charge above about INR 15,000, or above the mandate maximum, needs the customer to approve the bank's notice before the debit. A mandated charge stays processing for up to 26 hours. Without an active mandate the customer pays on the hosted page as before.
 - **Failed-payment retries skip reasons that cannot succeed** (authentication or a mandate needed, hard declines) and the customer gets the pay link at once. A payment that is processing no longer starts the failed-payment clock. See [Indian cards and automatic payments](/integrations/stripe#indian-cards-and-automatic-payments) and [Workspace billing](/guides/getting-started/workspace-billing#india-cards).
-### Sandbox mode (Core 11.7.0, Engine 2.18.0)
-
-_October 28, 2026_
+## Sandbox mode (Core 11.7.0, Engine 2.18.0)
 
 - **One sandbox per workspace.** A separate organization linked to your live one, with its own customers, plans, subscriptions, invoices, events, API keys, webhook endpoints and payment connections. An admin creates it by switching to **Sandbox** in the workspace switcher; after that every member can open it, with their live role. It starts empty and copies only your live billing settings. See [Sandbox mode](/guides/getting-started/sandbox).
 - **Test keys.** Sandbox keys start with `sk_nozle_test_` and `pk_nozle_test_` and use the same API URLs. The key's organization decides the environment: a test key on a live organization, a live key on a sandbox, or a key of a reset sandbox is refused with `401`. Every response to an accepted key carries `X-Nozle-Livemode: true` or `false`, readable from browsers. See [Live and sandbox keys](/api/authentication#live-and-sandbox-keys).
@@ -489,18 +454,14 @@ _October 28, 2026_
 - **Reset.** Admins type `RESET` to replace the sandbox with an empty one: API keys rotate, webhook endpoints are deleted, Stripe test connections are connected again automatically and Razorpay test connections must be connected again (the reset response lists them in `reconnectRequired`). At most once every 10 minutes and 5 times a day (`429 sandbox_reset_rate_limited`).
 - Docs: "there are no separate live and test keys" is removed from [Authentication](/api/authentication), [Core Concepts](/guides/getting-started/concepts) and the self-hosting environment page. The credits guides say "test customer" where they said "sandbox customer".
 
-### Breaking: plan changes without checkout follow transition policies; one checkout error shape (Core 11.6.0, Engine 2.14.0 and 2.15.0)
-
-_October 28, 2026_
+## Breaking: plan changes without checkout follow transition policies; one checkout error shape (Core 11.6.0, Engine 2.14.0 and 2.15.0)
 
 - **Breaking: `POST /billing/upgrade` and `POST /subscriptions/change` apply a downgrade as a plan transition.** A target plan cheaper than the current one goes through the merchant's [plan transition policy](/api/plan-transition-policies) for the pair, with its timing and settlement, and returns `{"subscription_transition": {...}}` instead of `{"subscription": {...}}`. A pair with no policy now answers `422 plan_transition_policy_required`, and Core's `409 subscription_change_pending`, `422 payment_required`, `422 outstanding_invoice` and `422 plan_already_active` pass through. Send an `Idempotency-Key`: a retry with the same key returns the stored answer with `replayed: true`. Optional `subscription_id` and `entity_id` select the subscription. A paid target at or above the current price still answers `422 payment_checkout_required`, and free to free is unchanged. For new integrations use [`POST /subscriptions/transitions`](/api/subscription-management#schedule-a-downgrade) and [`POST /checkout`](/api/create-checkout). See [Upgrade plan](/api/upgrade).
 - **Every checkout error has a `code`.** Core's checkout errors carry `status`, `error` and `code`; `subscription_selection_required`, `idempotency_key_reused`, `subscription_change_pending` and `subscription_and_idempotency_key_required` no longer come as a bare `{"code": ...}`. Every Engine checkout `400` carries `code: "invalid_request"`, and a customer scope mismatch is `403 customer_scope_mismatch`. See [Create checkout](/api/create-checkout#errors).
 - **Breaking: bulk Entity checkout answers `409 billing_anchor_checkout_in_progress`** while the customer's first paid Entity checkout is still open, as single Entity checkout does. It was `422 validation_errors` with `error_details.checkout`. See [Entity subscriptions](/api/entity-subscriptions).
 - **Analytics timestamps and timezones.** `GET /analytics/llm-events` returns `timestamp` as RFC 3339 in UTC, for example `2026-10-20T10:00:00Z`, instead of `2026-10-20 10:00:00.000` without an offset. `GET /analytics/usage-heatmap` groups hours and weekdays in your organization's timezone and returns it as `timezone` next to `cells`.
 
-### Breaking: Stripe checkout is hosted only (Core 11.5.0, Engine 2.13.0)
-
-_October 28, 2026_
+## Breaking: Stripe checkout is hosted only (Core 11.5.0, Engine 2.13.0)
 
 - **Breaking: every Stripe checkout is a Stripe-hosted Checkout Session.** A new subscription's first invoice, an invoice checkout, a paid plan change, the Entity subscription batch and the retry of a first invoice (`POST /invoices/{id}/retry_payment`) answer `{"type": "hosted", "url", "payment_url", "checkout_id", "invoice_id" or "plan_upgrade_intent_id", "amount_cents", "currency", "expires_at"}`. Redirect the customer to `url`. Embedded Stripe Checkout, the `stripe` result type and every `client_secret` and `clientSecret` are removed. No Stripe publishable key and no Stripe.js are needed on your page. A saved card is still charged first (`completed`, `processing` and `scheduled` results are unchanged), and Razorpay is unchanged. See [Checkout](/guides/billing/checkout#stripe) and [Create checkout](/api/create-checkout#hosted-stripe-result).
 - **`cancel_url` and `{CHECKOUT_SESSION_ID}`.** `POST /checkout` accepts `cancel_url`, validated like `return_url` and defaulting to it. The Entity subscription endpoints take `return_url` only. A return URL may contain the literal `{CHECKOUT_SESSION_ID}`, which Stripe replaces with the Checkout Session ID. A refused `cancel_url` answers `400 invalid_return_url`.
@@ -508,9 +469,7 @@ _October 28, 2026_
 - **SDKs (Node 0.20.0, React 0.18.0, Python 0.19.0, Go v0.18.0):** Node `cancelUrl` option, Python `cancel_url=`, Go `CancelURL` and `CheckoutInvoiceWithOptions`; the Go `ClientSecret` field is removed. In React, the components redirect to the hosted page, `Checkout` takes only `checkout={result}`, `useCheckoutSession().startCheckout` replaces `fetchClientSecret`, `onStripeClientSecret` and the Stripe peer dependencies (`@stripe/stripe-js`, `@stripe/react-stripe-js`) go away. Self-hosters run `payment_providers:refresh_stripe_webhook_events` once for the new refund events.
 - **Receipt link.** GraphQL `Payment.receiptUrl` returns Stripe's receipt page for a payment, fetched from Stripe on demand and never stored. See [Payments](/guides/billing/payments).
 
-### Workspace billing: card at onboarding, failed payments, suspension on day 7 (Core 11.5.0, Engine 2.13.0)
-
-_October 28, 2026_
+## Workspace billing: card at onboarding, failed payments, suspension on day 7 (Core 11.5.0, Engine 2.13.0)
 
 - **Every workspace adds a card at onboarding.** The card is verified on a Stripe-hosted page and nothing is charged. There is no rollout switch: it is always on, and existing workspaces are flagged within the hour. The card page is Stripe-hosted, cards only, with Stripe's reuse agreement text, and a lost webhook is recovered by a server-side check. After the card the AI onboarding opens. Until a card is verified, the dashboard and every API key call (Core REST, account MCP, Engine API, LLM proxy, event ingestion) answer `402` `card_required`. See [Workspace billing](/guides/getting-started/workspace-billing).
 - **Automatic upgrades run every hour** and charge the prorated invoice to the saved card at once. Members get emails at 50%, 80%, 90% and 100% of the included events or MRR limit.
@@ -519,32 +478,32 @@ _October 28, 2026_
 - **Resume when the invoices are paid**, then the time your own customers were not billed is billed with the original periods.
 - **Stripe refund events.** Webhook endpoints created by Nozle subscribe to `refund.updated` and `refund.failed`. The older `charge.refund.updated` is still accepted for one release. See [Stripe](/integrations/stripe#webhook-setup).
 
-### Know when top-up credits can be spent (Core 11.1.0, Engine 2.12.0)
+</Update>
 
-_October 27, 2026_
+<Update label="October 27, 2026">
+
+## Know when top-up credits can be spent (Core 11.1.0, Engine 2.12.0)
 
 - **New webhook `credit_top_up_purchase.fulfilled`.** Sent once per paid top-up purchase, after the credits are granted and can be spent. Until now nothing told you when that happened: the invoice is paid a moment before the grant. See [Webhook events](/api/webhook-events#credit_top_up_purchasefulfilled).
 - **`GET /api/v1/credit-top-up-purchases/{id}` on the Engine.** Returns the purchase with `fulfillment_status` (`pending`, then `fulfilled`) and `fulfilled_at`. Poll it after checkout if you do not use the webhook. Purchases in webhooks and in Core's `GET /credit-top-up-purchases/{id}` carry the same fields.
 - **Razorpay checkout status for a top-up** reports `fulfillment_status: succeeded` only once the credits are granted, not when the payment reaches Nozle.
 - Docs: [Paid Credit Top-ups](/guides/credits/top-ups#know-when-the-credits-can-be-spent) now tells you to wait for the webhook or poll the purchase instead of refreshing on a paid invoice.
 
-### Razorpay payment failures reach your webhook (Core 11.0.3)
-
-_October 27, 2026_
+## Razorpay payment failures reach your webhook (Core 11.0.3)
 
 - **A declined Razorpay payment in the modal or on a payment link sends `invoice.payment_failure`** (`payment_request.payment_failure` for the link of overdue invoices), once per Razorpay payment, with Razorpay's error in `provider_error`. The order or link and the invoice stay payable. See [Razorpay](/integrations/razorpay#status).
 - **The payment link for overdue invoices returns the customer to the connection's success redirect URL** when one is set.
 
-### Plan version migrations ask before raising a price (Core)
-
-_October 27, 2026_
+## Plan version migrations ask before raising a price (Core)
 
 - **A migration that raises a price needs `allow_price_increase`.** The preview now returns `price_change`, `price_increase` and `mandate_cap_exceeded` for each subscription. Starting a migration where a subscription would pay more, or pass its auto-pay limit, returns `422 price_increase_not_allowed` with `price_increase_count` and `mandate_cap_exceeded_count`, unless the request has `allow_price_increase: true` (GraphQL: `allowPriceIncrease`). Migrations that raise no price are not affected.
 - **New customer email `subscription.price_change_scheduled`.** Opt in through the billing entity's `email_settings`. It tells the customer the new price, the day it starts and how it will be charged, once per subscription per migration. See [Plan Versions and Migrations](/api/plan-versions#price-increases-need-your-consent).
 
-### Breaking Core releases: CORS, voided invoices, plan change default, no former-prefix names, API key display (Core 5.0.0 to 7.0.0)
+</Update>
 
-_October 26, 2026_
+<Update label="October 26, 2026">
+
+## Breaking Core releases: CORS, voided invoices, plan change default, no former-prefix names, API key display (Core 5.0.0 to 7.0.0)
 
 - **Core 5.0.0, breaking: browser calls are allowed only from listed origins.** Core answered every origin with `Access-Control-Allow-Origin: *`. It now answers only the exact origins in `CORS_ALLOWED_ORIGINS` (default: the origin of the dashboard URL) and nothing else, preflight included. The customer portal keeps working on any site: `POST /graphql` with a `customer-portal-token` header is allowed from any origin. Server-to-server calls are not affected. See the Core environment variables and [Authentication](/api/authentication#browser-access-cors).
 - **Core 5.1.0: a voided invoice can no longer be paid.** Open Stripe Checkout Sessions and Razorpay orders and links are expired when an invoice is voided, marked as paid, partly paid or reduced by a credit note offset. A payment that still lands on a voided invoice is refunded in full (Stripe and Razorpay), and you get `invoice.payment_failure` with `voided_invoice_payment_refunded`, or `voided_invoice_payment_refund_failed` when the provider refuses the refund. Invoice checkout answers `422 validation_errors` with `amount_below_provider_minimum` when the amount left is under the provider's minimum charge. See [Stripe](/integrations/stripe#checkout-flow) and [Razorpay](/integrations/razorpay#refunds-and-disputes).
@@ -553,18 +512,18 @@ _October 26, 2026_
 - **Core 7.0.0, breaking: API keys are shown once.** The full key is returned only when you create or rotate it; every later read is masked. Store it yourself. See [Authentication](/api/authentication#store-your-key-when-you-create-it).
 - **SDKs: choose the subscription in `can()`.** Node 0.17.0 (`options.subscriptionId`, `options.entityId`), React 0.16.0 (`useEntitlement(feature, { subscriptionId, entityId })`), Python 0.17.0 (`subscription_id=`, `entity_id=`, sync and async) and Go v0.16.0 (`CanWithOptions`). A customer with several subscriptions and no selector gets `allowed: false` with `reason: subscription_required`. `track()` without a subscription ID now fails with a 422 `active_subscription_not_found` or `active_subscription_ambiguous` error in all three server SDKs (the Python error had `status_code` 200). See [The can() endpoint](/guides/entitlements/can-endpoint).
 
-### Checkout return, LLM proxy delivery, credits plus money (Engine 2.9.0)
-
-_October 26, 2026_
+## Checkout return, LLM proxy delivery, credits plus money (Engine 2.9.0)
 
 - **Checkout return URLs are decided per organization.** The Engine no longer has an allowlist or a default return URL of its own (`CHECKOUT_RETURN_URL` and `CHECKOUT_RETURN_URL_ALLOWED_ORIGINS` are removed from the Engine). `POST /checkout` and `POST /manage-payment-method` send `return_url` to Core, which checks it against your organization's `checkout_return_origins` and uses `checkout_default_return_url` when none is sent. A refused URL answers `400 invalid_return_url`. Before you upgrade, register every origin that only the Engine list allowed. Set both in the dashboard under **Developers > Checkout return**. See [Return URLs](/guides/billing/checkout#return-urls-and-your-organizations-origins).
 - **LLM proxy usage is delivered durably.** Each event is stored before the response returns, retried with backoff for about five hours when Nozle's billing service is down, and recorded once per transaction ID. Events are sent with your organization's secret key, not the request's `X-Nozle-Key`. See [LLM Proxy](/api/llm-proxy).
 - **A Feature paid with credits cannot also carry a priced charge in the same plan.** `POST /usage/check` and `POST /usage/track` answer `409 feature_billed_in_money` instead of taking credits and billing the usage again. A charge priced at 0 still works with credits. See [Credits or money, not both](/api/usage-track#credits-or-money-not-both).
 - Docs: only the **Admin** role can create secret keys. See [Authentication](/api/authentication).
 
-### Plan versioning (API 4.1.0, Engine 2.7.0, Node 0.16.0, React 0.15.0, Python 0.16.0, Go 0.15.0)
+</Update>
 
-_October 23, 2026_
+<Update label="October 23, 2026">
+
+## Plan versioning (API 4.1.0, Engine 2.7.0, Node 0.16.0, React 0.15.0, Python 0.16.0, Go 0.15.0)
 
 - **Changed for every organization:** changing what a plan bills or grants while customers pay for it saves the plan's next version under the same code. Existing subscribers keep their version and price; new subscriptions get the current version. Before, the change applied to existing subscribers from their next invoice; to keep doing that, send `disable_version: true` with the edit. Plans have `version` and `is_current`, and `GET /plans` returns current versions only. See [Plan versioning](/guides/billing/plan-versions).
 - `PUT /plans/{code}` takes `disable_version` (change the current version for everyone) and `force_version`. An edit of an older version is refused with `409 plan_version_not_current`.
@@ -574,17 +533,17 @@ _October 23, 2026_
 - New webhook `plan.version_created`. Subscriptions carry `plan_version`, `previous_plan_version`, `next_plan_version` and `plan_version_migration_id`.
 - SDKs: plan versions and migrations in `@nozle-js/node`, `nozle-sdk` and `nozle-go`; `<CurrentPlan />` no longer shows the current version's limits to a customer on an older version.
 
-### Engine webhook verification (Engine 2.0.3)
+</Update>
 
-_October 21, 2026_
+<Update label="October 21, 2026">
+
+## Engine webhook verification (Engine 2.0.3)
 
 - Core webhooks to Nozle's Engine are verified with the sending organization's own `hmac_key`. Every organization's `hmac` endpoint is accepted; an unsigned, forged or cross-organization request, or one whose organization is unknown, gets `401` in every environment, and the Engine answers `503` if the key cannot be read so that Core retries. **Engine webhook endpoints must use the `hmac` signature algorithm**: `jwt` endpoints are rejected. See [Webhooks to the Engine](/api/receive-webhooks).
 - A signed webhook that names another organization's subscription no longer creates that subscription's credit grants.
 - The `NOZLE_WEBHOOK_SECRET` setting is removed and ignored.
 
-### Razorpay, Stripe and plan configuration fixes (API 3.8.11)
-
-_October 21, 2026_
+## Razorpay, Stripe and plan configuration fixes (API 3.8.11)
 
 - Razorpay customers created in the dashboard, or assigned to a Razorpay connection without a link, can pay credit top-ups, invoice payment URLs and overdue-invoice payment links without a plan checkout first: the missing link is created on the next attempt (3.8.3). See [Razorpay](/integrations/razorpay#assign-the-connection-to-customers).
 - Razorpay customer sync links a buyer who already exists in your Razorpay account, sends a new request after the customer's details are corrected, reconciles requests with an unknown outcome, and sends the phone as E.164 digits (3.8.4).
@@ -597,17 +556,13 @@ _October 21, 2026_
 - GraphQL `createOrUpdatePlanConfig` answers `not_found` for a plan of another organization or an unknown plan, and a plan never shows a plan configuration written by another organization. Such configurations written before are removed (3.8.11).
 - Includes API 3.8.3, 3.8.4, 3.8.5, 3.8.6, 3.8.7, 3.8.8, 3.8.9 and 3.8.10.
 
-### Dashboard 1.7.0
-
-_October 21, 2026_
+## Dashboard 1.7.0
 
 - Cost Sheet form: the margin policy is created after the Cost Sheet is published. If publishing fails, no policy is created and the draft stays. If only the policy cannot be saved, the Cost Sheet stays published, the dashboard says that no margin policy is active for the Feature, and opens the sheet.
 - New **When cost can't be estimated** select (Allow, Warn, Deny): what `/can` does when the Feature has no cost estimate, as in the AI-token path (`detailed_events_only`). With that path it follows the policy mode until you change it, so a Deny policy now denies. Before, the dashboard always sent Warn. See [Margin policy](/guides/margin/cost-models#margin-policy).
 - Overview, hub and invoice aging report: MRR, ARR, Outstanding and Overdue tiles show only the total in your default currency, with the unit inline ("$1,677.23 /mo"). An info icon beside the figure shows the per-currency split ("By currency: ₹143,994.00 · $153.00") and appears only when more than one currency is involved. The "Converted to ... at the ECB rate of ..." line of 1.6.0 is gone, from the tiles and the aging report export.
 
-### Engine 2.0.2: subscription selection, running totals and billing periods
-
-_October 21, 2026_
+## Engine 2.0.2: subscription selection, running totals and billing periods
 
 - **Breaking (2.0.0):** `GET /can` accepts optional `subscription_id` and `entity_id`. Without them, a customer with several current subscriptions is evaluated on its one own (not Entity-owned) subscription; when there is none or more than one, it answers `200` with `allowed: false` and `reason: subscription_required`, and `POST /billing/upgrade` answers `409 subscription_required`. Before, both used the most recently started subscription. A customer with one current subscription sees no change. Send `subscription_id` or `entity_id` for customers with several. See [Which subscription is checked](/guides/entitlements/can-endpoint#which-subscription-is-checked).
 - Usage counters are kept per subscription, so one Entity's seat never counts against another subscription's limit. Only subscriptions that are current now count.
@@ -619,9 +574,7 @@ _October 21, 2026_
 - `GET /analytics/overview` returns invoiced revenue (`invoiced_revenue_cents`, `previous_period_invoiced_revenue_cents`, `invoiced_revenue_mom_percent`, `invoiced_revenue_by_currency`, and the dates of both windows) next to the estimated usage revenue, and month over month compares the same days of the previous month. Before, on October 2 with flat revenue it showed -96.7% (1.10.0). See [Overview revenue](/guides/margin/dashboard).
 - Includes Engine 1.9.1, 1.9.2, 1.10.0, 1.11.0, 2.0.0, 2.0.1 and 2.0.2.
 
-### Legacy keys, entitlement fixes and checkout origins (API 3.8.2)
-
-_October 21, 2026_
+## Legacy keys, entitlement fixes and checkout origins (API 3.8.2)
 
 - **Superseded by Core 6.0.0: the old key names are removed now, not on January 19, 2027.** The next sentence describes the window Core 3.8.2 opened. **The old key names are back until January 19, 2027, then removed.** Since API 1.0.0 the REST, webhook and CSV keys had been renamed from the former product prefix to `nozle_` (`nozle_id`) or to no prefix (`customer_id`) without notice. Until January 19, 2027 (inclusive), REST responses and webhook payloads carry each old key beside its new key, with the same value, on every object that had it; the old EU tax codes resolve to `nozle_eu_*` in `tax_codes` and `GET`, `PUT` and `DELETE /taxes/{code}`; and CSV exports repeat the id columns at the end under their old names. The `nozle_*` keys stay. **Read the new keys before that date**: after it the old names are removed. The key list is on [API standards](/api/api-standards#legacy-key-names-removal-january-19-2027), and the exact old names are in the OpenAPI specification.
 - Entitlement `PATCH` (`/plans/{code}/entitlements` and `/subscriptions/{external_id}/entitlements`) changes only the metered settings it sends. `{"hard_limit": false}` keeps the usage limit, and an omitted `min_margin_percent`, `margin_enforcement_mode` or `enforce_plan_margin` is unchanged. Before, every omitted setting was reset (no usage limit, hard limit, no margin floor, `enforce`). On a subscription, omitted settings keep the subscription's override, or the plan's value. `POST` still replaces the whole entitlement. Restoring a removed feature or dropping an override now reaches `/can` within its usual refresh (3.5.1).
@@ -635,9 +588,7 @@ _October 21, 2026_
 - Automatic dunning runs for organizations whose Nozle plan includes it (Growth and up). A customer or billing entity accepts only a dunning campaign of its own organization (another's answers `not_found`), and applying the billing entity's current campaign again succeeds (3.8.2). See [Payments](/guides/billing/payments).
 - Includes API 3.5.1, 3.5.2, 3.5.3, 3.6.0, 3.6.1, 3.7.0, 3.7.1, 3.8.0 and 3.8.1.
 
-### Dashboard 1.6.0
-
-_October 21, 2026_
+## Dashboard 1.6.0
 
 - Settings > Billing settings > Plan: the plan cards show the prices, limits and descriptions of [nozle.dev/pricing](https://nozle.dev/pricing), including $0.04 per 1,000 events over the included amount on Starter, Growth and Scale and "+ 0.6%" / "+ 0.5%" revenue share. A note says that passing the MRR limit upgrades the workspace automatically, from Starter to Growth and from Growth to Scale. See [Nozle plans and pricing](/guides/getting-started/nozle-plans).
 - The current plan shows two usage bars: **Events used this period** (events used against the included events) and **MRR tracked** (tracked MRR in USD against the plan's MRR limit). A bar without a number reads **Not reported** instead of 0%. See [Usage on the Plan page](/guides/getting-started/nozle-plans#usage-on-the-plan-page).
@@ -645,9 +596,7 @@ _October 21, 2026_
 - Analytics panels that are not available, such as MRR movement and retention, say so and offer no Retry button. Before, they showed "Could not load" with a Retry that could never work.
 - Includes dashboard 1.5.0.
 
-### Workspace billing and converted totals (Engine 1.8.1)
-
-_October 21, 2026_
+## Workspace billing and converted totals (Engine 1.8.1)
 
 - Your workspace's usage is now billed through Nozle's own billing: its processed events are reported to your Nozle plan every hour, and events over the included amount are billed at $0.04 per 1,000 events at the end of the month. A plan change in the middle of a month bills every event once. See [Nozle plans and pricing](/guides/getting-started/nozle-plans).
 - The Growth and Scale revenue share is charged on collected revenue: your paid invoices excluding tax, minus refunds, converted to USD at the rate of the payment date (the official peg for AED, SAR, QAR, BHD, OMR and JOD, otherwise the ECB reference rate, with a second daily public source for currencies the ECB does not publish). See [Revenue share](/guides/getting-started/nozle-plans#revenue-share).
@@ -655,9 +604,7 @@ _October 21, 2026_
 - Nozle's billing status of your workspace adds `events_used`, `events_included`, `events_used_percent`, `mrr_tracked_usd_cents`, `mrr_limit_usd_cents`, `mrr_used_percent` and `plan_limits`, which the Plan page shows as usage bars. The [billing status](/api/billing-status) of your own customers is unchanged. See [Plan status fields](/guides/getting-started/nozle-plans#plan-status-fields).
 - Includes Engine 1.5.0, 1.6.0, 1.7.0 and 1.8.0.
 
-### Nozle plans, converted totals and security logs (API 3.4.0)
-
-_October 21, 2026_
+## Nozle plans, converted totals and security logs (API 3.4.0)
 
 - Nozle plans: events over the included 50K (Starter), 10M (Growth) or 100M (Scale) are billed at $0.04 per 1,000 events in 1,000-event blocks at the end of the month and are never blocked. The revenue share, 0.6% on Growth and 0.5% on Scale, is charged on collected revenue in USD. The MRR limits are $5K, $100K and $1M. See [Nozle plans and pricing](/guides/getting-started/nozle-plans).
 - Your tracked MRR is checked once a day. Passing the limit upgrades Starter to Growth and Growth to Scale, with the same plan change as the dashboard's upgrade: charged and applied at once with a saved payment method, otherwise when its checkout is paid. There is no automatic downgrade. Scale over $1M stays on Scale; contact sales for Enterprise. Usage emails at 50%, 80%, 90% and 100% are coming later. See [MRR limit and automatic upgrade](/guides/getting-started/nozle-plans#mrr-limit-and-automatic-upgrade).
@@ -669,9 +616,7 @@ _October 21, 2026_
 - Revenue analytics, analytics dashboards and forecasted usage remain unavailable. Their GraphQL queries and `GET /analytics/usage` answer `analytics_unavailable` in every case, never an internal error.
 - Includes API 3.1.18, 3.1.19, 3.2.0 and 3.3.0.
 
-### Dashboard 1.4.8
-
-_October 21, 2026_
+## Dashboard 1.4.8
 
 - Onboarding, Connect step: **Reveal and copy** shows and copies the full secret key, and the sample `curl` carries it. Before, it copied the masked key and the request failed with `401`. A key created in the step is the one shown.
 - The sample event no longer sends a `timestamp`, so Nozle stamps the time it receives it and the event counts for a new subscription. Its transaction id is `onboarding-` plus 8 random hex characters, new on each visit to the step, so running the sample again is not dropped as a duplicate. The step's documentation links open working pages.
@@ -679,9 +624,7 @@ _October 21, 2026_
 - Settings > Access: members show their roles, and editing roles keeps the ones they have. Before, every member showed "No role assigned" next to the Admin badge, and adding a role removed Admin. Administrator now stands on its own: ticking it selects Administrator only, and the other roles show as included. A member stored as Administrator plus other roles opens as Administrator, and saving stores Administrator only.
 - Includes dashboard 1.4.6 and 1.4.7.
 
-### Analytics, API key permissions and catalog CORS (Engine 1.4.0)
-
-_October 21, 2026_
+## Analytics, API key permissions and catalog CORS (Engine 1.4.0)
 
 - With API key permissions, every Engine secret-key route now checks the key: `POST /customers` needs `customer:write`, `POST /check-and-deduct` `credit_system:write`, `GET /auth/centrifugo-token` `customer_usage:read`, `POST /cost-events` `event:write`, cost models and Cost Intelligence `analytic:read` or `analytic:write`, and `/analytics/*`, `/margin/*` and `POST /margin/simulate` `analytic:read`. A key without it gets `403 permission_denied`. Organizations without API key permissions see no change. See [Engine routes](/api/authentication#engine-routes).
 - `POST /analytics/snapshot` and `POST /onboarding/chat` are internal to Nozle and accept only its internal service token. Secret keys get `403`.
@@ -690,9 +633,7 @@ _October 21, 2026_
 - MRR is the monthly equivalent of each active subscription's plan amount: weekly × 52 / 12, monthly × 1, quarterly / 3, semiannual / 6, yearly / 12. ARR is the yearly equivalent. A 1,200.00 yearly plan now counts 100.00 MRR and 1,200.00 ARR (before: 1,200.00 MRR and 14,400.00 ARR). Subscriptions still in their trial and subscriptions of deleted customers are left out. This MRR is subscription-based, so it can differ from the invoice-based `GET /analytics/mrr`.
 - When the billing data or the analytics store cannot be read, the analytics overview, the invoices summary and the `/analytics/*` and `/margin/*` reads answer `503 analytics_unavailable`, instead of zero revenue or `500 internal_error`. A missing analytics schema still answers `503 analytics_schema_missing`. The MRR history gets no zero day from such a failure. See [Margin dashboard](/guides/margin/dashboard).
 
-### Plan catalog, analytics and branding (API 3.1.17)
-
-_October 21, 2026_
+## Plan catalog, analytics and branding (API 3.1.17)
 
 - GraphQL `nozleAnalyticsOverview` adds `currency` and `mrrByCurrency` (`currency`, `mrrCents`, `arrCents`), and `nozleAnalyticsInvoicesSummary` adds `currency` and `byCurrency` (`currency`, `outstandingCents`, `overdueCents`), from Engine 1.4.0. When analytics cannot be computed, these queries answer a GraphQL error with the code `analytics_unavailable` and `status: 503` instead of an internal error.
 - Hiding a plan family or a feature from the pricing table only removes it from the pricing table list. `GET /plans/{code}` with a publishable key returns a plan of a hidden or deleted family instead of `404`, and every plan, listed or read by code, carries all its entitlements and charges, including those of hidden features. Plans pending deletion still answer `404` to publishable keys. See [Which plans are returned](/api/list-plans#which-plans-are-returned).
@@ -702,34 +643,26 @@ _October 21, 2026_
 - **Breaking:** the GraphQL mutations `createRole`, `updateRole` and `destroyRole` and their input types are removed. Custom roles are no longer part of the product. The built-in roles are `admin`, `finance` and `manager`, and the `roles` query lists them.
 - Revenue analytics, analytics dashboards and forecasted usage are not available. `GET /analytics/usage` answers `503 analytics_unavailable`.
 
-### Node.js SDK 0.13.1
-
-_October 21, 2026_
+## Node.js SDK 0.13.1
 
 - [`@nozle-js/node` 0.13.1](https://www.npmjs.com/package/@nozle-js/node/v/0.13.1): **Behaviour change:** `wrapOpenAI` and `wrapAnthropic` return a new view of the client and never change the client you pass in. Use the returned client: code that ignored the return value and kept calling the original client no longer records usage.
 - Fixed: wrapping one shared client for several customers recorded an event for every one of them on each call. Each view now records once, for its own `customerId`, so you can keep one provider client and wrap it per request. Wrapping an already wrapped client wraps its original. `withResponse()`, `parse()`, `stream()` and streaming keep working and record once. See [Client wrappers](/sdks/node/llm-auto-capture#client-wrappers).
 - Install with `npm install @nozle-js/node@0.13.1`.
 
-### Python SDK 0.13.1
-
-_October 21, 2026_
+## Python SDK 0.13.1
 
 - [`nozle-sdk` 0.13.1](https://pypi.org/project/nozle-sdk/0.13.1/): **Behaviour change:** `wrap_openai` and `wrap_anthropic` return a view of the client and never change the client you pass in. Use the returned client: code that ignored the return value and kept calling the original client no longer records usage.
 - Fixed: wrapping one shared client for several customers recorded an event for every one of them on each call. Each view now records once, for its own `customer_id`, for sync and async clients and streams. Every other attribute is read from the original client, `isinstance` checks still pass, and wrapping an already wrapped client wraps its original. See [Client wrappers](/sdks/python/llm-auto-capture#client-wrappers).
 - Install with `pip install nozle-sdk==0.13.1`.
 
-### Dashboard 1.4.5
-
-_October 21, 2026_
+## Dashboard 1.4.5
 
 - Saving the General, Invoicing, Address or Notifications settings sends only the fields you edited, so it no longer resets the default billing entity's email, email settings, net payment term or grace period. Notifications edits the default billing entity's email settings.
 - Editing a usage limit in a plan family sets the limit of that plan only, so a monthly and a yearly plan keep their own limits.
 - Adding a billing interval to a plan pre-fills the form from the source plan, as Duplicate does: charges, fixed charges, trial and taxes. A note lists what was copied. Amounts are copied unchanged, so adjust them for the new interval.
 - Includes dashboard 1.4.4. Version 1.4.5 changes only tests.
 
-### Usage, credits and entitlements (Engine 1.3.3)
-
-_October 21, 2026_
+## Usage, credits and entitlements (Engine 1.3.3)
 
 - [`/usage/check`](/api/usage-check) and [`/usage/track`](/api/usage-track) accept an optional `subscription_id`, the external id of the active subscription that pays. With `entity_id`, the Entity's own active subscription pays, else the customer's own; customers with one subscription per Entity no longer get `422 active_subscription_ambiguous` on every call. See [Which subscription pays](/api/usage-track#which-subscription-pays).
 - A customer with no active subscription can spend credits that do not need one: paid top-ups, opening balances, and plan credits left after a cancellation until they expire. That usage sends no billing event. Before, every call returned `404 active_subscription_not_found`.
@@ -743,9 +676,7 @@ _October 21, 2026_
 - The `/admin/*` routes accept only Nozle's internal service token. Organization secret and publishable keys get `403`.
 - Reliability: an event accepted by `POST /events` is always post-processed (pay-in-advance fees, wallet refresh), even when an internal queue is briefly unavailable.
 
-### Billing, checkout and API keys (API 3.1.10)
-
-_October 21, 2026_
+## Billing, checkout and API keys (API 3.1.10)
 
 - **Breaking:** a plan created through `POST /plans`, GraphQL, the dashboard onboarding or the Agent Kit is shown on the pricing table by default again, so the [public plan catalog](/api/list-plans) lists it at once. Since 3.0.0 its new plan family started hidden, and `GET /plans/{code}` answered `404 plan_not_found`. Send `show_on_pricing: false` (GraphQL `showOnPricing: false`) to create it hidden. Existing families keep their visibility.
 - Usage limits stay per plan inside a plan family. Entitlement writes set `usage_limit` and `hard_limit` on the plan in the path only; features and privileges are still shared by the family. GraphQL `updatePlanFamilyEntitlements` accepts `planId`.
@@ -758,24 +689,26 @@ _October 21, 2026_
 - Saving organization settings (`PUT /api/v1/organizations`) copies to the default billing entity only the fields it changes. Before, a save such as a logo change could blank the billing entity's email and email settings, and customer emails stopped. Edit the billing entity itself to change its own values.
 - Executing a signed quote applies package, graduated, volume and percentage charge settings from the dashboard, and stores a charge minimum in cents (a $50 minimum was stored as $0.50). Quotes already signed are fixed without changes.
 
-### React SDK 0.13.0
+</Update>
 
-_October 19, 2026_
+<Update label="October 19, 2026">
+
+## React SDK 0.13.0
 
 - [`@nozle-js/react` 0.13.0](https://github.com/nozle-dev/nozle-js/releases/tag/react-v0.13.0): the dashboard page Developers > Customize SDK saves the appearance (theme, colours, plan card options) for your organization, and every SDK component picks it up automatically with no code. Props in code win: component `appearance` over `BillingProvider` `appearance` over the saved appearance. Set `<BillingProvider savedAppearance={false}>` to ignore it. See [Saved appearance](/sdks/react/styling#saved-appearance).
 - Global and component settings. Developers > Customize SDK has two tabs: Global settings (theme, colours, radius, "Powered by Nozle", and the `BillingProvider` code to paste at the root of your app) and Component settings, where one component gets its own theme and colours that apply to it only. They sit above the global settings and below the `appearance` you pass in code. See [Saved appearance](/sdks/react/styling#saved-appearance).
 - Plan buttons: with no current plan known, every plan gets the primary button; with `currentPlanCode`, plans above it get the primary button, the current plan uses the primary colour with no shadow, and plans at or below it get a plain button. Contact-sales plans stay outlined. See [Plan buttons](/sdks/react/styling#plan-buttons).
 - "Powered by Nozle" shows by default for every organization. A plan that removes the branding can turn it off for all components in Developers > Customize SDK > Global settings > Branding. It now shows by default, also for plans that removed it before, until you turn it off. See [Powered by Nozle](/sdks/react/components#powered-by-nozle).
 
-### Saved SDK appearance in the plan catalog
-
-_October 19, 2026_
+## Saved SDK appearance in the plan catalog
 
 - `GET /api/v1/plans` returns `meta.sdk_appearance`, the appearance saved for the organization (`{}` when none), for publishable and secret keys. It can hold the global settings and, under `components`, the settings of single SDK components, plus `hideBranding`. The saved object is at most 8 KB. `GET /plans/{code}` does not return it. See the [public plan catalog](/api/list-plans).
 
-### Nozle Agent Kit 1.0.4
+</Update>
 
-_October 18, 2026_
+<Update label="October 18, 2026">
+
+## Nozle Agent Kit 1.0.4
 
 - [Agent Kit 1.0.4](https://github.com/nozle-dev/nozle-agent-kit/releases/tag/v1.0.4) follows the SDK releases of October 17. On Node, the agent captures LLM usage with `captureFetch()` for any client that accepts a custom `fetch`, including the Vercel AI SDK, LangChain and Gemini. On Python and Go, it captures through the provider's HTTP client. It serves billing screens through `createBillingHandler()` and the React billing hooks, verifies webhooks with the SDK helpers, and reads errors by `NozleApiError` status and code.
 - It also follows the current API: plan families, `change_at` and pay-first plan changes, 422 for an event that matches no active subscription or several, and `null` limits from `can()`.
@@ -783,9 +716,11 @@ _October 18, 2026_
 - The guards block a client file that imports `@nozle-js/node`, and treat capture helpers like the LLM wrappers when they check for double billing.
 - To update, see [Install and update](/guides/agent-kit/install#update). Codex CLI users run the `hosts codex --write` command again in each app, because the hook path contains the version.
 
-### Node.js SDK 0.13.0
+</Update>
 
-_October 17, 2026_
+<Update label="October 17, 2026">
+
+## Node.js SDK 0.13.0
 
 - [`@nozle-js/node` 0.13.0](https://github.com/nozle-dev/nozle-js/releases/tag/node-v0.13.0): `new Nozle()` reads `NOZLE_SECRET_KEY` when you pass no `apiKey`. The `host` option (default `https://api.nozle.app`) fills in `baseUrl` and `eventsUrl`. Opt-in retries with `maxRetries` and `retryDelayMs` repeat only requests that are safe to repeat. See [Installation](/sdks/node/installation).
 - Every call that gets a non-2xx response throws `NozleApiError`, which now carries `requestId` and `retryAfter`. The message keeps its `<operation> failed: <status> <statusText>` form and the class still extends `Error`. See [Errors and retries](/sdks/node/errors).
@@ -799,9 +734,7 @@ _October 17, 2026_
 - **Breaking:** `CanResult.limit` and `CanResult.remaining` are typed `number | null`, `null` when the feature has no limit. Code that checked `=== undefined` should check `== null`. `PingResult.version` and `SubscriptionOptions.blocked_reason` are removed from the types; the API never sent them.
 - Install with `npm install @nozle-js/node@0.13.0 @nozle-js/react@0.11.0 @tanstack/react-query`.
 
-### React SDK 0.11.0
-
-_October 17, 2026_
+## React SDK 0.11.0
 
 - [`@nozle-js/react` 0.11.0](https://github.com/nozle-dev/nozle-js/releases/tag/react-v0.11.0) adds customer billing hooks built on TanStack Query: `useSubscription`, `useEntitlement`, `useCreditBalance`, `useCreditHistory`, `useUsage`, `useUpgradePreview`, `useBillingRefresh`, `useInvoices` and `useInvoiceDownload`. They read your backend route set as `BillingProvider` `billingEndpoint` (served by `createBillingHandler` from `@nozle-js/node` `0.13.0`), so the browser never holds a secret key. See [Provider and hooks](/sdks/react/hooks).
 - New components: [`CurrentPlan`](/sdks/react/components/current-plan), [`CreditBalance`](/sdks/react/components/credit-balance), [`CreditHistory`](/sdks/react/components/credit-history), [`UsageBreakdown`](/sdks/react/components/usage-breakdown), [`UsageTrend`](/sdks/react/components/usage-trend) and [`PoweredByNozle`](/sdks/react/components/powered-by-nozle).
@@ -814,9 +747,7 @@ _October 17, 2026_
 - **Breaking:** components no longer read Tailwind or shadcn variables, and `PricingTable` marks contact-sales plans from `contactSalesPlans` instead of their names. See "Upgrading from 0.10" on the [Appearance](/sdks/react/styling) page.
 - Install with `npm install @nozle-js/node@0.13.0 @nozle-js/react@0.11.0 @tanstack/react-query`.
 
-### Python SDK 0.13.0
-
-_October 17, 2026_
+## Python SDK 0.13.0
 
 - [`nozle-sdk` 0.13.0](https://github.com/nozle-dev/nozle-python/releases/tag/v0.13.0) adds `AsyncNozle` for asyncio apps, with the same arguments, namespaces and methods as `Nozle`, awaited. See [Installation](/sdks/python/installation#async-client).
 - `Nozle()` reads `NOZLE_SECRET_KEY` when you pass no `api_key`. The `host` argument (default `https://api.nozle.app`) fills in `base_url` and `events_url`. Opt-in retries with `max_retries` and `retry_delay` repeat only requests that are safe to repeat. `NozleAPIError` adds `request_id` and `retry_after`.
@@ -828,9 +759,7 @@ _October 17, 2026_
 - `PingResult.version` and `SubscriptionOptions.blocked_reason` are removed from the types; the API never sent them.
 - Install with `pip install nozle-sdk==0.13.0`.
 
-### Go SDK v0.12.0
-
-_October 17, 2026_
+## Go SDK v0.12.0
 
 - [`github.com/nozle-dev/nozle-go` v0.12.0](https://github.com/nozle-dev/nozle-go/releases/tag/v0.12.0): `New` reads `NOZLE_SECRET_KEY` when the key argument is blank. `WithHost` (default `https://api.nozle.app`) fills in the Engine and Core URLs. Opt-in retries with `WithMaxRetries` and `WithRetryDelay` repeat only calls that are safe to repeat. `APIError` adds `RequestID` and `RetryAfter`. See [Installation](/sdks/go/installation).
 - `WrapHTTPClient` records the token usage of any LLM SDK that takes an `*http.Client`, and `RecordUsage` records usage your code read itself. See [LLM usage capture](/sdks/go/llm-usage).
@@ -841,16 +770,12 @@ _October 17, 2026_
 - **Breaking:** removed struct fields the API never sent: `PingResult.OrgID`, `KeyType`, `Env` and `Version`, and `CanResult.CostPerUseCents`, `RevenuePerUseCents`, `MarginPerUseCents` and `MinMarginPercent` (use `CanResult.Economics`).
 - Install with `go get github.com/nozle-dev/nozle-go@v0.12.0`.
 
-### React themes
-
-_October 17, 2026_
+## React themes
 
 - `@nozle-js/react` `0.11.0` adds `appearance` on `BillingProvider` and every component, with predefined themes from `@nozle-js/react/themes`: `light`, `dark`, `minimal`, `neobrutal`, `nozle` and `nozleDark`, and every colour adjustable. `PricingTable` adds `highlightStyle` (`outline` or `filled`) and `highlightLabel`. See [Appearance](/sdks/react/styling).
 - Components render without Tailwind. `PricingTable` marks contact-sales plans from `contactSalesPlans` instead of their names. Upgrade notes are on the Appearance page.
 
-### Error statuses and checkout fixes
-
-_October 17, 2026_
+## Error statuses and checkout fixes
 
 - **Breaking:** a request that the resource's current state refuses now returns `422` instead of `405`, with the same `code` (for example `not_voidable` or `plan_transition_policy_required`). A conflict with another operation in progress returns `409`. The SDKs branch on `code`, so their behavior is unchanged. See [Errors](/api/errors).
 - Bad bodies and unreachable dependencies return JSON errors with a `code` instead of `500`: `400 bad_request`, `502 upstream_unavailable`.
@@ -858,9 +783,7 @@ _October 17, 2026_
 - Checking out the same plan again reopens an abandoned new-subscription checkout; a different plan replaces it and returns the new checkout. `409 subscription_checkout_in_progress` (`entity_subscription_checkout_in_progress` for an Entity) remains only while the provider is still processing a payment for the old checkout.
 - Stripe: a reused invoice checkout key returns `409 idempotency_key_reused`; a rejected webhook URL sends `payment_provider.error`; `payment_method.detached` clears the stored default. Razorpay credentials are checked when you connect.
 
-### Usage, credits and checkout fixes
-
-_October 17, 2026_
+## Usage, credits and checkout fixes
 
 - The [LLM proxy](/api/llm-proxy#subscription) finds the subscription to bill before it calls the provider, and its usage event carries that `external_subscription_id`, so proxy usage is billed. A customer with several active subscriptions needs the new `X-Nozle-Subscription` header, which is not forwarded. A customer with no matching active subscription returns `422 active_subscription_not_found`, several without the header `422 active_subscription_ambiguous`; the provider is not called.
 - `POST /events` and `/events/batch` accept `external_customer_id` without `external_subscription_id`: the event is billed to the customer's single active subscription. No or several active subscriptions return `422 active_subscription_not_found` or `422 active_subscription_ambiguous` (in a batch, under the event's position). An event with neither id returns `422 validation_errors` with `external_subscription_id: ["value_is_mandatory"]`. See [Events](/api/events).
@@ -871,41 +794,43 @@ _October 17, 2026_
 - Stripe invoice checkout and invoice payment URLs refuse an invoice that is paid, voided, draft, closed, failed or has nothing due with `invalid_invoice_status_or_payment_status`, as Razorpay already did.
 - A paid upgrade checkout returns `409 subscription_change_pending` while the subscription has a scheduled cancellation or plan change. Cancelling at period end, scheduling a plan change or applying an immediate downgrade cancels an open upgrade checkout and expires its Stripe Checkout Session or Razorpay order.
 
-### Cancellation timing and downgrade credits
+</Update>
 
-_October 16, 2026_
+<Update label="October 16, 2026">
+
+## Cancellation timing and downgrade credits
 
 - `DELETE /subscriptions/{id}` without `cancellation_policy` uses your organization's cancellation timing, which defaults to `end_of_period`: the subscription stays active until its period ends. Send `cancellation_policy=immediate` to end it now. The credit, refund and final invoice options come from the request, then the subscription, then the organization. Set the defaults in **Settings → Billing → General → Cancellations**. See [Cancel subscription](/api/cancel-subscription).
 - An immediate downgrade takes back the old plan's unused credits beyond what the new plan grants for the rest of the period (`downgrade_plan_credits: revoke_excess`, the default). It never takes a balance below zero. To keep them until the period ends, set **Settings → Billing → General → "Credits after an immediate downgrade"** to keep, or send `billing_configuration.downgrade_plan_credits: "keep"` in `PUT /organizations`. See [Included Plan Credits](/guides/credits/plan-grants#lifecycle-policy).
 
-### Link existing Stripe customers from the SDKs
+</Update>
 
-_October 14, 2026_
+<Update label="October 14, 2026">
+
+## Link existing Stripe customers from the SDKs
 
 - Customer upsert accepts a billing configuration, so a customer can be created and linked to an existing Stripe customer (`cus_…`) in one call, without a separate REST request. Nozle stores the link and creates nothing in Stripe; repeating the upsert is safe.
 - [`@nozle-js/node` 0.12.0](https://github.com/nozle-dev/nozle-js/releases/tag/node-v0.12.0): `customers.upsert({ billingConfiguration })`. [`nozle-sdk` 0.12.0](https://github.com/nozle-dev/nozle-python/releases/tag/v0.12.0): `customers.upsert(..., billing_configuration=...)`. [`github.com/nozle-dev/nozle-go` v0.11.0](https://github.com/nozle-dev/nozle-go/releases/tag/v0.11.0): `Customer.BillingConfiguration`.
 - Upserts without it send the same request as before. See [Customers and Entities](/sdks/node/customers-entities#link-a-customer-that-already-exists-in-stripe) and [Assign the connection to customers](/integrations/stripe#assign-the-connection-to-customers).
 - Install with `npm install @nozle-js/node@0.12.0`, `pip install nozle-sdk==0.12.0` or `go get github.com/nozle-dev/nozle-go@v0.11.0`.
 
-### Nozle Agent Kit
+</Update>
 
-_October 13, 2026_
+<Update label="October 13, 2026">
+
+## Nozle Agent Kit
 
 - Released the [Nozle Agent Kit](/guides/agent-kit/overview), skills and guard hooks that let Claude Code, Codex CLI, and OpenCode integrate Nozle billing into your application. The agent reads your account through a read-only OAuth connection and edits only the files you approve.
 - [Agent Kit 1.0.3](https://github.com/nozle-dev/nozle-agent-kit/releases/tag/v1.0.3): the agent installs the packages the approved scope lists, such as `@nozle-js/node`, with your project's package manager, after you approve the command.
 - See [Install and update](/guides/agent-kit/install) and [Run an integration](/guides/agent-kit/workflow).
 
-### Go event ingestion through Engine
-
-_October 13, 2026_
+## Go event ingestion through Engine
 
 - Node `0.11.0`, Python `0.11.0`, and Go `v0.10.0` send Feature Events to `https://api.nozle.app/engine/api/v1/events`. Go batches use `/engine/api/v1/events/batch`.
 - Configure the Engine base URL for custom event ingestion. Core URL settings continue to control billing resources and subscription discovery. Event payloads, secret-key authentication, and transaction IDs are unchanged.
 - Updated the [Events API](/api/events), SDK setup/tracking guides, and OpenAPI event creation operations to use Engine.
 
-### Razorpay and Stripe guides, new SDK releases, API fixes
-
-_October 13, 2026_
+## Razorpay and Stripe guides, new SDK releases, API fixes
 
 - Added a [Razorpay integration guide](/integrations/razorpay) and expanded the [Stripe integration guide](/integrations/stripe) to the same depth: connection setup, webhooks, checkout and retry behavior, refunds, errors and testing.
 - Added the [public plan catalog reference](/api/list-plans).
@@ -919,45 +844,51 @@ _October 13, 2026_
 - Corrected the documentation for entitlement `reason` values, the required usage `timestamp`, credit balance decimals, the credit operations `limit` range, the margin simulate request, unknown cost meters and trend granularity.
 - Install with `npm install @nozle-js/node@0.10.0 @nozle-js/react@0.10.2`, `pip install nozle-sdk==0.10.0` or `go get github.com/nozle-dev/nozle-go@v0.9.1`.
 
-### React SDK 0.10.1
+</Update>
+
+<Update label="October 2026">
+
+## React SDK 0.10.1
 
 - Released [`@nozle-js/react` 0.10.1](https://github.com/nozle-dev/nozle-js/releases/tag/react-v0.10.1).
 - Fixed `usePlans` error handling for failed catalog requests, stale results and superseded responses. Upgrade with `npm install @nozle-js/react@0.10.1`.
 
-### Production integration guidance
+## Production integration guidance
 
 - Completed the quickstart prerequisites and aligned tracking and entitlement Feature codes.
 - Clarified asynchronous processing and initial credit grants, unavailable or gated features, and retry behavior. See the [production integration checklist](/guides/getting-started/production-readiness).
 - Compile TypeScript examples against the published SDK packages instead of hand-maintained substitute declarations.
 
-### Server SDK 0.9.1
+## Server SDK 0.9.1
 
 - Released [`@nozle-js/node` 0.9.1](https://github.com/nozle-dev/nozle-js/releases/tag/node-v0.9.1) on npm and [`nozle-sdk` 0.9.1](https://github.com/nozle-dev/nozle-python/releases/tag/v0.9.1) on PyPI.
 - Fixed RFC 3339 Feature Event timestamp serialization to Unix seconds in both SDKs, including OpenAI and Anthropic wrapper events. Numeric timestamps remain supported; malformed timestamps fail before delivery.
 - Install with `npm install @nozle-js/node@0.9.1` or `pip install nozle-sdk==0.9.1`. React was at `0.10.0` at that release; use the `0.10.1` patch above. Go remains at `v0.9.0`.
 
-### Go SDK 0.9.0
+## Go SDK 0.9.0
 
 - Released [`github.com/nozle-dev/nozle-go` v0.9.0](https://github.com/nozle-dev/nozle-go/releases/tag/v0.9.0) with typed billing, subscription, Entity, credit, usage, Cost Event, entitlement, and margin workflows.
 - Added automatic OpenAI and Anthropic usage capture for completed calls and streams through wrapped provider HTTP clients, plus explicit capture for custom delivery flows.
 - Published the Apache-2.0 licensed module through an immutable Go tag, with test, race, vet, and example checks in the release workflow.
 
-### Go SDK documentation and API reference
+## Go SDK documentation and API reference
 
 - Added Go SDK guides for installation, billing and subscriptions, tracking events, product credits, customers and Entities, entitlements, margin queries, errors, and OpenAI/Anthropic usage capture.
 - Added Go to SDK navigation and the existing quickstart, billing, credits, entitlement, margin, and React backend guidance.
 - Corrected Core API references for customer creation, Entity subscription checkout, and billing-state import; clarified the customer envelope and Unix-second Feature Event timestamps.
 - Added automatic Go OpenAI and Anthropic usage capture for completed calls and streams through a wrapped provider HTTP client. Manual capture remains available for queued delivery and custom provider clients.
 
-## September 2026
+</Update>
 
-### Server SDK 0.9.0 and React SDK 0.10.0
+<Update label="September 2026">
+
+## Server SDK 0.9.0 and React SDK 0.10.0
 
 - Released [`@nozle-js/node` 0.9.0](https://github.com/nozle-dev/nozle-js/releases/tag/node-v0.9.0) and [`nozle-sdk` 0.9.0](https://github.com/nozle-dev/nozle-python/releases/tag/v0.9.0) with selected-subscription options, signed plan-change quotes, pending-change withdrawal, and scoped checkout recovery for merchant backends.
 - Released [`@nozle-js/react` 0.10.0](https://github.com/nozle-dev/nozle-js/releases/tag/react-v0.10.0) with billing portal and self-service controls that use those backend flows.
 - Node.js and Python are published through npm and PyPI trusted publishing. The package versions and their release tags are separate from the React package version.
 
-### Cost Intelligence foundation
+## Cost Intelligence foundation
 
 - Added versioned Cost Sheets, Cost Event Meters, and historical Feature cost-composition modes.
 - Added exact-decimal Feature Event and Detailed Cost Event rating with durable PostgreSQL ledger entries and rebuildable ClickHouse projections.
@@ -967,18 +898,20 @@ _October 13, 2026_
 - Added ledger-backed Feature, customer, Cost Event, Shared Cost, and Uncosted reporting with finalized billing revenue kept separate from estimated event revenue.
 - Added guarded replay tools for uncosted sources and failed ClickHouse projections, plus PostgreSQL-backed `/can` snapshots with disposable Redis caching.
 
-## August 2026
+</Update>
+
+<Update label="August 2026">
 
 _Updated through August 8, 2026._
 
-### Tenant-safe customer provisioning
+## Tenant-safe customer provisioning
 
 - Routed Node.js and Python `customers.upsert()` calls directly to Nozle Core using the merchant's secret key.
 - Removed master-organization authentication from the Engine customer compatibility endpoint.
 - Added local SDK validation and tenant-isolation regressions for customer provisioning.
 - Verified Node.js and Python customer creation against the Pullse Testing production organization with disposable canaries.
 
-### Mixed Entity checkout and billing anchors
+## Mixed Entity checkout and billing anchors
 
 - Added one-invoice, one-payment checkout for mixed Entity plan baskets of up to 100 Entities.
 - Added a stable customer-level Entity billing anchor established only after the first successful paid checkout.
@@ -986,7 +919,7 @@ _Updated through August 8, 2026._
 - Added replay-safe checkout batches and fail-closed protection for concurrent first-paid checkouts.
 - Clarified that paid top-ups enter the customer pool and are allocated explicitly to Entities.
 
-### Entity-owned subscriptions and SDK 0.5.0
+## Entity-owned subscriptions and SDK 0.5.0
 
 - Added independent subscriptions for customer Entities, including mixed monthly and annual plans under one paying customer.
 - Added Entity-scoped checkout, plan changes, end-of-period cancellation, stable subscription identities, and payment-gated activation.
@@ -994,62 +927,68 @@ _Updated through August 8, 2026._
 - Released the backend integration surface in `@nozle-js/node` 0.5.0 and `nozle-sdk` 0.5.0.
 - Verified the Core API and published Python SDK against production with reversible Entity-subscription canaries.
 
-### Subscription settlement controls
+## Subscription settlement controls
 
 - Added preview and apply APIs for cancellation, downgrade, and uncancel transitions.
 - Added merchant-controlled timing, billing-anchor, proration, credit, refund, offset, and final-invoice policies.
 - Added idempotent transition application so uncertain requests can be retried safely.
 - Released the settlement controls in `@nozle-js/node` 0.4.2 and `nozle-sdk` 0.4.2.
 
-### Developer experience
+## Developer experience
 
 - Completed the React, Node.js, and Python SDK references with current signatures and security guidance.
 - Added rendered React component previews and a dedicated theming reference.
 - Replaced customer-specific examples with neutral, reusable integration examples.
 - Restored the complete Nozle Billing API reference with generated request, response, and schema documentation.
 
-## July 2026
+</Update>
 
-### Product credits
+<Update label="July 2026">
+
+## Product credits
 
 - Introduced exact-decimal credit systems, plan grants, paid top-ups, immutable balance sources, and operation history.
 - Added advisory usage checks and atomic, idempotent credit consumption.
 - Added durable usage-event publication and reconciliation so committed deductions survive downstream outages.
 - Added customer and Entity balance APIs, per-Entity grants, shared-pool policies, and top-up allocation/deallocation.
 
-### Payment-first billing
+## Payment-first billing
 
 - Paid plan changes now preserve the current plan until payment succeeds.
 - Added payment-aware checkout results for hosted Stripe, embedded Stripe, immediate completion, and scheduled changes.
 - Added durable upgrade webhook processing and support for end-of-period cancellation.
 - Added merchant-configurable billing anchors and transition-policy defaults.
 
-### Security and tenancy
+## Security and tenancy
 
 - Restricted publishable keys to the public plan catalog.
 - Moved customer billing operations behind authenticated merchant backends and least-privilege secret keys.
 - Hardened customer, organization, mutation, and internal service authorization.
 - Removed automatic seat billing from Entity lifecycle changes; merchants now emit explicit, idempotent seat events.
 
-### SDKs and dashboard
+## SDKs and dashboard
 
 - Added product-credit and Entity APIs to the Node.js and Python SDKs.
 - Refactored React checkout around merchant-owned callbacks and forwarded validated return URLs to Stripe.
 - Added customer and Entity credit dashboards, paid top-up checkout, and refreshed analytics and settings interfaces.
 
-## June 2026
+</Update>
 
-### Entitlement rework
+<Update label="June 2026">
+
+## Entitlement rework
 
 - Added two-path entitlement resolution for feature gates and usage limits.
 - Added margin-aware decision fields: `cost_per_use_cents`, `revenue_per_use_cents`, and `margin_per_use_cents`.
 
-### Checkout flow
+## Checkout flow
 
 - Introduced invoice-first embedded Stripe checkout.
 - Made plan activation payment-gated.
 - Added one-off invoice checkout for credit top-ups and add-ons.
 
-### SDK updates
+## SDK updates
 
 - Released initial LLM usage capture for OpenAI and Anthropic in the Node.js and Python SDKs.
+
+</Update>
