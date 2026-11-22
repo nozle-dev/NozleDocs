@@ -50,7 +50,7 @@ A publishable key alone never reads or changes a customer: customer reads and mu
 
 ## Customer tokens
 
-A customer token lets a browser read **one** customer's billing state with your publishable key, without a backend route per read. Core 11.66.0 and Engine 2.64.0.
+A customer token lets a browser read **one** customer's billing state with your publishable key, without a backend route per read. Core 11.59.0 and Engine 2.64.0.
 
 1. Your backend mints a token for the signed-in customer with a secret key: [`POST /customer_tokens`](/api-reference/customers/create-a-customer-token) with `customer_id` (the customer's external ID, taken from your session, never from the browser), optional `ttl_seconds` and optional `features`. It answers `{"token": "...", "customer_id": "...", "expires_at": "..."}`. The key needs `customer:read`; a publishable key is refused.
 

@@ -1788,7 +1788,7 @@ paths:
         - Customers
       summary: Create a customer token
       description: |-
-        Core 11.66.0. Mints a short-lived, read-only token that lets a browser read **one** customer's billing state with your publishable key: send `Authorization: Bearer pk_...` and `X-Nozle-Customer-Token: <token>`. Call it from your backend for the signed-in customer; take `customer_id` from your session, never from the browser.
+        Core 11.59.0. Mints a short-lived, read-only token that lets a browser read **one** customer's billing state with your publishable key: send `Authorization: Bearer pk_...` and `X-Nozle-Customer-Token: <token>`. Call it from your backend for the signed-in customer; take `customer_id` from your session, never from the browser.
 
         The token is accepted only on reads of its own customer: on the Engine `GET /can`, `GET /subscriptions/current`, `GET /billing/status` and the customer's credit balance and operation reads; on Core `GET /customers/{external_customer_id}/current_usage`, `GET /customers/{external_customer_id}/past_usage` and `GET /subscriptions?external_customer_id=`. Every other route still refuses the publishable key. See [Customer tokens](/api/authentication#customer-tokens).
 
@@ -1864,7 +1864,7 @@ paths:
         - Customers
       summary: Revoke customer tokens
       description: |-
-        Core 11.66.0. Every customer token the organization minted until now is refused from the next request, on Core and on the Engine (`401 invalid_customer_token`). Tokens minted afterwards work; a token minted in the same second as the revocation is refused too. Use it when a token leaked. A secret key with `customer:write` is required.
+        Core 11.59.0. Every customer token the organization minted until now is refused from the next request, on Core and on the Engine (`401 invalid_customer_token`). Tokens minted afterwards work; a token minted in the same second as the revocation is refused too. Use it when a token leaked. A secret key with `customer:write` is required.
       operationId: revokeCustomerTokens
       responses:
         '200':
