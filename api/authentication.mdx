@@ -79,7 +79,7 @@ Every other route refuses the publishable key with `403 publishable_key_not_allo
 | `subscription` | `GET /subscriptions`, `GET /billing/status` and `GET /subscriptions/current` |
 | `credit_system` | Credit balances and credit operations |
 
-Minting needs only `customer:read`, so a key scoped to `customer:read` alone mints a token that reads none of these: each of those reads answers `403`. Mint with a key that also has the read permissions the browser needs.
+Minting needs only `customer:read`, so a key scoped to `customer:read` alone mints a token that reads none of these: each of those reads answers `403` (Core `read_action_not_allowed_for_<permission>`, for example `read_action_not_allowed_for_subscription`; the Engine `permission_denied`). Mint with a key that also has the read permissions the browser needs.
 
 **A token belongs to one customer record.** It reads the customer it was minted for, not whoever holds that external ID later. If the customer is deleted, its tokens answer `401 invalid_customer_token`, also after a new customer reuses the external ID.
 
