@@ -21,7 +21,7 @@ def handle_analytics_request(customer_id: str) -> tuple[dict[str, Any], int]:
             "remaining": check.get("remaining"),
         }, 403
 
-    # overage never denies: a soft limit is reached and the usage is billed as overage.
+    # overage never denies by itself: a soft limit is reached and the usage is billed as overage.
     if check.get("overage"):
         logging.warning("%s is past the analytics limit and billed as overage", customer_id)
 

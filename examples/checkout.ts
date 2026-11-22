@@ -7,7 +7,7 @@ const returnUrl = 'https://app.example.com/settings/billing';
 
 // What your backend sends back to the browser.
 type CheckoutReply =
-  | { action: 'redirect'; url: string }
+  | { action: 'redirect'; url: string; planUpgradeIntentId?: string }
   | { action: 'open_razorpay'; keyId: string; orderId: string; amountCents: number; currency: string; checkoutId: string }
   | { action: 'retry_later'; checkoutId: string }
   | { action: 'done'; planCode?: string }
@@ -35,7 +35,8 @@ function toReply(result: CheckoutResult): CheckoutReply {
     case 'hosted':
       // Stripe, or Nozle's auto-pay page. The return to returnUrl proves nothing:
       // confirm with the subscription.started webhook or by reloading billing state.
-      return { action: 'redirect', url: result.url };
+      // A paid upgrade carries planUpgradeIntentId: poll it with checkoutSettled.
+      return { action: 'redirect', url: result.url, planUpgradeIntentId: result.plan_upgrade_intent_id };
     case 'razorpay':
       return {
         action: 'open_razorpay',

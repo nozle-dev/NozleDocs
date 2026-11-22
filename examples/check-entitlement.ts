@@ -18,7 +18,7 @@ export async function handleAnalyticsRequest(customerId: string): Promise<Respon
     );
   }
 
-  // overage never denies: a soft limit is reached and the usage is billed as overage.
+  // overage never denies by itself: a soft limit is reached and the usage is billed as overage.
   if (check.overage) console.warn(`${customerId} is past the analytics limit and billed as overage`);
 
   return Response.json(await runAnalyticsQuery(customerId));

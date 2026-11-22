@@ -25,7 +25,7 @@ SCENARIOS = [
     ),
     (
         "Check an entitlement",
-        "Gate a request with `can()`: deny only when `allowed` is false, and treat `overage` as billed, not refused.",
+        "Gate a request with `can()`: deny only when `allowed` is false, and treat `overage` as billed: it never denies by itself.",
         "check-entitlement.ts",
         "check_entitlement.py",
         [("Node.js entitlements", "/sdks/node/entitlements"), ("Python entitlements", "/sdks/python/entitlements"), ("Entitlements", "/guides/entitlements/overview")],
@@ -59,6 +59,15 @@ SCENARIOS = [
         [("Node.js subscription self-service", "/sdks/node/billing#subscription-self-service"), ("Plan transition policies", "/api/plan-transition-policies")],
     ),
 ]
+
+
+# Examples deliberately not on the scenario page (the React ones have their own section).
+UNLISTED = {"merchant-backend-checkout.tsx", "node-sdk.ts", "python-sdk.py", "razorpay-checkout.tsx", "stripe-checkout.tsx"}
+
+
+def unlisted_scenarios() -> list[str]:
+    listed = {name for _, _, ts, py, _ in SCENARIOS for name in (ts, py)}
+    return sorted(p.name for p in (ROOT / "examples").iterdir() if p.is_file() and p.name not in listed | UNLISTED)
 
 
 def code(name: str, language: str) -> str:
@@ -117,6 +126,8 @@ def main() -> None:
     args = parser.parse_args()
     page = render()
     if args.check:
+        if missing := unlisted_scenarios():
+            sys.exit(f"examples/ files missing from SCENARIOS (add them or list in UNLISTED): {', '.join(missing)}")
         if not PAGE.exists() or PAGE.read_text() != page:
             sys.exit(f"{PAGE.relative_to(ROOT)} is out of date: run python3 scripts/sync-examples-page.py")
         return

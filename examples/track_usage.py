@@ -14,7 +14,7 @@ def track_generation(
     generation_id: str,
     input_tokens: int,
     output_tokens: int,
-    completed_at: datetime,
+    completed_at: datetime,  # timezone-aware: the API rejects a timestamp without an offset
 ) -> str:
     """Bill a feature metered from events. Call it after the work succeeded."""
     # The same transaction_id and timestamp on a retry record the event once.
@@ -28,7 +28,10 @@ def track_generation(
 
 
 def charge_agent_step(customer_id: str, step_id: str, started_at: datetime) -> dict[str, Any]:
-    """Spend credits for one unit of work: checked and deducted in one call."""
+    """Spend credits for one unit of work: checked and deducted in one call.
+
+    started_at must be timezone-aware: the API rejects a timestamp without an offset.
+    """
     result = nozle.usage.track(
         customer_id,
         "agent_execution",
