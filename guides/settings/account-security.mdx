@@ -11,6 +11,10 @@ Your email is used to sign in and to attribute every change you make.
 
 One Nozle account exists per email, whatever the case of its letters. Signing up again with the same email, even as `Name@example.com` instead of `name@example.com`, is refused with `user_already_exists` and creates no second account. This applies to email sign-up, Google and Okta (Core 11.46.0).
 
+### Google sign-in
+
+_Unreleased._ Nozle matches a Google sign-in to an account by email, so it refuses a Google account whose email Google has not verified (`google_email_not_verified`). Emails match in any case on password sign-in, password reset and Google. Any invalid Google token (wrong audience, issuer, expiry or signature) answers `invalid_google_token`. Google sign-in stays switched off in the dashboard until the release is configured, and cannot be turned on as a workspace's only sign-in method while Google credentials are missing (`google_auth_missing_setup`).
+
 ## Password
 
 Nozle changes passwords through a verified email link, never in the browser. Choose **Send reset link** and follow the link in the email. Your current password keeps working until you use the link.
@@ -68,12 +72,39 @@ _Unreleased._ You can sign in without your password. On the sign-in page choose 
 
 ## Active sessions
 
-Every browser and device with a valid session is listed.
+_Unreleased._ **Your account** lists every browser and device signed in to your account, most recently active first. Each row shows the browser, the operating system or device, the sign-in method, when it was last active and the IP address it signed in from. Your current browser is marked **This browser**. Nozle does not show a location.
 
-- **Revoke** ends one session. Revoking the one you are using signs you out.
-- **Revoke every other session** signs out every device except this one. It cannot be undone.
+- **Sign out** ends one session. Signing out the one you are using signs you out here.
+- **Sign out others** ends every session except this one. It cannot be undone.
 
-A session ends when its token expires, when you revoke it, or when you reset your password. A session also ends 7 days after you signed in, however often you use it. Sign in again to continue.
+A session ends when any of these happens:
+
+- **30 minutes without activity.** An open tab that you use keeps its session going. An idle tab is signed out on its own.
+- **12 hours after you signed in**, however often you use it. Sign in again to continue.
+- **You sign it out**, or an admin of your workspace signs you out (see [Sign a member out](/guides/settings/team-access#sign-a-member-out)).
+- **You change your password.** A password reset ends every session of your account. The browser where you set the new password signs in again.
+
+A request with an ended session answers `expired_jwt_token` (HTTP 401). Sessions belong to your account, so ending one affects it in every workspace you belong to. After the release every member signs in once more.
+
+## Delete your account
+
+_Unreleased._ **Your account** has a **Delete account** button under the danger zone. It deletes your own sign-in. Any member can do it when nothing below blocks it. If something does, the page lists each reason and names the workspace.
+
+What happens depends on each workspace you belong to:
+
+- **Other members remain.** You leave the workspace and it stays with them. You cannot leave it if you are its last admin: make another member an admin first.
+- **You are the only member.** The workspace closes, and it must have no billing history. These block the deletion: subscriptions, invoices, payments, credit notes, credit transactions, payment requests or usage events (the sandbox never counts), a paid Nozle plan, invoice or payment (the free plan does not count), and a connected payment provider (disconnect it first).
+
+To delete, type your email in the dialog (the letters can be in any case) and confirm. Nozle checks the rules again at that moment. If something changed, the deletion is refused with `account_not_deletable` or `email_mismatch` and the page shows the current reasons.
+
+What it removes:
+
+- You are signed out on every device and every membership is revoked.
+- Your password, sign-in links, two-factor setup, devices and stored email are removed. The account row stays under a placeholder address, so audit history is intact.
+- A workspace that closes expires its API keys, deletes its webhook endpoints, cancels its pending invitations, retires its sandbox, ends its free Nozle plan and erases its Nozle customer.
+- Invitations sent to your email are marked as deleted.
+
+You can sign up again with the same email. It creates a new account with none of the old data. The deletion is recorded as `user.account_deleted` in the security log. To delete a workspace without deleting your account, see [Delete a workspace](/guides/settings/delete-workspace).
 
 ## Sign-in limits
 

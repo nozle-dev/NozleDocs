@@ -8,16 +8,25 @@ SDK release notes have their own pages: [Node.js](/sdks/node/changelog), [React]
 
 <Update label="November 2026">
 
-## Custom roles on every plan, Developer and Analyst roles (Core 11.57.0, dashboard 2.31.0)
+## Identity release (Core 11.57.0, Engine 2.63.0, dashboard 2.31.0)
 
 _Unreleased_
 
+- **Sessions.** Dashboard sign-ins are stored server-side. A session ends after 30 minutes without activity or 12 hours after sign-in (it was 7 days), and you can list your sessions and sign them out. A password reset ends every other session. Every member signs in once more after the release. See [Active sessions](/guides/settings/account-security#active-sessions).
+- **Account deletion.** A member can delete their own account. A workspace only they belong to closes and must have no billing history, and the last admin of a workspace others use cannot leave it. The same email can sign up again as a new account. See [Delete your account](/guides/settings/account-security#delete-your-account).
+- **Google sign-in hardening.** Google accounts with an unverified email are refused (`google_email_not_verified`), emails match in any case, a bad token answers `invalid_google_token`, and the redirect address is set on the server. Google sign-in itself is still switched off in the dashboard. See [Google sign-in](/guides/settings/account-security#google-sign-in).
+- **Data isolation.** Stripe import previews now carry their own workspace, closing the last tenant table that had none.
+- **Workspace rename.** An admin can rename the workspace. The sandbox and the default billing entity follow, the Nozle billing customer is renamed, and the slug never changes. See [Rename the workspace](/guides/settings/general#rename-the-workspace).
+- **Last active.** The members list shows when each member was last active in the dashboard. See [Team access](/guides/settings/team-access).
 - **Two more built-in roles.** **Developer** (`developer`) does integration work: developer settings, API keys and webhooks, plans, customers, features, charges, add-ons, pricing units, security and audit logs, with no workspace settings, payment methods, members, roles or billing. **Analyst** (`analyst`) only views: analytics, cost intelligence, the Data API, invoices, customers, plans, subscriptions, payments, credit notes, coupons, features and add-ons. Both can use the Copilot. See [Built-in roles](/guides/settings/roles#built-in-roles).
-- **Custom roles.** An Admin can create, edit and delete roles that hold exactly the capabilities picked, on every plan. A custom role never includes role management or admin rights, and it can only include capabilities its author holds (`permissions_not_held`). Names and codes of built-in roles are refused, a code never changes and is never reused, and a role held by a member or a pending invitation cannot be deleted (`role_assigned_to_members`, `role_assigned_to_invites`). See [Custom roles](/guides/settings/roles#custom-roles).
+- **Custom roles on every plan.** An Admin can create, edit and delete roles that hold exactly the capabilities picked. A custom role never includes role management or admin rights, and it can only include capabilities its author holds (`permissions_not_held`). Names and codes of built-in roles are refused, a code never changes and is never reused, and a role held by a member or a pending invitation cannot be deleted (`role_assigned_to_members`, `role_assigned_to_invites`). See [Custom roles](/guides/settings/roles#custom-roles).
 - **No broader roles.** Inviting someone or changing a member's roles is refused with `cannot_grant_broader_role` when a role grants capabilities you do not hold. See [Change roles](/guides/settings/team-access#change-roles).
-- **Fixed.** A role's rights came from its name, so a custom role named after a built-in role got that role's rights. A custom role now holds only its own capabilities, whatever its name.
-- **Copilot.** The Copilot can create, change and delete custom roles and give members roles. Role changes wait for approval on a card.
-- **GraphQL.** `createRole`, `updateRole`, `destroyRole`, and `Membership.roleCodes` next to `roles` (names).
+- **Roles fixed.** A role's rights came from its name, so a custom role named after a built-in role got that role's rights. A custom role now holds only its own capabilities, whatever its name.
+- **Roles in the Copilot and GraphQL.** The Copilot can create, change and delete custom roles and give members roles, with approval on a card. GraphQL has `createRole`, `updateRole`, `destroyRole`, and `Membership.roleCodes` next to `roles` (names).
+- **Two-factor authentication.** Sign in with a code from an authenticator app, with backup codes. An admin can require it for the workspace, and reset a member's. See [Two-factor authentication](/guides/settings/account-security#two-factor-authentication).
+- **Workspace deletion.** An admin can delete a workspace with no billing history and restore it for 30 days. While it is pending, the Engine refuses its API keys with `403 workspace_pending_deletion`. See [Delete a workspace](/guides/settings/delete-workspace).
+- **Sign-in link.** Sign in with a one-time link sent by email, valid 15 minutes. See [Sign in with an email link](/guides/settings/account-security#sign-in-with-an-email-link).
+- **Sign a member out.** An admin can end all of a member's sessions. See [Sign a member out](/guides/settings/team-access#sign-a-member-out).
 
 ## Spend limits accurate within minutes, last check time, adjustments list (Engine 2.62.0, Core 11.56.0, dashboard 2.30.0)
 

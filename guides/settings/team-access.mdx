@@ -46,6 +46,12 @@ Changing a member's roles needs workspace admin access. Every member needs at le
 
 Each change is recorded in the security log as `user.role_edited`. You can also ask the Copilot to give a member a role.
 
+## Sign a member out
+
+_Unreleased._ An admin can end every open session of a member, for example after a lost laptop. Choose **Sign out of all devices** next to the member and confirm with **Sign out everywhere**. It needs the capability that removes a member (`organization:members:update`), which only the Admin role holds, and it is not offered on yourself.
+
+The member returns to the sign-in screen on every browser and device, and keeps their access and roles. They can sign in again at once. Sessions belong to the person's account, so they are also signed out of every other Nozle workspace they belong to. To lock someone out, [remove them](#remove-a-member) too. The action is recorded in the [audit log](/guides/settings/audit-logs) as `user.sessions_revoked`, with the member's email and the number of sessions ended. See [Active sessions](/guides/settings/account-security#active-sessions).
+
 ## Remove a member
 
 Removing a member ends their access at once. Their history and audit records stay.
