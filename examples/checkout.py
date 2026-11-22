@@ -30,7 +30,12 @@ def to_reply(result: CheckoutResult) -> dict[str, Any]:
     if result["type"] == "hosted":
         # Stripe, or Nozle's auto-pay page. The return to RETURN_URL proves nothing:
         # confirm with the subscription.started webhook or by reloading billing state.
-        return {"action": "redirect", "url": result["url"]}
+        # A paid upgrade carries plan_upgrade_intent_id: poll it with checkout_settled.
+        return {
+            "action": "redirect",
+            "url": result["url"],
+            "plan_upgrade_intent_id": result.get("plan_upgrade_intent_id"),
+        }
     if result["type"] == "razorpay":
         return {
             "action": "open_razorpay",
