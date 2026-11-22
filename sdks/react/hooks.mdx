@@ -67,9 +67,10 @@ export async function POST(request: Request) {
 }
 ```
 
-The provider takes a `getCustomerToken` function that calls it:
+The provider takes a `getCustomerToken` function that calls it, and `customerId`, the external ID of the signed-in customer that route mints for. `customerId` is required with `getCustomerToken`:
 
 ```tsx
+import type { ReactNode } from 'react'
 import { BillingProvider, type CustomerToken } from '@nozle-js/react'
 
 const getCustomerToken = async (): Promise<CustomerToken> => {
@@ -78,13 +79,18 @@ const getCustomerToken = async (): Promise<CustomerToken> => {
   return response.json()
 }
 
-<BillingProvider publishableKey="pk_..." getCustomerToken={getCustomerToken}>
-  {children}
-</BillingProvider>
+export function Billing({ workspaceId, children }: { workspaceId: string; children: ReactNode }) {
+  return (
+    <BillingProvider publishableKey="pk_..." getCustomerToken={getCustomerToken} customerId={workspaceId}>
+      {children}
+    </BillingProvider>
+  )
+}
 ```
 
 - `useEntitlement`, `useCreditBalance`, `useCreditHistory`, `useUsage` and `useSubscription` then read Nozle directly, with the same `data` as from `createBillingHandler`. `useSubscription` has no `past_due`, and its `plan_version` comes without that version's entitlements.
-- The provider caches the token and asks for a new one a minute before it expires (half way, for a token shorter than two minutes). When Nozle answers `401 customer_token_expired` or `invalid_customer_token`, it asks once more and retries the read.
+- `customerId` keys the token and the hooks' cache. When it changes, for example on a sign-out and sign-in in the same tab, the provider drops the previous customer's cached reads and token, and the hooks read the new customer. A token whose `customer_id` is another customer is refused and never sent: the hooks return an error instead. Leaving out `customerId` throws.
+- A token lives at most one hour. The provider caches the token and asks for a new one a minute before it expires (half way, for a token shorter than two minutes). When Nozle answers `401 customer_token_expired` or `invalid_customer_token`, it asks once more and retries the read.
 - `useUpgradePreview`, `useInvoices` and `useInvoiceDownload` need `billingEndpoint`. With both props, `billingEndpoint` serves every hook.
 - Usage and subscriptions are read from Core: the provider uses `baseUrl` with its final `/engine` replaced by `/core`. Pass `coreUrl` when your `baseUrl` does not end in `/engine`.
 - Keep `getCustomerToken` stable (define it outside the component or with `useCallback`). A new function makes a new token cache.

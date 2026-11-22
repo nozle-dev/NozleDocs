@@ -7,7 +7,7 @@ Base URL: `https://api.nozle.app/engine/api/v1`.
 
 Check whether a customer is entitled to use a feature under their current plan. This is the primary gating endpoint -- call it before executing any metered or limited operation.
 
-**Auth:** a secret key with `customer_usage:read`, or a publishable key with a [customer token](/api/authentication#customer-tokens) for `customer_id` (a token minted with `features` checks only those features). A publishable key alone is always rejected.
+**Auth:** a secret key with `customer_usage:read`, or a publishable key with a [customer token](/api/authentication#customer-tokens) for `customer_id` (a token minted with `features` checks only those features). A publishable key alone is always rejected. A token request gets no `economics` and no `policy` fields, and its `metadata` is ignored.
 
 A subscription on an override plan (a plan made from a catalog plan for one customer, for example a negotiated price or a subscription created from a quote) gets the entitlements and usage limits of the catalog plan it was made from. Its usage is still priced with the override plan's own charges.
 

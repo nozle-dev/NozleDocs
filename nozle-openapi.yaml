@@ -1792,7 +1792,11 @@ paths:
 
         The token is accepted only on reads of its own customer: on the Engine `GET /can`, `GET /subscriptions/current`, `GET /billing/status` and the customer's credit balance and operation reads; on Core `GET /customers/{external_customer_id}/current_usage`, `GET /customers/{external_customer_id}/past_usage` and `GET /subscriptions?external_customer_id=`. Every other route still refuses the publishable key. See [Customer tokens](/api/authentication#customer-tokens).
 
-        A secret key with `customer:read` is required; a publishable key is refused with `403 publishable_key_not_allowed`. The response is not written to the API log, and carries `Cache-Control: no-store`.
+        A token lives at most one hour: `ttl_seconds` is 60 to 3600, default 3600.
+
+        A secret key with `customer:read` is required; a publishable key is refused with `403 publishable_key_not_allowed`. The token reads only what both this secret key and the publishable key may read: `customer_usage` (current and past usage, `/can`), `subscription` (the subscriptions list, billing status and current subscription) and `credit_system` (credit balances and operations). A key scoped to `customer:read` alone mints a token whose reads all answer `403`.
+
+        The token belongs to this exact customer record. If the customer is deleted, its tokens answer `401 invalid_customer_token`, even after a new customer reuses the external ID. Expiry allows 30 seconds of clock skew. The response is not written to the API log, and carries `Cache-Control: no-store`.
       operationId: createCustomerToken
       requestBody:
         required: true
@@ -1810,9 +1814,9 @@ paths:
                 ttl_seconds:
                   type: integer
                   minimum: 60
-                  maximum: 86400
+                  maximum: 3600
                   default: 3600
-                  description: Lifetime of the token in seconds. A value out of bounds or not an integer is refused with `422`.
+                  description: Lifetime of the token in seconds, at most one hour (3600). A value out of bounds or not an integer is refused with `422`.
                 features:
                   type: array
                   maxItems: 100
@@ -3096,7 +3100,10 @@ paths:
       tags:
         - Customers
       summary: Retrieve customer current usage
-      description: This endpoint enables the retrieval of the usage-based billing data for a customer within the current period.
+      description: |-
+        This endpoint enables the retrieval of the usage-based billing data for a customer within the current period.
+
+        With a publishable key and a [customer token](/api/authentication#customer-tokens), `feature_code` is the only usage filter: `charge_id`, `charge_code`, `group` and the `filter_by_*` parameters are ignored.
       parameters:
         - name: external_customer_id
           in: path

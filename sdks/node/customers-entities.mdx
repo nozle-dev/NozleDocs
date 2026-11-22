@@ -116,12 +116,12 @@ Available from Node.js `0.44.0`, with Core 11.66.0. A [customer token](/api/auth
 
 ```ts
 const { token, customer_id, expires_at } = await nozle.customerTokens.create('workspace_123', {
-  ttlSeconds: 900, // 60 to 86400; Nozle's default is 3600
+  ttlSeconds: 900, // 60 to 3600 (at most one hour); Nozle's default is 3600
   features: ['seats'], // optional: /can and usage reads limited to these features
 })
 ```
 
-Return the result to the browser, for example to `@nozle-js/react` `getCustomerToken` ([Provider and hooks](/sdks/react/hooks#read-from-nozle-with-a-customer-token)). Never take the customer from the request. After a leak, `await nozle.customerTokens.revoke()` refuses every token minted until now. Both need a secret key: `create` needs `customer:read`, `revoke` needs `customer:write`.
+Return the result to the browser, for example to `@nozle-js/react` `getCustomerToken` ([Provider and hooks](/sdks/react/hooks#read-from-nozle-with-a-customer-token)). Never take the customer from the request. After a leak, `await nozle.customerTokens.revoke()` refuses every token minted until now. Both need a secret key: `create` needs `customer:read`, `revoke` needs `customer:write`. The token reads only what both the minting key and your publishable key may read (`customer_usage`, `subscription`, `credit_system`), so mint with a key that has the reads the browser needs. Deleting the customer ends its tokens.
 
 ## Read Entities
 
