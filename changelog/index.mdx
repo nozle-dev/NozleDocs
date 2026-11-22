@@ -7,7 +7,7 @@ description: Product and developer-platform updates from Nozle
 
 ### Billing details and Stripe Tax at checkout, VAT numbers priced while VIES checks, Engine calls in the request log, billing emails from Nozle (Core 11.54.0, dashboard 2.28.0)
 
-_Unreleased_
+_November 19, 2026_
 
 - **Billing details step at checkout.** When the customer lacks what the billing entity's tax needs, `POST /checkout` answers `200` with `type: hosted`, `step: billing_details` and a `url` to a Nozle page. The page asks only for what tax needs: the country with EU tax management or Stripe Tax, the postal code of a US customer or the state or postal code of a Canadian or Indian one with Stripe Tax, and the full address when the entity has `customer_location_required`. A business can add its name, address and EU VAT number. The details are saved to the customer and the same checkout continues to Stripe or Razorpay. The link expires after 24 hours. See [Billing details step](/guides/billing/tax-ids#billing-details-step).
 - **Breaking for `customer_tax_location_required`.** Checkout no longer answers `422 customer_tax_location_required`: that customer gets the billing details step instead. Redirect to its `url` as for any hosted checkout.
@@ -24,7 +24,7 @@ _Unreleased_
 
 ### Rate limits and Engine calls in the request log (Engine 2.61.0)
 
-_Unreleased_
+_November 19, 2026_
 
 - **Rate limits.** The Engine API accepts, per workspace, 100 requests per second live and 25 in a sandbox, and 5,000 events per second live and 500 in a sandbox. Event ingestion, `POST /usage/track` and finalizing a hold count events, not requests: a batch counts its events. One API key can have 50 requests in flight; event ingestion and the LLM proxy hold no slot. The batch cap stays 5,000 events. See [Rate limits](/api/rate-limits).
 - **`429 rate_limited`.** Over a limit the call does nothing and answers `429` with `Retry-After` and `error_details.limit` set to `requests`, `events` or `concurrency`. Every counted call carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`, on success too. The LLM proxy answers this refusal in the Engine shape, not the provider's. The SDKs already retry a `429` after `Retry-After`.
@@ -32,7 +32,7 @@ _Unreleased_
 
 ### Shared prices for every provider, payment connection health, customer erasure (Core 11.52.0, dashboard 2.26.0)
 
-_Unreleased_
+_November 19, 2026_
 
 - **Every provider on the shared price list.** The models.dev import now covers every provider, each under its models.dev id (`groq`, `openrouter`, `amazon-bedrock`, and so on), not only OpenAI, Anthropic and Gemini. A model listed by several providers is stored once per provider, at that provider's price. See [Shared prices](/guides/margin/shared-prices).
 - **Provider from the API host.** A call is priced at the vendor its `provider_host` names, so a Groq call made with the OpenAI client gets Groq's price, not OpenAI's. Nozle keeps the host list. See [Which provider prices a call](/guides/margin/shared-prices#which-provider-prices-a-call).
@@ -54,7 +54,7 @@ _Unreleased_
 
 ### Late credit usage refused, pricing by API host, customer erasure (Engine 2.60.0)
 
-_Unreleased_
+_November 19, 2026_
 
 - **Late credit usage.** `POST /usage/track` and finalizing a credit or budget hold refuse usage whose `timestamp` falls in a billing period that is already invoiced, with `409 period_invoiced`, as `POST /events` does since Engine 2.59.0. Before, such usage spent credits and was never billed. Nothing is spent, the hold stays open, and the same `Idempotency-Key` can be resent with a current `timestamp`. See [Late usage](/api/usage-track#late-usage).
 - **Shared prices by vendor.** The Engine prices the shared price of Cost Events, Feature Events and legacy Cost Models at the vendor the call's `provider_host` names, and records that vendor on uncosted model rows. Your own prices and Cost Sheet conditions still match the reported `provider`.
@@ -84,7 +84,7 @@ _November 17, 2026_
 
 ### API rate limits, sign-in security, portal Pay, default payment connection (Core, Engine, dashboard)
 
-_Unreleased_
+_November 17, 2026_
 
 - **API rate limits.** Core's REST API (`/api/v1/*`) accepts 6,000 requests per minute per API key and per IP address. Over the limit it answers `429` `rate_limited` with a `Retry-After` header. Wait that long, then retry with backoff. See [Rate limits](/api/errors#rate-limits).
 - **Sign-in limits.** Dashboard sign-in accepts 10 attempts per email in 15 minutes and 100 per IP address. Password-reset requests accept 5 per email per hour and 30 per IP address. See [Sign-in limits](/guides/settings/account-security#sign-in-limits).

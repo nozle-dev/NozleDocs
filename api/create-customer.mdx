@@ -86,7 +86,7 @@ The response wraps the customer in a `customer` object.
 </ResponseField>
 
 <ResponseField name="customer.tax_identification_consultation_number" type="string | null">
-  _Unreleased (Core 11.54.0)._ The consultation number VIES returned with the last valid check, the proof of the check. See [Consultation number](/guides/billing/tax-ids#consultation-number).
+  The consultation number VIES returned with the last valid check, the proof of the check. See [Consultation number](/guides/billing/tax-ids#consultation-number).
 </ResponseField>
 
 <ResponseField name="customer.tax_treatment" type="string">
@@ -144,7 +144,7 @@ A bad tax ID answers `422` with `code: validation_errors`:
 }
 ```
 
-`external_id` is required (`400` `external_id is required` without it). `name`, `email` and `billing_configuration` are sent to Core only when the request has them, so a field you leave out keeps its value. _Unreleased:_ `billing_configuration` is forwarded as sent and Core validates it, as on Core's `POST /customers`: use it to assign the customer's payment connection (`payment_provider`, `payment_provider_code`). Before, the Engine dropped it. Address and tax fields are not forwarded: send them to Core's endpoint above.
+`external_id` is required (`400` `external_id is required` without it). `name`, `email` and `billing_configuration` are sent to Core only when the request has them, so a field you leave out keeps its value. `billing_configuration` is forwarded as sent and Core validates it, as on Core's `POST /customers`: use it to assign the customer's payment connection (`payment_provider`, `payment_provider_code`). Before, the Engine dropped it. Address and tax fields are not forwarded: send them to Core's endpoint above.
 
 The response is `{"external_id", "name", "email"}`. A Core error, such as `422` `validation_errors`, is returned as Core sent it.
 
