@@ -40,11 +40,14 @@ import { BillingProvider } from '@nozle-js/react'
 <BillingProvider
   publishableKey="pk_..."
   billingEndpoint="/api/nozle"
+  customerId={workspaceId}
   billingHeaders={() => ({ 'X-CSRF-Token': csrfToken })}
 >
   {children}
 </BillingProvider>
 ```
+
+`customerId` is the external ID of the signed-in customer, the one `getCustomerId` returns. It keys the hooks' cache: when it changes, for example on a sign-out and sign-in in the same tab, the provider drops the previous customer's cached reads and the hooks read the new customer. It is optional with `billingEndpoint` (`@nozle-js/react` 0.25.0 and later). Without it the cache is keyed on the endpoint alone, so a provider that stays mounted across a sign-in, such as one at your app's root, can show the previous customer's reads for up to 30 seconds. Pass it, or remount the provider on sign-in.
 
 `billingHeaders` adds headers such as a CSRF token. Pass your app's `queryClient` to share its cache and devtools; without one the provider makes its own. The hooks pass their client explicitly and never replace your app's `QueryClientProvider`.
 
