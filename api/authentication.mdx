@@ -97,7 +97,7 @@ Minting needs only `customer:read`, so a key scoped to `customer:read` alone min
 
 **Revoke** every token of the organization, for example after one leaked: [`POST /customer_tokens/revoke`](/api-reference/customers/revoke-customer-tokens) with a secret key that has `customer:write`. Tokens minted before it are refused from the next request, on Core and the Engine; tokens minted afterwards work. Rotating Nozle's signing secret also invalidates every token. A token is a bearer credential for one customer's billing data: keep the lifetime short, never log it, and serve it only to the signed-in customer.
 
-With React, pass `getCustomerToken` and `customerId` (the signed-in customer's external ID) to `BillingProvider` and the [customer hooks](/sdks/react/hooks#read-from-nozle-with-a-customer-token) use it. With Node.js, mint with `nozle.customerTokens.create(customerId, { ttlSeconds, features })`.
+With React, pass `getCustomerToken` and `customerId` (the signed-in customer's external ID) to `BillingProvider` and the [customer hooks](/sdks/react/hooks#read-from-nozle-with-a-customer-token) use it. To mint, use `nozle.customerTokens.create(customerId, { ttlSeconds, features })` in [Node.js](/sdks/node/customers-entities#customer-tokens-for-the-browser), `nozle.customer_tokens.create(customer_id, ttl_seconds, features)` in [Python](/sdks/python/customers-entities#customer-tokens-for-the-browser) or `client.CustomerTokens.Create(ctx, customerID, opts)` in [Go](/sdks/go/customers-entities#customer-tokens-for-the-browser).
 
 ## Key permissions
 

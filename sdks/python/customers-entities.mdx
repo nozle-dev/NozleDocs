@@ -100,6 +100,21 @@ except NozleAPIError as error:
 
 See [Erase a customer](/api/create-customer#erase-a-customer) for what is erased and what is kept.
 
+## Customer tokens for the browser
+
+Available from Python `0.42.0`, with Core 11.59.0. A [customer token](/api/authentication#customer-tokens) lets the signed-in customer's browser read that customer's entitlements, usage, credit balances and subscription with your publishable key. Mint it with a secret key, for the customer of your session:
+
+```python
+token = nozle.customer_tokens.create(
+    "workspace_123",
+    ttl_seconds=900,  # 60 to 3600 (at most one hour); Nozle's default is 3600
+    features=["seats"],  # optional: can and usage reads limited to these features
+)
+# {"token": "...", "customer_id": "workspace_123", "expires_at": "..."}
+```
+
+Return the result to the browser. Never take the customer from the request. After a leak, `nozle.customer_tokens.revoke()` refuses every token minted until now. Both need a secret key: `create` needs `customer:read`, `revoke` needs `customer:write`. The token reads only what both the minting key and your publishable key may read (`customer_usage`, `subscription`, `credit_system`), so mint with a key that has the reads the browser needs. Deleting the customer ends its tokens. A `NozleAPIError` carries Core's refusal: `403 publishable_key_not_allowed`, `404` for an unknown customer, `422` for a `ttl_seconds` outside 60 to 3600 or an unknown feature. `AsyncNozle` has the same methods, awaited.
+
 ## Read Entities
 
 ```python
