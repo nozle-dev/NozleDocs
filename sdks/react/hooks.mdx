@@ -48,6 +48,48 @@ import { BillingProvider } from '@nozle-js/react'
 
 `billingHeaders` adds headers such as a CSRF token. Pass your app's `queryClient` to share its cache and devtools; without one the provider makes its own. The hooks pass their client explicitly and never replace your app's `QueryClientProvider`.
 
+### Read from Nozle with a customer token
+
+Instead of serving the hooks from your backend, let the browser read the signed-in customer straight from Nozle with your publishable key and a [customer token](/api/authentication#customer-tokens). Requires `@nozle-js/react` `0.25.0`, `@nozle-js/node` `0.44.0`, Core 11.66.0 and Engine 2.64.0.
+
+Your backend mints the token for the signed-in customer with its secret key:
+
+```ts title="app/api/nozle-token/route.ts"
+import { auth } from '@/lib/auth'
+import { Nozle } from '@nozle-js/node'
+
+const nozle = new Nozle() // reads NOZLE_SECRET_KEY
+
+export async function POST(request: Request) {
+  const customerId = (await auth(request))?.workspaceId
+  if (!customerId) return new Response(null, { status: 401 })
+  return Response.json(await nozle.customerTokens.create(customerId, { ttlSeconds: 900 }))
+}
+```
+
+The provider takes a `getCustomerToken` function that calls it:
+
+```tsx
+import { BillingProvider, type CustomerToken } from '@nozle-js/react'
+
+const getCustomerToken = async (): Promise<CustomerToken> => {
+  const response = await fetch('/api/nozle-token', { method: 'POST' })
+  if (!response.ok) throw new Error('could not get a billing token')
+  return response.json()
+}
+
+<BillingProvider publishableKey="pk_..." getCustomerToken={getCustomerToken}>
+  {children}
+</BillingProvider>
+```
+
+- `useEntitlement`, `useCreditBalance`, `useCreditHistory`, `useUsage` and `useSubscription` then read Nozle directly, with the same `data` as from `createBillingHandler`. `useSubscription` has no `past_due`, and its `plan_version` comes without that version's entitlements.
+- The provider caches the token and asks for a new one a minute before it expires (half way, for a token shorter than two minutes). When Nozle answers `401 customer_token_expired` or `invalid_customer_token`, it asks once more and retries the read.
+- `useUpgradePreview`, `useInvoices` and `useInvoiceDownload` need `billingEndpoint`. With both props, `billingEndpoint` serves every hook.
+- Usage and subscriptions are read from Core: the provider uses `baseUrl` with its final `/engine` replaced by `/core`. Pass `coreUrl` when your `baseUrl` does not end in `/engine`.
+- Keep `getCustomerToken` stable (define it outside the component or with `useCallback`). A new function makes a new token cache.
+- Mint with `features` to limit `useEntitlement` and usage reads to some features; usage reads then need a `feature_code`, which `useUsage` does not send, so leave `features` out when you use `useUsage`.
+
 ### The hooks
 
 Each hook returns TanStack Query's result (`data`, `isPending`, `error`, `refetch` and the rest).
