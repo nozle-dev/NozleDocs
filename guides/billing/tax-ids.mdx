@@ -22,7 +22,7 @@ You send the tax ID with [`POST /customers`](/api/create-customer). Nozle stores
 | `tax_identification_number` | string | The value. An `eu_vat` number is stored upper case without spaces. |
 | `tax_identification_status` | `unverified`, `pending`, `valid`, `invalid` | The result of the check. |
 | `tax_identification_checked_at` | date-time or `null` | When the check last ran. |
-| `tax_identification_consultation_number` | string or `null` | _Unreleased (Core 11.54.0)._ The consultation number VIES returned with the last valid check. See [Consultation number](#consultation-number). |
+| `tax_identification_consultation_number` | string or `null` | Core 11.54.0. The consultation number VIES returned with the last valid check. See [Consultation number](#consultation-number). |
 | `tax_treatment` | `standard`, `reverse_charge`, `exempt`, `provider`, `pending`, `none` | How tax is applied to this customer. Read-only. |
 
 Status values:
@@ -67,7 +67,7 @@ Nozle does not recheck the numbers of existing customers by itself. Use the rech
 
 ### Tax while VIES checks
 
-_Unreleased (Core 11.54.0)._ With EU tax management, a customer saved with a well-formed EU VAT number gets the tax of a valid number at once, while VIES checks it: reverse charge (`nozle_eu_reverse_charge`) for a business in another EU country than the billing entity, and the billing entity's standard rate inside its own country. The customer's `tax_treatment` stays `pending` until the check ends. With [Stripe Tax](/guides/billing/stripe-tax), such a number is sent to Stripe while the check runs, so Stripe can apply reverse charge.
+With EU tax management, a customer saved with a well-formed EU VAT number gets the tax of a valid number at once, while VIES checks it: reverse charge (`nozle_eu_reverse_charge`) for a business in another EU country than the billing entity, and the billing entity's standard rate inside its own country. The customer's `tax_treatment` stays `pending` until the check ends. With [Stripe Tax](/guides/billing/stripe-tax), such a number is sent to Stripe while the check runs, so Stripe can apply reverse charge.
 
 This provisional tax prices the first invoice of a new subscription's checkout, so the checkout does not wait for VIES (see [Checkout and tax](#checkout-and-tax)). The customer's other invoices are still held until the check ends, as before.
 
@@ -77,13 +77,13 @@ Before Core 11.54.0 the customer had no EU tax until the check ended.
 
 ### Consultation number
 
-_Unreleased (Core 11.54.0)._ When the billing entity has its own EU VAT number in its tax identification number, Nozle sends it to VIES as the requester. VIES then returns a consultation number with a valid answer, the proof of the check that EU tax audits accept. Nozle stores it as `tax_identification_consultation_number` on the customer (REST, webhooks, GraphQL `taxIdentificationConsultationNumber`), as `consultation_number` in the `vies_check` of the `customer.vies_check` webhook, and in the `tax_details` of the invoices finalized after the check. The dashboard shows it on the customer page.
+When the billing entity has its own EU VAT number in its tax identification number, Nozle sends it to VIES as the requester. VIES then returns a consultation number with a valid answer, the proof of the check that EU tax audits accept. Nozle stores it as `tax_identification_consultation_number` on the customer (REST, webhooks, GraphQL `taxIdentificationConsultationNumber`), as `consultation_number` in the `vies_check` of the `customer.vies_check` webhook, and in the `tax_details` of the invoices finalized after the check. The dashboard shows it on the customer page.
 
 Without an EU VAT number on the billing entity, or when VIES refuses it as requester, the check still runs and the consultation number stays `null`. Changing the customer's tax ID clears it.
 
 ### Find customers by status
 
-_Unreleased (Core 11.54.0)._ [`GET /customers`](/api-reference/customers/list-all-customers) takes `tax_identification_statuses[]` (`unverified`, `pending`, `valid`, `invalid`), for example to list the customers whose number VIES rejected. GraphQL `customers` takes `taxIdentificationStatuses`. A customer without a tax ID is `unverified`, so add `has_tax_identification_number=true` to leave those out. The dashboard's customer list has a tax ID status column and filter.
+[`GET /customers`](/api-reference/customers/list-all-customers) takes `tax_identification_statuses[]` (`unverified`, `pending`, `valid`, `invalid`), for example to list the customers whose number VIES rejected. GraphQL `customers` takes `taxIdentificationStatuses`. A customer without a tax ID is `unverified`, so add `has_tax_identification_number=true` to leave those out. The dashboard's customer list has a tax ID status column and filter.
 
 ## Reverse charge on an invoice
 
@@ -101,7 +101,7 @@ Credit notes carry the `tax_treatment` of their invoice.
 
 ### In e-invoices
 
-_Unreleased (Core 11.54.0)._ The UBL and Factur-X e-invoices of a reverse charge invoice or credit note use VAT category `AE` (reverse charge), with rate 0 and the exemption reason code `VATEX-EU-AE`. A UBL document also carries the text `Reverse charge`. Both name the buyer's VAT ID, as EN 16931 rules BR-AE-01 to BR-AE-10 require. A reverse charge invoice passes the EN 16931 validation artifacts 1.3.17 (UBL and CII) without a fatal error.
+The UBL and Factur-X e-invoices of a reverse charge invoice or credit note use VAT category `AE` (reverse charge), with rate 0 and the exemption reason code `VATEX-EU-AE`. A UBL document also carries the text `Reverse charge`. Both name the buyer's VAT ID, as EN 16931 rules BR-AE-01 to BR-AE-10 require. A reverse charge invoice passes the EN 16931 validation artifacts 1.3.17 (UBL and CII) without a fatal error.
 
 Before Core 11.54.0 these documents used category `Z` (zero rated) and no buyer VAT ID.
 
@@ -157,7 +157,7 @@ Checkout fixes the price before the provider session opens, so Nozle makes sure 
 
 ### Billing details step
 
-_Unreleased (Core 11.54.0)._ When the customer lacks what the billing entity's tax needs, checkout sends the customer to a page hosted by Nozle that asks for it, then continues to the provider. `POST /checkout` answers `200` with:
+When the customer lacks what the billing entity's tax needs, checkout sends the customer to a page hosted by Nozle that asks for it, then continues to the provider. `POST /checkout` answers `200` with:
 
 ```json
 {

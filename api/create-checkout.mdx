@@ -162,7 +162,7 @@ A paid upgrade has `plan_upgrade_intent_id` instead of `invoice_id`. Redirect th
 
 ### Billing details step
 
-_Unreleased (Core 11.54.0)._ When the customer lacks what the billing entity's tax needs (a country, the postal code or state Stripe Tax needs, or the address the entity requires), the checkout answers a hosted Nozle page first:
+When the customer lacks what the billing entity's tax needs (a country, the postal code or state Stripe Tax needs, or the address the entity requires), the checkout answers a hosted Nozle page first:
 
 ```json
 {
@@ -280,10 +280,10 @@ Every error body carries `error` and `code`. Core's errors also carry `status`, 
 | `422` | `validation_errors` | `error_details.base` is `amount_below_provider_minimum`: an invoice checkout whose amount left to pay is under the payment provider's minimum charge (for example less than $0.50 on Stripe). |
 | `422` | `plan_upgrade_invoice_missing` | An upgrade to a plan billed in arrears: nothing is due up front. |
 | `422` | `plan_already_active`, `target_plan_is_not_a_downgrade` | See [transition policies](/api/plan-transition-policies). |
-| `422` | `customer_tax_location_required` | Core 11.31.0 to 11.53.0 only. From Core 11.54.0 (_Unreleased_) a customer without what tax needs gets the [billing details step](#billing-details-step) (`200`) instead. |
-| `409` | `customer_tax_check_pending` | Core 11.31.0. A VIES check holds the customer, so the price may still change. The body has `retry_after_seconds`. Retry after that time. From Core 11.54.0 (_Unreleased_) only a paid plan change, an invoice checkout and a number without a type that is not a well-formed EU VAT number wait; a new subscription's checkout is priced at once. See [Checkout and tax](/guides/billing/tax-ids#checkout-and-tax). |
-| `422` | `tax_calculation_failed` | _Unreleased (Core 11.54.0)._ Stripe Tax refused to price the checkout's invoice. `tax_error` has Stripe's code. See [Stripe Tax at checkout](/guides/billing/stripe-tax#at-checkout). |
-| `503` | `tax_calculation_pending` | _Unreleased (Core 11.54.0)._ Stripe Tax did not price the invoice within 5 seconds. Nothing is charged. Send the same request, with the same `Idempotency-Key`, after `retry_after_seconds` (10). |
+| `422` | `customer_tax_location_required` | Core 11.31.0 to 11.53.0 only. From Core 11.54.0 a customer without what tax needs gets the [billing details step](#billing-details-step) (`200`) instead. |
+| `409` | `customer_tax_check_pending` | Core 11.31.0. A VIES check holds the customer, so the price may still change. The body has `retry_after_seconds`. Retry after that time. From Core 11.54.0 only a paid plan change, an invoice checkout and a number without a type that is not a well-formed EU VAT number wait; a new subscription's checkout is priced at once. See [Checkout and tax](/guides/billing/tax-ids#checkout-and-tax). |
+| `422` | `tax_calculation_failed` | Core 11.54.0. Stripe Tax refused to price the checkout's invoice. `tax_error` has Stripe's code. See [Stripe Tax at checkout](/guides/billing/stripe-tax#at-checkout). |
+| `503` | `tax_calculation_pending` | Core 11.54.0. Stripe Tax did not price the invoice within 5 seconds. Nothing is charged. Send the same request, with the same `Idempotency-Key`, after `retry_after_seconds` (10). |
 | `409` | `subscription_selection_required` | The customer has several active subscriptions and no `subscription_id` was given. |
 | `409` | `plan_upgrade_checkout_in_progress` | Another upgrade checkout for the same subscription is open, or its time ran out while the provider reports a payment in progress or cannot be reached. Recover it with checkout status. See [Upgrade checkout that ran out of time](#upgrade-checkout-that-ran-out-of-time). |
 | `409` | `entity_subscription_checkout_in_progress` | A single Entity checkout on a different plan is still being paid: the provider is processing its payment, or it was paid. An abandoned one is replaced instead. |
@@ -292,7 +292,7 @@ Every error body carries `error` and `code`. Core's errors also carry `status`, 
 | `409` | `plan_change_quote_changed` | The quote no longer matches the subscription. Preview again. |
 | `409` | `subscription_change_pending` | The subscription has a scheduled cancellation or plan change, or an upgrade payment in progress. Withdraw the change, or wait for the payment, then preview again. |
 | `422` | `checkout_not_required` | The plan needs no up-front payment (free, trial, or billed in arrears) and the customer has no subscription. Use `subscribe`. |
-| `422` | `payment_provider_required` | The customer is not assigned to Razorpay and has no Stripe connection, and (_Unreleased_) the workspace has no [default payment connection](/integrations#default-payment-connection). The `message` names the fix. |
+| `422` | `payment_provider_required` | The customer is not assigned to Razorpay and has no Stripe connection, and the workspace has no [default payment connection](/integrations#default-payment-connection). The `message` names the fix. |
 | `422` | `stripe_customer_required` | Nozle could not create the customer in Stripe. A customer that is not in Stripe yet normally gets one at checkout, so this code appears only when that creation fails. See the [Stripe integration](/integrations/stripe#errors). |
 | `422` | `razorpay_requires_inr` | A Razorpay checkout for an invoice that is not in INR. See the [Razorpay integration](/integrations/razorpay#errors). |
 | `422` | `plan_already_active` | The customer, or Entity, is already on this plan, including right after a late upgrade payment for it was applied. |
