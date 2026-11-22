@@ -49,7 +49,7 @@ CI also checks for accidental third-party branding in published files. The [CI w
 
 1. Edit the relevant MDX page. For a new page, add its path to the appropriate tab and group in `docs.json`; a file alone does not make it appear in navigation.
 2. Keep API routes, request fields, and examples aligned with the current Core or Engine contract. `docs.json` maps Core reference pages to `nozle-openapi.yaml`; workflow pages in `api/` explain Nozle-specific operations.
-3. Keep SDK installation commands and release notes aligned with versions available from the public registries. Link runnable examples to tags that contain them.
+3. Keep SDK installation commands and release notes aligned with versions available from the public registries. Link runnable examples to tags that contain them. After an SDK release, run `python3 scripts/sync-sdk-changelogs.py` to regenerate the SDK changelog pages (`sdks/*/changelog.mdx`) from each SDK's `CHANGELOG.md`, and commit them.
 4. Run the checks above and review the changed pages in the local preview before opening a pull request.
 
 Never put a real `sk_` secret in an example or browser snippet. Server SDK examples use a backend environment variable such as `NOZLE_SECRET_KEY`; React examples use a publishable key and authenticated callbacks to the merchant backend.
