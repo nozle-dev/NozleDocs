@@ -13,7 +13,7 @@ One Nozle account exists per email, whatever the case of its letters. Signing up
 
 ### Google sign-in
 
-_Unreleased._ Nozle matches a Google sign-in to an account by email, so it refuses a Google account whose email Google has not verified (`google_email_not_verified`). Emails match in any case on password sign-in, password reset and Google. Any invalid Google token (wrong audience, issuer, expiry or signature) answers `invalid_google_token`. Google sign-in stays switched off in the dashboard until the release is configured, and cannot be turned on as a workspace's only sign-in method while Google credentials are missing (`google_auth_missing_setup`).
+Nozle matches a Google sign-in to an account by email, so it refuses a Google account whose email Google has not verified (`google_email_not_verified`). Emails match in any case on password sign-in, password reset and Google. Any invalid Google token (wrong audience, issuer, expiry or signature) answers `invalid_google_token`. Google sign-in stays switched off in the dashboard until the release is configured, and cannot be turned on as a workspace's only sign-in method while Google credentials are missing (`google_auth_missing_setup`).
 
 ## Password
 
@@ -25,7 +25,7 @@ Nozle changes passwords through a verified email link, never in the browser. Cho
 
 ## Two-factor authentication
 
-_Unreleased._ With two-factor authentication on, signing in with your password also asks for a 6-digit code from an authenticator app such as Google Authenticator, Authy or 1Password. A stolen password alone then cannot open your account. It covers every workspace you belong to.
+With two-factor authentication on, signing in with your password also asks for a 6-digit code from an authenticator app such as Google Authenticator, Authy or 1Password. A stolen password alone then cannot open your account. It covers every workspace you belong to.
 
 ### Turn it on
 
@@ -62,7 +62,7 @@ The code step accepts 5 codes per account and 100 requests per IP address every 
 
 ## Sign in with an email link
 
-_Unreleased._ You can sign in without your password. On the sign-in page choose **Email link**, enter your work email and choose **Email me a sign-in link**. Open the link from the email to sign in.
+You can sign in without your password. On the sign-in page choose **Email link**, enter your work email and choose **Email me a sign-in link**. Open the link from the email to sign in.
 
 - **The link works once and expires after 15 minutes.** Asking for a new link cancels the earlier one, so use the link in the latest email. An expired or used link says so and sends you back to the sign-in page to ask for a new one.
 - **The same answer for every email.** The page says **Check your inbox** whether or not the email has a Nozle account. Only an account that can sign in with its email receives a link: one with an active membership in a workspace where email sign-in is allowed. A workspace that allows only Okta sends no link.
@@ -72,7 +72,7 @@ _Unreleased._ You can sign in without your password. On the sign-in page choose 
 
 ## Active sessions
 
-_Unreleased._ **Your account** lists every browser and device signed in to your account, most recently active first. Each row shows the browser, the operating system or device, the sign-in method, when it was last active and the IP address it signed in from. Your current browser is marked **This browser**. Nozle does not show a location.
+**Your account** lists every browser and device signed in to your account, most recently active first. Each row shows the browser, the operating system or device, the sign-in method, when it was last active and the IP address it signed in from. Your current browser is marked **This browser**. Nozle does not show a location.
 
 - **Sign out** ends one session. Signing out the one you are using signs you out here.
 - **Sign out others** ends every session except this one. It cannot be undone.
@@ -88,7 +88,7 @@ A request with an ended session answers `expired_jwt_token` (HTTP 401). Sessions
 
 ## Delete your account
 
-_Unreleased._ **Your account** has a **Delete account** button under the danger zone. It deletes your own sign-in. Any member can do it when nothing below blocks it. If something does, the page lists each reason and names the workspace.
+**Your account** has a **Delete account** button under the danger zone. It deletes your own sign-in. Any member can do it when nothing below blocks it. If something does, the page lists each reason and names the workspace.
 
 What happens depends on each workspace you belong to:
 
@@ -108,7 +108,7 @@ You can sign up again with the same email. It creates a new account with none of
 
 ## Sign-in limits
 
-To slow down password guessing and mass sign-ups, the sign-in, sign-in link, sign-up, invitation and password-reset forms accept a limited number of requests. The rows marked Core 11.54.0 are new in that release. The sign-in link rows are _Unreleased_.
+To slow down password guessing and mass sign-ups, the sign-in, sign-in link, sign-up, invitation and password-reset forms accept a limited number of requests. The rows marked Core 11.54.0 are new in that release. The sign-in link rows are new in Core 11.57.0.
 
 | Request | Per email | Per IP address |
 |---|---|---|
@@ -123,8 +123,8 @@ To slow down password guessing and mass sign-ups, the sign-in, sign-in link, sig
 | Sign up with Google (Core 11.54.0) | | 30 per hour |
 | Password-reset request | 5 per hour | 30 per hour |
 | Set a new password from a reset link (Core 11.54.0) | | 30 per hour |
-| Sign-in link request (_Unreleased_) | 5 per hour | 30 per hour |
-| Sign in with an emailed link (_Unreleased_) | | 30 per hour |
+| Sign-in link request | 5 per hour | 30 per hour |
+| Sign in with an emailed link | | 30 per hour |
 
 Past a limit the form shows **Please wait before trying again**. Wait a few minutes, then try again. The limits apply whether or not the email has an account. A request that tries to do two of these at once is refused. The [API rate limits](/api/rate-limits) are separate.
 
