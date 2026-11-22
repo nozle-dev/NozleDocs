@@ -74,7 +74,7 @@ _ = ready
 _ = err
 ```
 
-`WaitForTaxCheck` polls until the status is not `pending`. On timeout it returns `ErrTaxCheckPending`. A checkout call fails with `customer_tax_location_required` (422) or `customer_tax_check_pending` (409). `(*APIError).RetryAfterSeconds()` gives the wait. From Core 11.54.0 (_Unreleased_) the checkout answers a `hosted` result whose URL is Nozle's [billing details step](/guides/billing/tax-ids#billing-details-step) instead of the 422: redirect the customer to it as for any hosted checkout. The 409 then only holds a paid plan change, an invoice checkout and a number without a type that is not well formed. See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
+`WaitForTaxCheck` polls until the status is not `pending`. On timeout it returns `ErrTaxCheckPending`. A checkout call fails with `customer_tax_location_required` (422) or `customer_tax_check_pending` (409). `(*APIError).RetryAfterSeconds()` gives the wait. From Core 11.54.0 the checkout answers a `hosted` result whose URL is Nozle's [billing details step](/guides/billing/tax-ids#billing-details-step) instead of the 422: redirect the customer to it as for any hosted checkout. The 409 then only holds a paid plan change, an invoice checkout and a number without a type that is not well formed. See [Tax IDs, reverse charge and VAT checks](/guides/billing/tax-ids).
 
 ## Erase or delete a customer
 

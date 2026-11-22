@@ -11,6 +11,7 @@ on:
       - package.json
       - package-lock.json
       - tsconfig.examples.json
+      - requirements-examples.txt
       - docs.json
       - scripts/**
       - .github/workflows/docs-ci.yml
@@ -24,6 +25,7 @@ on:
       - package.json
       - package-lock.json
       - tsconfig.examples.json
+      - requirements-examples.txt
       - docs.json
       - scripts/**
       - .github/workflows/docs-ci.yml
@@ -88,4 +90,9 @@ jobs:
         run: |
           npm ci --ignore-scripts
           npm run typecheck:examples
-          python -m py_compile examples/python-sdk.py
+          python -m py_compile examples/*.py
+          python3 -m pip install --quiet -r requirements-examples.txt
+          mypy --strict examples/*.py
+
+      - name: Check the code examples page matches examples/
+        run: python3 scripts/sync-examples-page.py --check

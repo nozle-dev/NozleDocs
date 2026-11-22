@@ -1,0 +1,47 @@
+---
+title: Delete a workspace
+description: Delete a workspace you no longer need, and restore it within 30 days.
+---
+
+An administrator can delete a workspace that has never billed anyone. Deleting pauses the workspace at once. Any administrator can restore it for 30 days. After that it is deleted for good.
+
+## Before you start
+
+Only an administrator can delete or restore a workspace. A role that has every other permission is not enough.
+
+A workspace can be deleted only when it has no billing history. Nozle refuses the deletion, and says why on the settings page, when the workspace has any of these:
+
+- Subscriptions, invoices, payments, credit notes, credit transactions, payment requests or usage events. Your sandbox never counts.
+- Paid Nozle billing: an invoice above zero, a payment, or a paid plan. The free plan does not count.
+- A connected payment provider. Disconnect it first.
+
+Other members do not block the deletion. Deleting removes the workspace for every member.
+
+## Delete the workspace
+
+1. Switch to your live workspace. A sandbox cannot be deleted on its own.
+2. Open **Settings** and choose **General**.
+3. Under **Danger zone**, choose **Delete workspace**.
+4. Type the workspace name to confirm, then choose **Delete workspace**.
+
+Every administrator gets an email with the date the restore period ends.
+
+## While the deletion is pending
+
+For 30 days the workspace, and its sandbox, are paused:
+
+- API keys stop working. Requests answer `403` with the code `workspace_pending_deletion`. Do not retry them.
+- No webhooks are sent.
+- Members see a page that says when the workspace will be deleted. The rest of the dashboard is closed.
+- Scheduled work stops: no invoices, top-ups or subscription changes run.
+- Pending invitations are cancelled. Send them again after a restore.
+
+Nothing else is removed during the 30 days. Members can still switch to another workspace, sign out and manage their own account.
+
+## Restore the workspace
+
+Any administrator can open the workspace and choose **Restore workspace** until the date shown. Everything works again at once: the same API keys, webhook endpoints, members and data.
+
+## After 30 days
+
+Nozle deletes the workspace for good. Its API keys expire, its webhook endpoints are removed, its sandbox is retired and every member loses access. The workspace can no longer be restored.

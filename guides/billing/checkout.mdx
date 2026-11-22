@@ -3,6 +3,10 @@ title: Checkout
 description: Payment-aware Stripe-hosted and Razorpay checkout through an authenticated merchant backend
 ---
 
+<Tip>
+Complete Node.js and Python example: [Create a checkout and handle the result](/guides/getting-started/code-examples#create-a-checkout-and-handle-the-result).
+</Tip>
+
 Nozle collects plan payments through the payment provider connected to your organization: Stripe or Razorpay. The flow is the same for both:
 
 1. Customer selects a plan in your application
@@ -18,7 +22,7 @@ Nozle collects plan payments through the payment provider connected to your orga
 Plan checkout is payment-gated: a paid plan change is not applied until the payment provider confirms payment. If prepaid credits reduce the exact amount due to zero, Nozle applies the change transactionally and returns `type: "completed"` without creating a provider session.
 </Info>
 
-A customer whose provider is not connected cannot pay: checkout returns `payment_provider_required`. Checkout charges through the connection assigned to the customer. _Unreleased:_ a customer with no assigned connection pays through the workspace's [default payment connection](/integrations#default-payment-connection) and is assigned to it; without a default it gets `payment_provider_required`, whose `message` names the fix. Assign the connection in the dashboard, or send `billing_configuration.payment_provider` and `payment_provider_code` when you create the customer through the API; see the [Razorpay](/integrations/razorpay#assign-the-connection-to-customers) and [Stripe](/integrations/stripe#assign-the-connection-to-customers) guides. At checkout Nozle creates the customer in Stripe when it is missing, and returns `422 stripe_customer_required` if it cannot.
+A customer whose provider is not connected cannot pay: checkout returns `payment_provider_required`. Checkout charges through the connection assigned to the customer. A customer with no assigned connection pays through the workspace's [default payment connection](/integrations#default-payment-connection) and is assigned to it; without a default it gets `payment_provider_required`, whose `message` names the fix. Assign the connection in the dashboard, or send `billing_configuration.payment_provider` and `payment_provider_code` when you create the customer through the API; see the [Razorpay](/integrations/razorpay#assign-the-connection-to-customers) and [Stripe](/integrations/stripe#assign-the-connection-to-customers) guides. At checkout Nozle creates the customer in Stripe when it is missing, and returns `422 stripe_customer_required` if it cannot.
 
 ## Stripe
 
@@ -126,7 +130,7 @@ A pay link is refused with `422` and `error_details.base`:
 - `invoice_carried_forward` when the amount due is below the provider's minimum charge and was carried to the next invoice. See [Amounts below the provider minimum](/guides/billing/invoices#amounts-below-the-provider-minimum).
 - `invalid_invoice_status_or_payment_status` when the invoice is paid, voided, draft, closed, failed or has nothing due.
 
-_Unreleased._ Your customers can also pay an unpaid invoice themselves with **Pay** in the hosted customer portal. See [Pay from the customer portal](/guides/billing/invoices#pay-from-the-customer-portal).
+Your customers can also pay an unpaid invoice themselves with **Pay** in the hosted customer portal. See [Pay from the customer portal](/guides/billing/invoices#pay-from-the-customer-portal).
 
 ## API shape
 

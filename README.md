@@ -13,7 +13,7 @@ Start with the [quickstart](https://docs.nozle.dev/guides/getting-started/quicks
 | [`sdks/`](sdks/node/installation.mdx) | Installation and workflow guides for React, Node.js, Python, and Go |
 | [`integrations/`](integrations/index.mdx) | Payment provider integration guides (Stripe and Razorpay) |
 | [`changelog/`](changelog/index.mdx) | Published product and SDK release notes |
-| [`examples/`](examples/node-sdk.ts) | Source examples compiled against the pinned published SDK packages by documentation CI; these are excluded from the published site |
+| [`examples/`](examples/node-sdk.ts) | Source examples compiled and type-checked against the pinned published SDK packages (`package.json`, `requirements-examples.txt`) by documentation CI. They are not published as files; `scripts/sync-examples-page.py` copies the scenario examples into the [code examples](guides/getting-started/code-examples.mdx) page |
 | [`docs.json`](docs.json) | Mintlify site configuration, navigation, and API reference mapping |
 
 SDK setup guides: [React](sdks/react/installation.mdx) · [Node.js](sdks/node/installation.mdx) · [Python](sdks/python/installation.mdx) · [Go](sdks/go/installation.mdx).
@@ -39,7 +39,9 @@ Install `jq` and Python 3 for the full checks. Run the content checks used by [d
 jq empty docs.json
 npx --yes mintlify@4.2.715 broken-links
 npm run typecheck:examples
-python3 -m py_compile examples/python-sdk.py
+python3 -m py_compile examples/*.py
+python3 -m pip install -r requirements-examples.txt && mypy --strict examples/*.py
+python3 scripts/sync-examples-page.py --check
 npx --yes mintlify@4.2.715 validate
 ```
 
@@ -49,7 +51,7 @@ CI also checks for accidental third-party branding in published files. The [CI w
 
 1. Edit the relevant MDX page. For a new page, add its path to the appropriate tab and group in `docs.json`; a file alone does not make it appear in navigation.
 2. Keep API routes, request fields, and examples aligned with the current Core or Engine contract. `docs.json` maps Core reference pages to `nozle-openapi.yaml`; workflow pages in `api/` explain Nozle-specific operations.
-3. Keep SDK installation commands and release notes aligned with versions available from the public registries. Link runnable examples to tags that contain them.
+3. Keep SDK installation commands and release notes aligned with versions available from the public registries. Link runnable examples to tags that contain them. After an SDK release, run `python3 scripts/sync-sdk-changelogs.py` to regenerate the SDK changelog pages (`sdks/*/changelog.mdx`) from each SDK's `CHANGELOG.md`, and commit them. After you change a file in `examples/`, run `python3 scripts/sync-examples-page.py` to update the code examples page.
 4. Run the checks above and review the changed pages in the local preview before opening a pull request.
 
 Never put a real `sk_` secret in an example or browser snippet. Server SDK examples use a backend environment variable such as `NOZLE_SECRET_KEY`; React examples use a publishable key and authenticated callbacks to the merchant backend.

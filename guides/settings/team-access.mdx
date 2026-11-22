@@ -5,6 +5,8 @@ description: Invite people to your workspace, give them roles, and remove them.
 
 Open **Settings** and choose **Members** to see who has access to your workspace, and who has been invited.
 
+Each member shows when they joined and when they were **Last active**. Last active is the person's latest dashboard activity in any of their workspaces, accurate to about a minute. **Never active** means they have not signed in since Nozle started tracking activity.
+
 ## Invite someone
 
 1. Choose **Invite member**.
@@ -13,7 +15,9 @@ Open **Settings** and choose **Members** to see who has access to your workspace
 
 Only an email that has no Nozle account yet can be invited. If any Nozle account already uses the email, in any workspace and whatever the case of its letters, the invitation is refused with `email_already_used` and nothing is sent. Ask the person for another address. A person who already has an account cannot join a second workspace through an invitation.
 
-Inviting needs settings access. A member gets the union of the capabilities of all their roles. Choosing **Admin** selects only Admin, because it already grants every capability.
+Inviting needs settings access. Built-in and [custom roles](/guides/settings/roles#custom-roles) are both offered. A member gets the union of the capabilities of all their roles. Choosing **Admin** selects only Admin, because it already grants every capability.
+
+You can only invite with roles whose capabilities you hold yourself. A broader role is refused with `cannot_grant_broader_role`, and only an Admin can invite someone as Admin (`cannot_grant_admin`).
 
 ## Invitations
 
@@ -34,7 +38,19 @@ The list shows when each invitation was **Last sent** and when it **Expires** (o
 
 ## Change roles
 
-Changing a member's roles needs workspace admin access. Every member needs at least one role.
+Changing a member's roles needs workspace admin access. Every member needs at least one role, and the new roles replace the old ones.
+
+- You can only give roles whose capabilities you hold yourself. Otherwise the change is refused with `cannot_grant_broader_role` and the member keeps their roles.
+- Only an Admin can give someone the Admin role (`cannot_grant_admin`).
+- The last Admin keeps the Admin role, also when you switch them to a custom role (`last_admin`). Make another member an Admin first.
+
+Each change is recorded in the security log as `user.role_edited`. You can also ask the Copilot to give a member a role.
+
+## Sign a member out
+
+An admin can end every open session of a member, for example after a lost laptop. Choose **Sign out of all devices** next to the member and confirm with **Sign out everywhere**. It needs the capability that removes a member (`organization:members:update`), which only the Admin role holds, and it is not offered on yourself.
+
+The member returns to the sign-in screen on every browser and device, and keeps their access and roles. They can sign in again at once. Sessions belong to the person's account, so they are also signed out of every other Nozle workspace they belong to. To lock someone out, [remove them](#remove-a-member) too. The action is recorded in the [audit log](/guides/settings/audit-logs) as `user.sessions_revoked`, with the member's email and the number of sessions ended. See [Active sessions](/guides/settings/account-security#active-sessions).
 
 ## Remove a member
 
@@ -45,3 +61,24 @@ A few guards protect you from locking yourself out:
 - The workspace owner always keeps administrator access and cannot be removed. Transfer ownership first.
 - You cannot remove the last administrator. Promote someone else first.
 - You cannot remove your own access or your own administrator access. Ask another administrator.
+
+## Two-factor authentication
+
+The members list shows **2FA on** or **2FA off** for each member: whether they sign in with a code from an authenticator app ([Account security](/guides/settings/account-security#two-factor-authentication)).
+
+### Require it for the workspace
+
+Open **Settings**, choose **Authentication** and turn on **Require two-factor authentication**, then **Save changes**. You need two-factor authentication on your own account first, so you cannot lock yourself out; otherwise the switch stays off and saving answers `mfa_required_for_actor`.
+
+While it is on:
+
+- A member who signs in with a password and has not set up two-factor authentication is taken to a setup page. They can set it up or sign out; the workspace stays closed to them until then. The API answers `mfa_setup_required` (HTTP 403) for anything else.
+- Members who sign in with Google or Okta are not asked: their identity provider protects the sign-in.
+- API keys are not affected.
+
+The setting belongs to the live workspace; its sandbox follows it.
+
+### Reset a member's two-factor authentication
+
+When a member lost their authenticator app and their backup codes, an admin can choose **Reset 2FA** next to them. It turns off their two-factor authentication and signs them out of every device. Two-factor authentication belongs to the person's account, so the reset applies in every Nozle workspace they belong to. Confirm who is asking before you reset it. The reset is recorded in the [audit log](/guides/settings/audit-logs) as `user.mfa_reset`.
+

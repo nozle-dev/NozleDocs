@@ -1,0 +1,24 @@
+---
+title: General settings
+description: Rename your workspace and see what the name changes, and what the slug is for.
+---
+
+Open **Settings** and choose **General** to see how your workspace names itself: its name, slug, logo, legal details and billing email. Reading needs access to the workspace settings. Changing needs workspace admin access.
+
+## Rename the workspace
+
+Change **Organization name** and choose **Save changes**. The name is trimmed of spaces, and a blank name is refused with `value_is_mandatory`. The API takes `name` on `PUT /api/v1/organizations` and on the GraphQL `updateOrganization` mutation.
+
+Rename the live workspace. The sandbox is named after it, so renaming the sandbox itself is refused with `live_organization_only`.
+
+A rename carries over to:
+
+- **The sandbox.** It becomes `<name> (Sandbox)`.
+- **The default billing entity.** Its name follows. If you edited the entity's name on its own, a save that does not change the workspace name keeps your edit.
+- **Your Nozle billing customer.** The customer that Nozle bills your workspace under takes the new name.
+
+Two copies keep the old name and are not shown to your workspace: the customer record at the payment provider behind your Nozle billing, and the webhook application used to deliver your webhooks.
+
+## Slug
+
+The slug is the short identifier of your workspace. It does not change when you rename the workspace. Nozle uses it in the links it sends to connected integrations such as NetSuite and HubSpot, so changing it breaks links already sent.
