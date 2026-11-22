@@ -47,6 +47,7 @@ Authorization: Bearer sk_nozle_...
       "mode": "hard",
       "status": "warning",
       "as_of": "2026-11-14T09:30:12.418Z",
+      "reconciled_at": "2026-11-14T09:25:04Z",
       "counted_from": "2026-11-01T00:00:00Z"
     },
     {
@@ -62,13 +63,14 @@ Authorization: Bearer sk_nozle_...
       "mode": "hard",
       "status": "ok",
       "as_of": "2026-11-14T09:30:12.418Z",
+      "reconciled_at": "2026-11-14T09:25:04Z",
       "counted_from": "2026-11-01T00:00:00Z"
     }
   ]
 }
 ```
 
-Budgets come tightest first (least `remaining`). `budgets` is empty when no spend limit applies. Amounts are decimal strings in major units of `currency` (dollars, not cents).
+Budgets come tightest first (least `remaining`). `budgets` is empty when no spend limit applies. Amounts are decimal strings in major units of `currency` (dollars, not cents). To see each change made to `spent` other than counting usage (a voided event, a correction), use [List Budget Corrections](/api/list-budget-corrections).
 
 | Field | Description |
 |-------|-------------|
@@ -83,6 +85,7 @@ Budgets come tightest first (least `remaining`). `budgets` is empty when no spen
 | `mode` | `hard` refuses metered calls once used up; `soft` only notifies. |
 | `status` | `exceeded` when `spent` plus `held` reaches the limit (a soft limit too, though it never refuses), `warning` once they reach a threshold of the limit below 100, else `ok`. |
 | `as_of` | Time of the latest event booked into `spent`; `null` before the first one. Usage reaches the Engine a few seconds after it happens. |
+| `reconciled_at` | Engine 2.62.0. When Nozle last re-added the period's recorded usage events and confirmed `spent`, or corrected it. Budgets that counted usage are checked every 5 minutes, and every budget nightly. `null` until the first check, which comes within minutes of the first spend. See [How fresh `spent` is](/guides/entitlements/spend-limits#how-fresh-spent-is). |
 | `counted_from` | Engine 2.38.0. When `spent` starts. `period_start` once the period's spend is counted in full. Before that, for a limit added mid-period (for about 5 minutes), the time counting started. `null` when nothing is counted yet. See [Limits added mid-period](/guides/entitlements/spend-limits#limits-added-mid-period). |
 
 ## Errors
