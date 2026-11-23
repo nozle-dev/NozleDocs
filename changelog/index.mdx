@@ -6,11 +6,9 @@ rss: true
 
 SDK release notes have their own pages: [Node.js](/sdks/node/changelog), [React](/sdks/react/changelog), [Python](/sdks/python/changelog) and [Go](/sdks/go/changelog). Subscribe to this page, or any of those, with the RSS button at the top.
 
-<Update label="November 2026">
+<Update label="November 23, 2026">
 
 ## Customer tokens: the browser reads one customer's billing state (Core 11.59.0, Engine 2.64.0, Node.js 0.44.0, React 0.25.0)
-
-_Unreleased_
 
 - **Customer tokens.** Your backend mints a token for the signed-in customer with `POST /customer_tokens` and a secret key that has `customer:read`. The browser then sends your publishable key with `X-Nozle-Customer-Token` and reads that customer's entitlements (`/can`), usage, credit balances and operations, and subscription, read only. Every other route still refuses a publishable key. See [Customer tokens](/api/authentication#customer-tokens).
 - **At most one hour.** `ttl_seconds` is 60 to 3600, default 3600; any other value answers `422`. Expiry allows 30 seconds of clock skew.
