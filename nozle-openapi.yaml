@@ -1782,6 +1782,108 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /customer_tokens:
+    post:
+      tags:
+        - Customers
+      summary: Create a customer token
+      description: |-
+        Core 11.59.0. Mints a short-lived, read-only token that lets a browser read **one** customer's billing state with your publishable key: send `Authorization: Bearer pk_...` and `X-Nozle-Customer-Token: <token>`. Call it from your backend for the signed-in customer; take `customer_id` from your session, never from the browser.
+
+        The token is accepted only on reads of its own customer: on the Engine `GET /can`, `GET /subscriptions/current`, `GET /billing/status` and the customer's credit balance and operation reads; on Core `GET /customers/{external_customer_id}/current_usage`, `GET /customers/{external_customer_id}/past_usage` and `GET /subscriptions?external_customer_id=`. Every other route still refuses the publishable key. See [Customer tokens](/api/authentication#customer-tokens).
+
+        A token lives at most one hour: `ttl_seconds` is 60 to 3600, default 3600.
+
+        A secret key with `customer:read` is required; a publishable key is refused with `403 publishable_key_not_allowed`. The token reads only what both this secret key and the publishable key may read: `customer_usage` (current and past usage, `/can`), `subscription` (the subscriptions list, billing status and current subscription) and `credit_system` (credit balances and operations). A key scoped to `customer:read` alone mints a token whose reads all answer `403`.
+
+        The token belongs to this exact customer record. If the customer is deleted, its tokens answer `401 invalid_customer_token`, even after a new customer reuses the external ID. Expiry allows 30 seconds of clock skew. The response is not written to the API log, and carries `Cache-Control: no-store`.
+      operationId: createCustomerToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - customer_id
+              properties:
+                customer_id:
+                  type: string
+                  description: The customer's external ID.
+                  example: cus_12345
+                ttl_seconds:
+                  type: integer
+                  minimum: 60
+                  maximum: 3600
+                  default: 3600
+                  description: Lifetime of the token in seconds, at most one hour (3600). A value out of bounds or not an integer is refused with `422`.
+                features:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: string
+                  description: Feature codes. `/can` and usage reads are then limited to these features (usage reads must name one with `feature_code`). Subscription and credit reads are not affected. An unknown code is refused with `422`.
+                  example:
+                    - seats
+      responses:
+        '200':
+          description: The token.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - token
+                  - customer_id
+                  - expires_at
+                properties:
+                  token:
+                    type: string
+                    description: Send it as `X-Nozle-Customer-Token`. A bearer credential for this customer's billing data; never log it.
+                  customer_id:
+                    type: string
+                    description: The customer's external ID.
+                    example: cus_12345
+                  expires_at:
+                    type: string
+                    format: date-time
+                    example: '2026-11-22T13:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: '`customer_tokens_unavailable`: the deployment is not configured for customer tokens (self-hosted Core without `NOZLE_INTERNAL_SERVICE_SECRET`).'
+  /customer_tokens/revoke:
+    post:
+      tags:
+        - Customers
+      summary: Revoke customer tokens
+      description: |-
+        Core 11.59.0. Every customer token the organization minted until now is refused from the next request, on Core and on the Engine (`401 invalid_customer_token`). Tokens minted afterwards work; a token minted in the same second as the revocation is refused too. Use it when a token leaked. A secret key with `customer:write` is required.
+      operationId: revokeCustomerTokens
+      responses:
+        '200':
+          description: Tokens minted until `revoked_at` are refused.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - revoked_at
+                properties:
+                  revoked_at:
+                    type: string
+                    format: date-time
+                    example: '2026-11-22T12:30:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /customers:
     post:
       tags:
@@ -2998,7 +3100,10 @@ paths:
       tags:
         - Customers
       summary: Retrieve customer current usage
-      description: This endpoint enables the retrieval of the usage-based billing data for a customer within the current period.
+      description: |-
+        This endpoint enables the retrieval of the usage-based billing data for a customer within the current period.
+
+        With a publishable key and a [customer token](/api/authentication#customer-tokens), `feature_code` is the only usage filter: `charge_id`, `charge_code`, `group` and the `filter_by_*` parameters are ignored.
       parameters:
         - name: external_customer_id
           in: path

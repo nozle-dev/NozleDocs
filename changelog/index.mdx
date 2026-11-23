@@ -6,6 +6,19 @@ rss: true
 
 SDK release notes have their own pages: [Node.js](/sdks/node/changelog), [React](/sdks/react/changelog), [Python](/sdks/python/changelog) and [Go](/sdks/go/changelog). Subscribe to this page, or any of those, with the RSS button at the top.
 
+<Update label="November 23, 2026">
+
+## Customer tokens: the browser reads one customer's billing state (Core 11.59.0, Engine 2.64.0, Node.js 0.44.0, React 0.25.0)
+
+- **Customer tokens.** Your backend mints a token for the signed-in customer with `POST /customer_tokens` and a secret key that has `customer:read`. The browser then sends your publishable key with `X-Nozle-Customer-Token` and reads that customer's entitlements (`/can`), usage, credit balances and operations, and subscription, read only. Every other route still refuses a publishable key. See [Customer tokens](/api/authentication#customer-tokens).
+- **At most one hour.** `ttl_seconds` is 60 to 3600, default 3600; any other value answers `422`. Expiry allows 30 seconds of clock skew.
+- **Both keys decide.** A token reads only what both the minting secret key and the publishable key may read: `customer_usage`, `subscription` and `credit_system`. A key scoped to `customer:read` alone mints a token whose reads answer `403`.
+- **Bound to the customer record.** Deleting the customer ends its tokens (`401 invalid_customer_token`), also when a new customer reuses the external ID. `POST /customer_tokens/revoke` (`customer:write`) refuses every token minted until then.
+- **Narrower reads.** With a token, current usage filters only by `feature_code` (charge, group and `filter_by_*` filters are ignored), and `/can` returns no `economics` or `policy` and ignores `metadata`.
+- **SDKs.** Node.js `nozle.customerTokens.create(customerId, { ttlSeconds, features })` and `revoke()`. React `BillingProvider getCustomerToken` with the required `customerId`: changing `customerId` on a sign-out and sign-in drops the previous customer's cached reads, and a token minted for another customer is refused. See [Read from Nozle with a customer token](/sdks/react/hooks#read-from-nozle-with-a-customer-token).
+
+</Update>
+
 <Update label="November 22, 2026">
 
 ## Identity release (Core 11.57.0, Engine 2.63.0, dashboard 2.31.0)

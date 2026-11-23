@@ -14,7 +14,7 @@ description: Public catalog and trusted-backend credentials
 
 | Key type | Prefix | Location | Access |
 |---|---|---|---|
-| Publishable | `pk_nozle_` (live), `pk_nozle_test_` (sandbox) | Browser | `GET /api/v1/plans` and `GET /api/v1/plans/{code}` only, which return the trimmed public plan. See the [public plan catalog](/api/list-plans). |
+| Publishable | `pk_nozle_` (live), `pk_nozle_test_` (sandbox) | Browser | Alone: `GET /api/v1/plans` and `GET /api/v1/plans/{code}` only, which return the trimmed public plan. See the [public plan catalog](/api/list-plans). With a [customer token](#customer-tokens): also that one customer's entitlements, usage, credit balances and subscription, read only. |
 | Secret | `sk_nozle_` (live), `sk_nozle_test_` (sandbox) | Trusted backend | Organization-scoped server operations allowed by the key's permissions |
 
 Every key belongs to one organization. A [sandbox](/guides/getting-started/sandbox) is its own organization, linked to your live one, and its keys carry `_test_` in the prefix.
@@ -46,7 +46,58 @@ Send server credentials as a Bearer token:
 Authorization: Bearer sk_nozle_your_secret_key
 ```
 
-The publishable-key boundary is unconditional: customer reads and mutations return HTTP 403 even if a browser supplies an arbitrary customer ID. Use an authenticated merchant backend for checkout, invoices, subscription status, cancellation, top-ups, entitlements, and credits. That backend derives the Nozle customer from the logged-in user or team and calls Nozle with a least-privilege `sk_`.
+A publishable key alone never reads or changes a customer: customer reads and mutations return `403 publishable_key_not_allowed` even if a browser supplies an arbitrary customer ID. To let the browser read the signed-in customer's billing state, your backend mints a [customer token](#customer-tokens) for that customer. Checkout, invoices, previews, cancellation, top-ups and every other write go through an authenticated merchant backend: it derives the Nozle customer from the logged-in user or team and calls Nozle with a least-privilege `sk_`.
+
+## Customer tokens
+
+A customer token lets a browser read **one** customer's billing state with your publishable key, without a backend route per read. Core 11.59.0 and Engine 2.64.0.
+
+1. Your backend mints a token for the signed-in customer with a secret key: [`POST /customer_tokens`](/api-reference/customers/create-a-customer-token) with `customer_id` (the customer's external ID, taken from your session, never from the browser), optional `ttl_seconds` and optional `features`. It answers `{"token": "...", "customer_id": "...", "expires_at": "..."}`. The key needs `customer:read`; a publishable key is refused.
+
+   **A token lives at most one hour.** `ttl_seconds` is an integer from 60 to 3600, and defaults to 3600. Any other value answers `422`. Mint a new token when one expires.
+2. The browser sends both credentials:
+
+```http
+Authorization: Bearer pk_nozle_your_publishable_key
+X-Nozle-Customer-Token: <token>
+```
+
+A token is read-only, short-lived, and accepted only on these reads of its own customer:
+
+| Service | Routes |
+|---|---|
+| Engine | `GET /can`, `GET /subscriptions/current`, `GET /billing/status`, `GET /customers/{customer}/credit-systems`, `GET /customers/{customer}/credit-systems/{code}/balance`, `GET /customers/{customer}/credit-operations` |
+| Core | `GET /customers/{customer}/current_usage`, `GET /customers/{customer}/past_usage`, `GET /subscriptions?external_customer_id={customer}` |
+
+Every other route refuses the publishable key with `403 publishable_key_not_allowed`, with or without a token, writes included (`/usage/track`, `/checkout`, top-ups, cancellations). A secret key ignores the header.
+
+**What a token may read.** A token reads only what both the secret key that minted it and the publishable key may read. Each read needs its permission on both keys:
+
+| Permission | Token reads |
+|---|---|
+| `customer_usage` | Current and past usage, and `GET /can` |
+| `subscription` | `GET /subscriptions`, `GET /billing/status` and `GET /subscriptions/current` |
+| `credit_system` | Credit balances and credit operations |
+
+Minting needs only `customer:read`, so a key scoped to `customer:read` alone mints a token that reads none of these: each of those reads answers `403` (Core `read_action_not_allowed_for_<permission>`, for example `read_action_not_allowed_for_subscription`; the Engine `permission_denied`). Mint with a key that also has the read permissions the browser needs.
+
+**A token belongs to one customer record.** It reads the customer it was minted for, not whoever holds that external ID later. If the customer is deleted, its tokens answer `401 invalid_customer_token`, also after a new customer reuses the external ID.
+
+**Token reads return less.** A token is for showing a customer their own state, so:
+
+- On [current usage](/api-reference/customers/retrieve-customer-current-usage), `feature_code` is the only usage filter. `charge_id`, `charge_code`, `group` and the `filter_by_*` parameters are ignored.
+- On [`GET /can`](/api/check-entitlement), the answer has no `economics` and no `policy` fields, and `metadata` is ignored.
+
+| Refusal | Meaning |
+|---|---|
+| `403 customer_token_customer_mismatch` | The request names another customer, or none. |
+| `403 customer_token_feature_not_allowed` | The token was minted with `features`, and `/can` or a usage read names another feature (usage reads need `feature_code`). Subscription and credit reads are not feature-scoped. |
+| `401 customer_token_expired` | Mint a new token. `@nozle-js/react` does this for you. Expiry allows 30 seconds of clock skew. |
+| `401 invalid_customer_token` | Tampered, of another organization or environment (a sandbox token on a live key), minted before a revocation, or its customer was deleted. |
+
+**Revoke** every token of the organization, for example after one leaked: [`POST /customer_tokens/revoke`](/api-reference/customers/revoke-customer-tokens) with a secret key that has `customer:write`. Tokens minted before it are refused from the next request, on Core and the Engine; tokens minted afterwards work. Rotating Nozle's signing secret also invalidates every token. A token is a bearer credential for one customer's billing data: keep the lifetime short, never log it, and serve it only to the signed-in customer.
+
+With React, pass `getCustomerToken` and `customerId` (the signed-in customer's external ID) to `BillingProvider` and the [customer hooks](/sdks/react/hooks#read-from-nozle-with-a-customer-token) use it. To mint, use `nozle.customerTokens.create(customerId, { ttlSeconds, features })` in [Node.js](/sdks/node/customers-entities#customer-tokens-for-the-browser), `nozle.customer_tokens.create(customer_id, ttl_seconds, features)` in [Python](/sdks/python/customers-entities#customer-tokens-for-the-browser) or `client.CustomerTokens.Create(ctx, customerID, opts)` in [Go](/sdks/go/customers-entities#customer-tokens-for-the-browser).
 
 ## Key permissions
 
@@ -79,9 +130,9 @@ On organizations with API key permissions, these Engine routes check the key too
 
 ## Browser access (CORS)
 
-The publishable-key plan catalog, `GET /plans` and `GET /plans/{code}` on the Engine, answers CORS from any origin, so the [React components](/sdks/react/components) can load plans on your own site. The catalog and its preflight return `Access-Control-Allow-Origin: *` and `Access-Control-Allow-Methods: GET, OPTIONS`, never `Access-Control-Allow-Credentials`. Every other Engine route answers only the origins Nozle allows, so call them from your backend.
+The publishable-key plan catalog, `GET /plans` and `GET /plans/{code}` on the Engine, answers CORS from any origin, so the [React components](/sdks/react/components) can load plans on your own site. The catalog and its preflight return `Access-Control-Allow-Origin: *` and `Access-Control-Allow-Methods: GET, OPTIONS`, never `Access-Control-Allow-Credentials`. The Engine's [customer token](#customer-tokens) reads answer the same way when the request carries `X-Nozle-Customer-Token` (or its preflight names it). Every other Engine route answers only the origins Nozle allows, so call them from your backend.
 
-Core (`https://api.nozle.app/core`) answers browser calls only from an allowlist of exact origins (Nozle Cloud lists the dashboard). A call from another origin gets no CORS headers, so the browser blocks it. The one exception is the customer portal: `POST /graphql` carrying a `customer-portal-token` header is allowed from any origin, so the [billing portal](/sdks/react/billing-portal) works on your site. Calls from your server with an API key are not affected. Self-hosted Core: see the Core environment variables.
+Core (`https://api.nozle.app/core`) answers browser calls only from an allowlist of exact origins (Nozle Cloud lists the dashboard). A call from another origin gets no CORS headers, so the browser blocks it. Two exceptions: the customer portal, where `POST /graphql` carrying a `customer-portal-token` header is allowed from any origin so the [billing portal](/sdks/react/billing-portal) works on your site, and the [customer token](#customer-tokens) reads (`current_usage`, `past_usage`, `GET /subscriptions`) carrying `X-Nozle-Customer-Token`. Calls from your server with an API key are not affected. Self-hosted Core: see the Core environment variables.
 
 <Warning>
 Never expose a secret or master key in client-side code. CORS and `Origin` headers do not authenticate a caller.
