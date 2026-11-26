@@ -2614,6 +2614,8 @@ paths:
 
         This endpoint allows you to fetch the URL that can be embedded to provide customers access to a dedicated portal
 
+        _Unreleased._ The URL carries the customer's access token and expires after 60 minutes, or after `expires_in_minutes` (5 to 1440). Fetch a fresh URL each time a customer opens the portal; do not cache it or send it by email. Once the portal page has read the token it removes it from the address bar, so reloading the page asks the customer to open the portal again from your app.
+
         _Unreleased._ In the portal the customer can pay a finalized invoice that is still unpaid: **Pay** opens the payment provider's page, and the customer returns to the portal afterwards, where the invoice shows as confirming until the payment settles. When the customer has no payment connection and the workspace has no default connection, the portal says that online payment isn't set up. See https://docs.nozle.dev/guides/billing/invoices#pay-from-the-customer-portal.
       parameters:
         - name: external_customer_id
@@ -2623,6 +2625,16 @@ paths:
           schema:
             type: string
             example: 5eb02857-a71e-4ea2-bcf9-57d3a41bc6ba
+        - name: expires_in_minutes
+          in: query
+          description: _Unreleased._ Minutes the URL stays valid, from 5 to 1440 (24 hours). Defaults to 60. Any other value answers 422 with `expires_in_minutes` set to `value_is_out_of_range`.
+          required: false
+          schema:
+            type: integer
+            minimum: 5
+            maximum: 1440
+            default: 60
+            example: 30
       operationId: getCustomerPortalUrl
       responses:
         '200':
@@ -2647,6 +2659,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /customers/{external_customer_id}/subscriptions:
     get:
       tags:

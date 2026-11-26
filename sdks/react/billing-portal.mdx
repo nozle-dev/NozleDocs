@@ -116,6 +116,8 @@ On the authenticated merchant backend, call Core's `GET /api/v1/customers/{exter
 }
 ```
 
+The token expires 60 minutes after Core issues it (pass `expires_in_minutes`, 5 to 1440, for another lifetime), so fetch a fresh URL in `createSession` instead of caching one. When it expires the portal shows "Your billing session has expired" with **Reconnect**, which calls `createSession` again.
+
 `apiUrl` is the Core base without `/graphql`. The component sends `customer-portal-token` on GraphQL requests and keeps the token in memory. Return session responses with `Cache-Control: no-store`; do not embed a token in static JavaScript or store it in local storage. The portal needs no entry in Core's `CORS_ALLOWED_ORIGINS`: Core allows `POST /graphql` from any origin when it carries the `customer-portal-token` header. Self-hosted Core 5.0.0 and later answers other browser calls only from the origins you list (see the Core environment variables).
 
 ### Portal props
