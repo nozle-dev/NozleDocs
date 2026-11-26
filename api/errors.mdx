@@ -49,7 +49,7 @@ Do not parse human-readable text when a machine-readable `code` is available.
 
 ## Rate limits
 
-A `429` with the code `rate_limited` means a rate limit was reached. Core's REST API accepts 6,000 requests per minute per API key and per IP address. From Engine 2.61.0, the Engine API accepts 100 requests per second for a live workspace (25 in a sandbox), 5,000 events per second (500 in a sandbox), and 50 requests in flight per API key. The Engine's refusal names the limit in `error_details.limit` and carries `Retry-After` and `X-RateLimit-*` headers. Wait at least `Retry-After` seconds, then retry. See [Rate limits](/api/rate-limits).
+A `429` with the code `rate_limited` means a rate limit was reached. Core's REST API accepts 6,000 requests per minute per API key and per IP address. From Engine 2.61.0, the Engine API accepts 100 requests per second for a live workspace (25 in a sandbox), 5,000 events per second (500 in a sandbox), 50 requests in flight per API key, and 50 event ingestion requests in flight per workspace. The Engine's refusal names the limit in `error_details.limit` and carries `Retry-After` and `X-RateLimit-*` headers. Wait at least `Retry-After` seconds, then retry. See [Rate limits](/api/rate-limits).
 
 ## Common failures
 
