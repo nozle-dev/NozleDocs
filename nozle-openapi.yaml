@@ -8,7 +8,7 @@ info:
 
     **Live and sandbox.** Live and sandbox use the same servers. The API key decides the environment: live keys start with `sk_nozle_` or `pk_nozle_`, sandbox keys with `sk_nozle_test_` or `pk_nozle_test_`, and each only reaches its own organization's data. A key whose prefix does not match its organization's environment, or a key of a reset sandbox, is refused with `401`. Every response to an accepted key, Core and Engine, carries the header `X-Nozle-Livemode: true` (live) or `false` (sandbox); browsers can read it. Webhook payloads carry `livemode` the same way. See https://docs.nozle.dev/guides/getting-started/sandbox.
 
-    **Rate limits (unreleased).** Core operations (`/api/v1/*`) are limited per API key and per client IP address, 6,000 requests per minute each. A request over a limit is refused with `429`, a `Retry-After` header in seconds, and `{"status": 429, "error": "Too Many Requests", "code": "rate_limited"}`. Engine operations (Engine 2.61.0) are limited per workspace: 100 requests per second live and 25 in a sandbox, 5,000 events per second live and 500 in a sandbox for event ingestion and usage tracking (counted per event), and 50 requests in flight per API key. Over an Engine limit the answer is `429` `rate_limited` with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` and `error_details.limit` (`requests`, `events` or `concurrency`). Wait at least `Retry-After` seconds, then retry with exponential backoff and jitter. See https://docs.nozle.dev/api/rate-limits.
+    **Rate limits (unreleased).** Core operations (`/api/v1/*`) are limited per API key and per client IP address, 6,000 requests per minute each. A request over a limit is refused with `429`, a `Retry-After` header in seconds, and `{"status": 429, "error": "Too Many Requests", "code": "rate_limited"}`. Engine operations (Engine 2.61.0) are limited per workspace: 100 requests per second live and 25 in a sandbox, 5,000 events per second live and 500 in a sandbox for event ingestion and usage tracking (counted per event), 50 requests in flight per API key, and 50 event ingestion requests (`/events`, `/events/batch`) in flight per workspace. Over an Engine limit the answer is `429` `rate_limited` with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` and `error_details.limit` (`requests`, `events`, `concurrency` or `events_in_flight`). Wait at least `Retry-After` seconds, then retry with exponential backoff and jitter. See https://docs.nozle.dev/api/rate-limits.
   version: 1.61.0
   license:
     name: AGPLv3
@@ -3716,6 +3716,15 @@ paths:
       summary: Batch multiple events
       description: 'Send a batch of usage records: 1 to 5000 events per request (Engine 2.28.0; 100 before). The body may be gzipped with `Content-Encoding: gzip`; decoded, it is limited to 16 MiB. The valid events are stored even when others are refused. A `5xx` stores nothing for the request: resend it with the same transaction ids.'
       operationId: createBatchEvents
+      parameters:
+        - name: response
+          in: query
+          required: false
+          description: '`summary` answers a `200` with counts instead of the stored events: `{"accepted", "duplicates", "failed", "failures": [{"index", "transaction_id", "error_details"}]}`. `duplicates` is left out on the high-volume event store. Other answers are unchanged. See https://docs.nozle.dev/api/events#batch-summary.'
+          schema:
+            type: string
+            enum:
+              - summary
       requestBody:
         description: Batch events payload
         content:
@@ -3772,7 +3781,7 @@ paths:
                     timestamp:
                       - period_invoiced
         '413':
-          description: 'The body is over 16 MiB, decoded. Nothing is stored. `code` is `payload_too_large`.'
+          description: 'The body is over 16 MiB, decoded, whether the size is declared or found while reading. Nothing is stored. `code` is `payload_too_large`.'
         '422':
           description: 'No event of the batch was stored. `code` is `validation_errors` and `error_details` is keyed by the position of each refused event, with the same field errors as a single event, for example `{"0": {"external_customer_id": ["active_subscription_not_found"]}}`. When only some events are refused, the answer is `200` instead. An empty batch returns `events: [no_events]`, more than 5000 events `events: [too_many_events]`. On the standard (PostgreSQL) event store, the same `transaction_id` twice in the batch, or one already used by an event with a different payload, refuses that event with `transaction_id: [value_already_exist]`; the high-volume (ClickHouse) event store accepts repeats.'
           content:
@@ -42153,7 +42162,8 @@ components:
                 - requests
                 - events
                 - concurrency
-              description: '`requests` and `events` are per second for the workspace; `concurrency` is requests in flight for the API key.'
+                - events_in_flight
+              description: '`requests` and `events` are per second for the workspace; `concurrency` is requests in flight for the API key; `events_in_flight` is event ingestion requests in flight for the workspace.'
             limit_value:
               type: integer
               example: 100
@@ -47498,7 +47508,7 @@ components:
             - hard
   headers:
     X-RateLimit-Limit:
-      description: 'Engine 2.61.0. The limit this call was counted against: requests per second for the workspace, or events per second on an ingestion call (`/events`, `/events/batch`, `/usage/track`, hold finalize). On a `429` for `concurrency`, the requests one API key may have in flight. Absent on calls made with the internal service secret, and while the limiter cannot reach its store. See https://docs.nozle.dev/api/rate-limits.'
+      description: 'Engine 2.61.0. The limit this call was counted against: requests per second for the workspace, or events per second on an ingestion call (`/events`, `/events/batch`, `/usage/track`, hold finalize). On a `429` for `concurrency`, the requests one API key may have in flight; for `events_in_flight`, the event ingestion requests one workspace may have in flight. Absent on calls made with the internal service secret, and while the limiter cannot reach its store. See https://docs.nozle.dev/api/rate-limits.'
       schema:
         type: integer
         example: 100
@@ -47774,7 +47784,7 @@ components:
               code: unavailable
             code: unavailable
     EngineRateLimited:
-      description: 'Engine 2.61.0. `rate_limited`: the workspace sent more requests or events per second than its limit, or the API key has too many requests in flight. `error_details.limit` names which: `requests` (100 per second live, 25 in a sandbox), `events` (5,000 events per second live, 500 in a sandbox, counted per event) or `concurrency` (50 requests in flight per API key; event ingestion and the LLM proxy hold no slot). Nothing was done. Wait at least `Retry-After` seconds, then retry with the same `Idempotency-Key` or `transaction_id`. See https://docs.nozle.dev/api/rate-limits.'
+      description: 'Engine 2.61.0. `rate_limited`: the workspace sent more requests or events per second than its limit, or the API key (or, for event ingestion, the workspace) has too many requests in flight. `error_details.limit` names which: `requests` (100 per second live, 25 in a sandbox), `events` (5,000 events per second live, 500 in a sandbox, counted per event) or `concurrency` (50 requests in flight per API key; event ingestion and the LLM proxy hold no slot) or `events_in_flight` (50 `/events` and `/events/batch` requests in flight per workspace). Nothing was done. Wait at least `Retry-After` seconds, then retry with the same `Idempotency-Key` or `transaction_id`. See https://docs.nozle.dev/api/rate-limits.'
       headers:
         Retry-After:
           description: Seconds to wait before retrying, at least 1.
